@@ -15,7 +15,7 @@ namespace WorldSim
         SpriteFont _font;
 
         // tile square size (px)
-        const int TileSize = 4;
+        const int TileSize = 7;
         Texture2D _pixel;
 
         public Game1()
