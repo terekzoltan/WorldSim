@@ -28,7 +28,7 @@ namespace WorldSim.Simulation
         public void Update(float dt)
         {
             _age += dt;
-            // később tech-fa, népesség-korlát stb.
+            // later tech tree, population cap, etc.
         }
     }
 }

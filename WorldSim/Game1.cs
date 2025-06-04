@@ -9,12 +9,12 @@ namespace WorldSim
     {
         GraphicsDeviceManager _g;
         SpriteBatch _sb;
-        const float Tick = 0.25f;          // 4×/s szimuláció
+        const float Tick = 0.25f;          // simulation 4× per second
         float _acc;
         World _world;
         SpriteFont _font;
 
-        // tile négyzetháttér mérete (px)
+        // tile square size (px)
         const int TileSize = 4;
         Texture2D _pixel;
 
@@ -24,7 +24,7 @@ namespace WorldSim
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
 
-            // ablakméret beállítása TileSize alapján
+            // set the window size based on TileSize
             _g.PreferredBackBufferWidth = 128 * TileSize;
             _g.PreferredBackBufferHeight = 128 * TileSize;
             _g.ApplyChanges();
@@ -40,7 +40,7 @@ namespace WorldSim
 
         protected override void LoadContent()
         {
-            // SpriteBatch és 1×1 pixel generálása
+            // create SpriteBatch and a 1×1 pixel
             _sb     = new SpriteBatch(GraphicsDevice);
             _pixel  = new Texture2D(GraphicsDevice, 1, 1);
             _pixel.SetData(new[] { Color.White});
@@ -64,7 +64,7 @@ namespace WorldSim
 
             _sb.Begin();
 
-            // Tile-ok kirajzolása
+            // draw tiles
             for (int y = 0; y < _world.Height; y++)
             {
                 for (int x = 0; x < _world.Width; x++)

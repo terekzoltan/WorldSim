@@ -19,7 +19,7 @@ namespace WorldSim.Simulation
         }
 
         /// <summary>
-        /// Megpróbál kitermelni mennyiség() fát/követ…
+        /// Tries to harvest the specified amount of wood or stone...
         /// </summary>
         public bool Harvest(int qty)
         {
