@@ -33,7 +33,6 @@ namespace WorldSim
         protected override void Initialize()
         {
             _sb = new SpriteBatch(GraphicsDevice);
-            _sb = new(GraphicsDevice);
             _world = new World(width: 128, height: 128, initialPop: 25);
             base.Initialize();
         }

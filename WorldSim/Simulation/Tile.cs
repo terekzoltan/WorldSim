@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace WorldSim.Simulation
 {
     public enum Resource { None, Wood, Stone, Food, Water }
-    public struct Tile
+    public class Tile
     {
         public Resource Type { get; }
         public int Amount { get; private set; }
