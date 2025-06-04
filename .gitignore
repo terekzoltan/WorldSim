@@ -1,0 +1,44 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Bb]in/
+[Oo]bj/
+*.exe
+*.dll
+*.pdb
+
+# MonoGame specific
+*.mgcb
+*.xnb
+
+# Mac-specific
+.DS_Store
+
+# Windows-specific
+Thumbs.db
+ehthumbs.db
+
+# Rider
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# NuGet
+*.nupkg
+packages/
+*.snupkg
+
+# Other
+*.tmp
+*.bak
+*.swp
+*.sdf
+*.cache
+*.dbmdl
