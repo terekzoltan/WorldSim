@@ -21,7 +21,7 @@ namespace WorldSim.Simulation
             Height = height;
             _map = new Tile[width, height];
 
-            // 1. Erőforrások véletlen szórása
+            // 1. Randomly scatter resources
             for (int y = 0; y < Height; y++)
                 for (int x = 0; x < Width; x++)
                     _map[x, y] = new Tile(
@@ -30,32 +30,32 @@ namespace WorldSim.Simulation
                                                    Resource.None,
                         _rng.Next(20, 100));
 
-            // 2. Egyetlen kolónia a térkép közepén
-            // 2. Több kolónia a pályán (3 db példa)
-            int colonyCount = 3; // új sor
-            for (int ci = 0; ci < colonyCount; ci++) // új sor
-            { // új sor
-                var colPos = ( // új sor
-                    _rng.Next(Width / 4, Width * 3 / 4), // új sor (térkép középmezőjébe spawnol)  
-                    _rng.Next(Height / 4, Height * 3 / 4) // új sor
-                ); // új sor
-                var col = new Colony(ci, colPos); // új sor
-                _colonies.Add(col); // új sor
-                                    // 3. Emberek legenerálása ehhez a kolóniához // új sor
-                int pop = initialPop / colonyCount; // új sor
-                for (int i = 0; i < pop; i++) // új sor
-                    _people.Add(Person.Spawn(col, RandomFreePos())); // új sor
+            // 2. Multiple colonies on the map (3 as example)
+            int colonyCount = 3;
+            for (int ci = 0; ci < colonyCount; ci++)
+            {
+                var colPos = (
+                    _rng.Next(Width / 4, Width * 3 / 4), // spawn near the center of the map
+                    _rng.Next(Height / 4, Height * 3 / 4)
+                );
+                var col = new Colony(ci, colPos);
+                _colonies.Add(col);
+
+                // 3. Generate residents for this colony
+                int pop = initialPop / colonyCount;
+                for (int i = 0; i < pop; i++)
+                    _people.Add(Person.Spawn(col, RandomFreePos()));
             }
         }
 
-        // Tick-alapú frissítés
+        // Tick-based update
         public void Update(float dt)
         {
             foreach (var p in _people) p.Update(this, dt);
             foreach (var c in _colonies) c.Update(dt);
         }
 
-        // Ki lehet próbálni így:
+        // Can be tested like this:
         public bool TryHarvest((int x, int y) pos, Resource need, int qty)
         {
             ref Tile tile = ref _map[pos.x, pos.y];
@@ -65,7 +65,7 @@ namespace WorldSim.Simulation
         (int, int) RandomFreePos()
             => (_rng.Next(Width), _rng.Next(Height));
 
-        /// <summary>Visszaadja az (x,y) tile-t a _map-ből.</summary>
+        /// <summary>Returns the tile at (x,y) from _map.</summary>
         public Tile GetTile(int x, int y)
             => _map[x, y];
     }

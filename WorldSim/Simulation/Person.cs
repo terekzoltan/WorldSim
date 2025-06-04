@@ -40,7 +40,7 @@ namespace WorldSim.Simulation
                     break;
 
                 case Job.GatherWood:
-                    // próbál fát kitermelni
+                    // attempts to harvest wood
                     if (w.TryHarvest(Pos, Resource.Wood, 1))
                         _home.Stock[Resource.Wood]++;
                     else
