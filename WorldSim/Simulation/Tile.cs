@@ -19,11 +19,17 @@ namespace WorldSim.Simulation
         }
 
         /// <summary>
-        /// Tries to harvest the specified amount of wood or stone...
+        /// Tries to harvest the specified quantity of a given resource.
         /// </summary>
-        public bool Harvest(int qty)
+        /// <param name="res">The type of resource requested.</param>
+        /// <param name="qty">How much to harvest.</param>
+        /// <returns>
+        /// True if this tile contains the requested resource and has
+        /// at least <paramref name="qty"/> amount available; otherwise false.
+        /// </returns>
+        public bool Harvest(Resource res, int qty)
         {
-            if (Type != Resource.None && Amount >= qty)
+            if (Type == res && Amount >= qty)
             {
                 Amount -= qty;
                 return true;
