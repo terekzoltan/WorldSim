@@ -59,7 +59,7 @@ namespace WorldSim.Simulation
         public bool TryHarvest((int x, int y) pos, Resource need, int qty)
         {
             ref Tile tile = ref _map[pos.x, pos.y];
-            return tile.Harvest(qty);
+            return tile.Harvest(need, qty);
         }
 
         (int, int) RandomFreePos()
