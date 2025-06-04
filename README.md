@@ -15,9 +15,3 @@ A MonoGame-alapú kolónia szimuláció, inspirációként a *WorldBox - God Sim
 - C# 10
 - MonoGame 3.8.3
 - Visual Studio 2022
-
-## Használat
-
-1. Klónozd a repót:
-   ```bash
-   git clone https://github.com/Zolikaaa999/WorldSim.git
