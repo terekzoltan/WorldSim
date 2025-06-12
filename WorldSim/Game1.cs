@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System.Linq;
 using WorldSim.Simulation;
 
 namespace WorldSim
@@ -9,12 +10,11 @@ namespace WorldSim
     {
         GraphicsDeviceManager _g;
         SpriteBatch _sb;
-        const float Tick = 0.25f;          // simulation 4× per second
+        const float Tick = 0.25f;
         float _acc;
         World _world;
         SpriteFont _font;
 
-        // tile square size (px)
         const int TileSize = 7;
         Texture2D _pixel;
 
@@ -24,7 +24,6 @@ namespace WorldSim
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
 
-            // set the window size based on TileSize
             _g.PreferredBackBufferWidth = 128 * TileSize;
             _g.PreferredBackBufferHeight = 128 * TileSize;
             _g.ApplyChanges();
@@ -39,7 +38,6 @@ namespace WorldSim
 
         protected override void LoadContent()
         {
-            // create SpriteBatch and a 1×1 pixel
             _sb     = new SpriteBatch(GraphicsDevice);
             _pixel  = new Texture2D(GraphicsDevice, 1, 1);
             _pixel.SetData(new[] { Color.White});
@@ -63,12 +61,11 @@ namespace WorldSim
 
             _sb.Begin();
 
-            // draw tiles
             for (int y = 0; y < _world.Height; y++)
             {
                 for (int x = 0; x < _world.Width; x++)
                 {
-                    var tile = _world.GetTile(x, y);
+                    Tile tile = _world.GetTile(x, y);
                     Color color = tile.Type switch
                     {
                         Resource.Wood => Color.ForestGreen,
@@ -81,21 +78,27 @@ namespace WorldSim
                 }
             }
 
-            foreach (var person in _world._people)
+            foreach (Person person in _world._people)
             {
                 _sb.Draw(
                     _pixel,
                     new Rectangle(person.Pos.x * TileSize, person.Pos.y * TileSize, TileSize, TileSize),
-                    Color.Red
+                    person.Color
                 );
             }
 
             _sb.End();
 
             _sb.Begin();
-            var colony = _world._colonies[0];
-            string stats = $"Wood: {colony.Stock[Resource.Wood]}\nHouses: {colony.HouseCount}";
-            _sb.DrawString(_font, stats, new Vector2(10, 10), Color.White);
+
+            int j = 10;
+            foreach (var colony in _world._colonies) 
+            {  
+                string stats = $"Colony {colony.Id}: Wood {colony.Stock[Resource.Wood]}, Houses {colony.HouseCount}, People {_world._people.Count(p => p.Home == colony)}";
+                _sb.DrawString(_font, stats, new Vector2(10, j), colony.Color); 
+                j += 20; 
+            } 
+
             _sb.End();
 
             base.Draw(gt);

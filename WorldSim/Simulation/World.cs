@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Xna.Framework;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -40,6 +41,14 @@ namespace WorldSim.Simulation
                 );
                 var col = new Colony(ci, colPos);
                 _colonies.Add(col);
+
+                col.Color = ci switch 
+                { 
+                    0 => Color.Red,    
+                    1 => Color.Blue,   
+                    2 => Color.Green,  
+                    _ => Color.White   
+                };
 
                 // 3. Generate residents for this colony
                 int pop = initialPop / colonyCount;
