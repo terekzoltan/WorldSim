@@ -15,7 +15,7 @@ public class Person
     public Job Current = Job.Idle;
     public float Health = 100;
     public int Strength, Intelligence;
-    public Colony Home => _home;                     // új sor
+    public Colony Home => _home;                 
     public Color Color => _home.Color;
 
     Colony _home;

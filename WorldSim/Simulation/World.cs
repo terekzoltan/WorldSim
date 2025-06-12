@@ -32,21 +32,25 @@ namespace WorldSim.Simulation
                         _rng.Next(20, 100));
 
             // 2. Multiple colonies on the map (3 as example)
-            int colonyCount = 3;
+            int colonyCount = 4;
             for (int ci = 0; ci < colonyCount; ci++)
             {
-                var colPos = (
-                    _rng.Next(Width / 4, Width * 3 / 4), // spawn near the center of the map
+                
+                (int, int) colPos = (
+                    _rng.Next(Width / 4, Width * 3 / 4) , // spawn near the center of the map
                     _rng.Next(Height / 4, Height * 3 / 4)
                 );
-                var col = new Colony(ci, colPos);
+                
+
+                Colony col = new Colony(ci, colPos);
                 _colonies.Add(col);
 
                 col.Color = ci switch 
                 { 
                     0 => Color.Red,    
                     1 => Color.Blue,   
-                    2 => Color.Green,  
+                    2 => Color.Yellow,
+                    3 => Color.Purple,
                     _ => Color.White   
                 };
 
@@ -60,8 +64,8 @@ namespace WorldSim.Simulation
         // Tick-based update
         public void Update(float dt)
         {
-            foreach (var p in _people) p.Update(this, dt);
-            foreach (var c in _colonies) c.Update(dt);
+            foreach (Person p in _people) p.Update(this, dt);
+            foreach (Colony c in _colonies) c.Update(dt);
         }
 
         // Can be tested like this:
@@ -73,6 +77,14 @@ namespace WorldSim.Simulation
 
         (int, int) RandomFreePos()
             => (_rng.Next(Width), _rng.Next(Height));
+        /*(int, int) colPos = ci switch
+                {
+                    0 => (0, 0),
+                    1 => (0, 0),
+                    2 => (0, 0),
+                    3 => (0, 0),
+                    _ => (0,0)
+                };*/
 
         /// <summary>Returns the tile at (x,y) from _map.</summary>
         public Tile GetTile(int x, int y)

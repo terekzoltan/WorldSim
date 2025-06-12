@@ -12,6 +12,8 @@ namespace WorldSim
         SpriteBatch _sb;
         const float Tick = 0.25f;
         float _acc;
+        float timeScale = 5.0f; // Just for testing
+
         World _world;
         SpriteFont _font;
 
@@ -46,7 +48,7 @@ namespace WorldSim
 
         protected override void Update(GameTime gt)
         {
-            _acc += (float)gt.ElapsedGameTime.TotalSeconds;
+            _acc += (float)gt.ElapsedGameTime.TotalSeconds * timeScale;
             while (_acc >= Tick)
             {
                 _world.Update(Tick);
