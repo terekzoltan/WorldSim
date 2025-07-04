@@ -14,8 +14,9 @@ public class Person
     public (int x, int y) Pos;
     public Job Current = Job.Idle;
     public float Health = 100;
+    public float Age = 0;
     public int Strength, Intelligence;
-    public Colony Home => _home;                 
+    public Colony Home => _home;
     public Color Color => _home.Color;
 
     Colony _home;
@@ -32,8 +33,20 @@ public class Person
     public static Person Spawn(Colony home, (int, int) pos)
         => new Person(home, pos);
 
-    public void Update(World w, float dt)
+    public bool Update(World w, float dt, List<Person> births)
     {
+        Age += dt;
+        if (Age > 80)
+            return false;
+
+        // simple reproduction chance if there is housing capacity
+        int colonyPop = w._people.Count(p => p.Home == _home);
+        int capacity = _home.HouseCount * 4;
+        if (Age >= 18 && Age <= 40 && colonyPop < capacity && _rng.NextDouble() < 0.01)
+        {
+            births.Add(Person.Spawn(_home, Pos));
+        }
+
         switch (Current)
         {
             case Job.Idle:
@@ -52,7 +65,12 @@ public class Person
                 break;
 
             case Job.BuildHouse:
-                if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
+        int maxHouses = (int)Math.Ceiling(colonyPop / 4.0);
+        if (_home.HouseCount < maxHouses && _home.Stock[Resource.Wood] >= _home.HouseWoodCost)
+        {
+            _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
+            _home.HouseCount++;
+        }
                 {
                     _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
                     _home.HouseCount++;
@@ -60,6 +78,7 @@ public class Person
                 Current = Job.Idle;
                 break;
         }
+        return true;
     }
 
     void Wander(World w)
