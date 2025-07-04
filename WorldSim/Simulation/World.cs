@@ -14,6 +14,9 @@ namespace WorldSim.Simulation
         public List<Person> _people = new();
         public List<Colony> _colonies = new();
 
+        // Amount of wood gathered per successful harvest
+        public int WoodYield { get; set; } = 1;
+
         readonly Random _rng = new();
 
         public World(int width, int height, int initialPop)

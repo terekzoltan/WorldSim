@@ -45,16 +45,16 @@ public class Person
             case Job.GatherWood:
                 // attempts to harvest wood
                 if (w.TryHarvest(Pos, Resource.Wood, 1))
-                    _home.Stock[Resource.Wood]++;
+                    _home.Stock[Resource.Wood] += w.WoodYield;
                 else
                     Wander(w);
                 Current = Job.Idle;
                 break;
 
             case Job.BuildHouse:
-                if (_home.Stock[Resource.Wood] >= 10)
+                if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
                 {
-                    _home.Stock[Resource.Wood] -= 10;
+                    _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
                     _home.HouseCount++;
                 }
                 Current = Job.Idle;
