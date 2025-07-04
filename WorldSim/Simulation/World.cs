@@ -64,7 +64,13 @@ namespace WorldSim.Simulation
         // Tick-based update
         public void Update(float dt)
         {
-            foreach (Person p in _people) p.Update(this, dt);
+            List<Person> births = new();
+            for (int i = _people.Count - 1; i >= 0; i--)
+            {
+                if (!_people[i].Update(this, dt, births))
+                    _people.RemoveAt(i);
+            }
+            _people.AddRange(births);
             foreach (Colony c in _colonies) c.Update(dt);
         }
 

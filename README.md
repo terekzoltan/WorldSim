@@ -5,8 +5,10 @@ A MonoGame-alapú kolónia szimuláció, inspirációként a *WorldBox - God Sim
 ## Fő jellemzők
 
 - 🧍 Egyének attribútumokkal (erő, intelligencia)
+- ⌛ Életkor növekedés és idővel halálozás
+- 👶 Egyszerű szaporodási logika házkapacitás alapján
 - 🪓 Erőforrás-gyűjtés (fa, kő stb.)
-- 🏠 Házépítés kolónián belül
+- 🏠 Házépítés kolónián belül, kapacitáslimit
 - 🌍 Véletlen térkép erőforráseloszlással
 - ⏱️ Tick-alapú szimuláció (4x/sec)
 
