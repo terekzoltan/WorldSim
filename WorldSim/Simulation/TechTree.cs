@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -8,15 +9,15 @@ namespace WorldSim.Simulation
 {
     public class Technology
     {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public string Effect { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string Effect { get; set; } = string.Empty;
     }
 
     public class TechData
     {
-        public List<Technology> Techs { get; set; }
+        public List<Technology> Techs { get; set; } = new();
     }
 
     public static class TechTree
@@ -57,3 +58,4 @@ namespace WorldSim.Simulation
         }
     }
 }
+#nullable disable

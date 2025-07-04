@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Linq;
@@ -11,7 +12,7 @@ namespace WorldSim
     {
         GraphicsDeviceManager _g;
         SpriteBatch _sb;
-        const float Tick = 0.25f;
+        new const float Tick = 0.25f;
         float _acc;
         float timeScale = 5.0f; // Just for testing
 
@@ -39,7 +40,7 @@ namespace WorldSim
         {
             _sb = new SpriteBatch(GraphicsDevice);
             _world = new World(width: 128, height: 128, initialPop: 25);
-            string techPath = Path.Combine(AppContext.BaseDirectory, "Tech", "technologies.json");
+            string techPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tech", "technologies.json");
             TechTree.Load(techPath);
             base.Initialize();
         }
