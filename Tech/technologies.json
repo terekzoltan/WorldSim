@@ -1,0 +1,16 @@
+{
+  "techs": [
+    {
+      "id": "woodcutting",
+      "name": "Efficient Woodcutting",
+      "description": "Gathering wood yields one extra wood.",
+      "effect": "extra_wood"
+    },
+    {
+      "id": "construction",
+      "name": "Improved Construction",
+      "description": "Houses cost half as much wood.",
+      "effect": "cheap_houses"
+    }
+  ]
+}

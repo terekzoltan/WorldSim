@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using System.Linq;
+using System.IO;
 using WorldSim.Simulation;
 
 namespace WorldSim
@@ -20,6 +21,9 @@ namespace WorldSim
         const int TileSize = 7;
         Texture2D _pixel;
 
+        bool _showTechMenu = false;
+        KeyboardState _prevKeys;
+
         public Game1()
         {
             _g = new(this);
@@ -35,6 +39,8 @@ namespace WorldSim
         {
             _sb = new SpriteBatch(GraphicsDevice);
             _world = new World(width: 128, height: 128, initialPop: 25);
+            string techPath = Path.Combine(AppContext.BaseDirectory, "Tech", "technologies.json");
+            TechTree.Load(techPath);
             base.Initialize();
         }
 
@@ -48,6 +54,24 @@ namespace WorldSim
 
         protected override void Update(GameTime gt)
         {
+            KeyboardState keys = Keyboard.GetState();
+
+            if (keys.IsKeyDown(Keys.F1) && !_prevKeys.IsKeyDown(Keys.F1))
+                _showTechMenu = !_showTechMenu;
+
+            if (_showTechMenu)
+            {
+                var locked = TechTree.Techs.Where(t => !TechTree.Unlocked.Contains(t.Id)).ToList();
+                for (int i = 0; i < locked.Count && i < 9; i++)
+                {
+                    Keys key = Keys.D1 + i;
+                    if (keys.IsKeyDown(key) && !_prevKeys.IsKeyDown(key))
+                        TechTree.Unlock(locked[i].Id, _world);
+                }
+            }
+
+            _prevKeys = keys;
+
             _acc += (float)gt.ElapsedGameTime.TotalSeconds * timeScale;
             while (_acc >= Tick)
             {
@@ -94,12 +118,26 @@ namespace WorldSim
             _sb.Begin();
 
             int j = 10;
-            foreach (var colony in _world._colonies) 
-            {  
+            foreach (var colony in _world._colonies)
+            {
                 string stats = $"Colony {colony.Id}: Wood {colony.Stock[Resource.Wood]}, Houses {colony.HouseCount}, People {_world._people.Count(p => p.Home == colony)}";
-                _sb.DrawString(_font, stats, new Vector2(10, j), colony.Color); 
-                j += 20; 
-            } 
+                _sb.DrawString(_font, stats, new Vector2(10, j), colony.Color);
+                j += 20;
+            }
+
+            if (_showTechMenu)
+            {
+                var locked = TechTree.Techs.Where(t => !TechTree.Unlocked.Contains(t.Id)).ToList();
+                j = 10;
+                _sb.DrawString(_font, "-- Tech Tree (F1 to close) --", new Vector2(400, j), Color.White);
+                j += 20;
+                for (int i = 0; i < locked.Count && i < 9; i++)
+                {
+                    string line = $"{i + 1}. {locked[i].Name}";
+                    _sb.DrawString(_font, line, new Vector2(400, j), Color.White);
+                    j += 20;
+                }
+            }
 
             _sb.End();
 

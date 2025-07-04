@@ -20,6 +20,7 @@ namespace WorldSim.Simulation
             [Resource.Food] = 0
         };
         public int HouseCount = 0;
+        public int HouseWoodCost { get; set; } = 10;
         float _age;
 
         public Colony(int id, (int, int) startPos)
