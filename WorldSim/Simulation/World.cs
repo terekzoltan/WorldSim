@@ -14,8 +14,22 @@ namespace WorldSim.Simulation
         public List<Person> _people = new();
         public List<Colony> _colonies = new();
 
-        // Amount of wood gathered per successful harvest
+        // Technology-affected properties
         public int WoodYield { get; set; } = 1;
+        public int StoneYield { get; set; } = 1;
+        public int FoodYield { get; set; } = 1;
+        public float HealthBonus { get; set; } = 0;
+        public float MaxAge { get; set; } = 80;
+        public float WorkEfficiencyMultiplier { get; set; } = 1.0f;
+        public int HouseCapacity { get; set; } = 4;
+        public bool ResourceSharingEnabled { get; set; } = false;
+        public int IntelligenceBonus { get; set; } = 0;
+        public int StrengthBonus { get; set; } = 0;
+        public float MovementSpeedMultiplier { get; set; } = 1.0f;
+        public float FoodSpoilageRate { get; set; } = 1.0f;
+        public float JobSwitchDelay { get; set; } = 1.0f;
+        public float BirthRateMultiplier { get; set; } = 1.0f;
+        public bool StoneBuildingsEnabled { get; set; } = false;
 
         readonly Random _rng = new();
 
@@ -86,14 +100,6 @@ namespace WorldSim.Simulation
 
         (int, int) RandomFreePos()
             => (_rng.Next(Width), _rng.Next(Height));
-        /*(int, int) colPos = ci switch
-                {
-                    0 => (0, 0),
-                    1 => (0, 0),
-                    2 => (0, 0),
-                    3 => (0, 0),
-                    _ => (0,0)
-                };*/
 
         /// <summary>Returns the tile at (x,y) from _map.</summary>
         public Tile GetTile(int x, int y)

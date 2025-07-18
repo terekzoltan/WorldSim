@@ -11,6 +11,84 @@
       "name": "Improved Construction",
       "description": "Houses cost half as much wood.",
       "effect": "cheap_houses"
+    },
+    {
+      "id": "mining",
+      "name": "Advanced Mining",
+      "description": "Increases stone gathering efficiency and yields.",
+      "effect": "better_mining"
+    },
+    {
+      "id": "agriculture",
+      "name": "Agricultural Techniques",
+      "description": "Improves food production and crop yields.",
+      "effect": "better_farming"
+    },
+    {
+      "id": "medicine",
+      "name": "Basic Medicine",
+      "description": "Increases population health and lifespan.",
+      "effect": "health_boost"
+    },
+    {
+      "id": "tools",
+      "name": "Metal Tools",
+      "description": "Workers are more efficient at all tasks.",
+      "effect": "work_efficiency"
+    },
+    {
+      "id": "housing",
+      "name": "Dense Housing",
+      "description": "Houses can accommodate more people.",
+      "effect": "more_capacity"
+    },
+    {
+      "id": "logistics",
+      "name": "Improved Logistics",
+      "description": "Resources are shared more efficiently between colonies.",
+      "effect": "resource_sharing"
+    },
+    {
+      "id": "education",
+      "name": "Education System",
+      "description": "Increases intelligence of new births.",
+      "effect": "smarter_people"
+    },
+    {
+      "id": "fitness",
+      "name": "Physical Training",
+      "description": "Increases strength of new births.",
+      "effect": "stronger_people"
+    },
+    {
+      "id": "exploration",
+      "name": "Exploration Techniques",
+      "description": "People move faster and discover resources more efficiently.",
+      "effect": "faster_movement"
+    },
+    {
+      "id": "preservation",
+      "name": "Food Preservation",
+      "description": "Food resources last longer and spoil less.",
+      "effect": "food_storage"
+    },
+    {
+      "id": "organization",
+      "name": "Work Organization",
+      "description": "Reduces time between job switches.",
+      "effect": "job_efficiency"
+    },
+    {
+      "id": "demographics",
+      "name": "Population Management",
+      "description": "Increases birth rates in suitable conditions.",
+      "effect": "higher_birthrate"
+    },
+    {
+      "id": "masonry",
+      "name": "Stone Masonry",
+      "description": "Enables building with stone for more durable structures.",
+      "effect": "stone_buildings"
     }
   ]
 }

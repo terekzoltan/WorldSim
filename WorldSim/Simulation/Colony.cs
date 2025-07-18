@@ -21,6 +21,7 @@ namespace WorldSim.Simulation
         };
         public int HouseCount = 0;
         public int HouseWoodCost { get; set; } = 10;
+        public bool CanBuildWithStone { get; set; } = false;
         float _age;
 
         public Colony(int id, (int, int) startPos)

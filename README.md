@@ -17,3 +17,13 @@ A MonoGame-alapú kolónia szimuláció, inspirációként a *WorldBox - God Sim
 - C# 10
 - MonoGame 3.8.3
 - Visual Studio 2022
+
+## Tervezett fejlesztések
+
+- Emberek viselkedésének finomhangolása (pl. ha nincs fa → ne csak kóboroljanak)
+- Többféle munka / szerepkör (pl. bányászat, farmolás)
+- Élelem-fogyasztás, halál éhségtől
+- Építkezés kőből (ha fel van oldva a „Stone Masonry” technológia)
+- Ház típusok és vizualizációjuk különbsége
+- Egyszerű AI-logika fejlesztése („vágyak”, prioritások)
+- Játékállás mentése/betöltése

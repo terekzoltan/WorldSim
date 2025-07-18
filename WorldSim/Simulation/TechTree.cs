@@ -54,6 +54,48 @@ namespace WorldSim.Simulation
                     foreach (var c in world._colonies)
                         c.HouseWoodCost = 5;
                     break;
+                case "better_mining":
+                    world.StoneYield = 2;
+                    break;
+                case "better_farming":
+                    world.FoodYield = 2;
+                    break;
+                case "health_boost":
+                    world.HealthBonus = 20;
+                    world.MaxAge = 100;
+                    break;
+                case "work_efficiency":
+                    world.WorkEfficiencyMultiplier = 1.5f;
+                    break;
+                case "more_capacity":
+                    world.HouseCapacity = 6;
+                    break;
+                case "resource_sharing":
+                    world.ResourceSharingEnabled = true;
+                    break;
+                case "smarter_people":
+                    world.IntelligenceBonus = 3;
+                    break;
+                case "stronger_people":
+                    world.StrengthBonus = 3;
+                    break;
+                case "faster_movement":
+                    world.MovementSpeedMultiplier = 2.0f;
+                    break;
+                case "food_storage":
+                    world.FoodSpoilageRate = 0.5f;
+                    break;
+                case "job_efficiency":
+                    world.JobSwitchDelay = 0.5f;
+                    break;
+                case "higher_birthrate":
+                    world.BirthRateMultiplier = 2.0f;
+                    break;
+                case "stone_buildings":
+                    world.StoneBuildingsEnabled = true;
+                    foreach (var c in world._colonies)
+                        c.CanBuildWithStone = true;
+                    break;
             }
         }
     }

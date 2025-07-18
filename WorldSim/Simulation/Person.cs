@@ -33,18 +33,27 @@ public class Person
     public static Person Spawn(Colony home, (int, int) pos)
         => new Person(home, pos);
 
+    public static Person SpawnWithBonus(Colony home, (int, int) pos, World world)
+    {
+        var person = new Person(home, pos);
+        person.Strength = Math.Min(20, person.Strength + world.StrengthBonus);
+        person.Intelligence = Math.Min(20, person.Intelligence + world.IntelligenceBonus);
+        person.Health += world.HealthBonus;
+        return person;
+    }
+
     public bool Update(World w, float dt, List<Person> births)
     {
-        Age += dt;
-        if (Age > 80)
+        Age += dt/10;
+        if (Age > w.MaxAge)
             return false;
 
         // simple reproduction chance if there is housing capacity
         int colonyPop = w._people.Count(p => p.Home == _home);
-        int capacity = _home.HouseCount * 4;
-        if (Age >= 18 && Age <= 40 && colonyPop < capacity && _rng.NextDouble() < 0.01)
+        int capacity = _home.HouseCount * w.HouseCapacity;
+        if (Age >= 18 && Age <= 40 && colonyPop < capacity && _rng.NextDouble() < (0.01 * w.BirthRateMultiplier))
         {
-            births.Add(Person.Spawn(_home, Pos));
+            births.Add(Person.SpawnWithBonus(_home, Pos, w));
         }
 
         switch (Current)
@@ -65,12 +74,8 @@ public class Person
                 break;
 
             case Job.BuildHouse:
-        int maxHouses = (int)Math.Ceiling(colonyPop / 4.0);
-        if (_home.HouseCount < maxHouses && _home.Stock[Resource.Wood] >= _home.HouseWoodCost)
-        {
-            _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
-            _home.HouseCount++;
-        }
+                int maxHouses = (int)Math.Ceiling(colonyPop / (double)w.HouseCapacity);
+                if (_home.HouseCount < maxHouses && _home.Stock[Resource.Wood] >= _home.HouseWoodCost)
                 {
                     _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
                     _home.HouseCount++;
@@ -83,9 +88,10 @@ public class Person
 
     void Wander(World w)
     {
+        int moveDistance = (int)w.MovementSpeedMultiplier;
         Pos = (
-          Math.Clamp(Pos.x + _rng.Next(-1, 2), 0, w.Width - 1),
-          Math.Clamp(Pos.y + _rng.Next(-1, 2), 0, w.Height - 1)
+          Math.Clamp(Pos.x + _rng.Next(-moveDistance, moveDistance + 1), 0, w.Width - 1),
+          Math.Clamp(Pos.y + _rng.Next(-moveDistance, moveDistance + 1), 0, w.Height - 1)
         );
     }
 }
