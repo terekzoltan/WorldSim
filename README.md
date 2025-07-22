@@ -11,6 +11,9 @@ A MonoGame-alapú kolónia szimuláció, inspirációként a *WorldBox - God Sim
 - 🏠 Házépítés kolónián belül, kapacitáslimit
 - 🌍 Véletlen térkép erőforráseloszlással
 - ⏱️ Tick-alapú szimuláció (4x/sec)
+- 🪨 Kőházak építése (Stone Masonry technológia után)
+- 🔄 Erőforrás megosztás kolóniák között (Improved Logistics után)
+
 
 ## Technológiák
 
@@ -23,7 +26,6 @@ A MonoGame-alapú kolónia szimuláció, inspirációként a *WorldBox - God Sim
 - Emberek viselkedésének finomhangolása (pl. ha nincs fa → ne csak kóboroljanak)
 - Többféle munka / szerepkör (pl. bányászat, farmolás)
 - Élelem-fogyasztás, halál éhségtől
-- Építkezés kőből (ha fel van oldva a „Stone Masonry” technológia)
 - Ház típusok és vizualizációjuk különbsége
 - Egyszerű AI-logika fejlesztése („vágyak”, prioritások)
 - Játékállás mentése/betöltése

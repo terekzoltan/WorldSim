@@ -21,7 +21,11 @@ namespace WorldSim.Simulation
         };
         public int HouseCount = 0;
         public int HouseWoodCost { get; set; } = 10;
+        public int HouseStoneCost { get; set; } = 15;
         public bool CanBuildWithStone { get; set; } = false;
+        public float MovementSpeedMultiplier { get; set; } = 1.0f;
+        public HashSet<string> UnlockedTechs { get; } = new();
+
         float _age;
 
         public Colony(int id, (int, int) startPos)

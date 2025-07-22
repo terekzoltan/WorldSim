@@ -23,7 +23,6 @@ namespace WorldSim.Simulation
     public static class TechTree
     {
         public static List<Technology> Techs { get; private set; } = new();
-        public static HashSet<string> Unlocked { get; } = new();
 
         public static void Load(string path)
         {
@@ -34,16 +33,16 @@ namespace WorldSim.Simulation
                 Techs = data.Techs;
         }
 
-        public static void Unlock(string id, World world)
+        public static void Unlock(string id, World world, Colony colony)
         {
-            if (Unlocked.Contains(id)) return;
+            if (colony.UnlockedTechs.Contains(id)) return;
             Technology? tech = Techs.FirstOrDefault(t => t.Id == id);
             if (tech == null) return;
-            Unlocked.Add(id);
-            ApplyEffect(tech, world);
+            colony.UnlockedTechs.Add(id);
+            ApplyEffect(tech, world, colony);
         }
 
-        static void ApplyEffect(Technology tech, World world)
+        static void ApplyEffect(Technology tech, World world, Colony colony)
         {
             switch (tech.Effect)
             {
@@ -51,8 +50,7 @@ namespace WorldSim.Simulation
                     world.WoodYield = 2;
                     break;
                 case "cheap_houses":
-                    foreach (var c in world._colonies)
-                        c.HouseWoodCost = 5;
+                    colony.HouseWoodCost = 5;
                     break;
                 case "better_mining":
                     world.StoneYield = 2;
@@ -80,21 +78,13 @@ namespace WorldSim.Simulation
                     world.StrengthBonus = 3;
                     break;
                 case "faster_movement":
-                    world.MovementSpeedMultiplier = 2.0f;
-                    break;
-                case "food_storage":
-                    world.FoodSpoilageRate = 0.5f;
-                    break;
-                case "job_efficiency":
-                    world.JobSwitchDelay = 0.5f;
+                    colony.MovementSpeedMultiplier = 2.0f;
                     break;
                 case "higher_birthrate":
                     world.BirthRateMultiplier = 2.0f;
                     break;
                 case "stone_buildings":
-                    world.StoneBuildingsEnabled = true;
-                    foreach (var c in world._colonies)
-                        c.CanBuildWithStone = true;
+                    colony.CanBuildWithStone = true;
                     break;
             }
         }

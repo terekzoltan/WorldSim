@@ -67,18 +67,6 @@
       "effect": "faster_movement"
     },
     {
-      "id": "preservation",
-      "name": "Food Preservation",
-      "description": "Food resources last longer and spoil less.",
-      "effect": "food_storage"
-    },
-    {
-      "id": "organization",
-      "name": "Work Organization",
-      "description": "Reduces time between job switches.",
-      "effect": "job_efficiency"
-    },
-    {
       "id": "demographics",
       "name": "Population Management",
       "description": "Increases birth rates in suitable conditions.",

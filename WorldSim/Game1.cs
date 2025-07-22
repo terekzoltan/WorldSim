@@ -24,6 +24,7 @@ namespace WorldSim
 
         bool _showTechMenu = false;
         KeyboardState _prevKeys;
+        int _selectedColony = 0;
 
         public Game1()
         {
@@ -62,12 +63,18 @@ namespace WorldSim
 
             if (_showTechMenu)
             {
-                var locked = TechTree.Techs.Where(t => !TechTree.Unlocked.Contains(t.Id)).ToList();
+                if (keys.IsKeyDown(Keys.Left) && !_prevKeys.IsKeyDown(Keys.Left))
+                    _selectedColony = (_selectedColony - 1 + _world._colonies.Count) % _world._colonies.Count;
+                if (keys.IsKeyDown(Keys.Right) && !_prevKeys.IsKeyDown(Keys.Right))
+                    _selectedColony = (_selectedColony + 1) % _world._colonies.Count;
+
+                var colony = _world._colonies[_selectedColony];
+                var locked = TechTree.Techs.Where(t => !colony.UnlockedTechs.Contains(t.Id)).ToList();
                 for (int i = 0; i < locked.Count && i < 9; i++)
                 {
                     Keys key = Keys.D1 + i;
                     if (keys.IsKeyDown(key) && !_prevKeys.IsKeyDown(key))
-                        TechTree.Unlock(locked[i].Id, _world);
+                        TechTree.Unlock(locked[i].Id, _world, colony);
                 }
             }
 
@@ -128,14 +135,15 @@ namespace WorldSim
 
             if (_showTechMenu)
             {
-                var locked = TechTree.Techs.Where(t => !TechTree.Unlocked.Contains(t.Id)).ToList();
-                j = 10;
-                _sb.DrawString(_font, "-- Tech Tree (F1 to close) --", new Vector2(400, j), Color.White);
+                var colony = _world._colonies[_selectedColony];
+                var locked = TechTree.Techs.Where(t => !colony.UnlockedTechs.Contains(t.Id)).ToList();
+                j = 100;
+                _sb.DrawString(_font, $"-- Tech Tree for Colony {colony.Id} (Left/Right to change, F1 to close) --", new Vector2(0, j), Color.White);
                 j += 20;
                 for (int i = 0; i < locked.Count && i < 9; i++)
                 {
                     string line = $"{i + 1}. {locked[i].Name}";
-                    _sb.DrawString(_font, line, new Vector2(400, j), Color.White);
+                    _sb.DrawString(_font, line, new Vector2(0, j), Color.White);
                     j += 20;
                 }
             }

@@ -26,8 +26,6 @@ namespace WorldSim.Simulation
         public int IntelligenceBonus { get; set; } = 0; // Intelligencia bónusz (újszülöttek plusz intelligenciát kapnak)
         public int StrengthBonus { get; set; } = 0; // Erő bónusz (újszülöttek plusz erőt kapnak)
         public float MovementSpeedMultiplier { get; set; } = 1.0f; // Mozgási sebesség szorzó (gyorsabban mozognak)
-        public float FoodSpoilageRate { get; set; } = 1.0f; // Élelmiszer romlási arány (lassabban romlik az étel)
-        public float JobSwitchDelay { get; set; } = 1.0f; // Munka váltás késleltetése (gyorsabban váltanak munkát)
         public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
         public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
 
@@ -100,6 +98,17 @@ namespace WorldSim.Simulation
             }
             _people.AddRange(births);
             foreach (Colony c in _colonies) c.Update(dt);
+
+            if (ResourceSharingEnabled && _colonies.Count > 1)
+            {
+                foreach (var res in _colonies[0].Stock.Keys.ToList())
+                {
+                    int total = _colonies.Sum(c => c.Stock[res]);
+                    int share = total / _colonies.Count;
+                    foreach (var c in _colonies)
+                        c.Stock[res] = share;
+                }
+            }
         }
 
         // Can be tested like this:

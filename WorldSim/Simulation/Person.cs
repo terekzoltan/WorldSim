@@ -75,10 +75,18 @@ public class Person
 
             case Job.BuildHouse:
                 int maxHouses = (int)Math.Ceiling(colonyPop / (double)w.HouseCapacity);
-                if (_home.HouseCount < maxHouses && _home.Stock[Resource.Wood] >= _home.HouseWoodCost)
+                if (_home.HouseCount < maxHouses)
                 {
-                    _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
-                    _home.HouseCount++;
+                    if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
+                    {
+                        _home.Stock[Resource.Stone] -= _home.HouseStoneCost;
+                        _home.HouseCount++;
+                    }
+                    else if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
+                    {
+                        _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
+                        _home.HouseCount++;
+                    }
                 }
                 Current = Job.Idle;
                 break;
@@ -88,7 +96,7 @@ public class Person
 
     void Wander(World w)
     {
-        int moveDistance = (int)w.MovementSpeedMultiplier;
+        int moveDistance = (int)_home.MovementSpeedMultiplier;
         Pos = (
           Math.Clamp(Pos.x + _rng.Next(-moveDistance, moveDistance + 1), 0, w.Width - 1),
           Math.Clamp(Pos.y + _rng.Next(-moveDistance, moveDistance + 1), 0, w.Height - 1)
