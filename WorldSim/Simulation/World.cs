@@ -15,21 +15,21 @@ namespace WorldSim.Simulation
         public List<Colony> _colonies = new();
 
         // Technology-affected properties
-        public int WoodYield { get; set; } = 1;
-        public int StoneYield { get; set; } = 1;
-        public int FoodYield { get; set; } = 1;
-        public float HealthBonus { get; set; } = 0;
-        public float MaxAge { get; set; } = 80;
-        public float WorkEfficiencyMultiplier { get; set; } = 1.0f;
-        public int HouseCapacity { get; set; } = 4;
-        public bool ResourceSharingEnabled { get; set; } = false;
-        public int IntelligenceBonus { get; set; } = 0;
-        public int StrengthBonus { get; set; } = 0;
-        public float MovementSpeedMultiplier { get; set; } = 1.0f;
-        public float FoodSpoilageRate { get; set; } = 1.0f;
-        public float JobSwitchDelay { get; set; } = 1.0f;
-        public float BirthRateMultiplier { get; set; } = 1.0f;
-        public bool StoneBuildingsEnabled { get; set; } = false;
+        public int WoodYield { get; set; } = 1; // Fa kitermelés hozama (mennyi fát kapnak egy gyűjtéskor)
+        public int StoneYield { get; set; } = 1; // Kő kitermelés hozama
+        public int FoodYield { get; set; } = 1; // Élelmiszer kitermelés hozama
+        public float HealthBonus { get; set; } = 0; // Egészség bónusz (plusz életpont vagy egészség)
+        public float MaxAge { get; set; } = 80; // Maximális életkor (meddig élhetnek az emberek)
+        public float WorkEfficiencyMultiplier { get; set; } = 1.0f; // Munka hatékonyság szorzó (gyorsabban dolgoznak)
+        public int HouseCapacity { get; set; } = 4; // Egy házban lakók maximális száma
+        public bool ResourceSharingEnabled { get; set; } = false; // Erőforrás-megosztás engedélyezve (kolóniák között)
+        public int IntelligenceBonus { get; set; } = 0; // Intelligencia bónusz (újszülöttek plusz intelligenciát kapnak)
+        public int StrengthBonus { get; set; } = 0; // Erő bónusz (újszülöttek plusz erőt kapnak)
+        public float MovementSpeedMultiplier { get; set; } = 1.0f; // Mozgási sebesség szorzó (gyorsabban mozognak)
+        public float FoodSpoilageRate { get; set; } = 1.0f; // Élelmiszer romlási arány (lassabban romlik az étel)
+        public float JobSwitchDelay { get; set; } = 1.0f; // Munka váltás késleltetése (gyorsabban váltanak munkát)
+        public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
+        public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
 
         readonly Random _rng = new();
 
@@ -48,33 +48,44 @@ namespace WorldSim.Simulation
                                                    Resource.None,
                         _rng.Next(20, 100));
 
-            // 2. Multiple colonies on the map (3 as example)
+            // 2. Multiple colonies on the map (completely random positions)
             int colonyCount = 4;
             for (int ci = 0; ci < colonyCount; ci++)
             {
-                
+                // Each colony gets a completely random position on the map
                 (int, int) colPos = (
-                    _rng.Next(Width / 4, Width * 3 / 4) , // spawn near the center of the map
-                    _rng.Next(Height / 4, Height * 3 / 4)
+                    _rng.Next(0, Width),
+                    _rng.Next(0, Height)
                 );
-                
 
                 Colony col = new Colony(ci, colPos);
                 _colonies.Add(col);
 
-                col.Color = ci switch 
-                { 
-                    0 => Color.Red,    
-                    1 => Color.Blue,   
+                col.Color = ci switch
+                {
+                    0 => Color.Red,
+                    1 => Color.Blue,
                     2 => Color.Yellow,
                     3 => Color.Purple,
-                    _ => Color.White   
+                    _ => Color.White
                 };
 
-                // 3. Generate residents for this colony
+                // 3. Generate residents for this colony near their origin
                 int pop = initialPop / colonyCount;
                 for (int i = 0; i < pop; i++)
-                    _people.Add(Person.Spawn(col, RandomFreePos()));
+                {
+                    // Spawn within a small radius (e.g. 5 tiles) of the colony origin
+                    int spawnRadius = 5;
+                    int px = Math.Clamp(
+                        col.Origin.x + _rng.Next(-spawnRadius, spawnRadius + 1),
+                        0, Width - 1
+                    );
+                    int py = Math.Clamp(
+                        col.Origin.y + _rng.Next(-spawnRadius, spawnRadius + 1),
+                        0, Height - 1
+                    );
+                    _people.Add(Person.Spawn(col, (px, py)));
+                }
             }
         }
 
