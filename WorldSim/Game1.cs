@@ -136,7 +136,8 @@ namespace WorldSim
             int j = 10;
             foreach (var colony in _world._colonies)
             {
-                string stats = $"Colony {colony.Id}: Wood {colony.Stock[Resource.Wood]}, Houses {colony.HouseCount}, People {_world._people.Count(p => p.Home == colony)}";
+                string stats =
+                    $"Colony {colony.Id}: Wood {colony.Stock[Resource.Wood]}, Stone {colony.Stock[Resource.Stone]}, Houses {colony.HouseCount}, People {_world._people.Count(p => p.Home == colony)}";
                 _sb.DrawString(_font, stats, new Vector2(10, j), colony.Color);
                 j += 20;
             }

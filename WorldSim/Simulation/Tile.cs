@@ -9,7 +9,7 @@ namespace WorldSim.Simulation
     public enum Resource { None, Wood, Stone, Food, Water }
     public class Tile
     {
-        public Resource Type { get; }
+        public Resource Type { get; private set; }
         public int Amount { get; private set; }
 
         public Tile(Resource type, int amount)
@@ -32,6 +32,11 @@ namespace WorldSim.Simulation
             if (Type == res && Amount >= qty)
             {
                 Amount -= qty;
+
+                // If the resource is depleted, turn this tile into empty ground.
+                if (Amount == 0)
+                    Type = Resource.None;
+
                 return true;
             }
             return false;

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace WorldSim.Simulation;
 
-public enum Job { Idle, GatherWood, BuildHouse }
+public enum Job { Idle, GatherWood, GatherStone, BuildHouse }
 
 public class Person
 {
@@ -21,6 +21,9 @@ public class Person
 
     Colony _home;
     Random _rng = new();
+
+
+    int _doingJob = 0; // csinalni hogy ideig dolgozzon ne instant
 
     private Person(Colony home, (int, int) pos)
     {
@@ -59,15 +62,26 @@ public class Person
         switch (Current)
         {
             case Job.Idle:
-                Current = _rng.NextDouble() < 0.5
-                            ? Job.GatherWood
-                            : Job.BuildHouse;
+                // Roughly split between wood, stone, and building
+                double r = _rng.NextDouble();
+                if (r < 0.4) Current = Job.GatherWood;
+                else if (r < 0.8) Current = Job.GatherStone;
+                else Current = Job.BuildHouse;
                 break;
 
             case Job.GatherWood:
                 // attempts to harvest wood
                 if (w.TryHarvest(Pos, Resource.Wood, 1))
                     _home.Stock[Resource.Wood] += w.WoodYield;
+                else
+                    Wander(w);
+                Current = Job.Idle;
+                break;
+
+            case Job.GatherStone:
+                // attempts to harvest stone
+                if (w.TryHarvest(Pos, Resource.Stone, 1))
+                    _home.Stock[Resource.Stone] += w.StoneYield;
                 else
                     Wander(w);
                 Current = Job.Idle;
