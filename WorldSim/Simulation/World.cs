@@ -13,6 +13,7 @@ namespace WorldSim.Simulation
         Tile[,] _map;
         public List<Person> _people = new();
         public List<Colony> _colonies = new();
+        public List<House> Houses = new();
 
         // Technology-affected properties
         public int WoodYield { get; set; } = 1; // Fa kitermelés hozama (mennyi fát kapnak egy gyűjtéskor)
@@ -21,7 +22,7 @@ namespace WorldSim.Simulation
         public float HealthBonus { get; set; } = 0; // Egészség bónusz (plusz életpont vagy egészség)
         public float MaxAge { get; set; } = 80; // Maximális életkor (meddig élhetnek az emberek)
         public float WorkEfficiencyMultiplier { get; set; } = 1.0f; // Munka hatékonyság szorzó (gyorsabban dolgoznak)
-        public int HouseCapacity { get; set; } = 4; // Egy házban lakók maximális száma
+        public int HouseCapacity { get; set; } = 5; // Egy házban lakók maximális száma
         public bool ResourceSharingEnabled { get; set; } = false; // Erőforrás-megosztás engedélyezve (kolóniák között)
         public int IntelligenceBonus { get; set; } = 0; // Intelligencia bónusz (újszülöttek plusz intelligenciát kapnak)
         public int StrengthBonus { get; set; } = 0; // Erő bónusz (újszülöttek plusz erőt kapnak)
@@ -44,7 +45,7 @@ namespace WorldSim.Simulation
                         _rng.NextDouble() < 0.05 ? Resource.Wood :
                         _rng.NextDouble() < 0.02 ? Resource.Stone :
                                                    Resource.None,
-                        _rng.Next(20, 100));
+                        _rng.Next(1, 10));
 
             // 2. Multiple colonies on the map (completely random positions)
             int colonyCount = 4;
@@ -124,5 +125,10 @@ namespace WorldSim.Simulation
         /// <summary>Returns the tile at (x,y) from _map.</summary>
         public Tile GetTile(int x, int y)
             => _map[x, y];
+
+        public void AddHouse(Colony colony, (int x, int y) pos)
+        {
+            Houses.Add(new House(colony, pos));
+        }
     }
 }

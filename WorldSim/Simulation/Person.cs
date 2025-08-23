@@ -51,7 +51,7 @@ public class Person
         // simple reproduction chance if there is housing capacity
         int colonyPop = w._people.Count(p => p.Home == _home);
         int capacity = _home.HouseCount * w.HouseCapacity;
-        if (Age >= 18 && Age <= 40 && colonyPop < capacity && _rng.NextDouble() < (0.01 * w.BirthRateMultiplier))
+        if (Age >= 18 && Age <= 60 && colonyPop < capacity && _rng.NextDouble() < (0.001 * w.BirthRateMultiplier))
         {
             births.Add(Person.SpawnWithBonus(_home, Pos, w));
         }
@@ -74,18 +74,21 @@ public class Person
                 break;
 
             case Job.BuildHouse:
-                int maxHouses = (int)Math.Ceiling(colonyPop / (double)w.HouseCapacity);
+                // Szükséges házak száma, de legalább annyi, mint a már meglévő házak (nem csökkenhet a házak száma).
+                int maxHouses = Math.Max(_home.HouseCount, (int)Math.Ceiling((colonyPop + 3) / (double)w.HouseCapacity)); 
                 if (_home.HouseCount < maxHouses)
                 {
                     if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
                     {
                         _home.Stock[Resource.Stone] -= _home.HouseStoneCost;
                         _home.HouseCount++;
+                        w.AddHouse(_home, Pos);
                     }
                     else if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
                     {
                         _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
                         _home.HouseCount++;
+                        w.AddHouse(_home, Pos);
                     }
                 }
                 Current = Job.Idle;

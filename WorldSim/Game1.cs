@@ -121,6 +121,14 @@ namespace WorldSim
                 );
             }
 
+            foreach (var house in _world.Houses)
+            {
+                Color houseColor = house.Owner.Color * 0.8f;
+                int px = house.Pos.x * TileSize + (TileSize - 3) / 2;
+                int py = house.Pos.y * TileSize + (TileSize - 3) / 2;
+                _sb.Draw(_pixel, new Rectangle(px, py, TileSize*3, TileSize*3), houseColor);
+            }
+
             _sb.End();
 
             _sb.Begin();

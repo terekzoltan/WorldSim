@@ -20,7 +20,7 @@ namespace WorldSim.Simulation
             [Resource.Food] = 0
         };
         public int HouseCount = 0;
-        public int HouseWoodCost { get; set; } = 10;
+        public int HouseWoodCost { get; set; } = 50;
         public int HouseStoneCost { get; set; } = 15;
         public bool CanBuildWithStone { get; set; } = false;
         public float MovementSpeedMultiplier { get; set; } = 1.0f;
