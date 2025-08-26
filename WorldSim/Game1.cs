@@ -14,17 +14,29 @@ namespace WorldSim
         SpriteBatch _sb;
         new const float Tick = 0.25f;
         float _acc;
-        float timeScale = 5.0f; // Just for testing
+        float timeScale = 10.0f; // Just for testing
 
         World _world;
         SpriteFont _font;
 
         const int TileSize = 7;
         Texture2D _pixel;
+        Texture2D _treeTex;
+        Texture2D _rockTex;
 
         bool _showTechMenu = false;
         KeyboardState _prevKeys;
         int _selectedColony = 0;
+
+        // Zoom + camera state
+        float _zoom = 1.0f;
+        const float MinZoom = 0.5f;
+        const float MaxZoom = 5.0f;
+        int _prevWheel;
+
+        Vector2 _camera = Vector2.Zero;          // world-space top-left (in pixels)
+        bool _isPanning = false;
+        Point _lastMousePos;
 
         public Game1()
         {
@@ -43,6 +55,10 @@ namespace WorldSim
             _world = new World(width: 128, height: 128, initialPop: 25);
             string techPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tech", "technologies.json");
             TechTree.Load(techPath);
+
+            // Initialize mouse wheel baseline
+            _prevWheel = Mouse.GetState().ScrollWheelValue;
+
             base.Initialize();
         }
 
@@ -52,14 +68,64 @@ namespace WorldSim
             _pixel  = new Texture2D(GraphicsDevice, 1, 1);
             _pixel.SetData(new[] { Color.White});
             _font = Content.Load<SpriteFont>("DebugFont");
+
+            // PNG icons from Content pipeline
+            _treeTex = Content.Load<Texture2D>("tree");
+            _rockTex = Content.Load<Texture2D>("rock");
         }
 
         protected override void Update(GameTime gt)
         {
             KeyboardState keys = Keyboard.GetState();
+            MouseState mouse = Mouse.GetState();
 
             if (keys.IsKeyDown(Keys.F1) && !_prevKeys.IsKeyDown(Keys.F1))
                 _showTechMenu = !_showTechMenu;
+
+            // Middle-mouse drag to pan
+            if (mouse.MiddleButton == ButtonState.Pressed && !_isPanning)
+            {
+                _isPanning = true;
+                _lastMousePos = mouse.Position;
+            }
+            else if (mouse.MiddleButton == ButtonState.Released && _isPanning)
+            {
+                _isPanning = false;
+            }
+
+            if (_isPanning)
+            {
+                Point cur = mouse.Position;
+                Point deltaPt = cur - _lastMousePos;
+                _lastMousePos = cur;
+
+                // Divide by zoom so panning speed is consistent at all zoom levels
+                _camera -= new Vector2(deltaPt.X, deltaPt.Y) / _zoom;
+                ClampCamera();
+            }
+
+            // Zoom with mouse wheel (120 per notch), anchored to mouse position
+            int wheel = mouse.ScrollWheelValue;
+            int wheelDelta = wheel - _prevWheel;
+            if (wheelDelta != 0)
+            {
+                float steps = wheelDelta / 120f;
+                float factor = MathF.Pow(1.1f, steps); // ~10% per notch
+                ZoomAt(new Vector2(mouse.X, mouse.Y), factor);
+            }
+            _prevWheel = wheel;
+
+            // Zoom with +/- keys (also anchored to mouse for convenience)
+            if ((keys.IsKeyDown(Keys.OemPlus) && !_prevKeys.IsKeyDown(Keys.OemPlus)) ||
+                (keys.IsKeyDown(Keys.Add) && !_prevKeys.IsKeyDown(Keys.Add)))
+            {
+                ZoomAt(new Vector2(mouse.X, mouse.Y), 1.1f);
+            }
+            if ((keys.IsKeyDown(Keys.OemMinus) && !_prevKeys.IsKeyDown(Keys.OemMinus)) ||
+                (keys.IsKeyDown(Keys.Subtract) && !_prevKeys.IsKeyDown(Keys.Subtract)))
+            {
+                ZoomAt(new Vector2(mouse.X, mouse.Y), 1f / 1.1f);
+            }
 
             if (_showTechMenu)
             {
@@ -89,11 +155,52 @@ namespace WorldSim
             base.Update(gt);
         }
 
+        // Keep mouse position fixed when zooming
+        void ZoomAt(Vector2 screenPoint, float zoomFactor)
+        {
+            // World position under the cursor BEFORE the zoom
+            Vector2 worldBefore = ScreenToWorld(screenPoint);
+
+            _zoom = Math.Clamp(_zoom * zoomFactor, MinZoom, MaxZoom);
+
+            // Adjust camera so the same world point stays under the cursor AFTER zoom
+            Vector2 worldAfter = ScreenToWorld(screenPoint);
+            _camera += worldBefore - worldAfter;
+
+            ClampCamera();
+        }
+
+        Vector2 ScreenToWorld(Vector2 screenPoint)
+        {
+            // screen = (world - camera) * zoom  => world = screen/zoom + camera
+            return screenPoint / _zoom + _camera;
+        }
+
+        void ClampCamera()
+        {
+            float mapW = _world.Width * TileSize;
+            float mapH = _world.Height * TileSize;
+
+            float viewW = GraphicsDevice.Viewport.Width / _zoom;
+            float viewH = GraphicsDevice.Viewport.Height / _zoom;
+
+            float maxX = Math.Max(0f, mapW - viewW);
+            float maxY = Math.Max(0f, mapH - viewH);
+
+            _camera.X = Math.Clamp(_camera.X, 0f, maxX);
+            _camera.Y = Math.Clamp(_camera.Y, 0f, maxY);
+        }
+
         protected override void Draw(GameTime gt)
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
-            _sb.Begin();
+            // World pass (scaled + translated by camera)
+            var worldTransform =
+                Matrix.CreateTranslation(-_camera.X, -_camera.Y, 0f) *
+                Matrix.CreateScale(_zoom, _zoom, 1f);
+
+            _sb.Begin(samplerState: SamplerState.PointClamp, transformMatrix: worldTransform);
 
             for (int y = 0; y < _world.Height; y++)
             {
@@ -108,7 +215,20 @@ namespace WorldSim
                         Resource.Water => Color.Blue,
                         _ => Color.SandyBrown
                     };
-                    _sb.Draw(_pixel, new Rectangle(x * TileSize, y * TileSize, TileSize, TileSize), color);
+                    int bx = x * TileSize;
+                    int by = y * TileSize;
+
+                    // Base tile
+                    _sb.Draw(_pixel, new Rectangle(bx, by, TileSize, TileSize), color);
+
+                    // Icon overlay
+                    if (tile.Amount > 0)
+                    {
+                        if (tile.Type == Resource.Wood && _treeTex != null)
+                            _sb.Draw(_treeTex, new Rectangle(bx, by, TileSize, TileSize), Color.White);
+                        else if (tile.Type == Resource.Stone && _rockTex != null)
+                            _sb.Draw(_rockTex, new Rectangle(bx, by, TileSize, TileSize), Color.White);
+                    }
                 }
             }
 
@@ -127,6 +247,15 @@ namespace WorldSim
                 int px = house.Pos.x * TileSize + (TileSize - 3) / 2;
                 int py = house.Pos.y * TileSize + (TileSize - 3) / 2;
                 _sb.Draw(_pixel, new Rectangle(px, py, TileSize*3, TileSize*3), houseColor);
+            }
+
+            foreach (var animal in _world._animals)
+            {
+                _sb.Draw(
+                    _pixel,
+                    new Rectangle(animal.Pos.x * TileSize, animal.Pos.y * TileSize, TileSize, TileSize),
+                    animal.Color
+                );
             }
 
             _sb.End();

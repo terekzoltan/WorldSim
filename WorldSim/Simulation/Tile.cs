@@ -33,7 +33,7 @@ namespace WorldSim.Simulation
             {
                 Amount -= qty;
 
-                // If the resource is depleted, turn this tile into empty ground.
+                // When depleted, convert this tile to empty ground
                 if (Amount == 0)
                     Type = Resource.None;
 

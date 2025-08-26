@@ -14,6 +14,7 @@ namespace WorldSim.Simulation
         public List<Person> _people = new();
         public List<Colony> _colonies = new();
         public List<House> Houses = new();
+        public List<Animal> _animals = new();
 
         // Technology-affected properties
         public int WoodYield { get; set; } = 1; // Fa kitermelés hozama (mennyi fát kapnak egy gyűjtéskor)
@@ -41,14 +42,14 @@ namespace WorldSim.Simulation
             // 1. Randomly scatter resources
             for (int y = 0; y < Height; y++)
                 for (int x = 0; x < Width; x++)
-                    _map[x, y] = new Tile(
+                    _map[x, y] = new Tile(          //EZ HOGYAN MUKODIK PONTOSAN? IDE KELL MAJD AZ IRON MEG GOLD STB
                         _rng.NextDouble() < 0.05 ? Resource.Wood :
                         _rng.NextDouble() < 0.02 ? Resource.Stone :
                                                    Resource.None,
                         _rng.Next(1, 10));
 
             // 2. Multiple colonies on the map (completely random positions)
-            int colonyCount = 4;
+            int colonyCount = 2;
             for (int ci = 0; ci < colonyCount; ci++)
             {
                 // Each colony gets a completely random position on the map
@@ -62,10 +63,10 @@ namespace WorldSim.Simulation
 
                 col.Color = ci switch
                 {
-                    0 => Color.Red,
-                    1 => Color.Blue,
-                    2 => Color.Yellow,
-                    3 => Color.Purple,
+                    0 => Color.Yellow,
+                    1 => Color.Purple,
+                    2 => Color.Red, 
+                    3 => Color.Blue, 
                     _ => Color.White
                 };
 
@@ -86,6 +87,11 @@ namespace WorldSim.Simulation
                     _people.Add(Person.Spawn(col, (px, py)));
                 }
             }
+
+            // 3. Spawn some animals at random positions
+            int animalCount = Math.Max(10, (Width * Height) / 256); // scale with map size
+            for (int i = 0; i < animalCount; i++)
+                _animals.Add(Animal.Spawn(RandomFreePos()));
         }
 
         // Tick-based update
@@ -98,7 +104,9 @@ namespace WorldSim.Simulation
                     _people.RemoveAt(i);
             }
             _people.AddRange(births);
+
             foreach (Colony c in _colonies) c.Update(dt);
+            foreach (var a in _animals) a.Update(this, dt);
 
             if (ResourceSharingEnabled && _colonies.Count > 1)
             {
