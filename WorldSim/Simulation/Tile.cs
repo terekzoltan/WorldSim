@@ -1,45 +1,54 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace WorldSim.Simulation
 {
     public enum Resource { None, Wood, Stone, Food, Water }
-    public class Tile
+    public enum Ground { Dirt, Water, Grass }
+
+    public sealed class ResourceNode
     {
-        public Resource Type { get; private set; }
+        public Resource Type { get; }
         public int Amount { get; private set; }
 
-        public Tile(Resource type, int amount)
+        public ResourceNode(Resource type, int amount)
         {
             Type = type;
             Amount = amount;
         }
 
+        public bool Consume(int qty)
+        {
+            if (Amount < qty) return false;
+            Amount -= qty;
+            return true;
+        }
+    }
+
+    public class Tile
+    {
+        public Ground Ground { get; }
+        public ResourceNode? Node { get; private set; }
+
+        public Tile(Ground ground, ResourceNode? node = null)
+        {
+            Ground = ground;
+            Node = node;
+        }
+
         /// <summary>
-        /// Tries to harvest the specified quantity of a given resource.
+        /// Tries to harvest from the resource node on this tile (if any).
         /// </summary>
-        /// <param name="res">The type of resource requested.</param>
-        /// <param name="qty">How much to harvest.</param>
-        /// <returns>
-        /// True if this tile contains the requested resource and has
-        /// at least <paramref name="qty"/> amount available; otherwise false.
-        /// </returns>
         public bool Harvest(Resource res, int qty)
         {
-            if (Type == res && Amount >= qty)
-            {
-                Amount -= qty;
+            if (Node == null) return false;
+            if (Node.Type != res) return false;
+            if (!Node.Consume(qty)) return false;
 
-                // When depleted, convert this tile to empty ground
-                if (Amount == 0)
-                    Type = Resource.None;
+            // When depleted, remove the node so the icon disappears.
+            if (Node.Amount == 0)
+                Node = null;
 
-                return true;
-            }
-            return false;
+            return true;
         }
     }
 }

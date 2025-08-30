@@ -19,10 +19,28 @@ namespace WorldSim
         World _world;
         SpriteFont _font;
 
+        // mezők
         const int TileSize = 7;
+        const float IconScale = 3.0f; // draw icons larger than a tile (resource/person)
+        const int HouseIconTiles = 3; // house icon size in tiles (3x3)
         Texture2D _pixel;
         Texture2D _treeTex;
         Texture2D _rockTex;
+
+        Texture2D _sylvarsTex;    // person icon (Cyan)
+        Texture2D _obsidariTex;   // person icon (Bronze)
+        // Texture2D _aetheriTex; // person icon (Purple)
+        // Texture2D _chitariTex; // person icon (Amber)
+
+        // house icons
+        Texture2D _sylvarHouseTex;
+        Texture2D _obsidiariHouseTex;
+        Texture2D _aetheriHouseTex;   // (előre bekészítve)
+        Texture2D _chiritaHouseTex;   // (előre bekészítve)
+
+        // opcionális színek (összehasonlításhoz)
+        static readonly Color Bronze = new Color(205, 127, 50);
+        static readonly Color Amber  = new Color(255, 191, 0);
 
         bool _showTechMenu = false;
         KeyboardState _prevKeys;
@@ -72,6 +90,18 @@ namespace WorldSim
             // PNG icons from Content pipeline
             _treeTex = Content.Load<Texture2D>("tree");
             _rockTex = Content.Load<Texture2D>("rock");
+
+            // persons
+            _sylvarsTex  = Content.Load<Texture2D>("Sylvar");
+            _obsidariTex = Content.Load<Texture2D>("Obsidiari");
+            // _aetheriTex  = Content.Load<Texture2D>("Aetheri");
+            // _chitariTex  = Content.Load<Texture2D>("Chirita");
+
+            // houses (ikonnevek: ChiritaHouse, AetheriHouse, ObsidiariHouse, SylvarHouse)
+            _sylvarHouseTex    = Content.Load<Texture2D>("SylvarHouse");
+            _obsidiariHouseTex = Content.Load<Texture2D>("ObsidiariHouse");
+            _aetheriHouseTex   = Content.Load<Texture2D>("AetheriHouse");   // későbbre
+            _chiritaHouseTex   = Content.Load<Texture2D>("ChiritaHouse");   // későbbre
         }
 
         protected override void Update(GameTime gt)
@@ -191,6 +221,26 @@ namespace WorldSim
             _camera.Y = Math.Clamp(_camera.Y, 0f, maxY);
         }
 
+        // helper az ikon kiválasztásához kolónia alapján (személy)
+        Texture2D? GetColonyIcon(Colony c)
+        {
+            if (c.Color == Color.Cyan) return _sylvarsTex;   // Sylvars
+            if (c.Color == Bronze)     return _obsidariTex;  // Obsidari
+            // if (c.Color == Color.Purple) return _aetheriTex; // Aetheri
+            // if (c.Color == Amber)       return _chitariTex;  // Chitáriak
+            return null;
+        }
+
+        // helper az ikon kiválasztásához kolónia alapján (ház)
+        Texture2D? GetHouseIcon(Colony c)
+        {
+            if (c.Color == Color.Cyan) return _sylvarHouseTex;       // SylvarHouse
+            if (c.Color == Bronze)     return _obsidiariHouseTex;    // ObsidiariHouse
+            if (c.Color == Color.Purple) return _aetheriHouseTex;    // AetheriHouse (ha be lesz kötve)
+            if (c.Color == Amber)        return _chiritaHouseTex;    // ChiritaHouse (ha be lesz kötve)
+            return null;
+        }
+
         protected override void Draw(GameTime gt)
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
@@ -202,53 +252,94 @@ namespace WorldSim
 
             _sb.Begin(samplerState: SamplerState.PointClamp, transformMatrix: worldTransform);
 
+            // 1) Base tiles
             for (int y = 0; y < _world.Height; y++)
             {
                 for (int x = 0; x < _world.Width; x++)
                 {
                     Tile tile = _world.GetTile(x, y);
-                    Color color = tile.Type switch
+                    Color color = tile.Ground switch
                     {
-                        Resource.Wood => Color.ForestGreen,
-                        Resource.Stone => Color.Gray,
-                        Resource.Food => Color.Yellow,
-                        Resource.Water => Color.Blue,
-                        _ => Color.SandyBrown
+                        Ground.Water => Color.Blue,
+                        Ground.Grass => Color.ForestGreen,
+                        _ => Color.SandyBrown // Dirt és egyéb
                     };
                     int bx = x * TileSize;
                     int by = y * TileSize;
 
-                    // Base tile
                     _sb.Draw(_pixel, new Rectangle(bx, by, TileSize, TileSize), color);
+                }
+            }
 
-                    // Icon overlay
-                    if (tile.Amount > 0)
+            // 2) Icons for resource nodes
+            for (int y = 0; y < _world.Height; y++)
+            {
+                for (int x = 0; x < _world.Width; x++)
+                {
+                    Tile tile = _world.GetTile(x, y);
+                    var node = tile.Node;
+                    if (node != null && node.Amount > 0)
                     {
-                        if (tile.Type == Resource.Wood && _treeTex != null)
-                            _sb.Draw(_treeTex, new Rectangle(bx, by, TileSize, TileSize), Color.White);
-                        else if (tile.Type == Resource.Stone && _rockTex != null)
-                            _sb.Draw(_rockTex, new Rectangle(bx, by, TileSize, TileSize), Color.White);
+                        int bx = x * TileSize;
+                        int by = y * TileSize;
+
+                        int iconSize = (int)MathF.Round(TileSize * IconScale);
+                        int iconX = bx + (TileSize - iconSize) / 2;
+                        int iconY = by + (TileSize - iconSize) / 2;
+
+                        if (node.Type == Resource.Wood && _treeTex != null)
+                            _sb.Draw(_treeTex, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
+                        else if (node.Type == Resource.Stone && _rockTex != null)
+                            _sb.Draw(_rockTex, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
                     }
                 }
             }
 
-            foreach (Person person in _world._people)
-            {
-                _sb.Draw(
-                    _pixel,
-                    new Rectangle(person.Pos.x * TileSize, person.Pos.y * TileSize, TileSize, TileSize),
-                    person.Color
-                );
-            }
-
+            // 3) Houses
             foreach (var house in _world.Houses)
             {
-                Color houseColor = house.Owner.Color * 0.8f;
-                int px = house.Pos.x * TileSize + (TileSize - 3) / 2;
-                int py = house.Pos.y * TileSize + (TileSize - 3) / 2;
-                _sb.Draw(_pixel, new Rectangle(px, py, TileSize*3, TileSize*3), houseColor);
+                int hx = house.Pos.x * TileSize;
+                int hy = house.Pos.y * TileSize;
+
+                // 3x3 pixel “base” marker a tile közepén (mindig)
+                int baseW = 3, baseH = 3;
+                int baseX = hx + (TileSize - baseW) / 2;
+                int baseY = hy + (TileSize - baseH) / 2;
+                _sb.Draw(_pixel, new Rectangle(baseX, baseY, baseW, baseH), house.Owner.Color * 0.9f);
+
+                // Ház ikon: ~3x3 tile méretű, a tile középpontjára igazítva
+                var hIcon = GetHouseIcon(house.Owner);
+                if (hIcon != null)
+                {
+                    int iconSize = TileSize * HouseIconTiles * 2; // pontosan 3x3 tile
+                    int iconX = hx + (TileSize - iconSize) / 2;
+                    int iconY = hy + (TileSize - iconSize) / 2;
+                    _sb.Draw(hIcon, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
+                }
+                // nincs else: ha nincs ikon, elég a 3x3 pixeles marker
             }
 
+            // 4) Személyek (frakcióikon, ha van)
+            foreach (Person person in _world._people)
+            {
+                int dx = person.Pos.x * TileSize;
+                int dy = person.Pos.y * TileSize;
+
+                var icon = GetColonyIcon(person.Home);
+                if (icon != null)
+                {
+                    int iconSize = (int)MathF.Round(TileSize * IconScale);
+                    int iconX = dx + (TileSize - iconSize) / 2;
+                    int iconY = dy + (TileSize - iconSize) / 2;
+                    _sb.Draw(icon, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
+                }
+                else
+                {
+                    _sb.Draw(_pixel, new Rectangle(dx, dy, TileSize, TileSize), person.Color);
+                }
+            }
+
+            // 5) Animals
             foreach (var animal in _world._animals)
             {
                 _sb.Draw(
@@ -260,6 +351,7 @@ namespace WorldSim
 
             _sb.End();
 
+            // UI pass (unchanged)
             _sb.Begin();
 
             int j = 10;
