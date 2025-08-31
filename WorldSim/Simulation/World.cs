@@ -156,87 +156,148 @@ namespace WorldSim.Simulation
             int total = Width * Height;
             int waterTarget = (int)(total * 0.10); // ~10% water
             int grassTarget = (int)(total * 0.60); // ~60% grass
-            // rest becomes dirt
 
-            // Grow a few water blobs
-            GrowRegion(mask, label: 0, targetCount: waterTarget, spreadProb: 0.72);
+            // 1) Tömör víz-blokkok (nincs lyuk blobon belül)
+            GrowRegionSolid(mask, label: 0, targetCount: waterTarget, minBlob: Math.Max(64, total/500), maxBlob: Math.Max(256, total/160));
 
-            // Grow grass blobs (overwriting unassigned cells)
-            GrowRegion(mask, label: 1, targetCount: grassTarget, spreadProb: 0.72);
+            // 2) Tömör fű-blokkok a maradékba
+            GrowRegionSolid(mask, label: 1, targetCount: grassTarget, minBlob: Math.Max(64, total/500), maxBlob: Math.Max(256, total/160));
 
-            // Fill the rest as dirt
+            // 3) Ami kimaradt: dirt
             for (int y = 0; y < Height; y++)
                 for (int x = 0; x < Width; x++)
-                    if (mask[x, y] == -1)
-                        mask[x, y] = 2;
+                    if (mask[x, y] == -1) mask[x, y] = 2;
 
-            // Convert to Ground[,]
+            // 4) Víz „lyukbetömés”: ami nem víz és nem ér szélére → legyen víz
+            FillEnclosed(mask, labelToKeep: 0);
+
+            // 5) Gyors simítás (opcionális, 0–2 iteráció elég)
+            SmoothMajority(mask, targetLabel: 0, iterations: 1); // víz simítás
+            SmoothMajority(mask, targetLabel: 1, iterations: 1); // fű simítás
+
+            // Konverzió Ground[,] -ra
             Ground[,] grounds = new Ground[Width, Height];
             for (int y = 0; y < Height; y++)
-            {
                 for (int x = 0; x < Width; x++)
-                {
-                    grounds[x, y] = mask[x, y] switch
-                    {
-                        0 => Ground.Water,
-                        1 => Ground.Grass,
-                        _ => Ground.Dirt
-                    };
-                }
-            }
+                    grounds[x, y] = mask[x, y] == 0 ? Ground.Water :
+                                    (mask[x, y] == 1 ? Ground.Grass : Ground.Dirt);
+
             return grounds;
         }
 
-        void GrowRegion(int[,] mask, int label, int targetCount, double spreadProb)
+        // --- Tömör blob-növesztés (BFS), olcsó és lyukmentes ---
+        void GrowRegionSolid(int[,] mask, int label, int targetCount, int minBlob, int maxBlob)
         {
             if (targetCount <= 0) return;
-
             int placed = 0;
+
+            while (placed < targetCount)
+            {
+                // új mag pont: még fel nem osztott cella
+                int sx, sy, guard = 0;
+                do
+                {
+                    sx = _rng.Next(Width);
+                    sy = _rng.Next(Height);
+                } while (mask[sx, sy] != -1 && ++guard < 2048);
+                if (guard >= 2048) break;
+
+                int blobTarget = Math.Min(targetCount - placed, _rng.Next(minBlob, maxBlob + 1));
+
+                Queue<(int x, int y)> q = new();
+                q.Enqueue((sx, sy));
+
+                while (q.Count > 0 && blobTarget > 0 && placed < targetCount)
+                {
+                    var (x, y) = q.Dequeue();
+                    if (x < 0 || y < 0 || x >= Width || y >= Height) continue;
+                    if (mask[x, y] != -1) continue;
+
+                    // kissé „fodros” part: néha kihagyunk
+                    if (_rng.NextDouble() < 0.06) { // 6%: part-véletlen
+                        // de szomszédokat ettől még sorba tesszük -> tovább nő a blob
+                    }
+                    else
+                    {
+                        mask[x, y] = label;
+                        placed++;
+                        blobTarget--;
+                    }
+
+                    // 4-szomszéd MINDIG sorba (ettől lesz tömör a blob)
+                    q.Enqueue((x + 1, y));
+                    q.Enqueue((x - 1, y));
+                    q.Enqueue((x, y + 1));
+                    q.Enqueue((x, y - 1));
+                }
+            }
+        }
+
+        // --- Perem-flood-fill: a zárt „száraz” üregeket vízzé alakítja ---
+        void FillEnclosed(int[,] mask, int labelToKeep)
+        {
+            bool[,] seen = new bool[Width, Height];
             Queue<(int x, int y)> q = new();
 
-            // Helper to enqueue neighbors with probability
-            void EnqueueNeighbors(int x, int y)
+            // indulás: minden szegély, ami NEM labelToKeep
+            for (int x = 0; x < Width; x++)
             {
-                // 4-neighborhood
-                Span<(int dx, int dy)> neigh = stackalloc (int dx, int dy)[]
+                if (mask[x, 0] != labelToKeep) { q.Enqueue((x, 0)); seen[x, 0] = true; }
+                if (mask[x, Height - 1] != labelToKeep) { q.Enqueue((x, Height - 1)); seen[x, Height - 1] = true; }
+            }
+            for (int y = 0; y < Height; y++)
+            {
+                if (mask[0, y] != labelToKeep) { q.Enqueue((0, y)); seen[0, y] = true; }
+                if (mask[Width - 1, y] != labelToKeep) { q.Enqueue((Width - 1, y)); seen[Width - 1, y] = true; }
+            }
+
+            // bejárjuk, mi éri el a szegélyt (nem-víz komponensek)
+            int[] dx = { 1, -1, 0, 0 };
+            int[] dy = { 0, 0, 1, -1 };
+            while (q.Count > 0)
+            {
+                var (x, y) = q.Dequeue();
+                for (int k = 0; k < 4; k++)
                 {
-                    (1,0), (-1,0), (0,1), (0,-1)
-                };
-                foreach (var (dx, dy) in neigh)
-                {
-                    if (_rng.NextDouble() < spreadProb)
-                        q.Enqueue((x + dx, y + dy));
+                    int nx = x + dx[k], ny = y + dy[k];
+                    if (nx < 0 || ny < 0 || nx >= Width || ny >= Height) continue;
+                    if (seen[nx, ny]) continue;
+                    if (mask[nx, ny] == labelToKeep) continue; // vízbe nem lépünk
+                    seen[nx, ny] = true;
+                    q.Enqueue((nx, ny));
                 }
             }
 
-            // Keep seeding new blobs until target reached
-            int safety = 0;
-            while (placed < targetCount && safety++ < targetCount * 20)
+            // ami nem látható a szegélyről és nem víz -> zárt üreg -> legyen víz
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
+                    if (mask[x, y] != labelToKeep && !seen[x, y])
+                        mask[x, y] = labelToKeep;
+        }
+
+        // --- 8-szomszédos többségi simítás (nagyon olcsó) ---
+        void SmoothMajority(int[,] mask, int targetLabel, int iterations)
+        {
+            for (int it = 0; it < iterations; it++)
             {
-                // If queue empty, pick a random unassigned cell as new seed
-                if (q.Count == 0)
+                int[,] copy = (int[,])mask.Clone();
+                for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
                 {
-                    // find a few random candidates
-                    for (int attempts = 0; attempts < 64 && q.Count == 0; attempts++)
+                    int cnt = 0, tot = 0;
+                    for (int yy = y - 1; yy <= y + 1; yy++)
+                    for (int xx = x - 1; xx <= x + 1; xx++)
                     {
-                        int sx = _rng.Next(0, Width);
-                        int sy = _rng.Next(0, Height);
-                        if (mask[sx, sy] == -1)
-                            q.Enqueue((sx, sy));
+                        if (xx == x && yy == y) continue;
+                        if (xx < 0 || yy < 0 || xx >= Width || yy >= Height) continue;
+                        tot++;
+                        if (copy[xx, yy] == targetLabel) cnt++;
                     }
-                    // If no unassigned left, we cannot place more
-                    if (q.Count == 0) break;
+                    // ha sok a cél-szomszéd → odasimítjuk
+                    if (cnt >= 5) mask[x, y] = targetLabel;
+                    // ha alig van → elvékonyítjuk
+                    else if (cnt <= 1 && mask[x, y] == targetLabel) mask[x, y] = (targetLabel == 0 ? 2 : 2);
                 }
-
-                var (x, y) = q.Dequeue();
-                if (x < 0 || y < 0 || x >= Width || y >= 0 + Height) { if (y >= Height) { } continue; } // keep bounds clean
-                if (x < 0 || y < 0 || x >= Width || y >= Height) continue;
-                if (mask[x, y] != -1) continue;
-
-                mask[x, y] = label;
-                placed++;
-
-                EnqueueNeighbors(x, y);
             }
         }
     }
