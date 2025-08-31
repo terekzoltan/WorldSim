@@ -154,8 +154,8 @@ namespace WorldSim.Simulation
                     mask[x, y] = -1;
 
             int total = Width * Height;
-            int waterTarget = (int)(total * 0.10); // ~10% water
-            int grassTarget = (int)(total * 0.60); // ~60% grass
+            int waterTarget = (int)(total * 0.15); // ~10% water
+            int grassTarget = (int)(total * 0.65); // ~60% grass
 
             // 1) Tömör víz-blokkok (nincs lyuk blobon belül)
             GrowRegionSolid(mask, label: 0, targetCount: waterTarget, minBlob: Math.Max(64, total/500), maxBlob: Math.Max(256, total/160));
