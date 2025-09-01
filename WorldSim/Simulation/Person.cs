@@ -22,18 +22,40 @@ public class Person
     Colony _home;
     Random _rng = new();
 
+    // Perception and internal state
+    public Blackboard Blackboard { get; } = new();
+    public Memory Memory { get; } = new();
+    public List<Sensor> Sensors { get; } = new() { new EnvironmentSensor() };
+
+    public Dictionary<string, float> Needs { get; } = new();
+    public Dictionary<string, float> Emotions { get; } = new();
+    public HashSet<string> Traits { get; } = new();
+
     const int WoodWorkTime = 5;
     const int StoneWorkTime = 8;
     const int BuildHouseTime = 20;
 
     int _doingJob = 0; // csinalni hogy ideig dolgozzon ne instant
 
+    // Idle loitering → wander only after some time doing nothing
+    float _idleTimeSeconds = 0f;
+    float _loiterThresholdSeconds; // randomized per person
+    (int x, int y) _lastPos;
+
     private Person(Colony home, (int, int) pos)
     {
         _home = home;
         Pos = pos;
+        _lastPos = pos;
         Strength = _rng.Next(3, 11);
         Intelligence = _rng.Next(3, 11);
+
+        // Needs/Emotions baseline-ok
+        Needs["Hunger"] = 20f; // 0..100, kisebb = jobb (jóllakott)
+        Emotions["Happy"] = 0f;
+        Emotions["Hope"] = 0f;
+
+        _loiterThresholdSeconds = 2.5f + (float)_rng.NextDouble() * 2.5f; // 2.5..5.0s
     }
 
     public static Person Spawn(Colony home, (int, int) pos)
@@ -48,11 +70,51 @@ public class Person
         return person;
     }
 
+    // Run sensors and store perceived facts to memory
+    void Perceive(World w)
+    {
+        Blackboard.Clear();
+        foreach (var sensor in Sensors)
+            sensor.Sense(w, this, Blackboard);
+
+        foreach (var factual in Blackboard.FactualEvents)
+            ProcessEvent(factual);
+
+        if (Blackboard.FactualEvents.Count > 0)
+            Memory.Remember(Blackboard.FactualEvents);
+    }
+
+    void ProcessEvent(FactualEvent factual)
+    {
+        if (factual.Type == EventTypes.ResourceHere && factual.Data is Resource res)
+        {
+            // Wood/Stone → kis remény növekedés
+            if (res == Resource.Wood || res == Resource.Stone)
+            {
+                Emotions["Hope"] = Math.Clamp(Emotions.GetValueOrDefault("Hope", 0f) + 0.5f, -100f, 100f);
+            }
+
+            // Ha lesz Food, csökkentsd az éhséget és növeld a Happy-t
+            if (res == Resource.Food)
+            {
+                Needs["Hunger"] = Math.Max(0f, Needs.GetValueOrDefault("Hunger", 20f) - 10f);
+                Emotions["Happy"] = Math.Clamp(Emotions.GetValueOrDefault("Happy", 0f) + 1f, -100f, 100f);
+            }
+        }
+    }
+
     public bool Update(World w, float dt, List<Person> births)
     {
-        Age += dt/10;
+        // perception step
+        Perceive(w);
+
+        Age += dt / 10;
         if (Age > w.MaxAge)
             return false;
+
+        // Needs időbeli változása
+        if (Needs.TryGetValue("Hunger", out var h))
+            Needs["Hunger"] = Math.Clamp(h + dt * 2f, 0f, 100f);
 
         // simple reproduction chance if there is housing capacity
         int colonyPop = w._people.Count(p => p.Home == _home);
@@ -64,6 +126,9 @@ public class Person
 
         if (_doingJob > 0 && Current != Job.Idle)
         {
+            // working → not idle
+            _idleTimeSeconds = 0f;
+
             _doingJob--;
             if (_doingJob <= 0)
             {
@@ -84,7 +149,7 @@ public class Person
                         break;
 
                     case Job.BuildHouse:
-                        // Szükséges házak száma, de legalább annyi, mint a már meglévő házak (nem csökkenhet a házak száma).
+                        // Szükséges házak száma, de legalább annyi, mint a már meglévő házak
                         int maxHouses = Math.Max(_home.HouseCount, (int)Math.Ceiling((colonyPop + 3) / (double)w.HouseCapacity));
                         if (_home.HouseCount < maxHouses)
                         {
@@ -109,7 +174,7 @@ public class Person
         }
         else if (Current == Job.Idle)
         {
-            // 1) Ha a jelenlegi tile-on van node → ahhoz illeszkedő munka
+            // 1) Ha a jelenlegi tile-on van node → indíts munkát
             var hereNode = w.GetTile(Pos.x, Pos.y).Node;
             if (hereNode != null && hereNode.Amount > 0)
             {
@@ -117,47 +182,43 @@ public class Person
                 {
                     Current = Job.GatherWood;
                     _doingJob = Math.Max(1, (int)MathF.Ceiling(WoodWorkTime / w.WorkEfficiencyMultiplier));
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
                     return true;
                 }
                 if (hereNode.Type == Resource.Stone)
                 {
                     Current = Job.GatherStone;
                     _doingJob = Math.Max(1, (int)MathF.Ceiling(StoneWorkTime / w.WorkEfficiencyMultiplier));
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
                     return true;
                 }
             }
 
             // 2) Keresd meg a legközelebbi node-ot (kis rádiusz), és lépj felé
-            if (TryMoveTowardsNearestResource(w, searchRadius: 3))
+            if (TryMoveTowardsNearestResource(w, searchRadius: 2))
             {
                 // mozogtunk egyet a cél felé, maradjon Idle, következő tickben újra próbál
+                _idleTimeSeconds = 0f; // movement → not idle
+                _lastPos = Pos;
                 return true;
             }
 
-            // 3) Ha semmi a közelben, akkor fallback (építés/gyűjtés random)
-            AssignRandomJob(w);
+            // 3) Nem talált semmit → várakozás egy ideig, majd időnként kóboroljon
+            _idleTimeSeconds += dt;
+            if (_idleTimeSeconds >= _loiterThresholdSeconds)
+            {
+                Wander(w);
+                _idleTimeSeconds = 0f; // reset after a wander burst
+                _lastPos = Pos;
+                return true;
+            }
+            // egyébként marad Idle és tényleg nem csinál semmit
         }
-        return true;
-    }
 
-    void AssignRandomJob(World w)
-    {
-        double r = _rng.NextDouble();
-        if (r < 0.4)
-        {
-            Current = Job.GatherWood;
-            _doingJob = Math.Max(1, (int)MathF.Ceiling(WoodWorkTime / w.WorkEfficiencyMultiplier));
-        }
-        else if (r < 0.8)
-        {
-            Current = Job.GatherStone;
-            _doingJob = Math.Max(1, (int)MathF.Ceiling(StoneWorkTime / w.WorkEfficiencyMultiplier));
-        }
-        else
-        {
-            Current = Job.BuildHouse;
-            _doingJob = Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier));
-        }
+        _lastPos = Pos;
+        return true;
     }
 
     bool TryMoveTowardsNearestResource(World w, int searchRadius)
