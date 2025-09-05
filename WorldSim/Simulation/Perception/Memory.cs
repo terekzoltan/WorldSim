@@ -17,4 +17,6 @@ public class Memory
             _events.RemoveRange(0, trim);
         }
     }
+
+    //Sleep-> algoritmus hogy a lényeges dolgokra emlékezzen csak.. -> ha ez bonyi akk maybe LLM segít
 }

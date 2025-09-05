@@ -34,6 +34,7 @@ public class Person
     const int WoodWorkTime = 5;
     const int StoneWorkTime = 8;
     const int BuildHouseTime = 20;
+    const double IdleBuildChance = 0.03; // kis eséllyel házépítés, ha nincs más teendő
 
     int _doingJob = 0; // csinalni hogy ideig dolgozzon ne instant
 
@@ -149,23 +150,20 @@ public class Person
                         break;
 
                     case Job.BuildHouse:
-                        // Szükséges házak száma, de legalább annyi, mint a már meglévő házak
-                        int maxHouses = Math.Max(_home.HouseCount, (int)Math.Ceiling((colonyPop + 3) / (double)w.HouseCapacity));
-                        if (_home.HouseCount < maxHouses)
+                        // Építs, ha van elég anyag (nincs kapacitás-limit)
+                        if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
                         {
-                            if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
-                            {
-                                _home.Stock[Resource.Stone] -= _home.HouseStoneCost;
-                                _home.HouseCount++;
-                                w.AddHouse(_home, Pos);
-                            }
-                            else if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
-                            {
-                                _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
-                                _home.HouseCount++;
-                                w.AddHouse(_home, Pos);
-                            }
+                            _home.Stock[Resource.Stone] -= _home.HouseStoneCost;
+                            _home.HouseCount++;
+                            w.AddHouse(_home, Pos);
                         }
+                        else if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
+                        {
+                            _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
+                            _home.HouseCount++;
+                            w.AddHouse(_home, Pos);
+                        }
+                        // ha nincs elég anyag, nem történik semmi
                         break;
                 }
 
@@ -199,13 +197,22 @@ public class Person
             // 2) Keresd meg a legközelebbi node-ot (kis rádiusz), és lépj felé
             if (TryMoveTowardsNearestResource(w, searchRadius: 2))
             {
-                // mozogtunk egyet a cél felé, maradjon Idle, következő tickben újra próbál
                 _idleTimeSeconds = 0f; // movement → not idle
                 _lastPos = Pos;
                 return true;
             }
 
-            // 3) Nem talált semmit → várakozás egy ideig, majd időnként kóboroljon
+            // 3) Nincs teendő → kis eséllyel kezdj házépítésbe, különben loiter → wander
+            if (_rng.NextDouble() < IdleBuildChance)
+            {
+                Current = Job.BuildHouse;
+                _doingJob = Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier));
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
+            }
+
+            // loiter idő gyűjtése, majd wander
             _idleTimeSeconds += dt;
             if (_idleTimeSeconds >= _loiterThresholdSeconds)
             {
@@ -214,7 +221,6 @@ public class Person
                 _lastPos = Pos;
                 return true;
             }
-            // egyébként marad Idle és tényleg nem csinál semmit
         }
 
         _lastPos = Pos;

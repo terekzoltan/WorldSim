@@ -119,7 +119,14 @@ namespace WorldSim.Simulation
             _people.AddRange(births);
 
             foreach (Colony c in _colonies) c.Update(dt);
-            foreach (var a in _animals) a.Update(this, dt);
+
+            // Animals: update and remove the dead
+            for (int i = _animals.Count - 1; i >= 0; i--)
+            {
+                _animals[i].Update(this, dt);
+                if (!_animals[i].IsAlive)
+                    _animals.RemoveAt(i);
+            }
 
             if (ResourceSharingEnabled && _colonies.Count > 1)
             {
