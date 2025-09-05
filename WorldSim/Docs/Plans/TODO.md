@@ -1,5 +1,7 @@
-﻿(*) jelentése: mennyiségben ahány csillag ahanyadik a prior sorrendben. (*) -> első ; (****) -> negyedik
+﻿
+we good
 
+(*) jelentése: mennyiségben ahány csillag ahanyadik a prior sorrendben. (*) -> első ; (****) -> negyedik
 
 - IDEIG DOLGOZZON NE INSTANT (X) -> Munkaidő bevezetése a személyek számára
 
