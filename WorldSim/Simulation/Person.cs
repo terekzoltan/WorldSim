@@ -31,10 +31,14 @@ public class Person
     public Dictionary<string, float> Emotions { get; } = new();
     public HashSet<string> Traits { get; } = new();
 
+    // Utility AI
+    private readonly GoalSelector _goalSelector = new();
+    private readonly IPlanner _planner = new SimplePlanner();
+    private readonly List<Goal> _goals = GoalLibrary.CreateDefaultGoals();
+
     const int WoodWorkTime = 5;
     const int StoneWorkTime = 8;
     const int BuildHouseTime = 20;
-    const double IdleBuildChance = 0.03; // kis eséllyel házépítés, ha nincs más teendő
 
     int _doingJob = 0; // csinalni hogy ideig dolgozzon ne instant
 
@@ -150,20 +154,23 @@ public class Person
                         break;
 
                     case Job.BuildHouse:
-                        // Építs, ha van elég anyag (nincs kapacitás-limit)
-                        if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
+                        // Szükséges házak száma, de legalább annyi, mint a már meglévő házak
+                        int maxHouses = Math.Max(_home.HouseCount, (int)Math.Ceiling((colonyPop + 3) / (double)w.HouseCapacity));
+                        if (_home.HouseCount < maxHouses)
                         {
-                            _home.Stock[Resource.Stone] -= _home.HouseStoneCost;
-                            _home.HouseCount++;
-                            w.AddHouse(_home, Pos);
+                            if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
+                            {
+                                _home.Stock[Resource.Stone] -= _home.HouseStoneCost;
+                                _home.HouseCount++;
+                                w.AddHouse(_home, Pos);
+                            }
+                            else if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
+                            {
+                                _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
+                                _home.HouseCount++;
+                                w.AddHouse(_home, Pos);
+                            }
                         }
-                        else if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
-                        {
-                            _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
-                            _home.HouseCount++;
-                            w.AddHouse(_home, Pos);
-                        }
-                        // ha nincs elég anyag, nem történik semmi
                         break;
                 }
 
@@ -172,7 +179,7 @@ public class Person
         }
         else if (Current == Job.Idle)
         {
-            // 1) Ha a jelenlegi tile-on van node → indíts munkát
+            // 1) Immediate resource on current tile → start job
             var hereNode = w.GetTile(Pos.x, Pos.y).Node;
             if (hereNode != null && hereNode.Amount > 0)
             {
@@ -194,7 +201,7 @@ public class Person
                 }
             }
 
-            // 2) Keresd meg a legközelebbi node-ot (kis rádiusz), és lépj felé
+            // 2) Move one step toward nearest resource in small radius
             if (TryMoveTowardsNearestResource(w, searchRadius: 2))
             {
                 _idleTimeSeconds = 0f; // movement → not idle
@@ -202,22 +209,30 @@ public class Person
                 return true;
             }
 
-            // 3) Nincs teendő → kis eséllyel kezdj házépítésbe, különben loiter → wander
-            if (_rng.NextDouble() < IdleBuildChance)
+            // 3) Utility-goal fallback → pick a job (e.g., BuildHouse if feasible)
+            _goalSelector.SelectGoal(_goals, _planner, this, w);
+            var next = _planner.GetNextJob(this, w);
+            if (next != Job.Idle)
             {
-                Current = Job.BuildHouse;
-                _doingJob = Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier));
+                Current = next;
+                _doingJob = next switch
+                {
+                    Job.GatherWood  => Math.Max(1, (int)MathF.Ceiling(WoodWorkTime  / w.WorkEfficiencyMultiplier)),
+                    Job.GatherStone => Math.Max(1, (int)MathF.Ceiling(StoneWorkTime / w.WorkEfficiencyMultiplier)),
+                    Job.BuildHouse  => Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier)),
+                    _ => 0
+                };
                 _idleTimeSeconds = 0f;
                 _lastPos = Pos;
                 return true;
             }
 
-            // loiter idő gyűjtése, majd wander
+            // 4) Loiter for a while, then wander
             _idleTimeSeconds += dt;
             if (_idleTimeSeconds >= _loiterThresholdSeconds)
             {
                 Wander(w);
-                _idleTimeSeconds = 0f; // reset after a wander burst
+                _idleTimeSeconds = 0f;
                 _lastPos = Pos;
                 return true;
             }
@@ -263,7 +278,7 @@ public class Person
 
         if (bestPos == null) return false;
 
-        // Ha már rajta állunk (biztonság), itt is indíthatunk munkát
+        // Ha már rajta állunk
         if (bestDist == 0)
         {
             if (bestType == Resource.Wood)
@@ -279,7 +294,7 @@ public class Person
             return true;
         }
 
-        // Lépjünk egyet a cél felé (max colony sebességgel)
+        // Step toward target
         MoveTowards(w, bestPos.Value, (int)_home.MovementSpeedMultiplier);
         return true;
     }
@@ -303,7 +318,6 @@ public class Person
             nx = Math.Clamp(nx, 0, w.Width - 1);
             ny = Math.Clamp(ny, 0, w.Height - 1);
 
-            // Csak akkor lépünk, ha nem víz a cél tile
             if (w.GetTile(nx, ny).Ground != Ground.Water)
             {
                 cx = nx;
@@ -311,7 +325,6 @@ public class Person
             }
             else
             {
-                // Ha víz lenne, megállunk
                 break;
             }
         }
@@ -333,6 +346,6 @@ public class Person
                 return;
             }
         }
-        // Ha nem találtunk szárazat, maradunk
+        // stay if all around is water
     }
 }

@@ -5,6 +5,20 @@ we good
 
 - IDEIG DOLGOZZON NE INSTANT (X) -> Munkaidő bevezetése a személyek számára
 
+-----------------------
+
+- Megérteni MINDENT EDDIG->Megérteni Create Goal, Consideration, UtilityEvaluator classes
+- clean TODO
+- Több Job, ResourseTypeok: ritkítani a kettő eddigit
+- FOOD
+- növények
+- volt vmi Unicode convert sztem erről gyors rákérdezni copilot
+
+- Állatok világa balanceFix
+
+- After these->GOAP codex
+
+-----------------------
 
 - ÁgensTerv végrehajtása még most, alapok refaktorálása BEING DONE (*)
 
