@@ -1,9 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Xna.Framework;
 
 namespace WorldSim.Simulation
 {
@@ -11,7 +7,6 @@ namespace WorldSim.Simulation
     {
         public int Id { get; }
         public (int x, int y) Origin;
-        public Color Color { get; set; } 
 
         public Dictionary<Resource, int> Stock = new()
         {

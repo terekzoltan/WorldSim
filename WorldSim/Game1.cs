@@ -38,10 +38,6 @@ namespace WorldSim
         Texture2D _aetheriHouseTex;   // (előre bekészítve)
         Texture2D _chiritaHouseTex;   // (előre bekészítve)
 
-        // opcionális színek (összehasonlításhoz)
-        static readonly Color Bronze = new Color(205, 127, 50);
-        static readonly Color Amber  = new Color(255, 191, 0);
-
         bool _showTechMenu = false;
         KeyboardState _prevKeys;
         int _selectedColony = 0;
@@ -224,21 +220,29 @@ namespace WorldSim
         // helper az ikon kiválasztásához kolónia alapján (személy)
         Texture2D? GetColonyIcon(Colony c)
         {
-            if (c.Color == Color.Cyan) return _sylvarsTex;   // Sylvars
-            if (c.Color == Bronze)     return _obsidariTex;  // Obsidari
-            // if (c.Color == Color.Purple) return _aetheriTex; // Aetheri
-            // if (c.Color == Amber)       return _chitariTex;  // Chitáriak
-            return null;
+            // Select by Id instead of color
+            switch (c.Id)
+            {
+                case 0: return _sylvarsTex;   // Sylvars
+                case 1: return _obsidariTex;  // Obsidari
+                // case 2: return _aetheriTex; // Aetheri (if enabled)
+                // case 3: return _chitariTex; // Chitáriak (if enabled)
+                default: return null;
+            }
         }
 
         // helper az ikon kiválasztásához kolónia alapján (ház)
         Texture2D? GetHouseIcon(Colony c)
         {
-            if (c.Color == Color.Cyan) return _sylvarHouseTex;       // SylvarHouse
-            if (c.Color == Bronze)     return _obsidiariHouseTex;    // ObsidiariHouse
-            if (c.Color == Color.Purple) return _aetheriHouseTex;    // AetheriHouse (ha be lesz kötve)
-            if (c.Color == Amber)        return _chiritaHouseTex;    // ChiritaHouse (ha be lesz kötve)
-            return null;
+            // Select by Id instead of color
+            switch (c.Id)
+            {
+                case 0: return _sylvarHouseTex;      // SylvarHouse
+                case 1: return _obsidiariHouseTex;   // ObsidiariHouse
+                case 2: return _aetheriHouseTex;     // AetheriHouse (loaded)
+                case 3: return _chiritaHouseTex;     // ChiritaHouse (loaded)
+                default: return null;
+            }
         }
 
         protected override void Draw(GameTime gt)
@@ -305,7 +309,7 @@ namespace WorldSim
                 int baseW = 3, baseH = 3;
                 int baseX = hx + (TileSize - baseW) / 2;
                 int baseY = hy + (TileSize - baseH) / 2;
-                _sb.Draw(_pixel, new Rectangle(baseX, baseY, baseW, baseH), house.Owner.Color * 0.9f);
+                _sb.Draw(_pixel, new Rectangle(baseX, baseY, baseW, baseH), Color.White);
 
                 // Ház ikon: ~3x3 tile méretű, a tile középpontjára igazítva
                 var hIcon = GetHouseIcon(house.Owner);
@@ -335,7 +339,7 @@ namespace WorldSim
                 }
                 else
                 {
-                    _sb.Draw(_pixel, new Rectangle(dx, dy, TileSize, TileSize), person.Color);
+                    _sb.Draw(_pixel, new Rectangle(dx, dy, TileSize, TileSize), Color.White);
                 }
             }
 
@@ -359,7 +363,7 @@ namespace WorldSim
             {
                 string stats =
                     $"Colony {colony.Id}: Wood {colony.Stock[Resource.Wood]}, Stone {colony.Stock[Resource.Stone]}, Houses {colony.HouseCount}, People {_world._people.Count(p => p.Home == colony)}";
-                _sb.DrawString(_font, stats, new Vector2(10, j), colony.Color);
+                _sb.DrawString(_font, stats, new Vector2(10, j), Color.White);
                 j += 20;
             }
 

@@ -3,12 +3,24 @@ we good
 
 -----------------------
 
-- Több Job, ResourseTypeok: ritkítani a kettő eddigit
-- FOOD
-- növények, azok természetes szaporodása
-- volt vmi Unicode convert sztem erről gyors rákérdezni copilot
+- (Több Job, ResourseTypeok: ritkítani a kettő eddigit)
 
-- Állatok világa balanceFix
+- növények, azok természetes szaporodása
+
+- FOOD (lentebb codex task)
+-> gyumolcs
+-> allatkaja
+-> novenykaja
+
+-IRON GOLD belerak(); (lentebb codex task)
+
+-novenyevok hasznossaga emberekhez->szaras, novenytermeles or st like that
+-ragadozok tamadasa emebereket->vedekezes->visszatamadas, tamadasi rendszer
+
+- Állatok Icons
+
+-----------------------
+
 
 - After these->GOAP codex
 
@@ -27,12 +39,6 @@ Codex ref:
 GOAP kész: Create GoapPlanner and HtnPlanner classes
 Implement action planning using GOAP or HTN (this for tasks)
 Write instructions for task execution(Majd amikor LLM-nel vagyunk fontos részletek végén)
-
-
-
-
-
--LOITER NEM CLEAN-> random burst mozgas teleportalxd -> EZ MAR LEHET JAVITVA?
 
 
 Roadmap – Mini lépések

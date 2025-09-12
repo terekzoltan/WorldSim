@@ -95,7 +95,9 @@ public abstract class Animal
         if (_rng.NextDouble() >= RandomStepChance)
             return;
 
-        int step = Math.Max(1, maxStep);
+        // Align animal wander speed with people: at most 1 tile step (4/8-neighborhood)
+        int step = 1;
+
         int tries = 6;
         for (int i = 0; i < tries; i++)
         {
@@ -125,6 +127,13 @@ public sealed class Herbivore : Animal
     {
         if (!IsAlive) return;
 
+        // If spawned on water, immediately disappear
+        if (w.GetTile(Pos.x, Pos.y).Ground == Ground.Water)
+        {
+            IsAlive = false;
+            return;
+        }
+
         // Look for nearest predator in vision
         Predator? nearestPred = null;
         int best = int.MaxValue;
@@ -144,16 +153,16 @@ public sealed class Herbivore : Animal
 
         if (nearestPred != null && best <= Vision)
         {
-            // Flee: step in opposite direction from predator
+            // Flee: step in opposite direction from predator (no extra speed boost)
             var (px, py) = nearestPred.Pos;
-            var target = (x: Pos.x + Math.Clamp(Pos.x - px, -1, 1) * Speed * 2,
-                          y: Pos.y + Math.Clamp(Pos.y - py, -1, 1) * Speed * 2);
+            var target = (x: Pos.x + Math.Clamp(Pos.x - px, -1, 1) * Speed,
+                          y: Pos.y + Math.Clamp(Pos.y - py, -1, 1) * Speed);
             target = (Math.Clamp(target.x, 0, w.Width - 1), Math.Clamp(target.y, 0, w.Height - 1));
             StepTowards(w, target, Speed);
         }
         else
         {
-            // Wander calmly (now probabilistic via RandomStepChance)
+            // Wander calmly
             RandomStep(w, Speed);
         }   
     }
@@ -161,10 +170,11 @@ public sealed class Herbivore : Animal
 
 public sealed class Predator : Animal
 {
-    // Orange for visibility
-    public override Color Color => new Color(255, 165, 0); // Orange
+    // Red for visibility
+    public override Color Color => Color.Red;
 
-    public Predator((int x, int y) pos) : base(pos, speed: 2, vision: 6) { }
+
+    public Predator((int x, int y) pos) : base(pos, speed: 1, vision: 6) { }
 
     // Predators wander a bit more often than herbivores
     protected override double RandomStepChance => 0.8;
@@ -203,7 +213,7 @@ public sealed class Predator : Animal
         }
         else
         {
-            // Patrol/wander (probabilistic)
+            // Patrol/wander
             RandomStep(w, Speed);
         }
     }

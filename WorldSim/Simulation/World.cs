@@ -77,19 +77,11 @@ namespace WorldSim.Simulation
                 Colony col = new Colony(ci, colPos);
                 _colonies.Add(col);
 
-                // Faction colors (jövőben 4 lesz):
-                // 0: Sylvars (Cyan)
-                // 1: Obsidari (Bronze)
-                // 2: Aetheri (Violet)
-                // 3: Chitáriak (Amber/Golden Yellow)
-                col.Color = ci switch
-                {
-                    0 => Color.Cyan,                    // Sylvars
-                    1 => new Color(205, 127, 50),       // Obsidari (Bronze)
-                    2 => Color.Purple,                  // Aetheri
-                    3 => new Color(255, 191, 0),        // Chitáriak (Amber)
-                    _ => Color.White
-                };
+                // Faction setup kept for reference; explicit color assignment removed (using icons instead)
+                // 0: Sylvars
+                // 1: Obsidari
+                // 2: Aetheri
+                // 3: Chitáriak
 
                 // Residents near origin
                 int pop = initialPop / colonyCount;

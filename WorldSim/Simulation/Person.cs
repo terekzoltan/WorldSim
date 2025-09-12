@@ -13,11 +13,10 @@ public class Person
 {
     public (int x, int y) Pos;
     public Job Current = Job.Idle;
-    public float Health = 100;
+    public float Health = 100;  
     public float Age = 0;
     public int Strength, Intelligence;
     public Colony Home => _home;
-    public Color Color => _home.Color;
 
     Colony _home;
     Random _rng = new();
