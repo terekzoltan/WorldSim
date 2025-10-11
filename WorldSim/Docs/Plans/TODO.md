@@ -5,8 +5,9 @@ we good
 
 - (Több Job, ResourseTypeok: ritkítani a kettő eddigit)
 
-- növények, azok természetes szaporodása
-
+- növények, azok természetes szaporodása -> novenyevok szaporodasa
+- kulonbozo epuletek(sawmill, ültető, állathely, stb)
+- STAMINA
 - FOOD (lentebb codex task)
 -> gyumolcs
 -> allatkaja
@@ -14,7 +15,7 @@ we good
 
 -IRON GOLD belerak(); (lentebb codex task)
 
--novenyevok hasznossaga emberekhez->szaras, novenytermeles or st like that
+-novenyEvok hasznossaga emberekhez->szaras, novenytermeles or st like that
 -ragadozok tamadasa emebereket->vedekezes->visszatamadas, tamadasi rendszer
 
 - Állatok Icons
@@ -85,22 +86,15 @@ Ezeket már csak akkor kezd el, ha az 1–7 alap működik. Ott is érdemes apr�
 3. Tegyél be megfelelő textúrákat és rajzoló logikát a `WorldSim/Game1.cs` fájlban, hogy az új erőforrások megjelenjenek a térképen.
 
 
-Élelemmechanika + STAMINA + Komplexebb állatviselkedés implementálása: 
-1. Vezess be új munkatípust (GatherFood) a WorldSim/Simulation/Person.cs-ben, implementáld a gyűjtési logikát
-(közeli Food node keresése, szedés, készletbe helyezés).
-2. Generálj Food típusú erőforrás-csomópontokat a WorldSim/Simulation/World.cs-ben, mennyiség és regeneráció kezeléssel.
-3. Minden tick-kor vonj le élelemkészletet a Person vagy Colony frissítésében, kezeld az éhség, stamina csökkenés/töltés, 
-éhhalál vagy születési korlát állapotait.
-4. Egészítsd ki a WorldSim/Simulation/Animal.cs-t olyan logikával, amely figyelembe veszi az élelemkeresést, ragadozást, menekülést.
-5. Adj hozzá szaporodási mechanikát és populációkontrollt az Animal osztály Update metódusában.
-6. Integráld az új viselkedéseket és az élelemmechanikát a WorldSim/Simulation/World.cs frissítési ciklusába.
-
-
 -Technológiákhoz előfeltételek és költségek hozzáadása: 
-1. Bővítsd a `Tech/technologies.json` szerkezetét `prerequisites` és `cost` mezőkkel.
-2. A `WorldSim/Simulation/TechTree.cs` `Technology` osztályában vezess be megfelelő tulajdonságokat.
-3. Módosítsd az `Unlock` metódust, hogy ellenőrizze az előfeltételek teljesülését és levonja az erőforrás-költséget.
-
+A Tech/technologies.json most csak az azonosítót, nevet, leírást és egy effect kulcsot tartalmaz, 
+amely alapján a kód eldönti, milyen tulajdonságot módosítson a világban vagy a kolóniában. 
+Az Unlock jelenleg azonnal beírja a technológiát a kolónia készletére, majd meghív egy switch-et, 
+nincs sem előfeltétel-ellenőrzés, sem erőforrás-levonás. A TODO-ban szereplő prerequisites és cost mezők ezért 
+azt tennék lehetővé, hogy az adatfájl határozza meg, milyen más technológiák vagy mennyi fa/kő/… kell egy 
+fejlesztéshez, és ezt az Unlock a JSON alapján ellenőrizze, illetve levonja a kolónia készleteiből (ami most is 
+központilag elérhető a Stock szótárban). Így a tech-fa sorrendje és gazdasági balansza adatszinten hangolható lenne, 
+a kód csak az értelmezést végezné.
 
 
 

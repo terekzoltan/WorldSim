@@ -53,15 +53,13 @@ namespace WorldSim.Simulation
                         double r = _rng.NextDouble();
                         if (grounds[x, y] == Ground.Grass)
                         {
-                            // Grass: a bit more wood
-                            if (r < 0.08) node = new ResourceNode(Resource.Wood, _rng.Next(1, 10));
-                            else if (r < 0.11) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));
+                            if (r < 0.03) node = new ResourceNode(Resource.Wood, _rng.Next(1, 10));          
+                            else if (r < 0.04) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));   
                         }
                         else // Dirt
                         {
-                            // Dirt: a bit more stone
-                            if (r < 0.05) node = new ResourceNode(Resource.Wood, _rng.Next(1, 10));
-                            else if (r < 0.11) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));
+                            if (r < 0.02) node = new ResourceNode(Resource.Wood, _rng.Next(1, 10));          
+                            else if (r < 0.028) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));   
                         }
                     }
                     _map[x, y] = new Tile(grounds[x, y], node);
@@ -72,7 +70,14 @@ namespace WorldSim.Simulation
             int colonyCount = 2; // 4 in future
             for (int ci = 0; ci < colonyCount; ci++)
             {
-                (int, int) colPos = (_rng.Next(0, Width), _rng.Next(0, Height));
+                // Ensure colony origin is not on water
+                int ox, oy, guard = 0;
+                do
+                {
+                    ox = _rng.Next(0, Width);
+                    oy = _rng.Next(0, Height);
+                } while (grounds[ox, oy] == Ground.Water && ++guard < 2048);
+                (int, int) colPos = (ox, oy);
 
                 Colony col = new Colony(ci, colPos);
                 _colonies.Add(col);
@@ -83,13 +88,20 @@ namespace WorldSim.Simulation
                 // 2: Aetheri
                 // 3: Chitáriak
 
-                // Residents near origin
+                // Residents near origin (avoid water tiles)
                 int pop = initialPop / colonyCount;
                 for (int i = 0; i < pop; i++)
                 {
                     int spawnRadius = 5;
-                    int px = Math.Clamp(col.Origin.x + _rng.Next(-spawnRadius, spawnRadius + 1), 0, Width - 1);
-                    int py = Math.Clamp(col.Origin.y + _rng.Next(-spawnRadius, spawnRadius + 1), 0, Height - 1);
+                    int px, py, attempts = 0;
+
+                    // Try random positions around origin until we hit non-water (same logic as origin)
+                    do
+                    {
+                        px = Math.Clamp(col.Origin.x + _rng.Next(-spawnRadius, spawnRadius + 1), 0, Width - 1);
+                        py = Math.Clamp(col.Origin.y + _rng.Next(-spawnRadius, spawnRadius + 1), 0, Height - 1);
+                    } while (_map[px, py].Ground == Ground.Water && ++attempts < 64);
+
                     _people.Add(Person.Spawn(col, (px, py)));
                 }
             }
