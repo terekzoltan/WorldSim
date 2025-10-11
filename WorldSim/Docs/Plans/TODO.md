@@ -6,6 +6,8 @@ we good
 - (Több Job, ResourseTypeok: ritkítani a kettő eddigit)
 
 - növények, azok természetes szaporodása -> novenyevok szaporodasa
+-> "Design plant and animal ecosystem dynamics" ELŐKÉSZÍTVE
+- 
 - kulonbozo epuletek(sawmill, ültető, állathely, stb)
 - STAMINA
 - FOOD (lentebb codex task)
