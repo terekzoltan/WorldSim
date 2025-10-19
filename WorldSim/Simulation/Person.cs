@@ -32,7 +32,7 @@ public class Person
 
     // Utility AI
     private readonly GoalSelector _goalSelector = new();
-    private readonly IPlanner _planner = new SimplePlanner();
+    private readonly IPlanner _planner = new GoapPlanner();
     private readonly List<Goal> _goals = GoalLibrary.CreateDefaultGoals();
 
     const int WoodWorkTime = 5;
