@@ -53,13 +53,17 @@ namespace WorldSim.Simulation
                         double r = _rng.NextDouble();
                         if (grounds[x, y] == Ground.Grass)
                         {
-                            if (r < 0.03) node = new ResourceNode(Resource.Wood, _rng.Next(1, 10));          
-                            else if (r < 0.04) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));   
+                            if (r < 0.03) node = new ResourceNode(Resource.Wood, _rng.Next(1, 10));
+                            else if (r < 0.04) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));
+                            else if (r < 0.042) node = new ResourceNode(Resource.Iron, _rng.Next(1, 6));
+                            else if (r < 0.043) node = new ResourceNode(Resource.Gold, _rng.Next(1, 4));
                         }
                         else // Dirt
                         {
-                            if (r < 0.02) node = new ResourceNode(Resource.Wood, _rng.Next(1, 10));          
-                            else if (r < 0.028) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));   
+                            if (r < 0.02) node = new ResourceNode(Resource.Wood, _rng.Next(1, 10));
+                            else if (r < 0.028) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));
+                            else if (r < 0.031) node = new ResourceNode(Resource.Iron, _rng.Next(1, 6));
+                            else if (r < 0.032) node = new ResourceNode(Resource.Gold, _rng.Next(1, 4));
                         }
                     }
                     _map[x, y] = new Tile(grounds[x, y], node);

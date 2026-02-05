@@ -12,6 +12,8 @@ namespace WorldSim.Simulation
         {
             [Resource.Wood] = 0,
             [Resource.Stone] = 0,
+            [Resource.Iron] = 0,
+            [Resource.Gold] = 0,
             [Resource.Food] = 0
         };
         public int HouseCount = 0;
