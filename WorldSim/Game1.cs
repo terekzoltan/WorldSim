@@ -26,6 +26,8 @@ namespace WorldSim
         Texture2D _pixel;
         Texture2D _treeTex;
         Texture2D _rockTex;
+        Texture2D _ironTex;
+        Texture2D _goldTex;
 
         Texture2D _sylvarsTex;    // person icon (Cyan)
         Texture2D _obsidariTex;   // person icon (Bronze)
@@ -86,6 +88,8 @@ namespace WorldSim
             // PNG icons from Content pipeline
             _treeTex = Content.Load<Texture2D>("tree");
             _rockTex = Content.Load<Texture2D>("rock");
+            _ironTex = Content.Load<Texture2D>("iron");
+            _goldTex = Content.Load<Texture2D>("gold");
 
             // persons
             _sylvarsTex  = Content.Load<Texture2D>("Sylvar");
@@ -295,6 +299,10 @@ namespace WorldSim
                             _sb.Draw(_treeTex, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
                         else if (node.Type == Resource.Stone && _rockTex != null)
                             _sb.Draw(_rockTex, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
+                        else if (node.Type == Resource.Iron && _ironTex != null)
+                            _sb.Draw(_ironTex, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
+                        else if (node.Type == Resource.Gold && _goldTex != null)
+                            _sb.Draw(_goldTex, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
                     }
                 }
             }
@@ -362,7 +370,7 @@ namespace WorldSim
             foreach (var colony in _world._colonies)
             {
                 string stats =
-                    $"Colony {colony.Id}: Wood {colony.Stock[Resource.Wood]}, Stone {colony.Stock[Resource.Stone]}, Houses {colony.HouseCount}, People {_world._people.Count(p => p.Home == colony)}";
+                    $"Colony {colony.Id}: Wood {colony.Stock[Resource.Wood]}, Stone {colony.Stock[Resource.Stone]}, Iron {colony.Stock[Resource.Iron]}, Gold {colony.Stock[Resource.Gold]}, Houses {colony.HouseCount}, People {_world._people.Count(p => p.Home == colony)}";
                 _sb.DrawString(_font, stats, new Vector2(10, j), Color.White);
                 j += 20;
             }

@@ -2,7 +2,7 @@
 
 namespace WorldSim.Simulation
 {
-    public enum Resource { None, Wood, Stone, Food, Water }
+    public enum Resource { None, Wood, Stone, Iron, Gold, Food, Water }
     public enum Ground { Dirt, Water, Grass }
 
     public sealed class ResourceNode
