@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://worldsim.local/refinery-service-java/schema/patch-response-v1.schema.json",
+  "title": "PatchResponse v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "seed",
+    "patch",
+    "explain",
+    "warnings"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "v1"
+    },
+    "requestId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "patch": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "opId",
+              "techId",
+              "prereqTechIds",
+              "cost",
+              "effects"
+            ],
+            "properties": {
+              "op": {
+                "const": "addTech"
+              },
+              "opId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "techId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "prereqTechIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "cost": {
+                "type": "object"
+              },
+              "effects": {
+                "type": "object"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "opId",
+              "techId",
+              "fieldPath",
+              "deltaNumber"
+            ],
+            "properties": {
+              "op": {
+                "const": "tweakTech"
+              },
+              "opId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "techId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fieldPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "deltaNumber": {
+                "type": "number"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "opId",
+              "eventId",
+              "type",
+              "params",
+              "durationTicks"
+            ],
+            "properties": {
+              "op": {
+                "const": "addWorldEvent"
+              },
+              "opId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "eventId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "params": {
+                "type": "object"
+              },
+              "durationTicks": {
+                "type": "integer"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "explain": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

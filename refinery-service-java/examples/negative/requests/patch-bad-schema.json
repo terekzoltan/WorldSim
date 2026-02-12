@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "v0",
+  "requestId": "1e6b2311-c4e8-4e3d-b3f0-ab4d030a8a03",
+  "seed": 123,
+  "tick": 42,
+  "goal": "TECH_TREE_PATCH",
+  "snapshot": {
+    "world": "minimal"
+  }
+}

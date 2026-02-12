@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "49e95c3f-8df6-45b5-8f47-7d2be30c23f3",
+  "seed": 123,
+  "patch": [
+    {
+      "op": "addTech",
+      "opId": "op_1FUMEZ584F1SD",
+      "techId": "IRRIGATION_1",
+      "prereqTechIds": [
+        "FARMING_1"
+      ],
+      "cost": {
+        "research": 80
+      },
+      "effects": {
+        "foodYieldDelta": 1,
+        "waterEfficiencyDelta": 1
+      }
+    }
+  ],
+  "explain": [
+    "MockPlanner produced a deterministic response for pipeline testing.",
+    "Given the same goal, seed, and tick, this service returns the same patch."
+  ],
+  "warnings": []
+}

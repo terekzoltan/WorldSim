@@ -1,0 +1,10 @@
+server:
+  port: ${REFINERY_SERVICE_PORT:8091}
+
+app:
+  version: ${APP_VERSION:0.1.0}
+
+planner:
+  mode: ${PLANNER_MODE:mock}
+  llm:
+    enabled: ${PLANNER_LLM_ENABLED:false}

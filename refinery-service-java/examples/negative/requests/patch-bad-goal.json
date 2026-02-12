@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "9f222f68-3f15-41ef-bf7d-ef8b49895f19",
+  "seed": 123,
+  "tick": 42,
+  "goal": "UNKNOWN_GOAL",
+  "snapshot": {
+    "world": "minimal"
+  }
+}

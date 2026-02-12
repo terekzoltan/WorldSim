@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "f4ec9ceb-3892-4c98-b75b-7ed73e9d2ad4",
+  "seed": 2024,
+  "patch": [
+    {
+      "op": "tweakTech",
+      "opId": "op_2VO2AHHGJZSNH",
+      "techId": "POLICY_GLOBAL",
+      "fieldPath": "military.readiness",
+      "deltaNumber": -0.05
+    }
+  ],
+  "explain": [
+    "MockPlanner produced a deterministic response for pipeline testing.",
+    "Given the same goal, seed, and tick, this service returns the same patch."
+  ],
+  "warnings": []
+}

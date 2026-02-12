@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "f4ec9ceb-3892-4c98-b75b-7ed73e9d2ad4",
+  "seed": 2024,
+  "tick": 77,
+  "goal": "NPC_POLICY",
+  "snapshot": {
+    "world": "minimal"
+  }
+}

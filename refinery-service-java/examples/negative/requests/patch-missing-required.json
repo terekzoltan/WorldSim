@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "f6c7e23d-a21f-4f56-87e1-64f4596ce6dc",
+  "seed": 123,
+  "tick": 42,
+  "snapshot": {
+    "world": "minimal"
+  }
+}

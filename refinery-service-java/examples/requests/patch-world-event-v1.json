@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "0da6ce2c-57aa-44ca-aafa-bf29caea89ef",
+  "seed": 99,
+  "tick": 101,
+  "goal": "WORLD_EVENT",
+  "snapshot": {
+    "world": "minimal"
+  }
+}

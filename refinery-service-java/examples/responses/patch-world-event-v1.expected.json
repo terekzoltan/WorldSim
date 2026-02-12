@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "0da6ce2c-57aa-44ca-aafa-bf29caea89ef",
+  "seed": 99,
+  "patch": [
+    {
+      "op": "addWorldEvent",
+      "opId": "op_13EOX7SPQ7UJW",
+      "eventId": "WEATHER_35I43G3EIJR93",
+      "type": "DROUGHT",
+      "params": {
+        "severity": 1,
+        "region": "GLOBAL"
+      },
+      "durationTicks": 19
+    }
+  ],
+  "explain": [
+    "MockPlanner produced a deterministic response for pipeline testing.",
+    "Given the same goal, seed, and tick, this service returns the same patch."
+  ],
+  "warnings": []
+}
