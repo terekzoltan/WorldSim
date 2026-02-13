@@ -8,3 +8,7 @@ planner:
   mode: ${PLANNER_MODE:mock}
   llm:
     enabled: ${PLANNER_LLM_ENABLED:false}
+
+logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId:-} goal:%X{goal:-} seed:%X{seed:-} tick:%X{tick:-}]"

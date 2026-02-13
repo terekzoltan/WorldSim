@@ -5,14 +5,14 @@
   "patch": [
     {
       "op": "addWorldEvent",
-      "opId": "op_13EOX7SPQ7UJW",
-      "eventId": "WEATHER_35I43G3EIJR93",
-      "type": "DROUGHT",
+      "opId": "op_EHEXWRJLIOXY",
+      "eventId": "WEATHER_2NX253AKWZ0L7",
+      "type": "RAIN_BONUS",
       "params": {
-        "severity": 1,
+        "severity": 2,
         "region": "GLOBAL"
       },
-      "durationTicks": 19
+      "durationTicks": 17
     }
   ],
   "explain": [

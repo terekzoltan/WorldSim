@@ -5,7 +5,7 @@
   "patch": [
     {
       "op": "addTech",
-      "opId": "op_1FUMEZ584F1SD",
+      "opId": "op_CSFWK8P7D5EL",
       "techId": "IRRIGATION_1",
       "prereqTechIds": [
         "FARMING_1"

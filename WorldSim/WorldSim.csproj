@@ -16,6 +16,9 @@
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\WorldSim.RefineryClient\WorldSim.RefineryClient.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="..\Tech\technologies.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -2,6 +2,7 @@ package hu.zoltanterek.worldsim.refinery.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
@@ -22,27 +23,18 @@ public class PatchService {
     }
 
     public PatchResponse createPatch(PatchRequest request) {
-        logger.info(
-                "patch request received requestId={} goal={} seed={} tick={}",
-                request.requestId(),
-                request.goal(),
-                request.seed(),
-                request.tick()
-        );
+        try (var c1 = MDC.putCloseable("requestId", request.requestId());
+             var c2 = MDC.putCloseable("goal", request.goal().name());
+             var c3 = MDC.putCloseable("seed", Long.toString(request.seed()));
+             var c4 = MDC.putCloseable("tick", Long.toString(request.tick()))) {
+            logger.info("patch request received");
 
-        requestValidator.validateSchema(request);
+            requestValidator.validateSchema(request);
 
-        PatchResponse response = patchPlanner.plan(request);
+            PatchResponse response = patchPlanner.plan(request);
 
-        logger.info(
-                "patch request completed requestId={} goal={} seed={} tick={} patchOps={}",
-                request.requestId(),
-                request.goal(),
-                request.seed(),
-                request.tick(),
-                response.patch().size()
-        );
-
-        return response;
+            logger.info("patch request completed patchOps={}", response.patch().size());
+            return response;
+        }
     }
 }

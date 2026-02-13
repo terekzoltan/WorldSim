@@ -5,6 +5,7 @@ using Microsoft.Xna.Framework.Input;
 using System.Linq;
 using System.IO;
 using WorldSim.Simulation;
+using WorldSim.Integration;
 
 namespace WorldSim
 {
@@ -43,6 +44,8 @@ namespace WorldSim
         bool _showTechMenu = false;
         KeyboardState _prevKeys;
         int _selectedColony = 0;
+        long _simTick;
+        RefineryPatchRuntime _refineryRuntime;
 
         // Zoom + camera state
         float _zoom = 1.0f;
@@ -61,8 +64,24 @@ namespace WorldSim
             IsMouseVisible = true;
 
             _g.PreferredBackBufferWidth = 128 * TileSize;
-            _g.PreferredBackBufferHeight = 128 * TileSize;
+            _g.PreferredBackBufferHeight = 110 * TileSize;
+            _g.IsFullScreen = false;
             _g.ApplyChanges();
+
+            // Ensure the window starts windowed, is resizable and positioned
+            // so the OS window chrome (close button) remains visible.
+            Window.AllowUserResizing = true;
+            try
+            {
+                Window.Position = new Point(50, 50);
+            }
+            catch
+            {
+                // Some platforms may not support setting position; ignore failures.
+            }
+
+            var refineryOptions = RefineryRuntimeOptions.FromEnvironment(AppDomain.CurrentDomain.BaseDirectory);
+            _refineryRuntime = new RefineryPatchRuntime(refineryOptions);
         }
 
         protected override void Initialize()
@@ -111,6 +130,11 @@ namespace WorldSim
 
             if (keys.IsKeyDown(Keys.F1) && !_prevKeys.IsKeyDown(Keys.F1))
                 _showTechMenu = !_showTechMenu;
+
+            if (keys.IsKeyDown(Keys.F6) && !_prevKeys.IsKeyDown(Keys.F6))
+            {
+                _refineryRuntime.Trigger(_world, _simTick);
+            }
 
             // Middle-mouse drag to pan
             if (mouse.MiddleButton == ButtonState.Pressed && !_isPanning)
@@ -175,11 +199,13 @@ namespace WorldSim
             }
 
             _prevKeys = keys;
+            _refineryRuntime.Pump();
 
             _acc += (float)gt.ElapsedGameTime.TotalSeconds * timeScale;
             while (_acc >= Tick)
             {
                 _world.Update(Tick);
+                _simTick++;
                 _acc -= Tick;
             }
             base.Update(gt);
@@ -374,6 +400,8 @@ namespace WorldSim
                 _sb.DrawString(_font, stats, new Vector2(10, j), Color.White);
                 j += 20;
             }
+
+            _sb.DrawString(_font, _refineryRuntime.LastStatus, new Vector2(10, j + 10), Color.LightCyan);
 
             if (_showTechMenu)
             {

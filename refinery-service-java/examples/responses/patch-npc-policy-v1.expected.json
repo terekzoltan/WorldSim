@@ -5,10 +5,10 @@
   "patch": [
     {
       "op": "tweakTech",
-      "opId": "op_2VO2AHHGJZSNH",
+      "opId": "op_1WPNY9ZUBA2UY",
       "techId": "POLICY_GLOBAL",
       "fieldPath": "military.readiness",
-      "deltaNumber": -0.05
+      "deltaNumber": 0.05
     }
   ],
   "explain": [

@@ -25,7 +25,7 @@ public class MockPlanner implements PatchPlanner {
 
     @Override
     public PatchResponse plan(PatchRequest request) {
-        Random random = new Random(DeterministicIds.combineSeed(request.seed(), request.tick(), request.goal()));
+        Random random = new Random(DeterministicIds.combineSeed(request.seed(), request.tick(), request.goal().name()));
 
         PatchOp op = switch (request.goal()) {
             case Goal.TECH_TREE_PATCH -> planTechTreePatch(request);
@@ -60,7 +60,7 @@ public class MockPlanner implements PatchPlanner {
         String opId = DeterministicIds.opId(
                 request.seed(),
                 request.tick(),
-                request.goal(),
+                request.goal().name(),
                 "addTech",
                 "IRRIGATION_1"
         );
@@ -75,7 +75,12 @@ public class MockPlanner implements PatchPlanner {
     }
 
     private PatchOp planWorldEvent(PatchRequest request, Random random) {
-        String eventId = "WEATHER_" + DeterministicIds.shortStableId(request.seed(), request.tick(), request.goal().name());
+        String eventId = "WEATHER_" + DeterministicIds.shortStableId(
+                request.seed(),
+                request.tick(),
+                request.goal().name(),
+                request.goal().name()
+        );
         String type = random.nextBoolean() ? "DROUGHT" : "RAIN_BONUS";
 
         ObjectNode params = objectMapper.createObjectNode();
@@ -83,7 +88,7 @@ public class MockPlanner implements PatchPlanner {
         params.put("region", "GLOBAL");
 
         long duration = 10L + random.nextInt(11);
-        String opId = DeterministicIds.opId(request.seed(), request.tick(), request.goal(), "addWorldEvent", eventId);
+        String opId = DeterministicIds.opId(request.seed(), request.tick(), request.goal().name(), "addWorldEvent", eventId);
         return new PatchOp.AddWorldEvent(opId, eventId, type, params, duration);
     }
 
@@ -91,7 +96,7 @@ public class MockPlanner implements PatchPlanner {
         String[] fields = {"economy.taxRate", "military.readiness", "science.focus"};
         String field = fields[random.nextInt(fields.length)];
         double delta = random.nextBoolean() ? 0.05 : -0.05;
-        String opId = DeterministicIds.opId(request.seed(), request.tick(), request.goal(), "tweakTech", field + ":" + delta);
+        String opId = DeterministicIds.opId(request.seed(), request.tick(), request.goal().name(), "tweakTech", field + ":" + delta);
         return new PatchOp.TweakTech(opId, "POLICY_GLOBAL", field, delta);
     }
 }

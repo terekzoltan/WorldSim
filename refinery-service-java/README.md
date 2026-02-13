@@ -85,7 +85,7 @@ Example response:
   "patch": [
     {
       "op": "addTech",
-      "opId": "op_1FUMEZ584F1SD",
+      "opId": "op_CSFWK8P7D5EL",
       "techId": "IRRIGATION_1",
       "prereqTechIds": ["FARMING_1"],
       "cost": {"research": 80},
@@ -104,12 +104,13 @@ Example response:
 
 - Patch operations are modeled as a discriminated union via `op`.
 - Every patch operation includes deterministic `opId` for idempotent client-side dedupe.
+- `opId` is derived from stable inputs only: `goal` string + `seed` + `tick` + op stable key.
 - Supported operations now:
   - `addTech`
   - `tweakTech`
   - `addWorldEvent`
 - Deterministic behavior means same `goal + seed + tick` produces same output.
-- For `tweakTech`, clients should dedupe by `opId` before applying repeated responses.
+- `tweakTech` is delta-based, so clients must dedupe by `opId` and apply each op at most once.
 - The contract is versioned via `schemaVersion` (`v1`) for forward compatibility.
 
 ## Architecture
@@ -173,6 +174,7 @@ Package root: `hu.zoltanterek.worldsim.refinery`
 ### Phase 4
 
 - Add structured observability with required log fields: `requestId`, `goal`, `seed`, `tick`.
+- MDC is configured so these fields appear automatically in log lines.
 
 ### Phase 5
 
