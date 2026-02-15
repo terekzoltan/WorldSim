@@ -5,10 +5,10 @@
   "patch": [
     {
       "op": "addTech",
-      "opId": "op_CSFWK8P7D5EL",
-      "techId": "IRRIGATION_1",
+      "opId": "op_N9AA4H5WVBI2",
+      "techId": "agriculture",
       "prereqTechIds": [
-        "FARMING_1"
+        "woodcutting"
       ],
       "cost": {
         "research": 80

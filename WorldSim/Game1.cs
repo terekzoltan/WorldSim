@@ -286,12 +286,18 @@ namespace WorldSim
 
             _sb.Begin(samplerState: SamplerState.PointClamp, transformMatrix: worldTransform);
 
+            int activeFoodNodes = 0;
+            int depletedFoodSpots = 0;
+
             // 1) Base tiles
             for (int y = 0; y < _world.Height; y++)
             {
                 for (int x = 0; x < _world.Width; x++)
                 {
                     Tile tile = _world.GetTile(x, y);
+                    if (tile.Node != null && tile.Node.Type == Resource.Food && tile.Node.Amount == 0)
+                        depletedFoodSpots++;
+
                     Color color = tile.Ground switch
                     {
                         Ground.Water => Color.Blue,
@@ -329,6 +335,11 @@ namespace WorldSim
                             _sb.Draw(_ironTex, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
                         else if (node.Type == Resource.Gold && _goldTex != null)
                             _sb.Draw(_goldTex, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
+                        else if (node.Type == Resource.Food)
+                        {
+                            activeFoodNodes++;
+                            _sb.Draw(_pixel, new Rectangle(iconX, iconY, iconSize, iconSize), Color.YellowGreen);
+                        }
                     }
                 }
             }
@@ -395,10 +406,30 @@ namespace WorldSim
             int j = 10;
             foreach (var colony in _world._colonies)
             {
+                var colonyPeople = _world._people.Where(p => p.Home == colony).ToList();
+                float avgHunger = colonyPeople.Count == 0 ? 0f : colonyPeople.Average(p => p.Needs.ContainsKey("Hunger") ? p.Needs["Hunger"] : 0f);
+                float avgStamina = colonyPeople.Count == 0 ? 0f : colonyPeople.Average(p => p.Stamina);
                 string stats =
-                    $"Colony {colony.Id}: Wood {colony.Stock[Resource.Wood]}, Stone {colony.Stock[Resource.Stone]}, Iron {colony.Stock[Resource.Iron]}, Gold {colony.Stock[Resource.Gold]}, Houses {colony.HouseCount}, People {_world._people.Count(p => p.Home == colony)}";
+                    $"Colony {colony.Id}: Food {colony.Stock[Resource.Food]}, Wood {colony.Stock[Resource.Wood]}, Stone {colony.Stock[Resource.Stone]}, Iron {colony.Stock[Resource.Iron]}, Gold {colony.Stock[Resource.Gold]}, Houses {colony.HouseCount}, People {colonyPeople.Count}, AvgHun {avgHunger:0}, AvgSta {avgStamina:0}";
                 _sb.DrawString(_font, stats, new Vector2(10, j), Color.White);
                 j += 20;
+            }
+
+            string worldLine = $"Season: {_world.CurrentSeason} | Drought: {(_world.IsDroughtActive ? "ON" : "off")}";
+            _sb.DrawString(_font, worldLine, new Vector2(10, j), Color.LightGoldenrodYellow);
+            j += 20;
+
+            int herbCount = _world._animals.Count(a => a is Herbivore && a.IsAlive);
+            int predCount = _world._animals.Count(a => a is Predator && a.IsAlive);
+            int criticalHungry = _world._people.Count(p => p.Needs.ContainsKey("Hunger") && p.Needs["Hunger"] >= 85f);
+            string ecoTelemetry = $"Eco: Herb {herbCount}, Pred {predCount}, FoodNodes {activeFoodNodes}, FoodRegrow {depletedFoodSpots}, CriticalHungry {criticalHungry}";
+            _sb.DrawString(_font, ecoTelemetry, new Vector2(10, j), Color.LightGray);
+            j += 20;
+
+            foreach (string evt in _world.RecentEvents)
+            {
+                _sb.DrawString(_font, $"Event: {evt}", new Vector2(10, j), Color.LightGray);
+                j += 18;
             }
 
             _sb.DrawString(_font, _refineryRuntime.LastStatus, new Vector2(10, j + 10), Color.LightCyan);

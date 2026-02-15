@@ -7,6 +7,14 @@ using System.Threading.Tasks;
 
 namespace WorldSim.Simulation
 {
+    public enum Season
+    {
+        Spring,
+        Summer,
+        Autumn,
+        Winter
+    }
+
     public class World
     {
         public readonly int Width, Height;
@@ -31,7 +39,19 @@ namespace WorldSim.Simulation
         public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
         public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
 
+        public Season CurrentSeason { get; private set; } = Season.Spring;
+        public bool IsDroughtActive { get; private set; }
+        public IReadOnlyList<string> RecentEvents => _recentEvents;
+
         readonly Random _rng = new();
+        readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
+        readonly List<string> _recentEvents = new();
+
+        float _seasonTimer;
+        float _droughtTimer;
+
+        const float SeasonDurationSeconds = 90f;
+        const float DroughtDurationSeconds = 35f;
 
         public World(int width, int height, int initialPop)
         {
@@ -57,6 +77,7 @@ namespace WorldSim.Simulation
                             else if (r < 0.04) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));
                             else if (r < 0.042) node = new ResourceNode(Resource.Iron, _rng.Next(1, 6));
                             else if (r < 0.043) node = new ResourceNode(Resource.Gold, _rng.Next(1, 4));
+                            else if (r < 0.06) node = new ResourceNode(Resource.Food, _rng.Next(2, 7));
                         }
                         else // Dirt
                         {
@@ -64,6 +85,7 @@ namespace WorldSim.Simulation
                             else if (r < 0.028) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));
                             else if (r < 0.031) node = new ResourceNode(Resource.Iron, _rng.Next(1, 6));
                             else if (r < 0.032) node = new ResourceNode(Resource.Gold, _rng.Next(1, 4));
+                            else if (r < 0.04) node = new ResourceNode(Resource.Food, _rng.Next(2, 6));
                         }
                     }
                     _map[x, y] = new Tile(grounds[x, y], node);
@@ -118,6 +140,9 @@ namespace WorldSim.Simulation
 
         public void Update(float dt)
         {
+            UpdateSeasonsAndEvents(dt);
+            UpdateFoodRegrowth(dt);
+
             List<Person> births = new();
             for (int i = _people.Count - 1; i >= 0; i--)
             {
@@ -136,6 +161,8 @@ namespace WorldSim.Simulation
                     _animals.RemoveAt(i);
             }
 
+            UpdateAnimalPopulation(dt);
+
             if (ResourceSharingEnabled && _colonies.Count > 1)
             {
                 foreach (var res in _colonies[0].Stock.Keys.ToList())
@@ -152,7 +179,13 @@ namespace WorldSim.Simulation
         public bool TryHarvest((int x, int y) pos, Resource need, int qty)
         {
             ref Tile tile = ref _map[pos.x, pos.y];
-            return tile.Harvest(need, qty);
+            bool ok = tile.Harvest(need, qty);
+            if (!ok) return false;
+
+            if (need == Resource.Food && tile.Node != null && tile.Node.Type == Resource.Food && tile.Node.Amount == 0)
+                RegisterFoodRegrowthSpot(pos.x, pos.y);
+
+            return true;
         }
 
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
@@ -314,6 +347,86 @@ namespace WorldSim.Simulation
                     else if (cnt <= 1 && mask[x, y] == targetLabel) mask[x, y] = (targetLabel == 0 ? 2 : 2);
                 }
             }
+        }
+
+        void RegisterFoodRegrowthSpot(int x, int y)
+        {
+            if (_foodRegrowth.Any(s => s.x == x && s.y == y))
+                return;
+
+            _foodRegrowth.Add((x, y, 0f, 35f + (float)_rng.NextDouble() * 35f));
+        }
+
+        void UpdateFoodRegrowth(float dt)
+        {
+            float growSpeed = IsDroughtActive ? 0.85f : 1f;
+            for (int i = _foodRegrowth.Count - 1; i >= 0; i--)
+            {
+                var spot = _foodRegrowth[i];
+                spot.timer += dt * growSpeed;
+                if (spot.timer >= spot.target)
+                {
+                    if (_map[spot.x, spot.y].Ground != Ground.Water)
+                        _map[spot.x, spot.y].ReplaceNode(new ResourceNode(Resource.Food, _rng.Next(2, 7)));
+                    _foodRegrowth.RemoveAt(i);
+                    continue;
+                }
+                _foodRegrowth[i] = spot;
+            }
+        }
+
+        void UpdateSeasonsAndEvents(float dt)
+        {
+            _seasonTimer += dt;
+            if (_seasonTimer >= SeasonDurationSeconds)
+            {
+                _seasonTimer -= SeasonDurationSeconds;
+                CurrentSeason = (Season)(((int)CurrentSeason + 1) % 4);
+                AddEvent($"Season changed to {CurrentSeason}");
+
+                if (!IsDroughtActive && _rng.NextDouble() < 0.25)
+                {
+                    IsDroughtActive = true;
+                    _droughtTimer = 0f;
+                    AddEvent("Drought started");
+                }
+            }
+
+            if (IsDroughtActive)
+            {
+                _droughtTimer += dt;
+                if (_droughtTimer >= DroughtDurationSeconds)
+                {
+                    IsDroughtActive = false;
+                    _droughtTimer = 0f;
+                    AddEvent("Drought ended");
+                }
+            }
+        }
+
+        void AddEvent(string text)
+        {
+            _recentEvents.Add(text);
+            if (_recentEvents.Count > 3)
+                _recentEvents.RemoveAt(0);
+        }
+
+        void UpdateAnimalPopulation(float dt)
+        {
+            if (_rng.NextDouble() >= dt * 0.01)
+                return;
+
+            int herbivores = _animals.Count(a => a is Herbivore && a.IsAlive);
+            int predators = _animals.Count(a => a is Predator && a.IsAlive);
+
+            if (herbivores < Math.Max(8, (Width * Height) / 400))
+            {
+                _animals.Add(new Herbivore(RandomFreePos()));
+                return;
+            }
+
+            if (predators < Math.Max(3, herbivores / 6) && _rng.NextDouble() < 0.5)
+                _animals.Add(new Predator(RandomFreePos()));
         }
     }
 }

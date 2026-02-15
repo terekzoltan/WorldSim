@@ -160,11 +160,58 @@ public sealed class Herbivore : Animal
             target = (Math.Clamp(target.x, 0, w.Width - 1), Math.Clamp(target.y, 0, w.Height - 1));
             StepTowards(w, target, Speed);
         }
+        else if (TryEatNearbyFood(w))
+        {
+            // staying fed keeps herbivores clustered around food spots
+        }
+        else if (TryMoveTowardsFood(w))
+        {
+            // move purposefully to food when calm
+        }
         else
         {
             // Wander calmly
             RandomStep(w, Speed);
         }   
+    }
+
+    private bool TryEatNearbyFood(World w)
+    {
+        return w.TryHarvest(Pos, Resource.Food, 1);
+    }
+
+    private bool TryMoveTowardsFood(World w)
+    {
+        (int x, int y)? bestPos = null;
+        int bestDist = int.MaxValue;
+
+        for (int dy = -Vision; dy <= Vision; dy++)
+        {
+            for (int dx = -Vision; dx <= Vision; dx++)
+            {
+                int nx = Pos.x + dx;
+                int ny = Pos.y + dy;
+                if (nx < 0 || ny < 0 || nx >= w.Width || ny >= w.Height) continue;
+
+                int md = Math.Abs(dx) + Math.Abs(dy);
+                if (md == 0 || md > Vision) continue;
+
+                var node = w.GetTile(nx, ny).Node;
+                if (node == null || node.Type != Resource.Food || node.Amount <= 0) continue;
+
+                if (md < bestDist)
+                {
+                    bestDist = md;
+                    bestPos = (nx, ny);
+                }
+            }
+        }
+
+        if (bestPos == null)
+            return false;
+
+        StepTowards(w, bestPos.Value, Speed);
+        return true;
     }
 }
 
@@ -175,6 +222,9 @@ public sealed class Predator : Animal
 
 
     public Predator((int x, int y) pos) : base(pos, speed: 1, vision: 6) { }
+
+    // Mild nerf so herbivores do not collapse too early.
+    private const double CaptureSuccessChance = 0.65;
 
     // Predators wander a bit more often than herbivores
     protected override double RandomStepChance => 0.8;
@@ -206,7 +256,7 @@ public sealed class Predator : Animal
             StepTowards(w, nearestPrey.Pos, Speed);
 
             // Capture if on same tile
-            if (Pos == nearestPrey.Pos && nearestPrey.IsAlive)
+            if (Pos == nearestPrey.Pos && nearestPrey.IsAlive && _rng.NextDouble() < CaptureSuccessChance)
             {
                 nearestPrey.IsAlive = false; // prey is removed by World after updates
             }

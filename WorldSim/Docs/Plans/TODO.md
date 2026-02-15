@@ -1,6 +1,29 @@
 ﻿
 we good
 
+SPRINT 1 (Eco-first) - KALIBRALT SORREND
+
+- Food modell S1-ben: egyetlen Resource.Food (absztrakt "kaloria" stock)
+- Food forrasok S1-ben:
+  - forage/novenyi food node (map resource)
+  - herbivore vadászatbol hus -> Resource.Food
+- FONTOS kesobbre (NE FELEJTSUK): Food felbontasa tipusokra (pl. plant/meat, majd milk/egg stb.)
+- FONTOS kesobbre: domestication + passive income loop (tej/tojas) + vedelem ragadozok ellen
+
+S1 implementacios sorrend:
+1) Elobb termelo oldal (1.2): legyen mit enni
+   - food node spawn + minimal regrowth
+   - herbivore food fogyasztas
+   - predator/herbivore minimal balansz
+   - human hunting -> food gain
+2) Utana fogyaszto oldal (1.1): hunger+stamina loop
+   - GatherFood / EatFood / Rest
+   - starvation health hatas
+   - stamina fogyasztas es visszatoltes
+3) 1.3 maradjon MINIMAL world event szint
+   - season/event log legyen
+   - vilagra gyakorolt hatas kezdetben kicsi
+
 -----------------------
 
 - (Több Job, ResourseTypeok: ritkítani a kettő eddigit)
@@ -14,11 +37,14 @@ we good
 -> gyumolcs
 -> allatkaja
 -> novenykaja
+-> S1: ideiglenesen egyben kezeljuk Resource.Food-kent
+-> KESOBB: bontas tipusokra (plant/meat/milk/egg/...) + passive income rendszer
 
 -IRON GOLD belerak(); (lentebb codex task)
 
 -novenyEvok hasznossaga emberekhez->szaras, novenytermeles or st like that
 -ragadozok tamadasa emebereket->vedekezes->visszatamadas, tamadasi rendszer
+-> domestication/fence/vedelmi loop KESOBBI sprintben (S2/S3)
 
 - Állatok Icons
 

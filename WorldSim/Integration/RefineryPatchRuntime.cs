@@ -220,10 +220,20 @@ public sealed class RefineryPatchRuntime
             switch (op)
             {
                 case AddTechOp addTech:
-                    if (TechTree.Techs.Any(t => t.Id == addTech.TechId) && world._colonies.Count > 0)
+                    if (world._colonies.Count == 0)
                     {
-                        TechTree.Unlock(addTech.TechId, world, world._colonies[0]);
+                        throw new InvalidOperationException("Cannot apply addTech: world has no colonies.");
                     }
+
+                    if (!TechTree.Techs.Any(t => t.Id == addTech.TechId))
+                    {
+                        throw new InvalidOperationException(
+                            "Cannot apply addTech: unknown techId '" + addTech.TechId +
+                            "'. TODO: add Java->C# tech ID mapping layer for cross-project IDs."
+                        );
+                    }
+
+                    TechTree.Unlock(addTech.TechId, world, world._colonies[0]);
                     break;
                 default:
                     throw new NotSupportedException(

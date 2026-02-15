@@ -44,11 +44,14 @@ namespace WorldSim.Simulation
             if (Node.Type != res) return false;
             if (!Node.Consume(qty)) return false;
 
-            // When depleted, remove the node so the icon disappears.
-            if (Node.Amount == 0)
+            // Food nodes keep their slot when depleted so world regrowth can refill them later.
+            // Rendering already hides nodes with Amount == 0.
+            if (Node.Amount == 0 && Node.Type != Resource.Food)
                 Node = null;
 
             return true;
         }
+
+        public void ReplaceNode(ResourceNode? node) => Node = node;
     }
 }

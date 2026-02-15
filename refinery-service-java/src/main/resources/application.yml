@@ -6,6 +6,8 @@ app:
 
 planner:
   mode: ${PLANNER_MODE:mock}
+  refinery:
+    enabled: ${PLANNER_REFINERY_ENABLED:false}
   llm:
     enabled: ${PLANNER_LLM_ENABLED:false}
 

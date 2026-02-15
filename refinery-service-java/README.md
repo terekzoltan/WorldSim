@@ -3,7 +3,7 @@
 Local Java 21 service for the WorldSim polyglot monorepo.
 
 It receives a simulation snapshot and returns a deterministic patch/delta over HTTP.
-Current planner is a deterministic mock so C# integration can be tested now; Refinery + optional LLM will be added next.
+Current default planner is deterministic mock; pipeline mode can enable a minimal Refinery-backed TECH_TREE slice.
 
 ## Prerequisites
 
@@ -22,6 +22,7 @@ Planner mode defaults to deterministic mock:
 
 - `PLANNER_MODE=mock` (default)
 - `PLANNER_MODE=pipeline` (scaffolded LLM -> Refinery chain with deterministic fallback)
+- `PLANNER_REFINERY_ENABLED=false` (default)
 - `PLANNER_LLM_ENABLED=false` (default)
 
 ## Test
@@ -85,9 +86,9 @@ Example response:
   "patch": [
     {
       "op": "addTech",
-      "opId": "op_CSFWK8P7D5EL",
-      "techId": "IRRIGATION_1",
-      "prereqTechIds": ["FARMING_1"],
+      "opId": "op_N9AA4H5WVBI2",
+      "techId": "agriculture",
+      "prereqTechIds": ["woodcutting"],
       "cost": {"research": 80},
       "effects": {"foodYieldDelta": 1, "waterEfficiencyDelta": 1}
     }
@@ -144,6 +145,15 @@ Package root: `hu.zoltanterek.worldsim.refinery`
 - Read `patch[].op` discriminator and deserialize per concrete op payload.
 - Persist or short-term cache applied `opId`s and skip duplicates.
 - Keep `schemaVersion` check on the C# side to reject unknown contracts early.
+
+### C# integration runtime
+
+- Runtime setup, env switches, and debug playbook are documented in `WorldSim/Integration/README.md`.
+- Typical local flow:
+  1. Start this Java service: `./gradlew bootRun`
+  2. Run C# with `REFINERY_INTEGRATION_MODE=live`
+  3. Trigger patch from game with `F6`
+  4. Optional parity check: `REFINERY_PARITY_TEST=true` then `dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj`
 
 ## Fixtures for integration tests
 

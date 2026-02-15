@@ -62,13 +62,13 @@ public class MockPlanner implements PatchPlanner {
                 request.tick(),
                 request.goal().name(),
                 "addTech",
-                "IRRIGATION_1"
+                "agriculture"
         );
 
         return new PatchOp.AddTech(
                 opId,
-                "IRRIGATION_1",
-                List.of("FARMING_1"),
+                "agriculture",
+                List.of("woodcutting"),
                 cost,
                 effects
         );

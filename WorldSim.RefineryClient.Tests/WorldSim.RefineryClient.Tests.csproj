@@ -16,4 +16,10 @@
   <ItemGroup>
     <ProjectReference Include="..\WorldSim.RefineryClient\WorldSim.RefineryClient.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\refinery-service-java\examples\**\*.json"
+          Link="fixtures\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

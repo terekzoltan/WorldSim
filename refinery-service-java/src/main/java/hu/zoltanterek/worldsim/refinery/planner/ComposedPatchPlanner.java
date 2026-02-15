@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
+import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
@@ -41,7 +42,16 @@ public class ComposedPatchPlanner implements PatchPlanner {
 
         Optional<List<PatchOp>> llmProposal = llmPlanner.propose(request);
         List<PatchOp> candidatePatch = llmProposal.orElseGet(mockResponse::patch);
-        List<PatchOp> validatedPatch = refineryPlanner.validateAndRepair(request, candidatePatch);
+        List<PatchOp> validatedPatch;
+        boolean refineryValidated = false;
+        boolean refineryFailed = false;
+        try {
+            validatedPatch = refineryPlanner.validateAndRepair(request, candidatePatch);
+            refineryValidated = refineryPlanner.isRefineryEnabled() && request.goal() == Goal.TECH_TREE_PATCH;
+        } catch (IllegalArgumentException ex) {
+            validatedPatch = mockResponse.patch();
+            refineryFailed = true;
+        }
 
         List<String> explain = new ArrayList<>();
         if (llmProposal.isPresent()) {
@@ -49,12 +59,19 @@ public class ComposedPatchPlanner implements PatchPlanner {
         } else {
             explain.add("LLM planner unavailable, used deterministic mock candidate patch.");
         }
-        explain.add("Refinery planner validated candidate patch (scaffold pass-through).");
+        if (refineryValidated) {
+            explain.add("Refinery planner validated TECH_TREE_PATCH addTech slice.");
+        } else {
+            explain.add("Refinery planner stage skipped or pass-through.");
+        }
         explain.addAll(mockResponse.explain());
 
         List<String> warnings = new ArrayList<>(mockResponse.warnings());
         if (llmProposal.isEmpty()) {
             warnings.add("LLM disabled or not implemented; using mock planner output.");
+        }
+        if (refineryFailed) {
+            warnings.add("Refinery validation failed, falling back to deterministic mock patch.");
         }
 
         return new PatchResponse(

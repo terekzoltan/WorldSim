@@ -1,13 +1,11 @@
-﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace WorldSim.Simulation;
 
-public enum Job { Idle, GatherWood, GatherStone, BuildHouse }
+public enum Job { Idle, GatherWood, GatherStone, GatherFood, EatFood, Rest, BuildHouse }
 
 public class Person
 {
@@ -15,6 +13,7 @@ public class Person
     public Job Current = Job.Idle;
     public float Health = 100;  
     public float Age = 0;
+    public float Stamina { get; private set; } = 100f;
     public int Strength, Intelligence;
     public Colony Home => _home;
 
@@ -37,6 +36,9 @@ public class Person
 
     const int WoodWorkTime = 5;
     const int StoneWorkTime = 8;
+    const int FoodWorkTime = 4;
+    const int EatWorkTime = 2;
+    const int RestWorkTime = 4;
     const int BuildHouseTime = 20;
 
     int _doingJob = 0; // csinalni hogy ideig dolgozzon ne instant
@@ -98,10 +100,9 @@ public class Person
                 Emotions["Hope"] = Math.Clamp(Emotions.GetValueOrDefault("Hope", 0f) + 0.5f, -100f, 100f);
             }
 
-            // Ha lesz Food, csökkentsd az éhséget és növeld a Happy-t
+            // Food látványa kis pozitív hatás
             if (res == Resource.Food)
             {
-                Needs["Hunger"] = Math.Max(0f, Needs.GetValueOrDefault("Hunger", 20f) - 10f);
                 Emotions["Happy"] = Math.Clamp(Emotions.GetValueOrDefault("Happy", 0f) + 1f, -100f, 100f);
             }
         }
@@ -118,7 +119,21 @@ public class Person
 
         // Needs időbeli változása
         if (Needs.TryGetValue("Hunger", out var h))
-            Needs["Hunger"] = Math.Clamp(h + dt * 2f, 0f, 100f);
+            Needs["Hunger"] = Math.Clamp(h + dt * 2.2f, 0f, 100f);
+
+        if (Current == Job.Idle)
+            Stamina = Math.Clamp(Stamina + dt * 2.2f, 0f, 100f);
+        else
+            Stamina = Math.Clamp(Stamina - dt * 1.6f, 0f, 100f);
+
+        float hunger = Needs.GetValueOrDefault("Hunger", 0f);
+        if (hunger >= 95f)
+            Health -= dt * 4.0f;
+        else if (hunger >= 85f)
+            Health -= dt * 2.0f;
+
+        if (Health <= 0f)
+            return false;
 
         // simple reproduction chance if there is housing capacity
         int colonyPop = w._people.Count(p => p.Home == _home);
@@ -127,6 +142,10 @@ public class Person
         {
             births.Add(Person.SpawnWithBonus(_home, Pos, w));
         }
+
+        int colonyFoodStock = _home.Stock[Resource.Food];
+        bool emergencyFood = colonyFoodStock <= Math.Max(3, colonyPop);
+        bool veryLowFood = colonyFoodStock <= Math.Max(1, colonyPop / 3);
 
         if (_doingJob > 0 && Current != Job.Idle)
         {
@@ -171,6 +190,29 @@ public class Person
                             }
                         }
                         break;
+
+                    case Job.GatherFood:
+                        if (w.TryHarvest(Pos, Resource.Food, 1))
+                            _home.Stock[Resource.Food] += w.FoodYield;
+                        else if (veryLowFood && TryHuntNearbyHerbivore(w, 1))
+                            _home.Stock[Resource.Food] += Math.Max(1, w.FoodYield);
+                        else
+                            Wander(w);
+                        break;
+
+                    case Job.EatFood:
+                        if (_home.Stock[Resource.Food] > 0)
+                        {
+                            _home.Stock[Resource.Food] -= 1;
+                            Needs["Hunger"] = Math.Max(0f, Needs.GetValueOrDefault("Hunger", 30f) - 35f);
+                            Stamina = Math.Clamp(Stamina + 12f, 0f, 100f);
+                            Health = Math.Min(100f + w.HealthBonus, Health + 1.5f);
+                        }
+                        break;
+
+                    case Job.Rest:
+                        Stamina = Math.Clamp(Stamina + 22f, 0f, 100f);
+                        break;
                 }
 
                 Current = Job.Idle;
@@ -178,6 +220,56 @@ public class Person
         }
         else if (Current == Job.Idle)
         {
+            float localHunger = Needs.GetValueOrDefault("Hunger", 0f);
+
+            if (Stamina <= 20f)
+            {
+                Current = Job.Rest;
+                _doingJob = ComputeTicks(RestWorkTime, w, isHeavyWork: false);
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
+            }
+
+            float eatThreshold = emergencyFood ? 64f : 70f;
+            if (localHunger >= eatThreshold && _home.Stock[Resource.Food] > 0)
+            {
+                Current = Job.EatFood;
+                _doingJob = ComputeTicks(EatWorkTime, w, isHeavyWork: false);
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
+            }
+
+            float gatherFoodThreshold = emergencyFood ? 48f : 55f;
+            if (localHunger >= gatherFoodThreshold)
+            {
+                var hereFood = w.GetTile(Pos.x, Pos.y).Node;
+                if (hereFood != null && hereFood.Type == Resource.Food && hereFood.Amount > 0)
+                {
+                    Current = Job.GatherFood;
+                    _doingJob = ComputeTicks(FoodWorkTime, w, isHeavyWork: true);
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
+
+                if (veryLowFood && TryHuntNearbyHerbivore(w, range: 1))
+                {
+                    _home.Stock[Resource.Food] += Math.Max(1, w.FoodYield + 1);
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
+
+                if (TryMoveTowardsNearestResource(w, searchRadius: 4, Resource.Food))
+                {
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
+            }
+
             // 1) Immediate resource on current tile → start job
             var hereNode = w.GetTile(Pos.x, Pos.y).Node;
             if (hereNode != null && hereNode.Amount > 0)
@@ -185,7 +277,7 @@ public class Person
                 if (hereNode.Type == Resource.Wood)
                 {
                     Current = Job.GatherWood;
-                    _doingJob = Math.Max(1, (int)MathF.Ceiling(WoodWorkTime / w.WorkEfficiencyMultiplier));
+                    _doingJob = ComputeTicks(WoodWorkTime, w, isHeavyWork: true);
                     _idleTimeSeconds = 0f;
                     _lastPos = Pos;
                     return true;
@@ -193,7 +285,7 @@ public class Person
                 if (hereNode.Type == Resource.Stone)
                 {
                     Current = Job.GatherStone;
-                    _doingJob = Math.Max(1, (int)MathF.Ceiling(StoneWorkTime / w.WorkEfficiencyMultiplier));
+                    _doingJob = ComputeTicks(StoneWorkTime, w, isHeavyWork: true);
                     _idleTimeSeconds = 0f;
                     _lastPos = Pos;
                     return true;
@@ -201,7 +293,7 @@ public class Person
             }
 
             // 2) Move one step toward nearest resource in small radius
-            if (TryMoveTowardsNearestResource(w, searchRadius: 2))
+            if (TryMoveTowardsNearestResource(w, searchRadius: 2, Resource.Wood, Resource.Stone))
             {
                 _idleTimeSeconds = 0f; // movement → not idle
                 _lastPos = Pos;
@@ -218,6 +310,9 @@ public class Person
                 {
                     Job.GatherWood  => Math.Max(1, (int)MathF.Ceiling(WoodWorkTime  / w.WorkEfficiencyMultiplier)),
                     Job.GatherStone => Math.Max(1, (int)MathF.Ceiling(StoneWorkTime / w.WorkEfficiencyMultiplier)),
+                    Job.GatherFood  => ComputeTicks(FoodWorkTime, w, isHeavyWork: true),
+                    Job.EatFood     => ComputeTicks(EatWorkTime, w, isHeavyWork: false),
+                    Job.Rest        => ComputeTicks(RestWorkTime, w, isHeavyWork: false),
                     Job.BuildHouse  => Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier)),
                     _ => 0
                 };
@@ -241,11 +336,29 @@ public class Person
         return true;
     }
 
-    bool TryMoveTowardsNearestResource(World w, int searchRadius)
+    int ComputeTicks(int baseTicks, World w, bool isHeavyWork)
+    {
+        float staminaFactor = isHeavyWork
+            ? Math.Clamp(0.45f + (Stamina / 100f) * 0.55f, 0.45f, 1f)
+            : Math.Clamp(0.7f + (Stamina / 100f) * 0.3f, 0.7f, 1f);
+
+        float effectiveSpeed = Math.Max(0.2f, w.WorkEfficiencyMultiplier * staminaFactor);
+        return Math.Max(1, (int)MathF.Ceiling(baseTicks / effectiveSpeed));
+    }
+
+    bool TryMoveTowardsNearestResource(World w, int searchRadius, params Resource[] desired)
     {
         (int x, int y)? bestPos = null;
         int bestDist = int.MaxValue;
         Resource bestType = Resource.None;
+
+        bool Wants(Resource r)
+        {
+            if (desired == null || desired.Length == 0) return false;
+            for (int i = 0; i < desired.Length; i++)
+                if (desired[i] == r) return true;
+            return false;
+        }
 
         for (int r = 1; r <= searchRadius; r++)
         {
@@ -262,7 +375,7 @@ public class Person
 
                     var node = w.GetTile(nx, ny).Node;
                     if (node == null || node.Amount <= 0) continue;
-                    if (node.Type != Resource.Wood && node.Type != Resource.Stone) continue;
+                    if (!Wants(node.Type)) continue;
 
                     if (md < bestDist)
                     {
@@ -283,18 +396,49 @@ public class Person
             if (bestType == Resource.Wood)
             {
                 Current = Job.GatherWood;
-                _doingJob = Math.Max(1, (int)MathF.Ceiling(WoodWorkTime / w.WorkEfficiencyMultiplier));
+                _doingJob = ComputeTicks(WoodWorkTime, w, isHeavyWork: true);
             }
-            else
+            else if (bestType == Resource.Stone)
             {
                 Current = Job.GatherStone;
-                _doingJob = Math.Max(1, (int)MathF.Ceiling(StoneWorkTime / w.WorkEfficiencyMultiplier));
+                _doingJob = ComputeTicks(StoneWorkTime, w, isHeavyWork: true);
+            }
+            else if (bestType == Resource.Food)
+            {
+                Current = Job.GatherFood;
+                _doingJob = ComputeTicks(FoodWorkTime, w, isHeavyWork: true);
             }
             return true;
         }
 
         // Step toward target
         MoveTowards(w, bestPos.Value, (int)_home.MovementSpeedMultiplier);
+        return true;
+    }
+
+    bool TryHuntNearbyHerbivore(World w, int range)
+    {
+        Herbivore? nearest = null;
+        int best = int.MaxValue;
+
+        foreach (var animal in w._animals)
+        {
+            if (animal is not Herbivore herb || !herb.IsAlive)
+                continue;
+
+            int dist = Math.Abs(herb.Pos.x - Pos.x) + Math.Abs(herb.Pos.y - Pos.y);
+            if (dist > range || dist >= best)
+                continue;
+
+            nearest = herb;
+            best = dist;
+        }
+
+        if (nearest == null)
+            return false;
+
+        nearest.IsAlive = false;
+        Emotions["Hope"] = Math.Clamp(Emotions.GetValueOrDefault("Hope", 0f) + 2f, -100f, 100f);
         return true;
     }
 

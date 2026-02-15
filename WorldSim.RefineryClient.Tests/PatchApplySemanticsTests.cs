@@ -94,14 +94,14 @@ public sealed class PatchApplySemanticsTests
                 new TweakTechOp
                 {
                     OpId = "op_tweak",
-                    TechId = "IRRIGATION_1",
+                    TechId = "agriculture",
                     FieldPath = "cost.research",
                     DeltaNumber = 10
                 },
                 new AddTechOp
                 {
                     OpId = "op_add",
-                    TechId = "IRRIGATION_1",
+                    TechId = "agriculture",
                     PrereqTechIds = Array.Empty<string>(),
                     Cost = new JsonObject(),
                     Effects = new JsonObject()
