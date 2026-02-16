@@ -25,6 +25,11 @@ Planner mode defaults to deterministic mock:
 - `PLANNER_REFINERY_ENABLED=false` (default)
 - `PLANNER_LLM_ENABLED=false` (default)
 
+When `PLANNER_MODE=pipeline`, responses include an explicit explain marker:
+
+- `refineryStage:enabled` if Refinery stage is enabled
+- `refineryStage:disabled` if Refinery stage is off
+
 ## Test
 
 ```bash
@@ -154,6 +159,17 @@ Package root: `hu.zoltanterek.worldsim.refinery`
   2. Run C# with `REFINERY_INTEGRATION_MODE=live`
   3. Trigger patch from game with `F6`
   4. Optional parity check: `REFINERY_PARITY_TEST=true` then `dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj`
+
+### Current Refinery slice
+
+- Enabled with `PLANNER_MODE=pipeline` and `PLANNER_REFINERY_ENABLED=true`.
+- Scope is intentionally narrow: `TECH_TREE_PATCH` with `addTech` operations.
+- Invariants currently enforced in this slice:
+  - `addTech.techId` must be known.
+  - `addTech.prereqTechIds` must reference known tech IDs.
+  - Self-prereq is removed.
+  - `cost.research` is repaired to `80` if missing or non-positive.
+- Non-`addTech` operations under `TECH_TREE_PATCH` are rejected by this slice.
 
 ## Fixtures for integration tests
 

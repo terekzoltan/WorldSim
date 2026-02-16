@@ -47,9 +47,10 @@ class PipelineRefineryEnabledTest {
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         assertEquals("addTech", body.path("patch").get(0).path("op").asText());
         assertEquals("agriculture", body.path("patch").get(0).path("techId").asText());
+        assertEquals("refineryStage:enabled", body.path("explain").get(0).asText());
         assertEquals(
                 "Refinery planner validated TECH_TREE_PATCH addTech slice.",
-                body.path("explain").get(1).asText()
+                body.path("explain").get(2).asText()
         );
     }
 }

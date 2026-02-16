@@ -19,12 +19,15 @@ public abstract class Animal
     // Toggle that enforces StepTowards only occurring every second invocation.
     // True means the next StepTowards call is allowed; after allowing it we set it to false.
     private bool _allowStep = true;
+    private (int x, int y) _lastPosForStuck;
+    private int _stuckFrames;
 
     protected Animal((int x, int y) pos, int speed, int vision)
     {
         Pos = pos;
         Speed = Math.Max(1, speed);
         Vision = Math.Max(1, vision);
+        _lastPosForStuck = pos;
     }
 
     // Chance [0..1) to actually perform a RandomStep when RandomStep is invoked.
@@ -87,6 +90,22 @@ public abstract class Animal
         }
 
         Pos = (cx, cy);
+
+        if (Pos == _lastPosForStuck)
+        {
+            _stuckFrames++;
+            if (_stuckFrames >= 3)
+            {
+                ForceRandomStep(w, maxStep);
+                _stuckFrames = 0;
+                w.ReportAnimalStuckRecovery();
+            }
+        }
+        else
+        {
+            _stuckFrames = 0;
+            _lastPosForStuck = Pos;
+        }
     }
 
     protected void RandomStep(World w, int maxStep)
@@ -110,6 +129,23 @@ public abstract class Animal
             }
         }
         // if blocked by water around, stay in place
+    }
+
+    protected void ForceRandomStep(World w, int maxStep)
+    {
+        int step = Math.Max(1, maxStep);
+        int tries = 8;
+        for (int i = 0; i < tries; i++)
+        {
+            int nx = Math.Clamp(Pos.x + _rng.Next(-step, step + 1), 0, w.Width - 1);
+            int ny = Math.Clamp(Pos.y + _rng.Next(-step, step + 1), 0, w.Height - 1);
+            if (w.GetTile(nx, ny).Ground != Ground.Water)
+            {
+                Pos = (nx, ny);
+                _lastPosForStuck = Pos;
+                return;
+            }
+        }
     }
 }
 
@@ -225,6 +261,11 @@ public sealed class Predator : Animal
 
     // Mild nerf so herbivores do not collapse too early.
     private const double CaptureSuccessChance = 0.65;
+    private const float MaxAgeYears = 95f;
+
+    private float _age;
+    private float _energy = 100f;
+    private bool _reportedDeath;
 
     // Predators wander a bit more often than herbivores
     protected override double RandomStepChance => 0.8;
@@ -232,6 +273,20 @@ public sealed class Predator : Animal
     public override void Update(World w, float dt)
     {
         if (!IsAlive) return;
+
+        _age += dt / 10f;
+        _energy = Math.Clamp(_energy - dt * 1.0f, 0f, 120f);
+
+        if (_age > MaxAgeYears || _energy <= 0f)
+        {
+            IsAlive = false;
+            if (!_reportedDeath)
+            {
+                _reportedDeath = true;
+                w.ReportPredatorDeath();
+            }
+            return;
+        }
 
         // Seek nearest herbivore in vision
         Herbivore? nearestPrey = null;
@@ -259,12 +314,51 @@ public sealed class Predator : Animal
             if (Pos == nearestPrey.Pos && nearestPrey.IsAlive && _rng.NextDouble() < CaptureSuccessChance)
             {
                 nearestPrey.IsAlive = false; // prey is removed by World after updates
+                _energy = Math.Clamp(_energy + 18f, 0f, 120f);
             }
         }
         else
         {
-            // Patrol/wander
-            RandomStep(w, Speed);
+            if (w.EnablePredatorHumanAttacks && TryHarassNearbyPerson(w))
+            {
+                _energy = Math.Clamp(_energy + 4f, 0f, 120f);
+            }
+            else
+            {
+                // Patrol/wander
+                RandomStep(w, Speed);
+            }
         }
+    }
+
+    private bool TryHarassNearbyPerson(World w)
+    {
+        Person? nearest = null;
+        int best = int.MaxValue;
+        foreach (var person in w._people)
+        {
+            if (person.Health <= 0f)
+                continue;
+
+            int d = Manhattan(Pos, person.Pos);
+            if (d < best)
+            {
+                best = d;
+                nearest = person;
+            }
+        }
+
+        if (nearest == null || best > 2)
+            return false;
+
+        StepTowards(w, nearest.Pos, Speed);
+        if (Pos == nearest.Pos)
+        {
+            nearest.ApplyDamage(w.PredatorHumanDamage, "Predator");
+            w.ReportPredatorHumanHit();
+            return true;
+        }
+
+        return false;
     }
 }

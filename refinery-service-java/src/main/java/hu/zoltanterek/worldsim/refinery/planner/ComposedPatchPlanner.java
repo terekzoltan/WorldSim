@@ -54,6 +54,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
         }
 
         List<String> explain = new ArrayList<>();
+        explain.add(refineryPlanner.isRefineryEnabled() ? "refineryStage:enabled" : "refineryStage:disabled");
         if (llmProposal.isPresent()) {
             explain.add("LLM planner proposed candidate patch.");
         } else {

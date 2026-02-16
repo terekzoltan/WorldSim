@@ -2,6 +2,7 @@ package hu.zoltanterek.worldsim.refinery.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,22 @@ import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 
 @Component
 public class RefineryPlanner {
+    private static final Set<String> KNOWN_TECH_IDS = Set.of(
+            "woodcutting",
+            "construction",
+            "mining",
+            "agriculture",
+            "medicine",
+            "tools",
+            "housing",
+            "logistics",
+            "education",
+            "fitness",
+            "exploration",
+            "demographics",
+            "masonry"
+    );
+
     private final boolean refineryEnabled;
     private final ObjectMapper objectMapper;
 
@@ -58,6 +75,9 @@ public class RefineryPlanner {
         if (addTech.techId() == null || addTech.techId().isBlank()) {
             throw new IllegalArgumentException("addTech.techId must be non-empty.");
         }
+        if (!KNOWN_TECH_IDS.contains(addTech.techId())) {
+            throw new IllegalArgumentException("addTech.techId must be known: " + addTech.techId());
+        }
 
         List<String> prereqs = addTech.prereqTechIds() == null
                 ? List.of()
@@ -66,6 +86,12 @@ public class RefineryPlanner {
                 .filter(id -> !id.equals(addTech.techId()))
                 .distinct()
                 .toList();
+
+        for (String prereq : prereqs) {
+            if (!KNOWN_TECH_IDS.contains(prereq)) {
+                throw new IllegalArgumentException("addTech.prereqTechIds contains unknown id: " + prereq);
+            }
+        }
 
         ObjectNode repairedCost = ensureObject(addTech.cost());
         double research = repairedCost.path("research").asDouble(-1d);

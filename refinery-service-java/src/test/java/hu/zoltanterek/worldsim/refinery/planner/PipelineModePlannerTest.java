@@ -53,6 +53,7 @@ class PipelineModePlannerTest {
 
         assertEquals(first, second);
         assertEquals(mockExpected.path("patch"), first.path("patch"));
+        assertEquals("refineryStage:disabled", first.path("explain").get(0).asText());
         assertEquals(
                 "LLM disabled or not implemented; using mock planner output.",
                 first.path("warnings").get(0).asText()

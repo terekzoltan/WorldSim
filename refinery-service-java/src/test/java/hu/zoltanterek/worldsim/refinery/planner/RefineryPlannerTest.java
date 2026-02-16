@@ -71,4 +71,29 @@ class RefineryPlannerTest {
 
         assertThrows(IllegalArgumentException.class, () -> planner.validateAndRepair(request, List.of(badOp)));
     }
+
+    @Test
+    void techTreeSliceRejectsUnknownPrereqIds() {
+        RefineryPlanner planner = new RefineryPlanner(true, objectMapper);
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-3",
+                123,
+                42,
+                Goal.TECH_TREE_PATCH,
+                objectMapper.createObjectNode(),
+                null
+        );
+
+        PatchOp badOp = new PatchOp.AddTech(
+                "op_bad2",
+                "agriculture",
+                List.of("unknown_prereq"),
+                objectMapper.createObjectNode(),
+                objectMapper.createObjectNode()
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> planner.validateAndRepair(request, List.of(badOp)));
+    }
 }

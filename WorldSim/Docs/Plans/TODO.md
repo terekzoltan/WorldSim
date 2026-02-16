@@ -24,6 +24,13 @@ S1 implementacios sorrend:
    - season/event log legyen
    - vilagra gyakorolt hatas kezdetben kicsi
 
+SPRINT 2 STATUS (Society-first, seed implementation)
+- profession rendszer + enyhe auto-rebalance bekerult
+- morale + frakcio passzivok bekerultek
+- predator->human minimal damage scaffold bekerult
+- predator mortality + stuck-recovery telemetria bekerult
+- KNOWN BUG (kesobbi fix): shoreline/pathfinding menten animal/NPC beragadas meg elofordulhat
+
 -----------------------
 
 - (Több Job, ResourseTypeok: ritkítani a kettő eddigit)

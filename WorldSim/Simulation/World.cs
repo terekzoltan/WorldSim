@@ -38,20 +38,29 @@ namespace WorldSim.Simulation
         public float MovementSpeedMultiplier { get; set; } = 1.0f; // Mozgási sebesség szorzó (gyorsabban mozognak)
         public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
         public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
+        public bool EnablePredatorHumanAttacks { get; set; } = true;
+        public float PredatorHumanDamage { get; set; } = 10f;
 
         public Season CurrentSeason { get; private set; } = Season.Spring;
         public bool IsDroughtActive { get; private set; }
         public IReadOnlyList<string> RecentEvents => _recentEvents;
+        public int TotalAnimalStuckRecoveries { get; private set; }
+        public int TotalPredatorDeaths { get; private set; }
+        public int TotalPredatorHumanHits { get; private set; }
 
         readonly Random _rng = new();
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
         readonly List<string> _recentEvents = new();
+        readonly HashSet<int> _houseMilestones = new();
+        readonly HashSet<int> _extinctionMilestones = new();
 
         float _seasonTimer;
         float _droughtTimer;
+        float _professionRebalanceTimer;
 
         const float SeasonDurationSeconds = 90f;
         const float DroughtDurationSeconds = 35f;
+        const float ProfessionRebalancePeriod = 12f;
 
         public World(int width, int height, int initialPop)
         {
@@ -151,7 +160,14 @@ namespace WorldSim.Simulation
             }
             _people.AddRange(births);
 
-            foreach (Colony c in _colonies) c.Update(dt);
+            _professionRebalanceTimer += dt;
+            if (_professionRebalanceTimer >= ProfessionRebalancePeriod)
+            {
+                _professionRebalanceTimer = 0f;
+                RebalanceProfessions();
+            }
+
+            foreach (Colony c in _colonies) c.Update(this, dt);
 
             // Animals: update and remove the dead
             for (int i = _animals.Count - 1; i >= 0; i--)
@@ -162,6 +178,7 @@ namespace WorldSim.Simulation
             }
 
             UpdateAnimalPopulation(dt);
+            UpdateMilestones();
 
             if (ResourceSharingEnabled && _colonies.Count > 1)
             {
@@ -190,7 +207,11 @@ namespace WorldSim.Simulation
 
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
         public Tile GetTile(int x, int y) => _map[x, y];
-        public void AddHouse(Colony colony, (int x, int y) pos) => Houses.Add(new House(colony, pos));
+        public void AddHouse(Colony colony, (int x, int y) pos) => Houses.Add(new House(colony, pos, HouseCapacity));
+
+        public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;
+        public void ReportPredatorDeath() => TotalPredatorDeaths++;
+        public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
 
         // --- Biome generation (cheap, blob-like) ---
 
@@ -427,6 +448,105 @@ namespace WorldSim.Simulation
 
             if (predators < Math.Max(3, herbivores / 6) && _rng.NextDouble() < 0.5)
                 _animals.Add(new Predator(RandomFreePos()));
+        }
+
+        void UpdateMilestones()
+        {
+            foreach (var colony in _colonies)
+            {
+                if (colony.HouseCount > 0 && !_houseMilestones.Contains(colony.Id))
+                {
+                    _houseMilestones.Add(colony.Id);
+                    AddEvent($"{colony.Name} built first house");
+                }
+
+                int people = _people.Count(p => p.Home == colony && p.Health > 0f);
+                if (people == 0 && !_extinctionMilestones.Contains(colony.Id))
+                {
+                    _extinctionMilestones.Add(colony.Id);
+                    AddEvent($"{colony.Name} collapsed");
+                }
+            }
+        }
+
+        void RebalanceProfessions()
+        {
+            foreach (var colony in _colonies)
+            {
+                var adults = _people
+                    .Where(p => p.Home == colony && p.Age >= 16f && p.Health > 0f)
+                    .ToList();
+
+                if (adults.Count == 0)
+                    continue;
+
+                bool emergencyFood = colony.Stock[Resource.Food] <= Math.Max(4, adults.Count);
+
+                var targets = CreateProfessionTargets(adults.Count, emergencyFood);
+                var counts = adults
+                    .GroupBy(p => p.Profession)
+                    .ToDictionary(g => g.Key, g => g.Count());
+
+                Profession? lacking = null;
+                int gap = 0;
+                foreach (var kv in targets)
+                {
+                    counts.TryGetValue(kv.Key, out int current);
+                    int diff = kv.Value - current;
+                    if (diff > gap)
+                    {
+                        gap = diff;
+                        lacking = kv.Key;
+                    }
+                }
+
+                if (lacking is null || gap <= 0)
+                    continue;
+
+                var candidate = adults
+                    .Where(p => p.Profession != lacking.Value && p.Current == Job.Idle)
+                    .OrderBy(p => p.Stamina)
+                    .FirstOrDefault();
+
+                if (candidate != null)
+                    candidate.Profession = lacking.Value;
+            }
+        }
+
+        Dictionary<Profession, int> CreateProfessionTargets(int adultCount, bool emergencyFood)
+        {
+            var ratios = emergencyFood
+                ? new Dictionary<Profession, float>
+                {
+                    [Profession.Farmer] = 0.34f,
+                    [Profession.Hunter] = 0.24f,
+                    [Profession.Lumberjack] = 0.14f,
+                    [Profession.Miner] = 0.14f,
+                    [Profession.Builder] = 0.08f,
+                    [Profession.Generalist] = 0.06f
+                }
+                : new Dictionary<Profession, float>
+                {
+                    [Profession.Farmer] = 0.24f,
+                    [Profession.Hunter] = 0.12f,
+                    [Profession.Lumberjack] = 0.2f,
+                    [Profession.Miner] = 0.2f,
+                    [Profession.Builder] = 0.14f,
+                    [Profession.Generalist] = 0.1f
+                };
+
+            var targets = ratios.ToDictionary(
+                kv => kv.Key,
+                kv => Math.Max(0, (int)MathF.Round(adultCount * kv.Value))
+            );
+
+            int sum = targets.Values.Sum();
+            if (sum < adultCount)
+                targets[Profession.Generalist] += adultCount - sum;
+            else if (sum > adultCount)
+                targets[Profession.Generalist] = Math.Max(0, targets[Profession.Generalist] - (sum - adultCount));
+
+            return targets;
         }
     }
 }

@@ -409,8 +409,14 @@ namespace WorldSim
                 var colonyPeople = _world._people.Where(p => p.Home == colony).ToList();
                 float avgHunger = colonyPeople.Count == 0 ? 0f : colonyPeople.Average(p => p.Needs.ContainsKey("Hunger") ? p.Needs["Hunger"] : 0f);
                 float avgStamina = colonyPeople.Count == 0 ? 0f : colonyPeople.Average(p => p.Stamina);
+                var profSummary = string.Join(",", colonyPeople
+                    .Where(p => p.Age >= 16f)
+                    .GroupBy(p => p.Profession)
+                    .OrderByDescending(g => g.Count())
+                    .Take(3)
+                    .Select(g => $"{g.Key}:{g.Count()}"));
                 string stats =
-                    $"Colony {colony.Id}: Food {colony.Stock[Resource.Food]}, Wood {colony.Stock[Resource.Wood]}, Stone {colony.Stock[Resource.Stone]}, Iron {colony.Stock[Resource.Iron]}, Gold {colony.Stock[Resource.Gold]}, Houses {colony.HouseCount}, People {colonyPeople.Count}, AvgHun {avgHunger:0}, AvgSta {avgStamina:0}";
+                    $"{colony.Name}({colony.Id}) Morale {colony.Morale:0}: Food {colony.Stock[Resource.Food]}, Wood {colony.Stock[Resource.Wood]}, Stone {colony.Stock[Resource.Stone]}, Iron {colony.Stock[Resource.Iron]}, Gold {colony.Stock[Resource.Gold]}, Houses {colony.HouseCount}, People {colonyPeople.Count}, AvgHun {avgHunger:0}, AvgSta {avgStamina:0}, Prof[{profSummary}]";
                 _sb.DrawString(_font, stats, new Vector2(10, j), Color.White);
                 j += 20;
             }
@@ -422,7 +428,7 @@ namespace WorldSim
             int herbCount = _world._animals.Count(a => a is Herbivore && a.IsAlive);
             int predCount = _world._animals.Count(a => a is Predator && a.IsAlive);
             int criticalHungry = _world._people.Count(p => p.Needs.ContainsKey("Hunger") && p.Needs["Hunger"] >= 85f);
-            string ecoTelemetry = $"Eco: Herb {herbCount}, Pred {predCount}, FoodNodes {activeFoodNodes}, FoodRegrow {depletedFoodSpots}, CriticalHungry {criticalHungry}";
+            string ecoTelemetry = $"Eco: Herb {herbCount}, Pred {predCount}, FoodNodes {activeFoodNodes}, FoodRegrow {depletedFoodSpots}, CriticalHungry {criticalHungry}, StuckFix {_world.TotalAnimalStuckRecoveries}, PredDeaths {_world.TotalPredatorDeaths}, PredHits {_world.TotalPredatorHumanHits}";
             _sb.DrawString(_font, ecoTelemetry, new Vector2(10, j), Color.LightGray);
             j += 20;
 

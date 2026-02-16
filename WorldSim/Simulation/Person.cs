@@ -6,6 +6,8 @@ using System.Linq;
 namespace WorldSim.Simulation;
 
 public enum Job { Idle, GatherWood, GatherStone, GatherFood, EatFood, Rest, BuildHouse }
+public enum Profession { Generalist, Lumberjack, Miner, Farmer, Hunter, Builder }
+public enum PersonDeathReason { None, OldAge, Starvation, Predator, Other }
 
 public class Person
 {
@@ -14,6 +16,8 @@ public class Person
     public float Health = 100;  
     public float Age = 0;
     public float Stamina { get; private set; } = 100f;
+    public Profession Profession { get; internal set; }
+    public PersonDeathReason LastDeathReason { get; private set; } = PersonDeathReason.None;
     public int Strength, Intelligence;
     public Colony Home => _home;
 
@@ -48,13 +52,15 @@ public class Person
     float _loiterThresholdSeconds; // randomized per person
     (int x, int y) _lastPos;
 
-    private Person(Colony home, (int, int) pos)
+    private Person(Colony home, (int, int) pos, bool newborn)
     {
         _home = home;
         Pos = pos;
         _lastPos = pos;
         Strength = _rng.Next(3, 11);
         Intelligence = _rng.Next(3, 11);
+        Age = newborn ? 0f : 18f + (float)_rng.NextDouble() * 22f;
+        Profession = PickInitialProfession(home);
 
         // Needs/Emotions baseline-ok
         Needs["Hunger"] = 20f; // 0..100, kisebb = jobb (jóllakott)
@@ -65,15 +71,50 @@ public class Person
     }
 
     public static Person Spawn(Colony home, (int, int) pos)
-        => new Person(home, pos);
+        => new Person(home, pos, newborn: false);
 
     public static Person SpawnWithBonus(Colony home, (int, int) pos, World world)
     {
-        var person = new Person(home, pos);
+        var person = new Person(home, pos, newborn: true);
         person.Strength = Math.Min(20, person.Strength + world.StrengthBonus);
         person.Intelligence = Math.Min(20, person.Intelligence + world.IntelligenceBonus);
         person.Health += world.HealthBonus;
         return person;
+    }
+
+    private static Profession PickInitialProfession(Colony colony)
+    {
+        var roll = Random.Shared.NextDouble();
+        return colony.Faction switch
+        {
+            Faction.Sylvars => roll switch
+            {
+                < 0.30 => Profession.Farmer,
+                < 0.48 => Profession.Lumberjack,
+                < 0.60 => Profession.Hunter,
+                < 0.80 => Profession.Builder,
+                < 0.92 => Profession.Miner,
+                _ => Profession.Generalist
+            },
+            Faction.Obsidari => roll switch
+            {
+                < 0.32 => Profession.Miner,
+                < 0.52 => Profession.Builder,
+                < 0.66 => Profession.Lumberjack,
+                < 0.78 => Profession.Hunter,
+                < 0.92 => Profession.Farmer,
+                _ => Profession.Generalist
+            },
+            _ => roll switch
+            {
+                < 0.22 => Profession.Farmer,
+                < 0.40 => Profession.Lumberjack,
+                < 0.58 => Profession.Miner,
+                < 0.73 => Profession.Builder,
+                < 0.86 => Profession.Hunter,
+                _ => Profession.Generalist
+            }
+        };
     }
 
     // Run sensors and store perceived facts to memory
@@ -115,7 +156,10 @@ public class Person
 
         Age += dt / 10;
         if (Age > w.MaxAge)
+        {
+            LastDeathReason = PersonDeathReason.OldAge;
             return false;
+        }
 
         // Needs időbeli változása
         if (Needs.TryGetValue("Hunger", out var h))
@@ -133,12 +177,40 @@ public class Person
             Health -= dt * 2.0f;
 
         if (Health <= 0f)
+        {
+            LastDeathReason = hunger >= 85f ? PersonDeathReason.Starvation : PersonDeathReason.Other;
             return false;
+        }
+
+        if (Age < 16f)
+        {
+            if (hunger >= 68f && _home.Stock[Resource.Food] > 0)
+            {
+                Current = Job.EatFood;
+                _doingJob = ComputeTicks(EatWorkTime, w, isHeavyWork: false);
+                return true;
+            }
+
+            if (Stamina < 40f)
+            {
+                Current = Job.Rest;
+                _doingJob = ComputeTicks(RestWorkTime, w, isHeavyWork: false);
+                return true;
+            }
+
+            if (_rng.NextDouble() < 0.1)
+                Wander(w);
+
+            return true;
+        }
 
         // simple reproduction chance if there is housing capacity
         int colonyPop = w._people.Count(p => p.Home == _home);
         int capacity = _home.HouseCount * w.HouseCapacity;
-        if (Age >= 18 && Age <= 60 && colonyPop < capacity && _rng.NextDouble() < (0.001 * w.BirthRateMultiplier))
+        int adultsInColony = w._people.Count(p => p.Home == _home && p.Age >= 18f && p.Health > 0f);
+        bool hasHousingRoom = colonyPop < capacity;
+        bool socialGate = adultsInColony >= 2 && _home.Morale >= 28f;
+        if (Age >= 18 && Age <= 60 && hasHousingRoom && socialGate && _rng.NextDouble() < (0.001 * w.BirthRateMultiplier))
         {
             births.Add(Person.SpawnWithBonus(_home, Pos, w));
         }
@@ -159,14 +231,14 @@ public class Person
                 {
                     case Job.GatherWood:
                         if (w.TryHarvest(Pos, Resource.Wood, 1))
-                            _home.Stock[Resource.Wood] += w.WoodYield;
+                            _home.Stock[Resource.Wood] += GetGatherAmount(Resource.Wood, w.WoodYield);
                         else
                             Wander(w);
                         break;
 
                     case Job.GatherStone:
                         if (w.TryHarvest(Pos, Resource.Stone, 1))
-                            _home.Stock[Resource.Stone] += w.StoneYield;
+                            _home.Stock[Resource.Stone] += GetGatherAmount(Resource.Stone, w.StoneYield);
                         else
                             Wander(w);
                         break;
@@ -193,9 +265,9 @@ public class Person
 
                     case Job.GatherFood:
                         if (w.TryHarvest(Pos, Resource.Food, 1))
-                            _home.Stock[Resource.Food] += w.FoodYield;
+                            _home.Stock[Resource.Food] += GetGatherAmount(Resource.Food, w.FoodYield);
                         else if (veryLowFood && TryHuntNearbyHerbivore(w, 1))
-                            _home.Stock[Resource.Food] += Math.Max(1, w.FoodYield);
+                            _home.Stock[Resource.Food] += Math.Max(1, GetGatherAmount(Resource.Food, w.FoodYield));
                         else
                             Wander(w);
                         break;
@@ -211,7 +283,8 @@ public class Person
                         break;
 
                     case Job.Rest:
-                        Stamina = Math.Clamp(Stamina + 22f, 0f, 100f);
+                        float restGain = HasNearbyOwnHouse(w, radius: 2) ? 30f : 22f;
+                        Stamina = Math.Clamp(Stamina + restGain, 0f, 100f);
                         break;
                 }
 
@@ -256,7 +329,7 @@ public class Person
 
                 if (veryLowFood && TryHuntNearbyHerbivore(w, range: 1))
                 {
-                    _home.Stock[Resource.Food] += Math.Max(1, w.FoodYield + 1);
+                    _home.Stock[Resource.Food] += Math.Max(1, GetGatherAmount(Resource.Food, w.FoodYield + 1));
                     _idleTimeSeconds = 0f;
                     _lastPos = Pos;
                     return true;
@@ -268,6 +341,13 @@ public class Person
                     _lastPos = Pos;
                     return true;
                 }
+            }
+
+            if (TryProfessionDirectedAction(w, veryLowFood))
+            {
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
             }
 
             // 1) Immediate resource on current tile → start job
@@ -342,8 +422,106 @@ public class Person
             ? Math.Clamp(0.45f + (Stamina / 100f) * 0.55f, 0.45f, 1f)
             : Math.Clamp(0.7f + (Stamina / 100f) * 0.3f, 0.7f, 1f);
 
-        float effectiveSpeed = Math.Max(0.2f, w.WorkEfficiencyMultiplier * staminaFactor);
+        float professionSpeed = Profession switch
+        {
+            Profession.Builder when baseTicks == BuildHouseTime => 1.18f,
+            Profession.Farmer when baseTicks == FoodWorkTime => 1.16f,
+            Profession.Lumberjack when baseTicks == WoodWorkTime => 1.15f,
+            Profession.Miner when baseTicks == StoneWorkTime => 1.15f,
+            Profession.Hunter when baseTicks == FoodWorkTime => 1.08f,
+            _ => 1f
+        };
+
+        float effectiveSpeed = Math.Max(0.2f, w.WorkEfficiencyMultiplier * staminaFactor * professionSpeed);
         return Math.Max(1, (int)MathF.Ceiling(baseTicks / effectiveSpeed));
+    }
+
+    int GetGatherAmount(Resource res, int baseYield)
+    {
+        float colonyMultiplier = res switch
+        {
+            Resource.Wood => _home.WoodGatherMultiplier,
+            Resource.Stone => _home.StoneGatherMultiplier,
+            Resource.Food => _home.FoodGatherMultiplier,
+            _ => 1f
+        };
+
+        float professionMultiplier = (res, Profession) switch
+        {
+            (Resource.Wood, Profession.Lumberjack) => 1.22f,
+            (Resource.Stone, Profession.Miner) => 1.22f,
+            (Resource.Food, Profession.Farmer) => 1.2f,
+            (Resource.Food, Profession.Hunter) => 1.12f,
+            _ => 1f
+        };
+
+        return Math.Max(1, (int)MathF.Round(baseYield * colonyMultiplier * professionMultiplier));
+    }
+
+    bool TryProfessionDirectedAction(World w, bool veryLowFood)
+    {
+        switch (Profession)
+        {
+            case Profession.Builder:
+                if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost / 2)
+                {
+                    Current = Job.BuildHouse;
+                    _doingJob = ComputeTicks(BuildHouseTime, w, isHeavyWork: true);
+                    return true;
+                }
+                break;
+            case Profession.Lumberjack:
+                if (TryMoveTowardsNearestResource(w, searchRadius: 4, Resource.Wood))
+                    return true;
+                break;
+            case Profession.Miner:
+                if (TryMoveTowardsNearestResource(w, searchRadius: 4, Resource.Stone))
+                    return true;
+                break;
+            case Profession.Farmer:
+                if (TryMoveTowardsNearestResource(w, searchRadius: 5, Resource.Food))
+                    return true;
+                break;
+            case Profession.Hunter:
+                if (veryLowFood && TryHuntNearbyHerbivore(w, range: 2))
+                {
+                    _home.Stock[Resource.Food] += Math.Max(1, GetGatherAmount(Resource.Food, w.FoodYield + 1));
+                    return true;
+                }
+                break;
+        }
+
+        return false;
+    }
+
+    public void ApplyDamage(float amount, string source)
+    {
+        if (amount <= 0f || Health <= 0f)
+            return;
+
+        Health -= amount;
+        if (Health <= 0f)
+        {
+            LastDeathReason = source.Contains("Predator", StringComparison.OrdinalIgnoreCase)
+                ? PersonDeathReason.Predator
+                : PersonDeathReason.Other;
+        }
+    }
+
+    bool HasNearbyOwnHouse(World w, int radius)
+    {
+        int r = Math.Max(0, radius);
+        foreach (var h in w.Houses)
+        {
+            if (h.Owner != _home)
+                continue;
+
+            int dist = Math.Abs(h.Pos.x - Pos.x) + Math.Abs(h.Pos.y - Pos.y);
+            if (dist <= r)
+                return true;
+        }
+
+        return false;
     }
 
     bool TryMoveTowardsNearestResource(World w, int searchRadius, params Resource[] desired)
