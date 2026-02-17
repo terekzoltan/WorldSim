@@ -1,6 +1,36 @@
-using WorldSim.Simulation;
-
 namespace WorldSim.Runtime.ReadModel;
+
+public enum TileGroundView
+{
+    Dirt,
+    Water,
+    Grass
+}
+
+public enum ResourceView
+{
+    None,
+    Wood,
+    Stone,
+    Iron,
+    Gold,
+    Food,
+    Water
+}
+
+public enum AnimalKindView
+{
+    Herbivore,
+    Predator
+}
+
+public enum SeasonView
+{
+    Spring,
+    Summer,
+    Autumn,
+    Winter
+}
 
 public sealed record WorldRenderSnapshot(
     int Width,
@@ -11,18 +41,18 @@ public sealed record WorldRenderSnapshot(
     IReadOnlyList<AnimalRenderData> Animals,
     IReadOnlyList<ColonyHudData> Colonies,
     EcoHudData Ecology,
-    Season CurrentSeason,
+    SeasonView CurrentSeason,
     bool IsDroughtActive,
     IReadOnlyList<string> RecentEvents
 );
 
-public sealed record TileRenderData(int X, int Y, Ground Ground, Resource NodeType, int NodeAmount);
+public sealed record TileRenderData(int X, int Y, TileGroundView Ground, ResourceView NodeType, int NodeAmount);
 
 public sealed record HouseRenderData(int X, int Y, int ColonyId);
 
 public sealed record PersonRenderData(int X, int Y, int ColonyId);
 
-public sealed record AnimalRenderData(int X, int Y, AnimalKind Kind);
+public sealed record AnimalRenderData(int X, int Y, AnimalKindView Kind);
 
 public sealed record ColonyHudData(
     int Id,

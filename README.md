@@ -1,31 +1,31 @@
-# WorldSim - Colony Simulation Game
+# WorldSim
 
-A MonoGame-alapú kolónia szimuláció, inspirációként a *WorldBox - God Simulator* szolgált. A cél egy dinamikus, fejlődő világ létrehozása, ahol az emberek kolóniát alapítanak, nyersanyagokat gyűjtenek, házakat építenek, és később komplexebb viselkedések is megjelennek.
+MonoGame-based colony simulation project under modular migration (Tracks A-D).
 
-## Fő jellemzők
+## Active project structure
 
-- 🧍 Egyének attribútumokkal (erő, intelligencia)
-- ⌛ Életkor növekedés és idővel halálozás
-- 👶 Egyszerű szaporodási logika házkapacitás alapján
-- 🪓 Erőforrás-gyűjtés (fa, kő stb.)
-- 🏠 Házépítés kolónián belül, kapacitáslimit
-- 🌍 Véletlen térkép erőforráseloszlással
-- ⏱️ Tick-alapú szimuláció (4x/sec)
-- 🪨 Kőházak építése (Stone Masonry technológia után)
-- 🔄 Erőforrás megosztás kolóniák között (Improved Logistics után)
+- `WorldSim.App/` - MonoGame host and input wiring
+- `WorldSim.Graphics/` - rendering and HUD from read-only snapshot
+- `WorldSim.Runtime/` - world simulation, ecology/economy updates, tech effects
+- `WorldSim.AI/` - AI abstractions and future planner module extraction target
+- `WorldSim.Contracts/` - shared C# contract ownership target
+- `WorldSim.RefineryAdapter/` - runtime adapter boundary for refinery integration
+- `WorldSim.RefineryClient/` - HTTP client + patch parser/applier
 
+## Legacy note
 
-## Technológiák
+The old monolithic `WorldSim/` project tree is being retired as part of the split.
+Use the modular projects above for active development.
 
-- C# 10
-- MonoGame 3.8.3
-- Visual Studio 2022
+## Build and test
 
-## Tervezett fejlesztések
+```bash
+dotnet build WorldSim.sln
+dotnet test WorldSim.ArchTests/WorldSim.ArchTests.csproj
+```
 
-- Emberek viselkedésének finomhangolása (pl. ha nincs fa → ne csak kóboroljanak)
-- Többféle munka / szerepkör (pl. bányászat, farmolás)
-- Élelem-fogyasztás, halál éhségtől
-- Ház típusok és vizualizációjuk különbsége
-- Egyszerű AI-logika fejlesztése („vágyak”, prioritások)
-- Játékállás mentése/betöltése
+## Boundary guardrails
+
+- Runtime must not reference App/Graphics/RefineryClient directly.
+- Graphics should consume only Runtime read-model/snapshot types.
+- App should remain a thin host over Runtime APIs.

@@ -1,18 +1,17 @@
 using System;
 using System.IO;
-using System.Net.Http;
 using System.Net;
-using System.Text.Json.Nodes;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
+using WorldSim.Runtime;
 using WorldSimRefineryClient.Apply;
 using WorldSimRefineryClient.Contracts;
 using WorldSimRefineryClient.Serialization;
 using WorldSimRefineryClient.Service;
-using WorldSim.Simulation;
 
-namespace WorldSim.Integration;
+namespace WorldSim.RefineryAdapter.Integration;
 
 public sealed class RefineryPatchRuntime
 {
@@ -49,7 +48,7 @@ public sealed class RefineryPatchRuntime
         };
     }
 
-    public void Trigger(World world, long tick)
+    public void Trigger(SimulationRuntime runtime, long tick)
     {
         if (_options.Mode == RefineryIntegrationMode.Off)
         {
@@ -81,7 +80,7 @@ public sealed class RefineryPatchRuntime
 
         _lastTriggerUtc = DateTime.UtcNow;
 
-        _inFlight = Task.Run(async () => await RunApplyAsync(world, tick));
+        _inFlight = Task.Run(async () => await RunApplyAsync(runtime, tick));
     }
 
     public void Pump()
@@ -105,14 +104,14 @@ public sealed class RefineryPatchRuntime
         }
     }
 
-    private async Task RunApplyAsync(World world, long tick)
+    private async Task RunApplyAsync(SimulationRuntime runtime, long tick)
     {
         var beforeHash = CanonicalStateSerializer.Sha256(_patchState);
 
         PatchResponse response = _options.Mode switch
         {
             RefineryIntegrationMode.Fixture => LoadFixtureResponse(),
-            RefineryIntegrationMode.Live => await LoadLiveResponseAsync(world, tick),
+            RefineryIntegrationMode.Live => await LoadLiveResponseAsync(runtime, tick),
             _ => throw new InvalidOperationException("Integration mode is OFF")
         };
 
@@ -120,7 +119,7 @@ public sealed class RefineryPatchRuntime
 
         if (_options.ApplyToWorld)
         {
-            ApplySupportedDomainOps(world, response);
+            ApplySupportedDomainOps(runtime, response);
         }
 
         _consecutiveFailures = 0;
@@ -144,21 +143,20 @@ public sealed class RefineryPatchRuntime
         return _parser.Parse(json, new PatchApplyOptions(_options.StrictMode));
     }
 
-    private async Task<PatchResponse> LoadLiveResponseAsync(World world, long tick)
+    private async Task<PatchResponse> LoadLiveResponseAsync(SimulationRuntime runtime, long tick)
     {
         if (_serviceClient is null)
         {
             throw new InvalidOperationException("Live mode requires initialized service client.");
         }
 
-        var snapshot = BuildSnapshot(world);
         var request = new PatchRequest(
             "v1",
             Guid.NewGuid().ToString(),
             _options.RequestSeed,
             tick,
             _options.Goal,
-            snapshot,
+            runtime.BuildRefinerySnapshot(),
             null
         );
 
@@ -213,19 +211,14 @@ public sealed class RefineryPatchRuntime
         return false;
     }
 
-    private static void ApplySupportedDomainOps(World world, PatchResponse response)
+    private static void ApplySupportedDomainOps(SimulationRuntime runtime, PatchResponse response)
     {
         foreach (var op in response.Patch)
         {
             switch (op)
             {
                 case AddTechOp addTech:
-                    if (world._colonies.Count == 0)
-                    {
-                        throw new InvalidOperationException("Cannot apply addTech: world has no colonies.");
-                    }
-
-                    if (!TechTree.Techs.Any(t => t.Id == addTech.TechId))
+                    if (!runtime.IsKnownTech(addTech.TechId))
                     {
                         throw new InvalidOperationException(
                             "Cannot apply addTech: unknown techId '" + addTech.TechId +
@@ -233,7 +226,7 @@ public sealed class RefineryPatchRuntime
                         );
                     }
 
-                    TechTree.Unlock(addTech.TechId, world, world._colonies[0]);
+                    runtime.UnlockTechForPrimaryColony(addTech.TechId);
                     break;
                 default:
                     throw new NotSupportedException(
@@ -241,34 +234,5 @@ public sealed class RefineryPatchRuntime
                     );
             }
         }
-    }
-
-    private static JsonObject BuildSnapshot(World world)
-    {
-        var colonies = new JsonArray();
-        foreach (var colony in world._colonies)
-        {
-            colonies.Add(new JsonObject
-            {
-                ["id"] = colony.Id,
-                ["unlockedTechCount"] = colony.UnlockedTechs.Count,
-                ["houseCount"] = colony.HouseCount
-            });
-        }
-
-        return new JsonObject
-        {
-            ["world"] = new JsonObject
-            {
-                ["width"] = world.Width,
-                ["height"] = world.Height,
-                ["peopleCount"] = world._people.Count,
-                ["colonyCount"] = world._colonies.Count,
-                ["foodYield"] = world.FoodYield,
-                ["woodYield"] = world.WoodYield,
-                ["stoneYield"] = world.StoneYield
-            },
-            ["colonies"] = colonies
-        };
     }
 }

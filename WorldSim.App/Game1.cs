@@ -9,8 +9,8 @@ using WorldSim.Graphics.Camera;
 using WorldSim.Graphics.Rendering;
 using WorldSim.Graphics.UI;
 using WorldSim.RefineryAdapter;
+using WorldSim.Runtime;
 using WorldSim.Runtime.ReadModel;
-using WorldSim.Simulation;
 
 namespace WorldSim;
 
@@ -22,7 +22,7 @@ public class Game1 : Game
 
     private readonly GraphicsDeviceManager _graphics;
     private SpriteBatch _spriteBatch = null!;
-    private World _world = null!;
+    private SimulationRuntime _runtime = null!;
     private SpriteFont _font = null!;
     private TextureCatalog _textures = null!;
     private readonly Camera2D _camera = new();
@@ -39,7 +39,7 @@ public class Game1 : Game
     private KeyboardState _previousKeys;
     private bool _isPanning;
     private Point _lastMousePos;
-    private long _simTick;
+    private bool _cameraInitialized;
 
     public Game1()
     {
@@ -50,8 +50,11 @@ public class Game1 : Game
         var display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
         _graphics.PreferredBackBufferWidth = display.Width;
         _graphics.PreferredBackBufferHeight = display.Height;
+        _graphics.HardwareModeSwitch = false;
         _graphics.IsFullScreen = true;
         _graphics.ApplyChanges();
+        Window.IsBorderless = true;
+        Window.ClientSizeChanged += (_, _) => FitCameraToViewport();
 
         _refineryRuntime = new RefineryTriggerAdapter(AppDomain.CurrentDomain.BaseDirectory);
     }
@@ -59,12 +62,11 @@ public class Game1 : Game
     protected override void Initialize()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        _world = new World(width: 128, height: 128, initialPop: 25);
-
         var techPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tech", "technologies.json");
-        TechTree.Load(techPath);
+        _runtime = new SimulationRuntime(width: 128, height: 128, initialPopulation: 25, technologyFilePath: techPath);
 
         _previousWheel = Mouse.GetState().ScrollWheelValue;
+        FitCameraToViewport();
 
         base.Initialize();
     }
@@ -85,7 +87,7 @@ public class Game1 : Game
             _showTechMenu = !_showTechMenu;
 
         if (keys.IsKeyDown(Keys.F6) && !_previousKeys.IsKeyDown(Keys.F6))
-            _refineryRuntime.Trigger(_world, _simTick);
+            _refineryRuntime.Trigger(_runtime, _runtime.Tick);
 
         HandleCameraInput(keys, mouse);
         HandleTechMenuInput(keys);
@@ -96,8 +98,7 @@ public class Game1 : Game
         _accumulator += (float)gameTime.ElapsedGameTime.TotalSeconds * _timeScale;
         while (_accumulator >= SimulationTickDuration)
         {
-            _world.Update(SimulationTickDuration);
-            _simTick++;
+            _runtime.AdvanceTick(SimulationTickDuration);
             _accumulator -= SimulationTickDuration;
         }
 
@@ -153,49 +154,80 @@ public class Game1 : Game
 
     private void HandleTechMenuInput(KeyboardState keys)
     {
-        if (!_showTechMenu || _world._colonies.Count == 0)
+        if (!_showTechMenu || _runtime.ColonyCount == 0)
             return;
 
         if (keys.IsKeyDown(Keys.Left) && !_previousKeys.IsKeyDown(Keys.Left))
-            _selectedColony = (_selectedColony - 1 + _world._colonies.Count) % _world._colonies.Count;
+            _selectedColony = _runtime.NormalizeColonyIndex(_selectedColony - 1);
         if (keys.IsKeyDown(Keys.Right) && !_previousKeys.IsKeyDown(Keys.Right))
-            _selectedColony = (_selectedColony + 1) % _world._colonies.Count;
+            _selectedColony = _runtime.NormalizeColonyIndex(_selectedColony + 1);
 
-        var colony = _world._colonies[_selectedColony];
-        var locked = TechTree.Techs.Where(t => !colony.UnlockedTechs.Contains(t.Id)).ToList();
-        for (var i = 0; i < locked.Count && i < 9; i++)
+        var lockedNames = _runtime.GetLockedTechNames(_selectedColony);
+        for (var i = 0; i < lockedNames.Count && i < 9; i++)
         {
             var hotkey = Keys.D1 + i;
             if (keys.IsKeyDown(hotkey) && !_previousKeys.IsKeyDown(hotkey))
-                TechTree.Unlock(locked[i].Id, _world, colony);
+                _runtime.UnlockLockedTechBySlot(_selectedColony, i);
         }
     }
 
     private void ClampCamera()
     {
         _camera.ClampToWorld(
-            _world.Width * _worldRenderer.Settings.TileSize,
-            _world.Height * _worldRenderer.Settings.TileSize,
+            _runtime.Width * _worldRenderer.Settings.TileSize,
+            _runtime.Height * _worldRenderer.Settings.TileSize,
             GraphicsDevice.Viewport.Width,
             GraphicsDevice.Viewport.Height);
     }
 
+    private void FitCameraToViewport()
+    {
+        if (_runtime == null)
+            return;
+
+        var mapWidth = _runtime.Width * _worldRenderer.Settings.TileSize;
+        var mapHeight = _runtime.Height * _worldRenderer.Settings.TileSize;
+        if (mapWidth <= 0 || mapHeight <= 0)
+            return;
+
+        var viewportWidth = GraphicsDevice.Viewport.Width;
+        var viewportHeight = GraphicsDevice.Viewport.Height;
+        if (viewportWidth <= 0 || viewportHeight <= 0)
+            return;
+
+        var zoomX = viewportWidth / (float)mapWidth;
+        var zoomY = viewportHeight / (float)mapHeight;
+        var coverZoom = MathF.Max(zoomX, zoomY);
+
+        _camera.SetZoom(coverZoom, MinZoom, MaxZoom);
+
+        var visibleWidth = viewportWidth / _camera.Zoom;
+        var visibleHeight = viewportHeight / _camera.Zoom;
+        var centered = new Vector2(
+            (mapWidth - visibleWidth) * 0.5f,
+            (mapHeight - visibleHeight) * 0.5f);
+
+        _camera.SetPosition(centered);
+        ClampCamera();
+        _cameraInitialized = true;
+    }
+
     protected override void Draw(GameTime gameTime)
     {
+        if (!_cameraInitialized)
+            FitCameraToViewport();
+
         GraphicsDevice.Clear(_worldRenderer.Theme.Background);
 
-        var snapshot = WorldSnapshotBuilder.Build(_world);
+        var snapshot = _runtime.GetSnapshot();
         _worldRenderer.Draw(_spriteBatch, snapshot, _camera, _textures);
 
         TechMenuView? techMenu = null;
-        if (_showTechMenu && _world._colonies.Count > 0)
+        if (_showTechMenu && _runtime.ColonyCount > 0)
         {
-            var colony = _world._colonies[_selectedColony];
-            var lockedNames = TechTree.Techs
-                .Where(t => !colony.UnlockedTechs.Contains(t.Id))
-                .Select(t => t.Name)
-                .ToList();
-            techMenu = new TechMenuView(colony.Id, lockedNames);
+            _selectedColony = _runtime.NormalizeColonyIndex(_selectedColony);
+            var lockedNames = _runtime.GetLockedTechNames(_selectedColony);
+            techMenu = new TechMenuView(_runtime.GetColonyId(_selectedColony), lockedNames);
         }
 
         _spriteBatch.Begin();

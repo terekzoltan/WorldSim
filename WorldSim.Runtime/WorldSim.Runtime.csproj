@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WorldSim.RefineryClient\WorldSim.RefineryClient.csproj" />
     <ProjectReference Include="..\WorldSim.Contracts\WorldSim.Contracts.csproj" />
   </ItemGroup>
 </Project>

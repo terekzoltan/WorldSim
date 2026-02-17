@@ -7,6 +7,11 @@ public sealed class Camera2D
     public Vector2 Position { get; private set; } = Vector2.Zero;
     public float Zoom { get; private set; } = 1f;
 
+    public void SetPosition(Vector2 position)
+    {
+        Position = position;
+    }
+
     public void SetZoom(float zoom, float minZoom, float maxZoom)
     {
         Zoom = Math.Clamp(zoom, minZoom, maxZoom);

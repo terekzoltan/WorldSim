@@ -100,6 +100,14 @@ WorldSim.RefineryClient
 
 Tiltott: `Runtime -> Graphics`, `Runtime -> App`, `AI -> Graphics`, kozvetlen `Graphics -> Simulation mutable state`.
 
+## Atmeneti szabalyok (migration policy)
+
+- Amig a Track C nincs teljesen atvezetve, az AI kod ideiglenesen maradhat a `WorldSim.Runtime` alatt,
+  de csak interfesz mogott (`INpcBrain`, `IPlanner` stb.), hogy kesobb vesztesegmentesen atmozgathato legyen.
+- Uj AI logika lehetoseg szerint mar most interfesz-alapu wiringgal keszuljon; Track C celja az implementaciok
+  fizikai atkoltoztetese `WorldSim.AI` modulba.
+- A fenti atmeneti szabaly kizarolag migration idoszakra szol; vegallapotban `WorldSim.Runtime -> WorldSim.AI` fuggoseg maradjon.
+
 ## Trackok (A-D)
 
 ### Track A - Graphics/UI
@@ -128,6 +136,9 @@ Deliverable:
 Definition of Done:
 - Runtime buildel standalone.
 - Snapshot alapjan ugyanazok a jatekallapotok kirajzolhatok.
+- `WorldSim.Runtime` nem fugg `WorldSim.RefineryClient`-tol.
+- `WorldSim.App` host marad: nincs kozvetlen mutable domain allapot-manipulacio.
+- `WorldSim.Graphics` csak read-model/snapshot tipusokra tamaszkodik (nincs `WorldSim.Simulation` enum leak).
 
 ### Track C - AI Module
 
@@ -183,4 +194,3 @@ A telemetry/persistence/scenario-runner feladatok nem kulon trackkent kezeltek, 
 - Telemetry: Track A (HUD/debug overlay) + Track B (runtime counters)
 - Persistence: Track B (runtime allapot) + Track D (patch dedupe state)
 - Scenario runner/headless: Track B incremental toolkent, ha CI vagy balansz igenyli
-

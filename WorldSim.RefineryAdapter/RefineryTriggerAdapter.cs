@@ -1,5 +1,5 @@
-using WorldSim.Integration;
-using WorldSim.Simulation;
+using WorldSim.RefineryAdapter.Integration;
+using WorldSim.Runtime;
 
 namespace WorldSim.RefineryAdapter;
 
@@ -15,7 +15,7 @@ public sealed class RefineryTriggerAdapter
 
     public string LastStatus => _runtime.LastStatus;
 
-    public void Trigger(World world, long tick) => _runtime.Trigger(world, tick);
+    public void Trigger(SimulationRuntime runtime, long tick) => _runtime.Trigger(runtime, tick);
 
     public void Pump() => _runtime.Pump();
 }

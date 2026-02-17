@@ -3,7 +3,6 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using WorldSim.Graphics.Assets;
 using WorldSim.Runtime.ReadModel;
-using WorldSim.Simulation;
 
 namespace WorldSim.Graphics.Rendering;
 
@@ -41,7 +40,7 @@ public sealed class ActorRenderPass
     {
         foreach (var animal in snapshot.Animals)
         {
-            var color = animal.Kind == AnimalKind.Predator ? theme.Predator : theme.Herbivore;
+            var color = animal.Kind == AnimalKindView.Predator ? theme.Predator : theme.Herbivore;
             spriteBatch.Draw(
                 textures.Pixel,
                 new Rectangle(animal.X * settings.TileSize, animal.Y * settings.TileSize, settings.TileSize, settings.TileSize),

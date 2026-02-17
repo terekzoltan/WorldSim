@@ -1,7 +1,6 @@
 using Microsoft.Xna.Framework.Graphics;
 using WorldSim.Graphics.Assets;
 using WorldSim.Runtime.ReadModel;
-using WorldSim.Simulation;
 
 namespace WorldSim.Graphics.Rendering;
 
@@ -13,8 +12,8 @@ public sealed class TerrainRenderPass
         {
             var color = tile.Ground switch
             {
-                Ground.Water => theme.Water,
-                Ground.Grass => theme.Grass,
+                TileGroundView.Water => theme.Water,
+                TileGroundView.Grass => theme.Grass,
                 _ => theme.Dirt
             };
 

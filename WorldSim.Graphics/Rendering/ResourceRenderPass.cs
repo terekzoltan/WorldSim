@@ -3,7 +3,6 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using WorldSim.Graphics.Assets;
 using WorldSim.Runtime.ReadModel;
-using WorldSim.Simulation;
 
 namespace WorldSim.Graphics.Rendering;
 
@@ -23,15 +22,15 @@ public sealed class ResourceRenderPass
             var iconY = by + (settings.TileSize - iconSize) / 2;
             var iconRect = new Rectangle(iconX, iconY, iconSize, iconSize);
 
-            if (tile.NodeType == Resource.Wood)
+            if (tile.NodeType == ResourceView.Wood)
                 spriteBatch.Draw(textures.Tree, iconRect, Color.White);
-            else if (tile.NodeType == Resource.Stone)
+            else if (tile.NodeType == ResourceView.Stone)
                 spriteBatch.Draw(textures.Rock, iconRect, Color.White);
-            else if (tile.NodeType == Resource.Iron)
+            else if (tile.NodeType == ResourceView.Iron)
                 spriteBatch.Draw(textures.Iron, iconRect, Color.White);
-            else if (tile.NodeType == Resource.Gold)
+            else if (tile.NodeType == ResourceView.Gold)
                 spriteBatch.Draw(textures.Gold, iconRect, Color.White);
-            else if (tile.NodeType == Resource.Food)
+            else if (tile.NodeType == ResourceView.Food)
                 spriteBatch.Draw(textures.Pixel, iconRect, theme.FoodNode);
         }
     }

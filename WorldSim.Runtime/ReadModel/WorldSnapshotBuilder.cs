@@ -26,7 +26,12 @@ public static class WorldSnapshotBuilder
                         depletedFoodNodes++;
                 }
 
-                tiles.Add(new TileRenderData(x, y, tile.Ground, nodeType, nodeAmount));
+                tiles.Add(new TileRenderData(
+                    x,
+                    y,
+                    MapGround(tile.Ground),
+                    MapResource(nodeType),
+                    nodeAmount));
             }
         }
 
@@ -39,7 +44,7 @@ public static class WorldSnapshotBuilder
             .ToList();
 
         var animals = world._animals
-            .Select(a => new AnimalRenderData(a.Pos.x, a.Pos.y, a.Kind))
+            .Select(a => new AnimalRenderData(a.Pos.x, a.Pos.y, MapAnimalKind(a.Kind)))
             .ToList();
 
         var colonies = world._colonies
@@ -97,9 +102,41 @@ public static class WorldSnapshotBuilder
             animals,
             colonies,
             ecology,
-            world.CurrentSeason,
+            MapSeason(world.CurrentSeason),
             world.IsDroughtActive,
             world.RecentEvents.ToList()
         );
     }
+
+    private static TileGroundView MapGround(Ground ground) => ground switch
+    {
+        Ground.Water => TileGroundView.Water,
+        Ground.Grass => TileGroundView.Grass,
+        _ => TileGroundView.Dirt
+    };
+
+    private static ResourceView MapResource(Resource resource) => resource switch
+    {
+        Resource.Wood => ResourceView.Wood,
+        Resource.Stone => ResourceView.Stone,
+        Resource.Iron => ResourceView.Iron,
+        Resource.Gold => ResourceView.Gold,
+        Resource.Food => ResourceView.Food,
+        Resource.Water => ResourceView.Water,
+        _ => ResourceView.None
+    };
+
+    private static AnimalKindView MapAnimalKind(AnimalKind kind) => kind switch
+    {
+        AnimalKind.Predator => AnimalKindView.Predator,
+        _ => AnimalKindView.Herbivore
+    };
+
+    private static SeasonView MapSeason(Season season) => season switch
+    {
+        Season.Summer => SeasonView.Summer,
+        Season.Autumn => SeasonView.Autumn,
+        Season.Winter => SeasonView.Winter,
+        _ => SeasonView.Spring
+    };
 }

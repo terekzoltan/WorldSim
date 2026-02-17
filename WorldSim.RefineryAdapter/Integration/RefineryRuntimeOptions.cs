@@ -1,4 +1,4 @@
-namespace WorldSim.Integration;
+namespace WorldSim.RefineryAdapter.Integration;
 
 public sealed record RefineryRuntimeOptions(
     RefineryIntegrationMode Mode,
