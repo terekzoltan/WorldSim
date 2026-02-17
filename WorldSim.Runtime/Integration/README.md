@@ -42,13 +42,13 @@ Refinery applied: applied=1, deduped=0, noop=0, techs=2, events=0, hash=32EA7108
 ## Debug playbook
 
 1. **Styled test** (fixture path only):
-   - `set REFINERY_INTEGRATION_MODE=fixture` + `dotnet run --project WorldSim/WorldSim.csproj`
+   - `set REFINERY_INTEGRATION_MODE=fixture` + `dotnet run --project WorldSim.App/WorldSim.App.csproj`
    - Press `F6` once → expect `applied=1`. Press again quickly → expect `noop=1` or `throttled`.
 
 2. **Live test (with Java service)**:
    - In `refinery-service-java`: `./gradlew bootRun` (port 8091 by default).
    - `set REFINERY_INTEGRATION_MODE=live`, optionally `REFINERY_BASE_URL=http://localhost:8091`, `REFINERY_APPLY_TO_WORLD=true`.
-   - `dotnet run --project WorldSim/WorldSim.csproj` → press `F6`. Observe HTTP success in Java logs and updated status line.
+   - `dotnet run --project WorldSim.App/WorldSim.App.csproj` → press `F6`. Observe HTTP success in Java logs and updated status line.
    - If you get `Refinery trigger throttled` or `circuit open`, wait for `REFINERY_MIN_TRIGGER_MS` / `REFINERY_BREAKER_SECONDS` before retrying.
 
 3. **Parity sanity check (CI/local)**:
@@ -57,7 +57,7 @@ Refinery applied: applied=1, deduped=0, noop=0, techs=2, events=0, hash=32EA7108
    - The fixture hash must match the live patch hash; otherwise service and fixture outputs have diverged.
 
 4. **Failure handling**:
-   - If you see `Cannot apply addTech: unknown techId 'X'`, add the missing tech to `Tech/technologies.json` or extend the Java -> C# mapping (see `Integration/TODO.md`).
+   - If you see `Cannot apply addTech: unknown techId 'X'`, add the missing tech to `Tech/technologies.json` or extend the Java -> C# mapping (see `WorldSim.Runtime/Integration/TODO.md`).
    - For random HTTP errors, check `refinery-service-java/logs` and make sure you don’t exceed `REFINERY_TIMEOUT_MS`.
 
 ## Todo

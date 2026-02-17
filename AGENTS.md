@@ -1,0 +1,186 @@
+# WorldSim AGENTS Guide
+
+Ez a dokumentum a projekt tudatos szetvalasztasi terve: kulon fejlesztheto komponensek, tiszta hatarok, es parhuzamos munkaszervezes (Track A-D).
+
+## Cel
+
+- A jelenlegi `WorldSim` monolit felelossegeinek szetvalasztasa kulon projektekre.
+- Stabil boundary-k letrehozasa a simulation runtime, a grafika/UI, es a Java refinery service kozott.
+- PArhuzamos fejlesztes tamogatasa ugy, hogy a csapatok minimalisan zavarjak egymast.
+
+## Tervezett celstruktura
+
+Root szinten (solution alatt):
+
+```text
+WorldSim.sln
+AGENTS.md
+
+WorldSim.App/                 # MonoGame host (exe), minimalis wiring
+WorldSim.Graphics/            # Render + camera + HUD + content mapping
+WorldSim.Runtime/             # Sim update loop + domain orchestracio
+WorldSim.AI/                  # Utility/GOAP/HTN es NPC decision modul
+WorldSim.Contracts/           # KozoS DTO/Schema C# oldalon (Java parityhoz)
+WorldSim.RefineryAdapter/     # Java patch -> runtime command mapping
+WorldSim.RefineryClient/      # HTTP client + patch parser/applier (mar megvan)
+WorldSim.RefineryClient.Tests/
+refinery-service-java/        # Kulon Java service (mar megvan)
+
+Tech/                         # Data (technologies.json)
+```
+
+## Modulleiras es felelossegek
+
+### 1) WorldSim.App
+
+- MonoGame `Game` host (`Program`, `GameHost`).
+- Input routing commandokra.
+- Osszekoti a `Runtime` + `Graphics` + `RefineryAdapter` retegeket.
+- Nem tartalmaz domain logikat.
+
+### 2) WorldSim.Graphics
+
+- Kamera (`Camera2D`), render pipeline (`WorldRenderer`, `HudRenderer`, stb.).
+- Asset katalogus (`TextureCatalog`) + faction/resource ikon mapping.
+- Csak read-only snapshotot fogyaszt (`WorldRenderSnapshot`), nem nyul domain modellekhez.
+
+### 3) WorldSim.Runtime
+
+- Vilagmodell, tick update, ecology/economy/tech alkalmazasa.
+- Domain command endpoint: pl. `TriggerRefineryPatch`, `UnlockTech`, `ToggleOverlay`.
+- Kiad egy immutable/read-only snapshotot a graphics szamara.
+- Nincs MonoGame fuggoseg.
+
+### 4) WorldSim.AI
+
+- NPC goal selection/planning (Utility, GOAP, kesobb HTN).
+- Cserelheto planner/brain interfeszek (`INpcBrain`, `IPlanner`, stb.).
+- Runtime csak interfeszen at hivja.
+
+### 5) WorldSim.Contracts
+
+- KozoS contract tipusok + verziokezeles (`v1`, kesobb `v2`).
+- Java/C# kozt a schema egyetlen forrasa.
+- Contract validation policy (strict/lenient) deklaracioja.
+
+### 6) WorldSim.RefineryAdapter
+
+- Anti-corruption layer a Java patch contract es a Runtime commandok kozott.
+- Felelos a tech ID mappingert es op-level validaciokert.
+- Runtime oldalon ne legyen Java-specifikus branching.
+
+### 7) refinery-service-java
+
+- Planner pipeline (`Mock/Llm/Refinery`) HTTP API-n keresztul.
+- A C# oldallal csak contracton keresztul beszel.
+
+## Dependency graph (engedelyezett iranyok)
+
+```text
+WorldSim.App
+  -> WorldSim.Graphics
+  -> WorldSim.Runtime
+  -> WorldSim.RefineryAdapter
+
+WorldSim.Graphics
+  -> WorldSim.Runtime (csak snapshot/read model namespace)
+
+WorldSim.Runtime
+  -> WorldSim.AI
+  -> WorldSim.Contracts
+
+WorldSim.RefineryAdapter
+  -> WorldSim.Contracts
+  -> WorldSim.Runtime
+  -> WorldSim.RefineryClient
+
+WorldSim.RefineryClient
+  -> WorldSim.Contracts
+```
+
+Tiltott: `Runtime -> Graphics`, `Runtime -> App`, `AI -> Graphics`, kozvetlen `Graphics -> Simulation mutable state`.
+
+## Trackok (A-D)
+
+### Track A - Graphics/UI
+
+Scope:
+- `Game1` draw/update vizualis reszeinek kiszervezese `WorldSim.Graphics` ala.
+- Kamera, render pass-ok, HUD, tech menu overlay.
+
+Deliverable:
+- `GameHost` csak host legyen; render logika kulon osztalyokban.
+
+Definition of Done:
+- F1/F6 UI flow nem torik.
+- Zoom/pan mukodik.
+- Ugyanaz a gameplay vizualisan korrekt marad.
+
+### Track B - Runtime Core
+
+Scope:
+- `Simulation`, `TechTree`, season/ecology/economy update logika `WorldSim.Runtime` ala.
+- Command API + snapshot builder.
+
+Deliverable:
+- MonoGame-tol fuggetlen runtime assembly.
+
+Definition of Done:
+- Runtime buildel standalone.
+- Snapshot alapjan ugyanazok a jatekallapotok kirajzolhatok.
+
+### Track C - AI Module
+
+Scope:
+- Utility/GOAP planner kod kivitele `WorldSim.AI` modulba.
+- Runtime only interface-level wiring.
+
+Deliverable:
+- Planner implementaciok cserelhetok konfiguracioval.
+
+Definition of Done:
+- NPC-k dontesi ciklusa regresszio nelkul fut.
+- AI modul kulon tesztelheto.
+
+### Track D - Refinery Boundary
+
+Scope:
+- `Contracts` + `RefineryAdapter` kiepitese.
+- Java patch opok runtime commandokka forditasa.
+- Tech ID mapping kulon konfiguracios retegben.
+
+Deliverable:
+- Stabil Java-C# boundary, minimalis runtime coupling.
+
+Definition of Done:
+- Fixture es live mod parity mukodik.
+- Unknown op/tech kezelese determinisztikus hibaval tortenik.
+
+## Javasolt implementacios sorrend
+
+1. `WorldSim.Contracts` letrehozas (dto + versioning).
+2. `WorldSim.Runtime` kiszervezes + snapshot API.
+3. `WorldSim.Graphics` kiszervezes + `GameHost` vekonyitas.
+4. `WorldSim.RefineryAdapter` bevezetese a jelenlegi integration fole.
+5. `WorldSim.AI` modul kivetele es interfeszes visszakotese.
+
+## Branch/PR iranyelv
+
+- `feature/track-a-*`, `feature/track-b-*`, `feature/track-c-*`, `feature/track-d-*` naming.
+- Minden PR egy boundary-t mozgasson; keruld a "mindent egyszerre" refaktort.
+- Elso korben viselkedesazonos refaktor (no gameplay change).
+
+## Kockazatok es mitigacio
+
+- Nagy `Game1` refaktor regressziot okozhat -> kis, lepesenkenti PR-ek.
+- Content path torhet projektmozgasnal -> smoke test minden PR utan.
+- Tulsagosan gyors encapsulation lassithat -> snapshot adapterrel fokozatos atallas.
+
+## "Nem kell kulon Track E"
+
+A telemetry/persistence/scenario-runner feladatok nem kulon trackkent kezeltek, hanem:
+
+- Telemetry: Track A (HUD/debug overlay) + Track B (runtime counters)
+- Persistence: Track B (runtime allapot) + Track D (patch dedupe state)
+- Scenario runner/headless: Track B incremental toolkent, ha CI vagy balansz igenyli
+

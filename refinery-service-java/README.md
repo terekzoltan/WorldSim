@@ -153,7 +153,7 @@ Package root: `hu.zoltanterek.worldsim.refinery`
 
 ### C# integration runtime
 
-- Runtime setup, env switches, and debug playbook are documented in `WorldSim/Integration/README.md`.
+- Runtime setup, env switches, and debug playbook are documented in `WorldSim.Runtime/Integration/README.md`.
 - Typical local flow:
   1. Start this Java service: `./gradlew bootRun`
   2. Run C# with `REFINERY_INTEGRATION_MODE=live`

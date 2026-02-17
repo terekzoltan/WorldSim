@@ -1,13 +1,18 @@
-using Microsoft.Xna.Framework;
 using System;
 using System.Linq;
 
 namespace WorldSim.Simulation;
 
+public enum AnimalKind
+{
+    Herbivore,
+    Predator
+}
+
 public abstract class Animal
 {
     public (int x, int y) Pos;
-    public abstract Color Color { get; }
+    public abstract AnimalKind Kind { get; }
 
     public bool IsAlive { get; internal protected set; } = true;
 
@@ -151,8 +156,7 @@ public abstract class Animal
 
 public sealed class Herbivore : Animal
 {
-    // Light green for visibility
-    public override Color Color => Color.LightGreen;
+    public override AnimalKind Kind => AnimalKind.Herbivore;
 
     public Herbivore((int x, int y) pos) : base(pos, speed: 1, vision: 5) { }
 
@@ -253,8 +257,7 @@ public sealed class Herbivore : Animal
 
 public sealed class Predator : Animal
 {
-    // Red for visibility
-    public override Color Color => Color.Red;
+    public override AnimalKind Kind => AnimalKind.Predator;
 
 
     public Predator((int x, int y) pos) : base(pos, speed: 1, vision: 6) { }

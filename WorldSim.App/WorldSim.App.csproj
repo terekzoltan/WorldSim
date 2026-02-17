@@ -6,28 +6,31 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <TieredCompilation>false</TieredCompilation>
     <UseWindowsForms>true</UseWindowsForms>
-  </PropertyGroup>
-  <PropertyGroup>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="MonoGame.Framework.WindowsDX" Version="3.8.*" />
     <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\WorldSim.RefineryClient\WorldSim.RefineryClient.csproj" />
+    <ProjectReference Include="..\WorldSim.Graphics\WorldSim.Graphics.csproj" />
+    <ProjectReference Include="..\WorldSim.Runtime\WorldSim.Runtime.csproj" />
+    <ProjectReference Include="..\WorldSim.RefineryAdapter\WorldSim.RefineryAdapter.csproj" />
   </ItemGroup>
+
   <ItemGroup>
     <None Include="..\Tech\technologies.json">
+      <Link>Tech\technologies.json</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Simulation\Systems\" />
-  </ItemGroup>
+
   <Target Name="RestoreDotnetTools" BeforeTargets="Restore">
     <Message Text="Restoring dotnet tools" Importance="High" />
     <Exec Command="dotnet tool restore" />
   </Target>
+
 </Project>
