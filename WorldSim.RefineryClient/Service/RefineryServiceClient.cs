@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
 using WorldSimRefineryClient.Apply;
-using WorldSimRefineryClient.Contracts;
+using WorldSim.Contracts.V1;
 using WorldSimRefineryClient.Serialization;
 
 namespace WorldSimRefineryClient.Service;

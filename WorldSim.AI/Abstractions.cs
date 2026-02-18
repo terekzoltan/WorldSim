@@ -1,12 +1,37 @@
 namespace WorldSim.AI;
 
-public interface IPlanner<TGoal, TActor, TWorld, TCommand>
+public enum NpcCommand
 {
-    void SetGoal(TGoal goal);
-    TCommand GetNextCommand(TActor actor, TWorld world);
+    Idle,
+    GatherWood,
+    GatherStone,
+    GatherFood,
+    EatFood,
+    Rest,
+    BuildHouse
 }
 
-public interface INpcBrain<TActor, TWorld, TCommand>
+public readonly record struct NpcAiContext(
+    float SimulationTimeSeconds,
+    float Hunger,
+    int HomeWood,
+    int HomeStone,
+    int HomeFood,
+    int HomeHouseCount,
+    int HouseWoodCost,
+    int ColonyPopulation,
+    int HouseCapacity,
+    bool StoneBuildingsEnabled,
+    bool CanBuildWithStone,
+    int HouseStoneCost);
+
+public interface IPlanner
 {
-    TCommand Think(TActor actor, TWorld world);
+    void SetGoal(Goal goal);
+    NpcCommand GetNextCommand(in NpcAiContext context);
+}
+
+public interface INpcDecisionBrain
+{
+    NpcCommand Think(in NpcAiContext context);
 }

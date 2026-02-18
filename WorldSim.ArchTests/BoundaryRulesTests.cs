@@ -13,9 +13,49 @@ public class BoundaryRulesTests
     {
         var runtimeCsproj = Read("WorldSim.Runtime/WorldSim.Runtime.csproj");
 
+        Assert.Contains("WorldSim.AI", runtimeCsproj, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("WorldSim.RefineryClient", runtimeCsproj, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("WorldSim.Graphics", runtimeCsproj, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("WorldSim.App", runtimeCsproj, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AppProject_DoesNotReferenceRefineryClientDirectly()
+    {
+        var appCsproj = Read("WorldSim.App/WorldSim.App.csproj");
+
+        Assert.DoesNotContain("WorldSim.RefineryClient", appCsproj, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AdapterProject_ReferencesOnlyExpectedCoreProjects()
+    {
+        var adapterCsproj = Read("WorldSim.RefineryAdapter/WorldSim.RefineryAdapter.csproj");
+
+        Assert.Contains("WorldSim.Contracts", adapterCsproj, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("WorldSim.Runtime", adapterCsproj, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("WorldSim.RefineryClient", adapterCsproj, StringComparison.OrdinalIgnoreCase);
+
+        Assert.DoesNotContain("WorldSim.App", adapterCsproj, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("WorldSim.Graphics", adapterCsproj, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RefineryClientProject_ReferencesContracts()
+    {
+        var refineryClientCsproj = Read("WorldSim.RefineryClient/WorldSim.RefineryClient.csproj");
+
+        Assert.Contains("WorldSim.Contracts", refineryClientCsproj, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AiProject_DoesNotReferenceForbiddenProjects()
+    {
+        var aiCsproj = Read("WorldSim.AI/WorldSim.AI.csproj");
+
+        Assert.DoesNotContain("WorldSim.Runtime", aiCsproj, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("WorldSim.Graphics", aiCsproj, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("WorldSim.App", aiCsproj, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

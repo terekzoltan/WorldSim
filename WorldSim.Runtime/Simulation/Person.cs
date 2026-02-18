@@ -32,10 +32,8 @@ public class Person
     public Dictionary<string, float> Emotions { get; } = new();
     public HashSet<string> Traits { get; } = new();
 
-    // Utility AI
-    private readonly GoalSelector _goalSelector = new();
-    private readonly IPlanner _planner = new GoapPlanner();
-    private readonly List<Goal> _goals = GoalLibrary.CreateDefaultGoals();
+    // Utility/GOAP AI via runtime adapter boundary
+    private readonly RuntimeNpcBrain _brain = new();
 
     const int WoodWorkTime = 5;
     const int StoneWorkTime = 8;
@@ -162,7 +160,7 @@ public class Person
 
         // Needs időbeli változása
         if (Needs.TryGetValue("Hunger", out var h))
-            Needs["Hunger"] = Math.Clamp(h + dt * 2.2f, 0f, 100f);
+            Needs["Hunger"] = Math.Clamp(h + dt * 1.8f, 0f, 100f);
 
         if (Current == Job.Idle)
             Stamina = Math.Clamp(Stamina + dt * 2.2f, 0f, 100f);
@@ -171,9 +169,9 @@ public class Person
 
         float hunger = Needs.GetValueOrDefault("Hunger", 0f);
         if (hunger >= 95f)
-            Health -= dt * 4.0f;
+            Health -= dt * 3.0f;
         else if (hunger >= 85f)
-            Health -= dt * 2.0f;
+            Health -= dt * 1.4f;
 
         if (Health <= 0f)
         {
@@ -215,8 +213,8 @@ public class Person
         }
 
         int colonyFoodStock = _home.Stock[Resource.Food];
-        bool emergencyFood = colonyFoodStock <= Math.Max(3, colonyPop);
-        bool veryLowFood = colonyFoodStock <= Math.Max(1, colonyPop / 3);
+        bool emergencyFood = colonyFoodStock <= Math.Max(5, colonyPop + 1);
+        bool veryLowFood = colonyFoodStock <= Math.Max(2, colonyPop / 2);
 
         if (_doingJob > 0 && Current != Job.Idle)
         {
@@ -380,8 +378,7 @@ public class Person
             }
 
             // 3) Utility-goal fallback → pick a job (e.g., BuildHouse if feasible)
-            _goalSelector.SelectGoal(_goals, _planner, this, w);
-            var next = _planner.GetNextJob(this, w);
+            var next = _brain.Think(this, w, dt);
             if (next != Job.Idle)
             {
                 Current = next;

@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace WorldSimRefineryClient.Contracts;
+namespace WorldSim.Contracts.V1;
 
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "op")]
 [JsonDerivedType(typeof(AddTechOp), "addTech")]

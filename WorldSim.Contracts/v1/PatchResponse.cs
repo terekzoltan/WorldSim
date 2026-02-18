@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace WorldSimRefineryClient.Contracts;
+namespace WorldSim.Contracts.V1;
 
 public sealed record PatchResponse(
     [property: JsonPropertyName("schemaVersion")] string SchemaVersion,

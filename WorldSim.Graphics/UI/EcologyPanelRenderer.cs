@@ -19,6 +19,11 @@ public sealed class EcologyPanelRenderer
         spriteBatch.DrawString(font, ecoLine, new Vector2(10, y), theme.SecondaryText);
         y += 20;
 
+        var deathLine =
+            $"Deaths: Age {snapshot.Ecology.DeathsOldAge}, Starv {snapshot.Ecology.DeathsStarvation}, Pred {snapshot.Ecology.DeathsPredator}, Other {snapshot.Ecology.DeathsOther} | Pred->Human {(snapshot.Ecology.PredatorHumanAttacksEnabled ? "ON" : "off")}";
+        spriteBatch.DrawString(font, deathLine, new Vector2(10, y), theme.SecondaryText);
+        y += 20;
+
         return y;
     }
 }

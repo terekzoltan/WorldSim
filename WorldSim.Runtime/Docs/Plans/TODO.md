@@ -30,6 +30,7 @@ SPRINT 2 STATUS (Society-first, seed implementation)
 - predator->human minimal damage scaffold bekerult
 - predator mortality + stuck-recovery telemetria bekerult
 - KNOWN BUG (kesobbi fix): shoreline/pathfinding menten animal/NPC beragadas meg elofordulhat
+- ideiglenes policy: predator->human tamadas default OFF, ameddig nincs teljes fight/retaliation rendszer (emberi visszautes/vedekezes)
 
 -----------------------
 

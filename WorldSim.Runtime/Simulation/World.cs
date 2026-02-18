@@ -37,7 +37,8 @@ namespace WorldSim.Simulation
         public float MovementSpeedMultiplier { get; set; } = 1.0f; // Mozgási sebesség szorzó (gyorsabban mozognak)
         public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
         public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
-        public bool EnablePredatorHumanAttacks { get; set; } = true;
+        // Disabled by default until bidirectional combat/retaliation exists.
+        public bool EnablePredatorHumanAttacks { get; set; } = false;
         public float PredatorHumanDamage { get; set; } = 10f;
 
         public Season CurrentSeason { get; private set; } = Season.Spring;
@@ -46,6 +47,10 @@ namespace WorldSim.Simulation
         public int TotalAnimalStuckRecoveries { get; private set; }
         public int TotalPredatorDeaths { get; private set; }
         public int TotalPredatorHumanHits { get; private set; }
+        public int TotalDeathsOldAge { get; private set; }
+        public int TotalDeathsStarvation { get; private set; }
+        public int TotalDeathsPredator { get; private set; }
+        public int TotalDeathsOther { get; private set; }
 
         readonly Random _rng = new();
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
@@ -155,7 +160,10 @@ namespace WorldSim.Simulation
             for (int i = _people.Count - 1; i >= 0; i--)
             {
                 if (!_people[i].Update(this, dt, births))
+                {
+                    ReportPersonDeath(_people[i].LastDeathReason);
                     _people.RemoveAt(i);
+                }
             }
             _people.AddRange(births);
 
@@ -211,6 +219,25 @@ namespace WorldSim.Simulation
         public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;
         public void ReportPredatorDeath() => TotalPredatorDeaths++;
         public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
+
+        private void ReportPersonDeath(PersonDeathReason reason)
+        {
+            switch (reason)
+            {
+                case PersonDeathReason.OldAge:
+                    TotalDeathsOldAge++;
+                    break;
+                case PersonDeathReason.Starvation:
+                    TotalDeathsStarvation++;
+                    break;
+                case PersonDeathReason.Predator:
+                    TotalDeathsPredator++;
+                    break;
+                default:
+                    TotalDeathsOther++;
+                    break;
+            }
+        }
 
         // --- Biome generation (cheap, blob-like) ---
 

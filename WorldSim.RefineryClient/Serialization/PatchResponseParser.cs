@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using WorldSimRefineryClient.Apply;
-using WorldSimRefineryClient.Contracts;
+using WorldSim.Contracts.V1;
 
 namespace WorldSimRefineryClient.Serialization;
 

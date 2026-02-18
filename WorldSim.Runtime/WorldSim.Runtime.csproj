@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\WorldSim.AI\WorldSim.AI.csproj" />
     <ProjectReference Include="..\WorldSim.Contracts\WorldSim.Contracts.csproj" />
   </ItemGroup>
 </Project>

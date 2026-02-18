@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 using WorldSimRefineryClient.Apply;
-using WorldSimRefineryClient.Contracts;
+using WorldSim.Contracts.V1;
 
 namespace WorldSim.RefineryClient.Tests;
 
@@ -13,7 +13,7 @@ public sealed class PatchApplySemanticsTests
         var applier = new PatchApplier();
 
         var response = new PatchResponse(
-            "v1",
+            PatchContract.SchemaVersion,
             "req-1",
             123,
             new List<PatchOp>
@@ -46,7 +46,7 @@ public sealed class PatchApplySemanticsTests
         var applier = new PatchApplier();
 
         var response = new PatchResponse(
-            "v1",
+            PatchContract.SchemaVersion,
             "req-2",
             123,
             new List<PatchOp>
@@ -86,7 +86,7 @@ public sealed class PatchApplySemanticsTests
         var applier = new PatchApplier();
 
         var response = new PatchResponse(
-            "v1",
+            PatchContract.SchemaVersion,
             "req-3",
             123,
             new List<PatchOp>

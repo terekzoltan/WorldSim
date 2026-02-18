@@ -1,4 +1,4 @@
-using WorldSimRefineryClient.Contracts;
+using WorldSim.Contracts.V1;
 
 namespace WorldSimRefineryClient.Apply;
 
@@ -8,7 +8,7 @@ public sealed class PatchApplier
     {
         options ??= new PatchApplyOptions();
 
-        if (!string.Equals(response.SchemaVersion, "v1", StringComparison.Ordinal))
+        if (!string.Equals(response.SchemaVersion, PatchContract.SchemaVersion, StringComparison.Ordinal))
         {
             throw new PatchApplyException($"Unsupported schemaVersion '{response.SchemaVersion}'.");
         }

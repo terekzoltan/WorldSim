@@ -90,7 +90,12 @@ public static class WorldSnapshotBuilder
             world._people.Count(p => p.Needs.GetValueOrDefault("Hunger", 0f) >= 85f),
             world.TotalAnimalStuckRecoveries,
             world.TotalPredatorDeaths,
-            world.TotalPredatorHumanHits
+            world.TotalPredatorHumanHits,
+            world.TotalDeathsOldAge,
+            world.TotalDeathsStarvation,
+            world.TotalDeathsPredator,
+            world.TotalDeathsOther,
+            world.EnablePredatorHumanAttacks
         );
 
         return new WorldRenderSnapshot(

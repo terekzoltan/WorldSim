@@ -78,5 +78,10 @@ public sealed record EcoHudData(
     int CriticalHungry,
     int AnimalStuckRecoveries,
     int PredatorDeaths,
-    int PredatorHumanHits
+    int PredatorHumanHits,
+    int DeathsOldAge,
+    int DeathsStarvation,
+    int DeathsPredator,
+    int DeathsOther,
+    bool PredatorHumanAttacksEnabled
 );

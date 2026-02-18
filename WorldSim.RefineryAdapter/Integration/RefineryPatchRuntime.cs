@@ -2,12 +2,13 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
 using WorldSim.Runtime;
+using WorldSim.RefineryAdapter.Translation;
 using WorldSimRefineryClient.Apply;
-using WorldSimRefineryClient.Contracts;
+using WorldSim.Contracts.V1;
 using WorldSimRefineryClient.Serialization;
 using WorldSimRefineryClient.Service;
 
@@ -18,6 +19,8 @@ public sealed class RefineryPatchRuntime
     private readonly RefineryRuntimeOptions _options;
     private readonly PatchResponseParser _parser = new();
     private readonly PatchApplier _applier = new();
+    private readonly PatchCommandTranslator _translator = new();
+    private readonly RuntimePatchCommandExecutor _executor = new();
     private readonly SimulationPatchState _patchState = SimulationPatchState.CreateBaseline();
     private readonly RefineryServiceClient? _serviceClient;
     private readonly HttpClient? _httpClient;
@@ -119,17 +122,22 @@ public sealed class RefineryPatchRuntime
 
         if (_options.ApplyToWorld)
         {
-            ApplySupportedDomainOps(runtime, response);
+            var commands = _translator.Translate(response);
+            _executor.Execute(runtime, commands);
         }
 
         _consecutiveFailures = 0;
         _circuitBreakerUntilUtc = DateTime.MinValue;
 
         var afterHash = CanonicalStateSerializer.Sha256(_patchState);
+        var stageMarker = response.Explain.FirstOrDefault(item => item.StartsWith("refineryStage:", StringComparison.Ordinal))
+                          ?? "refineryStage:unknown";
+        var warningHead = response.Warnings.FirstOrDefault();
         LastStatus =
             $"Refinery applied: applied={result.AppliedCount}, deduped={result.DedupedCount}, noop={result.NoOpCount}, " +
             $"techs={_patchState.TechIds.Count}, events={_patchState.EventIds.Count}, " +
-            $"hash={beforeHash[..8]}->{afterHash[..8]}";
+            $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={stageMarker}" +
+            (warningHead is null ? string.Empty : $", warn={warningHead}");
     }
 
     private PatchResponse LoadFixtureResponse()
@@ -211,28 +219,4 @@ public sealed class RefineryPatchRuntime
         return false;
     }
 
-    private static void ApplySupportedDomainOps(SimulationRuntime runtime, PatchResponse response)
-    {
-        foreach (var op in response.Patch)
-        {
-            switch (op)
-            {
-                case AddTechOp addTech:
-                    if (!runtime.IsKnownTech(addTech.TechId))
-                    {
-                        throw new InvalidOperationException(
-                            "Cannot apply addTech: unknown techId '" + addTech.TechId +
-                            "'. TODO: add Java->C# tech ID mapping layer for cross-project IDs."
-                        );
-                    }
-
-                    runtime.UnlockTechForPrimaryColony(addTech.TechId);
-                    break;
-                default:
-                    throw new NotSupportedException(
-                        $"Domain apply supports only addTech currently. Unsupported: {op.GetType().Name}"
-                    );
-            }
-        }
-    }
 }

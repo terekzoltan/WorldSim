@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 using WorldSimRefineryClient.Apply;
-using WorldSimRefineryClient.Contracts;
+using WorldSim.Contracts.V1;
 using WorldSimRefineryClient.Serialization;
 using WorldSimRefineryClient.Service;
 
@@ -31,11 +31,11 @@ public sealed class FixtureLiveParityTests
         var serviceClient = new RefineryServiceClient(httpClient, parser);
 
         var liveRequest = new PatchRequest(
-            "v1",
+            PatchContract.SchemaVersion,
             "49e95c3f-8df6-45b5-8f47-7d2be30c23f3",
             123,
             42,
-            "TECH_TREE_PATCH",
+            PatchGoals.TechTreePatch,
             new JsonObject { ["world"] = "minimal" },
             null
         );
