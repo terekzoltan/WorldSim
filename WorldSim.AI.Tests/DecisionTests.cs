@@ -91,4 +91,94 @@ public class DecisionTests
         Assert.Equal("Goap", result.Trace.PlannerName);
         Assert.NotEmpty(result.Trace.GoalScores);
     }
+
+    [Fact]
+    public void GoapPlanner_RebuildsPlan_WhenCurrentStepBecomesInvalid()
+    {
+        var planner = new GoapPlanner();
+        planner.SetGoal(new Goal("BuildHouse"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 2f,
+            Hunger: 20f,
+            Stamina: 80f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 4,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100);
+
+        var first = planner.GetNextCommand(context);
+        var second = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.GatherWood, first.Command);
+        Assert.Equal(NpcCommand.GatherWood, second.Command);
+        Assert.Equal("PlanRebuiltAfterInvalidation", second.ReplanReason);
+    }
+
+    [Fact]
+    public void GoapPlanner_AppliesReplanBackoff_WhenNoPlanExists()
+    {
+        var planner = new GoapPlanner();
+        planner.SetGoal(new Goal("UnknownGoal"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 7f,
+            Hunger: 10f,
+            Stamina: 70f,
+            HomeWood: 5,
+            HomeStone: 2,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 1,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 5,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100);
+
+        var first = planner.GetNextCommand(context);
+        var second = planner.GetNextCommand(context);
+
+        Assert.Equal("NoPlan", first.ReplanReason);
+        Assert.Equal("ReplanBackoff", second.ReplanReason);
+    }
+
+    [Fact]
+    public void HtnPlanner_SelectsHighestScoreMethod_ForSecureFood()
+    {
+        var planner = new HtnPlanner();
+        planner.SetGoal(new Goal("SecureFood"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 4f,
+            Hunger: 82f,
+            Stamina: 65f,
+            HomeWood: 12,
+            HomeStone: 4,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 3,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.EatFood, decision.Command);
+        Assert.Equal("EmergencyEat", decision.MethodName);
+    }
 }

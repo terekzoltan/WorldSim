@@ -181,21 +181,16 @@ public sealed class SimulationRuntime
     {
         return options.PolicyMode switch
         {
-            NpcPolicyMode.FactionMix => CreateFactionPolicyBrain(colony),
+            NpcPolicyMode.FactionMix => CreateFactionPolicyBrain(colony, options),
             NpcPolicyMode.HtnPilot => new RuntimeNpcBrain(NpcPlannerMode.Htn, "HtnPilot"),
             _ => new RuntimeNpcBrain(options.PlannerMode, $"Global:{options.PlannerMode}")
         };
     }
 
-    private static RuntimeNpcBrain CreateFactionPolicyBrain(Colony colony)
+    private static RuntimeNpcBrain CreateFactionPolicyBrain(Colony colony, RuntimeAiOptions options)
     {
-        return colony.Faction switch
-        {
-            Faction.Sylvars => new RuntimeNpcBrain(NpcPlannerMode.Goap, "FactionMix:Sylvars"),
-            Faction.Obsidari => new RuntimeNpcBrain(NpcPlannerMode.Simple, "FactionMix:Obsidari"),
-            Faction.Aetheri => new RuntimeNpcBrain(NpcPlannerMode.Htn, "FactionMix:Aetheri"),
-            _ => new RuntimeNpcBrain(NpcPlannerMode.Goap, "FactionMix:Default")
-        };
+        var planner = options.ResolveFactionPlanner(colony.Faction);
+        return new RuntimeNpcBrain(planner, $"FactionMix:{colony.Faction}->{planner}");
     }
 
     private void RefreshAiDebugSnapshot()

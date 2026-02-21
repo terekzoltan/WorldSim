@@ -188,7 +188,7 @@ public class Person
         float hunger = Needs.GetValueOrDefault("Hunger", 0f);
 
         // Critical hunger preemption happens before starvation damage to avoid dying with available food.
-        if (hunger >= 78f && _home.Stock[Resource.Food] > 0 && Current != Job.EatFood)
+        if (hunger >= 78f && _home.Stock[Resource.Food] > 0)
         {
             if (hunger >= 96f)
             {
@@ -217,6 +217,19 @@ public class Person
 
         if (Health <= 0f)
         {
+            // Last-chance starvation rescue: consume food if available before declaring death.
+            if (hunger >= 85f && _home.Stock[Resource.Food] > 0)
+            {
+                _home.Stock[Resource.Food] -= 1;
+                Needs["Hunger"] = Math.Max(0f, hunger - 30f);
+                Health = Math.Max(1f, Health + 1.2f);
+                Current = Job.Idle;
+                _doingJob = 0;
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
+            }
+
             LastDeathReason = hunger >= 85f ? PersonDeathReason.Starvation : PersonDeathReason.Other;
             return false;
         }

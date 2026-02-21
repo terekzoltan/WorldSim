@@ -10,6 +10,8 @@ public sealed class GoapPlanner : IPlanner
     private readonly Queue<GoapAction> _currentPlan = new();
     private Goal? _goal;
     private bool _goalChanged;
+    private float _nextReplanAllowedAtSeconds;
+    private int _cachedRemainingPlanCost;
     public string Name => "Goap";
 
     public void SetGoal(Goal goal)
@@ -17,6 +19,7 @@ public sealed class GoapPlanner : IPlanner
         _goalChanged = _goal?.Name != goal.Name;
         _goal = goal;
         _currentPlan.Clear();
+        _cachedRemainingPlanCost = 0;
     }
 
     public PlannerDecision GetNextCommand(in NpcAiContext context)
@@ -26,38 +29,65 @@ public sealed class GoapPlanner : IPlanner
 
         var reason = _goalChanged ? "GoalChanged" : "PlanContinue";
 
+        if (_currentPlan.Count > 0 && !CanExecuteCurrentAction(context, _currentPlan.Peek()))
+        {
+            _currentPlan.Clear();
+            _cachedRemainingPlanCost = 0;
+            reason = "PlanInvalidated";
+        }
+
         if (_currentPlan.Count == 0)
         {
+            if (context.SimulationTimeSeconds < _nextReplanAllowedAtSeconds)
+            {
+                _goalChanged = false;
+                return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>(), 0, "ReplanBackoff", "GoapSearch");
+            }
+
             var plan = BuildPlan(context, _goal);
             if (plan != null)
             {
                 foreach (var action in plan)
                     _currentPlan.Enqueue(action);
-                reason = _goalChanged ? "GoalChanged" : "PlanBuilt";
+                _cachedRemainingPlanCost = plan.Sum(action => action.Cost);
+                reason = reason == "PlanInvalidated"
+                    ? "PlanRebuiltAfterInvalidation"
+                    : (_goalChanged ? "GoalChanged" : "PlanBuilt");
             }
             else
             {
                 reason = "NoPlan";
+                _nextReplanAllowedAtSeconds = context.SimulationTimeSeconds + 0.5f;
             }
 
             _goalChanged = false;
         }
 
-        var command = _currentPlan.Count > 0 ? _currentPlan.Dequeue().Command : NpcCommand.Idle;
+        GoapAction? currentAction = _currentPlan.Count > 0 ? _currentPlan.Dequeue() : null;
+        var command = currentAction?.Command ?? NpcCommand.Idle;
         if (command == NpcCommand.Idle)
             return new PlannerDecision(command, 0, Array.Empty<NpcCommand>(), 0, reason, "GoapSearch");
 
         var planLength = 1 + _currentPlan.Count;
         var preview = new List<NpcCommand>(1 + Math.Min(4, _currentPlan.Count)) { command };
         preview.AddRange(_currentPlan.Take(4).Select(action => action.Command));
-        var cost = preview.Count;
+        var cost = Math.Max(1, _cachedRemainingPlanCost);
+        _cachedRemainingPlanCost = Math.Max(0, _cachedRemainingPlanCost - (currentAction?.Cost ?? 1));
         return new PlannerDecision(command, planLength, preview, cost, reason, "GoapSearch");
+    }
+
+    private static bool CanExecuteCurrentAction(in NpcAiContext context, GoapAction action)
+    {
+        var worldState = GetWorldState(context);
+        return worldState.Contains(action.Preconditions);
     }
 
     private List<GoapAction>? BuildPlan(in NpcAiContext context, Goal goal)
     {
         var start = GetWorldState(context);
         var target = GetGoalState(goal, context);
+        if (!target.Values.Any())
+            return null;
 
         var open = new PriorityQueue<Node, int>();
         var closed = new HashSet<GoapState>();

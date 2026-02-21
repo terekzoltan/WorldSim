@@ -217,3 +217,4 @@ Entries:
 - `[2026-02-21][Track C] AI debug panel tracked NPC valtas bekerult (PgUp/PgDn, Home) - HUD/input szinkront erint - kovetkezo lepes: tracked replay/export opcio`.
 - `[2026-02-21][Track C] GOAP/HTN trace bovitve (plan cost, replan reason, method) - Track A debug olvashatosaghoz plusz mezok kellenek - kovetkezo lepes: compact+page UX finomitas`.
 - `[2026-02-21][Track C] Policy mix aktiv (Global/FactionMix/HtnPilot) es Aetheri HTN pilot - Track B balanszparametereket erint - kovetkezo lepes: config tablaba emeles hardcode switch helyett`.
+- `[2026-02-21][Track C] GOAP invalidation+backoff es HTN method scoring bekotve, faction policy table env-bol konfiguralhato - Track B runtime balansz/ops finomhangolast erint - kovetkezo lepes: policy tabla JSON-ra emelese`.

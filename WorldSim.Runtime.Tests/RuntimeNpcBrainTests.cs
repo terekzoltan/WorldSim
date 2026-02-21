@@ -126,6 +126,26 @@ public class RuntimeNpcBrainTests
         Assert.True(snapshot.TrackedNpcIndex <= 1);
     }
 
+    [Fact]
+    public void RuntimeAiOptions_FromEnvironment_AppliesFactionPolicyTable()
+    {
+        const string key = "WORLDSIM_AI_POLICY_TABLE";
+        var previous = Environment.GetEnvironmentVariable(key);
+        try
+        {
+            Environment.SetEnvironmentVariable(key, "Sylvars=Htn;Obsidari=Goap;default=Simple");
+            var options = RuntimeAiOptions.FromEnvironment();
+
+            Assert.Equal(NpcPlannerMode.Htn, options.ResolveFactionPlanner(Faction.Sylvars));
+            Assert.Equal(NpcPlannerMode.Goap, options.ResolveFactionPlanner(Faction.Obsidari));
+            Assert.Equal(NpcPlannerMode.Simple, options.ResolveFactionPlanner(Faction.Chirita));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(key, previous);
+        }
+    }
+
     private sealed class FixedBrain : INpcDecisionBrain
     {
         private readonly NpcCommand _command;

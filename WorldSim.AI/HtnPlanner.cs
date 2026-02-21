@@ -30,7 +30,7 @@ public sealed class HtnPlanner : IPlanner
         if (_plan.Count == 0)
         {
             Decompose(_goal.Name, context);
-            reason = _goalChanged ? "GoalChanged" : "MethodDecomposed";
+            reason = _goalChanged ? "GoalChanged" : "MethodScored";
             _goalChanged = false;
         }
 
@@ -46,50 +46,83 @@ public sealed class HtnPlanner : IPlanner
 
     private void Decompose(string goalName, in NpcAiContext context)
     {
+        var candidates = new List<MethodCandidate>();
         switch (goalName)
         {
             case "ExpandHousing":
             case "BuildHouse":
-                _methodName = "BuildHouseByWood";
-                if (context.HomeWood >= context.HouseWoodCost)
+                candidates.Add(new MethodCandidate(
+                    "BuildHouseByWood",
+                    context.HomeWood >= context.HouseWoodCost ? 1.0f : 0.7f,
+                    context.HomeWood >= context.HouseWoodCost
+                        ? new[] { NpcCommand.BuildHouse }
+                        : new[] { NpcCommand.GatherWood, NpcCommand.BuildHouse }));
+
+                if (context.StoneBuildingsEnabled && context.CanBuildWithStone)
                 {
-                    _plan.Enqueue(NpcCommand.BuildHouse);
-                }
-                else
-                {
-                    _plan.Enqueue(NpcCommand.GatherWood);
-                    _plan.Enqueue(NpcCommand.BuildHouse);
+                    candidates.Add(new MethodCandidate(
+                        "BuildHouseByStone",
+                        context.HomeStone >= context.HouseStoneCost ? 0.95f : 0.55f,
+                        context.HomeStone >= context.HouseStoneCost
+                            ? new[] { NpcCommand.BuildHouse }
+                            : new[] { NpcCommand.GatherStone, NpcCommand.BuildHouse }));
                 }
                 break;
 
             case "SecureFood":
-                _methodName = "FoodStabilization";
-                if (context.Hunger >= 70f && context.HomeFood > 0)
-                    _plan.Enqueue(NpcCommand.EatFood);
-                else
-                    _plan.Enqueue(NpcCommand.GatherFood);
+                candidates.Add(new MethodCandidate(
+                    "EmergencyEat",
+                    context.Hunger >= 75f && context.HomeFood > 0 ? 1.0f : 0.35f,
+                    context.HomeFood > 0 ? new[] { NpcCommand.EatFood } : new[] { NpcCommand.GatherFood }));
+                candidates.Add(new MethodCandidate(
+                    "ForageAndStabilize",
+                    context.HomeFood <= 2 ? 0.92f : 0.6f,
+                    new[] { NpcCommand.GatherFood }));
                 break;
 
             case "RecoverStamina":
-                _methodName = "StaminaRecovery";
-                _plan.Enqueue(NpcCommand.Rest);
+                candidates.Add(new MethodCandidate(
+                    "StaminaRecovery",
+                    (100f - context.Stamina) / 100f,
+                    new[] { NpcCommand.Rest }));
                 break;
 
             case "StabilizeResources":
             case "GatherStone":
-                _methodName = "StoneReserve";
-                _plan.Enqueue(NpcCommand.GatherStone);
+                candidates.Add(new MethodCandidate(
+                    "StoneReserve",
+                    context.HomeStone < 8 ? 0.95f : 0.4f,
+                    new[] { NpcCommand.GatherStone }));
+                candidates.Add(new MethodCandidate(
+                    "WoodFallback",
+                    context.HomeWood < 8 ? 0.75f : 0.3f,
+                    new[] { NpcCommand.GatherWood }));
                 break;
 
             case "GatherWood":
-                _methodName = "WoodReserve";
-                _plan.Enqueue(NpcCommand.GatherWood);
+                candidates.Add(new MethodCandidate(
+                    "WoodReserve",
+                    context.HomeWood < 10 ? 0.95f : 0.45f,
+                    new[] { NpcCommand.GatherWood }));
                 break;
 
             default:
-                _methodName = "FallbackIdle";
-                _plan.Enqueue(NpcCommand.Idle);
+                candidates.Add(new MethodCandidate("FallbackIdle", 0.01f, new[] { NpcCommand.Idle }));
                 break;
         }
+
+        var selected = candidates.OrderByDescending(candidate => candidate.Score).FirstOrDefault();
+        if (selected == null)
+        {
+            _methodName = "FallbackIdle";
+            _plan.Enqueue(NpcCommand.Idle);
+            return;
+        }
+
+        _methodName = selected.Name;
+        foreach (var command in selected.Commands)
+            _plan.Enqueue(command);
     }
+
+    private sealed record MethodCandidate(string Name, float Score, IReadOnlyList<NpcCommand> Commands);
 }
