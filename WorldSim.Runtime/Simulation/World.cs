@@ -6,6 +6,14 @@ using System.Threading.Tasks;
 
 namespace WorldSim.Simulation
 {
+    public sealed class ColonyDeathStats
+    {
+        public int OldAge;
+        public int Starvation;
+        public int Predator;
+        public int Other;
+    }
+
     public enum Season
     {
         Spring,
@@ -16,17 +24,21 @@ namespace WorldSim.Simulation
 
     public class World
     {
+        readonly Func<Colony, RuntimeNpcBrain> _brainFactory;
         public readonly int Width, Height;
         Tile[,] _map;
         public List<Person> _people = new();
         public List<Colony> _colonies = new();
         public List<House> Houses = new();
+        public List<SpecializedBuilding> SpecializedBuildings = new();
         public List<Animal> _animals = new();
 
         // Technology-affected properties
         public int WoodYield { get; set; } = 1; // Fa kitermelés hozama (mennyi fát kapnak egy gyűjtéskor)
         public int StoneYield { get; set; } = 1; // Kő kitermelés hozama
-        public int FoodYield { get; set; } = 1; // Élelmiszer kitermelés hozama
+        public int IronYield { get; set; } = 1;
+        public int GoldYield { get; set; } = 1;
+        public int FoodYield { get; set; } = 2; // Élelmiszer kitermelés hozama
         public float HealthBonus { get; set; } = 0; // Egészség bónusz (plusz életpont vagy egészség)
         public float MaxAge { get; set; } = 80; // Maximális életkor (meddig élhetnek az emberek)
         public float WorkEfficiencyMultiplier { get; set; } = 1.0f; // Munka hatékonyság szorzó (gyorsabban dolgoznak)
@@ -37,6 +49,7 @@ namespace WorldSim.Simulation
         public float MovementSpeedMultiplier { get; set; } = 1.0f; // Mozgási sebesség szorzó (gyorsabban mozognak)
         public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
         public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
+        public bool AllowFreeTechUnlocks { get; set; }
         // Disabled by default until bidirectional combat/retaliation exists.
         public bool EnablePredatorHumanAttacks { get; set; } = false;
         public float PredatorHumanDamage { get; set; } = 10f;
@@ -57,17 +70,21 @@ namespace WorldSim.Simulation
         readonly List<string> _recentEvents = new();
         readonly HashSet<int> _houseMilestones = new();
         readonly HashSet<int> _extinctionMilestones = new();
+        readonly Dictionary<int, ColonyDeathStats> _colonyDeathStats = new();
 
         float _seasonTimer;
         float _droughtTimer;
         float _professionRebalanceTimer;
+        float _specializedBuildTimer;
 
         const float SeasonDurationSeconds = 90f;
         const float DroughtDurationSeconds = 35f;
         const float ProfessionRebalancePeriod = 12f;
+        const float SpecializedBuildPeriod = 14f;
 
-        public World(int width, int height, int initialPop)
+        public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null)
         {
+            _brainFactory = brainFactory ?? (_ => new RuntimeNpcBrain());
             Width = width;
             Height = height;
             _map = new Tile[width, height];
@@ -90,7 +107,7 @@ namespace WorldSim.Simulation
                             else if (r < 0.04) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));
                             else if (r < 0.042) node = new ResourceNode(Resource.Iron, _rng.Next(1, 6));
                             else if (r < 0.043) node = new ResourceNode(Resource.Gold, _rng.Next(1, 4));
-                            else if (r < 0.06) node = new ResourceNode(Resource.Food, _rng.Next(2, 7));
+                            else if (r < 0.08) node = new ResourceNode(Resource.Food, _rng.Next(3, 8));
                         }
                         else // Dirt
                         {
@@ -98,7 +115,7 @@ namespace WorldSim.Simulation
                             else if (r < 0.028) node = new ResourceNode(Resource.Stone, _rng.Next(1, 10));
                             else if (r < 0.031) node = new ResourceNode(Resource.Iron, _rng.Next(1, 6));
                             else if (r < 0.032) node = new ResourceNode(Resource.Gold, _rng.Next(1, 4));
-                            else if (r < 0.04) node = new ResourceNode(Resource.Food, _rng.Next(2, 6));
+                            else if (r < 0.055) node = new ResourceNode(Resource.Food, _rng.Next(3, 7));
                         }
                     }
                     _map[x, y] = new Tile(grounds[x, y], node);
@@ -120,6 +137,7 @@ namespace WorldSim.Simulation
 
                 Colony col = new Colony(ci, colPos);
                 _colonies.Add(col);
+                _colonyDeathStats[col.Id] = new ColonyDeathStats();
 
                 // Faction setup kept for reference; explicit color assignment removed (using icons instead)
                 // 0: Sylvars
@@ -141,7 +159,7 @@ namespace WorldSim.Simulation
                         py = Math.Clamp(col.Origin.y + _rng.Next(-spawnRadius, spawnRadius + 1), 0, Height - 1);
                     } while (_map[px, py].Ground == Ground.Water && ++attempts < 64);
 
-                    _people.Add(Person.Spawn(col, (px, py)));
+                    _people.Add(Person.Spawn(col, (px, py), CreateNpcBrain(col)));
                 }
             }
 
@@ -161,7 +179,7 @@ namespace WorldSim.Simulation
             {
                 if (!_people[i].Update(this, dt, births))
                 {
-                    ReportPersonDeath(_people[i].LastDeathReason);
+                    ReportPersonDeath(_people[i]);
                     _people.RemoveAt(i);
                 }
             }
@@ -173,6 +191,15 @@ namespace WorldSim.Simulation
                 _professionRebalanceTimer = 0f;
                 RebalanceProfessions();
             }
+
+            _specializedBuildTimer += dt;
+            if (_specializedBuildTimer >= SpecializedBuildPeriod)
+            {
+                _specializedBuildTimer = 0f;
+                TryAutoConstructSpecializedBuildings();
+            }
+
+            RecalculateInfrastructureEffects();
 
             foreach (Colony c in _colonies) c.Update(this, dt);
 
@@ -215,13 +242,21 @@ namespace WorldSim.Simulation
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
         public Tile GetTile(int x, int y) => _map[x, y];
         public void AddHouse(Colony colony, (int x, int y) pos) => Houses.Add(new House(colony, pos, HouseCapacity));
+        public void AddSpecializedBuilding(Colony colony, (int x, int y) pos, SpecializedBuildingKind kind)
+            => SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
+        internal RuntimeNpcBrain CreateNpcBrain(Colony colony) => _brainFactory(colony);
 
         public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;
         public void ReportPredatorDeath() => TotalPredatorDeaths++;
         public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
+        public ColonyDeathStats GetColonyDeathStats(int colonyId)
+            => _colonyDeathStats.TryGetValue(colonyId, out var stats)
+                ? stats
+                : new ColonyDeathStats();
 
-        private void ReportPersonDeath(PersonDeathReason reason)
+        private void ReportPersonDeath(Person person)
         {
+            PersonDeathReason reason = person.LastDeathReason;
             switch (reason)
             {
                 case PersonDeathReason.OldAge:
@@ -235,6 +270,28 @@ namespace WorldSim.Simulation
                     break;
                 default:
                     TotalDeathsOther++;
+                    break;
+            }
+
+            if (!_colonyDeathStats.TryGetValue(person.Home.Id, out var colonyStats))
+            {
+                colonyStats = new ColonyDeathStats();
+                _colonyDeathStats[person.Home.Id] = colonyStats;
+            }
+
+            switch (reason)
+            {
+                case PersonDeathReason.OldAge:
+                    colonyStats.OldAge++;
+                    break;
+                case PersonDeathReason.Starvation:
+                    colonyStats.Starvation++;
+                    break;
+                case PersonDeathReason.Predator:
+                    colonyStats.Predator++;
+                    break;
+                default:
+                    colonyStats.Other++;
                     break;
             }
         }
@@ -401,12 +458,12 @@ namespace WorldSim.Simulation
             if (_foodRegrowth.Any(s => s.x == x && s.y == y))
                 return;
 
-            _foodRegrowth.Add((x, y, 0f, 35f + (float)_rng.NextDouble() * 35f));
+            _foodRegrowth.Add((x, y, 0f, 24f + (float)_rng.NextDouble() * 24f));
         }
 
         void UpdateFoodRegrowth(float dt)
         {
-            float growSpeed = IsDroughtActive ? 0.85f : 1f;
+            float growSpeed = IsDroughtActive ? 0.95f : 1f;
             for (int i = _foodRegrowth.Count - 1; i >= 0; i--)
             {
                 var spot = _foodRegrowth[i];
@@ -495,6 +552,90 @@ namespace WorldSim.Simulation
             }
         }
 
+        void RecalculateInfrastructureEffects()
+        {
+            foreach (var colony in _colonies)
+            {
+                int farms = SpecializedBuildings.Count(b => b.Owner == colony && b.Kind == SpecializedBuildingKind.FarmPlot);
+                int workshops = SpecializedBuildings.Count(b => b.Owner == colony && b.Kind == SpecializedBuildingKind.Workshop);
+                int storehouses = SpecializedBuildings.Count(b => b.Owner == colony && b.Kind == SpecializedBuildingKind.Storehouse);
+                colony.UpdateInfrastructure(farms, workshops, storehouses);
+            }
+        }
+
+        void TryAutoConstructSpecializedBuildings()
+        {
+            foreach (var colony in _colonies)
+            {
+                int people = _people.Count(p => p.Home == colony && p.Health > 0f);
+                if (people == 0 || colony.HouseCount == 0)
+                    continue;
+
+                float foodPerCapita = colony.Stock[Resource.Food] / (float)Math.Max(1, people);
+                int targetFarms = Math.Max(1, (int)Math.Ceiling(people / 10f));
+                if (foodPerCapita < 1.4f)
+                    targetFarms++;
+
+                if (colony.FarmPlotCount < targetFarms && colony.Stock[Resource.Wood] >= 12 && colony.Stock[Resource.Stone] >= 4)
+                {
+                    if (TryPlaceSpecialized(colony, SpecializedBuildingKind.FarmPlot, woodCost: 12, stoneCost: 4, ironCost: 0, goldCost: 0))
+                        AddEvent($"{colony.Name} built FarmPlot");
+                    continue;
+                }
+
+                if (foodPerCapita >= 1.2f && colony.WorkshopCount < 1 && colony.Stock[Resource.Wood] >= 16 && colony.Stock[Resource.Stone] >= 8 && colony.Stock[Resource.Iron] >= 4)
+                {
+                    if (TryPlaceSpecialized(colony, SpecializedBuildingKind.Workshop, woodCost: 16, stoneCost: 8, ironCost: 4, goldCost: 0))
+                        AddEvent($"{colony.Name} built Workshop");
+                    continue;
+                }
+
+                if (foodPerCapita >= 1.1f && colony.StorehouseCount < 1 && colony.Stock[Resource.Wood] >= 14 && colony.Stock[Resource.Stone] >= 10 && colony.Stock[Resource.Gold] >= 1)
+                {
+                    if (TryPlaceSpecialized(colony, SpecializedBuildingKind.Storehouse, woodCost: 14, stoneCost: 10, ironCost: 0, goldCost: 1))
+                        AddEvent($"{colony.Name} built Storehouse");
+                }
+            }
+        }
+
+        bool TryPlaceSpecialized(Colony colony, SpecializedBuildingKind kind, int woodCost, int stoneCost, int ironCost, int goldCost)
+        {
+            if (colony.Stock[Resource.Wood] < woodCost ||
+                colony.Stock[Resource.Stone] < stoneCost ||
+                colony.Stock[Resource.Iron] < ironCost ||
+                colony.Stock[Resource.Gold] < goldCost)
+                return false;
+
+            var pos = FindBuildSpotNear(colony.Origin, radius: 6);
+            if (pos == null)
+                return false;
+
+            colony.Stock[Resource.Wood] -= woodCost;
+            colony.Stock[Resource.Stone] -= stoneCost;
+            colony.Stock[Resource.Iron] -= ironCost;
+            colony.Stock[Resource.Gold] -= goldCost;
+            AddSpecializedBuilding(colony, pos.Value, kind);
+            return true;
+        }
+
+        (int x, int y)? FindBuildSpotNear((int x, int y) origin, int radius)
+        {
+            for (int i = 0; i < 24; i++)
+            {
+                int x = Math.Clamp(origin.x + _rng.Next(-radius, radius + 1), 0, Width - 1);
+                int y = Math.Clamp(origin.y + _rng.Next(-radius, radius + 1), 0, Height - 1);
+                if (_map[x, y].Ground == Ground.Water)
+                    continue;
+
+                bool occupied = Houses.Any(h => h.Pos.x == x && h.Pos.y == y) ||
+                                SpecializedBuildings.Any(b => b.Pos.x == x && b.Pos.y == y);
+                if (!occupied)
+                    return (x, y);
+            }
+
+            return null;
+        }
+
         void RebalanceProfessions()
         {
             foreach (var colony in _colonies)
@@ -506,7 +647,7 @@ namespace WorldSim.Simulation
                 if (adults.Count == 0)
                     continue;
 
-                bool emergencyFood = colony.Stock[Resource.Food] <= Math.Max(4, adults.Count);
+                bool emergencyFood = colony.Stock[Resource.Food] <= Math.Max(6, adults.Count + 2);
 
                 var targets = CreateProfessionTargets(adults.Count, emergencyFood);
                 var counts = adults

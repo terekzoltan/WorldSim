@@ -5,17 +5,23 @@ public enum NpcCommand
     Idle,
     GatherWood,
     GatherStone,
+    GatherIron,
+    GatherGold,
     GatherFood,
     EatFood,
     Rest,
-    BuildHouse
+    BuildHouse,
+    CraftTools
 }
 
 public readonly record struct NpcAiContext(
     float SimulationTimeSeconds,
     float Hunger,
+    float Stamina,
     int HomeWood,
     int HomeStone,
+    int HomeIron,
+    int HomeGold,
     int HomeFood,
     int HomeHouseCount,
     int HouseWoodCost,
@@ -27,11 +33,12 @@ public readonly record struct NpcAiContext(
 
 public interface IPlanner
 {
+    string Name { get; }
     void SetGoal(Goal goal);
-    NpcCommand GetNextCommand(in NpcAiContext context);
+    PlannerDecision GetNextCommand(in NpcAiContext context);
 }
 
 public interface INpcDecisionBrain
 {
-    NpcCommand Think(in NpcAiContext context);
+    AiDecisionResult Think(in NpcAiContext context);
 }

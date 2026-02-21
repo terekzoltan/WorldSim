@@ -44,7 +44,8 @@ public sealed class RuntimePatchCommandExecutor
                     {
                         throw new InvalidOperationException(
                             "Cannot apply addTech: unknown techId '" + unlockTech.TechId +
-                            "'. TODO: add Java->C# tech ID mapping layer for cross-project IDs."
+                            "'. loadedTechCount=" + runtime.LoadedTechCount +
+                            ". TODO: add Java->C# tech ID mapping layer for cross-project IDs."
                         );
                     }
 

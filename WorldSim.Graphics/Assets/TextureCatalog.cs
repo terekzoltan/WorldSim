@@ -17,24 +17,44 @@ public sealed class TextureCatalog
     public Texture2D ObsidariHouse { get; }
     public Texture2D AetheriHouse { get; }
     public Texture2D ChiritaHouse { get; }
+    public Texture2D MissingTexture { get; }
 
     public TextureCatalog(GraphicsDevice graphicsDevice, ContentManager content)
     {
         Pixel = new Texture2D(graphicsDevice, 1, 1);
         Pixel.SetData(new[] { Color.White });
 
-        Tree = content.Load<Texture2D>("tree");
-        Rock = content.Load<Texture2D>("rock");
-        Iron = content.Load<Texture2D>("iron");
-        Gold = content.Load<Texture2D>("gold");
+        MissingTexture = new Texture2D(graphicsDevice, 2, 2);
+        MissingTexture.SetData(new[]
+        {
+            Color.Magenta, Color.Black,
+            Color.Black, Color.Magenta
+        });
 
-        SylvarPerson = content.Load<Texture2D>("Sylvar");
-        ObsidariPerson = content.Load<Texture2D>("Obsidiari");
+        Tree = LoadOrFallback(content, "tree");
+        Rock = LoadOrFallback(content, "rock");
+        Iron = LoadOrFallback(content, "iron");
+        Gold = LoadOrFallback(content, "gold");
 
-        SylvarHouse = content.Load<Texture2D>("SylvarHouse");
-        ObsidariHouse = content.Load<Texture2D>("ObsidiariHouse");
-        AetheriHouse = content.Load<Texture2D>("AetheriHouse");
-        ChiritaHouse = content.Load<Texture2D>("ChiritaHouse");
+        SylvarPerson = LoadOrFallback(content, "Sylvar");
+        ObsidariPerson = LoadOrFallback(content, "Obsidiari");
+
+        SylvarHouse = LoadOrFallback(content, "SylvarHouse");
+        ObsidariHouse = LoadOrFallback(content, "ObsidiariHouse");
+        AetheriHouse = LoadOrFallback(content, "AetheriHouse");
+        ChiritaHouse = LoadOrFallback(content, "ChiritaHouse");
+    }
+
+    private Texture2D LoadOrFallback(ContentManager content, string assetName)
+    {
+        try
+        {
+            return content.Load<Texture2D>(assetName);
+        }
+        catch
+        {
+            return MissingTexture;
+        }
     }
 
     public Texture2D? GetPersonIcon(int colonyId)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace WorldSim.AI;
 
@@ -8,6 +9,7 @@ public sealed class GoapPlanner : IPlanner
     private readonly List<GoapAction> _actions = CreateActions();
     private readonly Queue<GoapAction> _currentPlan = new();
     private Goal? _goal;
+    public string Name => "Goap";
 
     public void SetGoal(Goal goal)
     {
@@ -15,10 +17,10 @@ public sealed class GoapPlanner : IPlanner
         _currentPlan.Clear();
     }
 
-    public NpcCommand GetNextCommand(in NpcAiContext context)
+    public PlannerDecision GetNextCommand(in NpcAiContext context)
     {
         if (_goal == null)
-            return NpcCommand.Idle;
+            return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>());
 
         if (_currentPlan.Count == 0)
         {
@@ -30,7 +32,14 @@ public sealed class GoapPlanner : IPlanner
             }
         }
 
-        return _currentPlan.Count > 0 ? _currentPlan.Dequeue().Command : NpcCommand.Idle;
+        var command = _currentPlan.Count > 0 ? _currentPlan.Dequeue().Command : NpcCommand.Idle;
+        if (command == NpcCommand.Idle)
+            return new PlannerDecision(command, 0, Array.Empty<NpcCommand>());
+
+        var planLength = 1 + _currentPlan.Count;
+        var preview = new List<NpcCommand>(1 + Math.Min(4, _currentPlan.Count)) { command };
+        preview.AddRange(_currentPlan.Take(4).Select(action => action.Command));
+        return new PlannerDecision(command, planLength, preview);
     }
 
     private List<GoapAction>? BuildPlan(in NpcAiContext context, Goal goal)
@@ -79,6 +88,21 @@ public sealed class GoapPlanner : IPlanner
         gatherStone.Effects["stone"] = 15;
         actions.Add(gatherStone);
 
+        var gatherFood = new GoapAction("GatherFood", NpcCommand.GatherFood);
+        gatherFood.Effects["food"] = 8;
+        gatherFood.Effects["satiety"] = 8;
+        actions.Add(gatherFood);
+
+        var eatFood = new GoapAction("EatFood", NpcCommand.EatFood);
+        eatFood.Preconditions["food"] = 1;
+        eatFood.Effects["food"] = -1;
+        eatFood.Effects["satiety"] = 35;
+        actions.Add(eatFood);
+
+        var rest = new GoapAction("Rest", NpcCommand.Rest);
+        rest.Effects["stamina"] = 28;
+        actions.Add(rest);
+
         var buildHouse = new GoapAction("BuildHouse", NpcCommand.BuildHouse);
         buildHouse.Preconditions["wood"] = 50;
         buildHouse.Effects["wood"] = -50;
@@ -93,7 +117,10 @@ public sealed class GoapPlanner : IPlanner
         var state = new GoapState();
         state["wood"] = context.HomeWood;
         state["stone"] = context.HomeStone;
+        state["food"] = context.HomeFood;
         state["house"] = context.HomeHouseCount;
+        state["satiety"] = Math.Max(0, 100 - (int)MathF.Round(context.Hunger));
+        state["stamina"] = Math.Max(0, (int)MathF.Round(context.Stamina));
         return state;
     }
 
@@ -106,7 +133,18 @@ public sealed class GoapPlanner : IPlanner
                 state["wood"] = context.HomeWood + 50;
                 break;
             case "BuildHouse":
+            case "ExpandHousing":
                 state["house"] = context.HomeHouseCount + 1;
+                break;
+            case "GatherStone":
+            case "StabilizeResources":
+                state["stone"] = context.HomeStone + 15;
+                break;
+            case "SecureFood":
+                state["satiety"] = Math.Max(20, 100 - (int)MathF.Round(context.Hunger)) + 20;
+                break;
+            case "RecoverStamina":
+                state["stamina"] = Math.Max(20, (int)MathF.Round(context.Stamina)) + 30;
                 break;
         }
 

@@ -11,11 +11,20 @@ using WorldSim.Graphics.UI;
 using WorldSim.RefineryAdapter;
 using WorldSim.Runtime;
 using WorldSim.Runtime.ReadModel;
+using WorldSim.Simulation;
 
 namespace WorldSim;
 
 public class Game1 : Game
 {
+    private static readonly (string Name, WorldRenderTheme Theme)[] ThemePresets =
+    {
+        ("Daylight", WorldRenderTheme.DaylightAtlas),
+        ("Parchment", WorldRenderTheme.ParchmentFrontier),
+        ("Industrial", WorldRenderTheme.IndustrialDawn),
+        ("Classic", WorldRenderTheme.Default)
+    };
+
     private const float SimulationTickDuration = 0.25f;
     private const float MinZoom = 0.5f;
     private const float MaxZoom = 5.0f;
@@ -40,6 +49,11 @@ public class Game1 : Game
     private bool _isPanning;
     private Point _lastMousePos;
     private bool _cameraInitialized;
+    private bool _isFullscreen = true;
+    private bool _fullscreenKeyDown;
+    private bool _showAiDebugPanel;
+    private bool _showRenderStats;
+    private int _themeIndex;
 
     public Game1()
     {
@@ -57,13 +71,13 @@ public class Game1 : Game
         Window.ClientSizeChanged += (_, _) => FitCameraToViewport();
 
         _refineryRuntime = new RefineryTriggerAdapter(AppDomain.CurrentDomain.BaseDirectory);
+        _hudRenderer.SetTheme(HudTheme.FromWorldTheme(_worldRenderer.Theme));
     }
 
     protected override void Initialize()
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
-        var techPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tech", "technologies.json");
-        _runtime = new SimulationRuntime(width: 128, height: 128, initialPopulation: 25, technologyFilePath: techPath);
+        _runtime = CreateRuntime();
 
         _previousWheel = Mouse.GetState().ScrollWheelValue;
         FitCameraToViewport();
@@ -75,7 +89,14 @@ public class Game1 : Game
     {
         _spriteBatch = new SpriteBatch(GraphicsDevice);
         _textures = new TextureCatalog(GraphicsDevice, Content);
-        _font = Content.Load<SpriteFont>("DebugFont");
+        try
+        {
+            _font = Content.Load<SpriteFont>("UiFont");
+        }
+        catch
+        {
+            _font = Content.Load<SpriteFont>("DebugFont");
+        }
     }
 
     protected override void Update(GameTime gameTime)
@@ -83,11 +104,40 @@ public class Game1 : Game
         var keys = Keyboard.GetState();
         var mouse = Mouse.GetState();
 
+        _camera.Step((float)gameTime.ElapsedGameTime.TotalSeconds);
+
+        if (keys.IsKeyDown(Keys.F11))
+        {
+            if (!_fullscreenKeyDown)
+                ToggleFullscreen();
+            _fullscreenKeyDown = true;
+        }
+        else
+        {
+            _fullscreenKeyDown = false;
+        }
+
         if (keys.IsKeyDown(Keys.F1) && !_previousKeys.IsKeyDown(Keys.F1))
             _showTechMenu = !_showTechMenu;
 
+        if (keys.IsKeyDown(Keys.F9) && !_previousKeys.IsKeyDown(Keys.F9))
+            CycleTheme(-1);
+
+        if (keys.IsKeyDown(Keys.F10) && !_previousKeys.IsKeyDown(Keys.F10))
+            CycleTheme(1);
+
         if (keys.IsKeyDown(Keys.F6) && !_previousKeys.IsKeyDown(Keys.F6))
             _refineryRuntime.Trigger(_runtime, _runtime.Tick);
+
+#if DEBUG
+        HandlePlannerToggleDebug(keys);
+#endif
+
+        if (keys.IsKeyDown(Keys.F8) && !_previousKeys.IsKeyDown(Keys.F8))
+            _showAiDebugPanel = !_showAiDebugPanel;
+
+        if (keys.IsKeyDown(Keys.F3) && !_previousKeys.IsKeyDown(Keys.F3))
+            _showRenderStats = !_showRenderStats;
 
         HandleCameraInput(keys, mouse);
         HandleTechMenuInput(keys);
@@ -171,6 +221,36 @@ public class Game1 : Game
         }
     }
 
+#if DEBUG
+    private void HandlePlannerToggleDebug(KeyboardState keys)
+    {
+        if (!keys.IsKeyDown(Keys.F7) || _previousKeys.IsKeyDown(Keys.F7))
+            return;
+
+        var nextMode = _runtime.PlannerMode switch
+        {
+            NpcPlannerMode.Goap => NpcPlannerMode.Simple,
+            NpcPlannerMode.Simple => NpcPlannerMode.Htn,
+            _ => NpcPlannerMode.Goap
+        };
+
+        _runtime = CreateRuntime(new RuntimeAiOptions { PlannerMode = nextMode, PolicyMode = _runtime.PolicyMode });
+        _showTechMenu = false;
+    }
+#endif
+
+    private static SimulationRuntime CreateRuntime()
+    {
+        var techPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tech", "technologies.json");
+        return new SimulationRuntime(width: 128, height: 128, initialPopulation: 25, technologyFilePath: techPath);
+    }
+
+    private static SimulationRuntime CreateRuntime(RuntimeAiOptions aiOptions)
+    {
+        var techPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tech", "technologies.json");
+        return new SimulationRuntime(width: 128, height: 128, initialPopulation: 25, technologyFilePath: techPath, aiOptions: aiOptions);
+    }
+
     private void ClampCamera()
     {
         _camera.ClampToWorld(
@@ -200,16 +280,47 @@ public class Game1 : Game
         var coverZoom = MathF.Max(zoomX, zoomY);
 
         _camera.SetZoom(coverZoom, MinZoom, MaxZoom);
-
-        var visibleWidth = viewportWidth / _camera.Zoom;
-        var visibleHeight = viewportHeight / _camera.Zoom;
+        var visibleWidth = viewportWidth / coverZoom;
+        var visibleHeight = viewportHeight / coverZoom;
         var centered = new Vector2(
             (mapWidth - visibleWidth) * 0.5f,
             (mapHeight - visibleHeight) * 0.5f);
 
-        _camera.SetPosition(centered);
+        _camera.SetTarget(centered, coverZoom, MinZoom, MaxZoom);
+        if (!_cameraInitialized)
+            _camera.SnapToTarget();
         ClampCamera();
         _cameraInitialized = true;
+    }
+
+    private void ToggleFullscreen()
+    {
+        _isFullscreen = !_isFullscreen;
+        if (_isFullscreen)
+        {
+            var display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
+            _graphics.PreferredBackBufferWidth = display.Width;
+            _graphics.PreferredBackBufferHeight = display.Height;
+            _graphics.IsFullScreen = true;
+            Window.IsBorderless = true;
+        }
+        else
+        {
+            _graphics.PreferredBackBufferWidth = 128 * _worldRenderer.Settings.TileSize;
+            _graphics.PreferredBackBufferHeight = 110 * _worldRenderer.Settings.TileSize;
+            _graphics.IsFullScreen = false;
+            Window.IsBorderless = false;
+        }
+
+        _graphics.ApplyChanges();
+        FitCameraToViewport();
+    }
+
+    private void CycleTheme(int delta)
+    {
+        _themeIndex = (_themeIndex + delta + ThemePresets.Length) % ThemePresets.Length;
+        _worldRenderer.SetTheme(ThemePresets[_themeIndex].Theme);
+        _hudRenderer.SetTheme(HudTheme.FromWorldTheme(_worldRenderer.Theme));
     }
 
     protected override void Draw(GameTime gameTime)
@@ -231,7 +342,24 @@ public class Game1 : Game
         }
 
         _spriteBatch.Begin();
-        _hudRenderer.Draw(_spriteBatch, _font, snapshot, _refineryRuntime.LastStatus, techMenu);
+        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode}";
+#if DEBUG
+        plannerStatus += " (F7 planner, F8 AI panel, F3 render stats, F9/F10 theme)";
+#endif
+        var aiDebug = _runtime.GetAiDebugSnapshot();
+        _hudRenderer.Draw(
+            _spriteBatch,
+            _textures.Pixel,
+            _font,
+            snapshot,
+            $"{_refineryRuntime.LastStatus} | {_runtime.LastTechActionStatus} | Theme: {ThemePresets[_themeIndex].Name}",
+            plannerStatus,
+            techMenu,
+            aiDebug,
+            _showAiDebugPanel,
+            GraphicsDevice.Viewport.Width,
+            GraphicsDevice.Viewport.Height,
+            _showRenderStats ? _worldRenderer.LastRenderStats : null);
         _spriteBatch.End();
 
         base.Draw(gameTime);

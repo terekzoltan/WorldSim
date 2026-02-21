@@ -23,6 +23,22 @@ public static class GoalLibrary
         gatherStone.Considerations.Add(new HungerConsideration());
         goals.Add(gatherStone);
 
+        var secureFood = new Goal("SecureFood")
+        {
+            CooldownSeconds = 1.5f
+        };
+        secureFood.Considerations.Add(new LowFoodStockConsideration());
+        secureFood.Considerations.Add(new HungerConsideration());
+        goals.Add(secureFood);
+
+        var recoverStamina = new Goal("RecoverStamina")
+        {
+            CooldownSeconds = 1f
+        };
+        recoverStamina.Considerations.Add(new StaminaDeficitConsideration());
+        recoverStamina.Considerations.Add(new InvertedConsideration(new HungerConsideration()));
+        goals.Add(recoverStamina);
+
         var buildHouse = new Goal("BuildHouse")
         {
             CooldownSeconds = 5f
@@ -30,6 +46,22 @@ public static class GoalLibrary
         buildHouse.Considerations.Add(new BuildHouseFeasibleConsideration());
         buildHouse.Considerations.Add(new InvertedConsideration(new HungerConsideration()));
         goals.Add(buildHouse);
+
+        var expandHousing = new Goal("ExpandHousing")
+        {
+            CooldownSeconds = 4f
+        };
+        expandHousing.Considerations.Add(new HousingPressureConsideration());
+        expandHousing.Considerations.Add(new BuildHouseFeasibleConsideration());
+        goals.Add(expandHousing);
+
+        var stabilizeResources = new Goal("StabilizeResources")
+        {
+            CooldownSeconds = 2.5f
+        };
+        stabilizeResources.Considerations.Add(new LowStoneStockConsideration(threshold: 8));
+        stabilizeResources.Considerations.Add(new InvertedConsideration(new LowFoodStockConsideration()));
+        goals.Add(stabilizeResources);
 
         return goals;
     }

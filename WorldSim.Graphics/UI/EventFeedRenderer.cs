@@ -5,13 +5,12 @@ namespace WorldSim.Graphics.UI;
 
 public sealed class EventFeedRenderer
 {
-    public int Draw(SpriteBatch spriteBatch, SpriteFont font, IReadOnlyList<string> events, int startY, HudTheme theme)
+    public int Draw(SpriteBatch spriteBatch, SpriteFont font, IReadOnlyList<string> events, int startX, int startY, int maxWidth, HudTheme theme)
     {
         var y = startY;
         foreach (var evt in events)
         {
-            spriteBatch.DrawString(font, $"Event: {evt}", new Vector2(10, y), theme.EventText);
-            y += 18;
+            y = TextWrap.DrawWrapped(spriteBatch, font, $"Event: {evt}", new Vector2(startX, y), theme.EventText, maxWidth, 18);
         }
 
         return y;

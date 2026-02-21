@@ -3,25 +3,35 @@ namespace WorldSim.AI;
 public sealed class SimplePlanner : IPlanner
 {
     private Goal? _goal;
+    public string Name => "Simple";
 
     public void SetGoal(Goal goal)
     {
         _goal = goal;
     }
 
-    public NpcCommand GetNextCommand(in NpcAiContext context)
+    public PlannerDecision GetNextCommand(in NpcAiContext context)
     {
         if (_goal == null)
-            return NpcCommand.Idle;
+            return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>());
 
-        return _goal.Name switch
+        var command = _goal.Name switch
         {
             "GatherWood" => NpcCommand.GatherWood,
             "GatherStone" => NpcCommand.GatherStone,
+            "SecureFood" => context.Hunger >= 68f && context.HomeFood > 0 ? NpcCommand.EatFood : NpcCommand.GatherFood,
+            "RecoverStamina" => NpcCommand.Rest,
+            "StabilizeResources" => NpcCommand.GatherStone,
+            "ExpandHousing" => context.HomeWood >= context.HouseWoodCost ? NpcCommand.BuildHouse : NpcCommand.GatherWood,
             "BuildHouse" => context.HomeWood >= context.HouseWoodCost
                 ? NpcCommand.BuildHouse
                 : NpcCommand.GatherWood,
             _ => NpcCommand.Idle
         };
+
+        if (command == NpcCommand.Idle)
+            return new PlannerDecision(command, 0, Array.Empty<NpcCommand>());
+
+        return new PlannerDecision(command, 1, new[] { command });
     }
 }

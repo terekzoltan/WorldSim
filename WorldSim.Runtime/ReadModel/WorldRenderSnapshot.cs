@@ -32,11 +32,19 @@ public enum SeasonView
     Winter
 }
 
+public enum SpecializedBuildingKindView
+{
+    FarmPlot,
+    Workshop,
+    Storehouse
+}
+
 public sealed record WorldRenderSnapshot(
     int Width,
     int Height,
     IReadOnlyList<TileRenderData> Tiles,
     IReadOnlyList<HouseRenderData> Houses,
+    IReadOnlyList<SpecializedBuildingRenderData> SpecializedBuildings,
     IReadOnlyList<PersonRenderData> People,
     IReadOnlyList<AnimalRenderData> Animals,
     IReadOnlyList<ColonyHudData> Colonies,
@@ -49,6 +57,8 @@ public sealed record WorldRenderSnapshot(
 public sealed record TileRenderData(int X, int Y, TileGroundView Ground, ResourceView NodeType, int NodeAmount);
 
 public sealed record HouseRenderData(int X, int Y, int ColonyId);
+
+public sealed record SpecializedBuildingRenderData(int X, int Y, int ColonyId, SpecializedBuildingKindView Kind);
 
 public sealed record PersonRenderData(int X, int Y, int ColonyId);
 
@@ -64,7 +74,16 @@ public sealed record ColonyHudData(
     int Iron,
     int Gold,
     int Houses,
+    int FarmPlots,
+    int Workshops,
+    int Storehouses,
+    int ToolCharges,
     int People,
+    float FoodPerPerson,
+    int DeathsOldAge,
+    int DeathsStarvation,
+    int DeathsPredator,
+    int DeathsOther,
     float AverageHunger,
     float AverageStamina,
     string ProfessionSummary
@@ -83,5 +102,7 @@ public sealed record EcoHudData(
     int DeathsStarvation,
     int DeathsPredator,
     int DeathsOther,
-    bool PredatorHumanAttacksEnabled
+    bool PredatorHumanAttacksEnabled,
+    float AverageFoodPerPerson,
+    int ColoniesInFoodEmergency
 );

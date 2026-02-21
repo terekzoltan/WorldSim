@@ -6,10 +6,18 @@ using WorldSim.Runtime.ReadModel;
 
 namespace WorldSim.Graphics.Rendering;
 
-public sealed class ActorRenderPass
+public sealed class ActorRenderPass : IRenderPass
 {
-    public void Draw(SpriteBatch spriteBatch, WorldRenderSnapshot snapshot, TextureCatalog textures, WorldRenderSettings settings, WorldRenderTheme theme)
+    public string Name => "Actors";
+
+    public void Draw(in RenderFrameContext context)
     {
+        var spriteBatch = context.SpriteBatch;
+        var snapshot = context.Snapshot;
+        var textures = context.Textures;
+        var settings = context.Settings;
+        var theme = context.Theme;
+
         DrawPeople(spriteBatch, snapshot, textures, settings);
         DrawAnimals(spriteBatch, snapshot, textures, settings, theme);
     }

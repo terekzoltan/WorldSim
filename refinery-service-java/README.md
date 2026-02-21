@@ -171,6 +171,16 @@ Package root: `hu.zoltanterek.worldsim.refinery`
   - `cost.research` is repaired to `80` if missing or non-positive.
 - Non-`addTech` operations under `TECH_TREE_PATCH` are rejected by this slice.
 
+### Season Director next slice (planned)
+
+- Planned Track D direction is a checkpoint-based Season Director goal that can emit:
+  - `story beat`
+  - `planner nudge`
+- Planned output gating modes: `both`, `story_only`, `nudge_only`, `off`.
+- LLM stage remains optional; formal Refinery gate remains mandatory for accepted output in director pipeline mode.
+- Detailed implementation plan is documented in:
+  - `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`
+
 ## Fixtures for integration tests
 
 - Fixture folder: `refinery-service-java/examples/`

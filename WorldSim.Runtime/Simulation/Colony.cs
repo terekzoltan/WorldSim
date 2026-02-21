@@ -36,9 +36,22 @@ namespace WorldSim.Simulation
         public float Morale { get; private set; } = 55f;
         public float WoodGatherMultiplier { get; private set; } = 1f;
         public float StoneGatherMultiplier { get; private set; } = 1f;
+        public float IronGatherMultiplier { get; private set; } = 1f;
+        public float GoldGatherMultiplier { get; private set; } = 1f;
         public float FoodGatherMultiplier { get; private set; } = 1f;
+        public float ColonyWorkMultiplier { get; private set; } = 1f;
+        public int FoodReserveBonus { get; private set; }
+        public int ToolCharges { get; set; }
+        public int FarmPlotCount { get; private set; }
+        public int WorkshopCount { get; private set; }
+        public int StorehouseCount { get; private set; }
 
         float _age;
+        readonly float _baseWoodGatherMultiplier = 1f;
+        readonly float _baseStoneGatherMultiplier = 1f;
+        readonly float _baseIronGatherMultiplier = 1f;
+        readonly float _baseGoldGatherMultiplier = 1f;
+        readonly float _baseFoodGatherMultiplier = 1f;
 
         public Colony(int id, (int, int) startPos)
         {
@@ -61,9 +74,34 @@ namespace WorldSim.Simulation
                     break;
                 case Faction.Obsidari:
                     StoneGatherMultiplier = 1.2f;
+                    IronGatherMultiplier = 1.1f;
                     WoodGatherMultiplier = 0.95f;
                     break;
             }
+
+            _baseWoodGatherMultiplier = WoodGatherMultiplier;
+            _baseStoneGatherMultiplier = StoneGatherMultiplier;
+            _baseIronGatherMultiplier = IronGatherMultiplier;
+            _baseGoldGatherMultiplier = GoldGatherMultiplier;
+            _baseFoodGatherMultiplier = FoodGatherMultiplier;
+        }
+
+        public void UpdateInfrastructure(int farms, int workshops, int storehouses)
+        {
+            FarmPlotCount = Math.Max(0, farms);
+            WorkshopCount = Math.Max(0, workshops);
+            StorehouseCount = Math.Max(0, storehouses);
+
+            var farmBonus = FarmPlotCount * 0.08f;
+            var workshopGatherBonus = WorkshopCount * 0.05f;
+
+            FoodGatherMultiplier = _baseFoodGatherMultiplier + farmBonus + workshopGatherBonus;
+            WoodGatherMultiplier = _baseWoodGatherMultiplier + workshopGatherBonus;
+            StoneGatherMultiplier = _baseStoneGatherMultiplier + workshopGatherBonus;
+            IronGatherMultiplier = _baseIronGatherMultiplier + workshopGatherBonus;
+            GoldGatherMultiplier = _baseGoldGatherMultiplier + workshopGatherBonus;
+            ColonyWorkMultiplier = 1f + WorkshopCount * 0.08f;
+            FoodReserveBonus = StorehouseCount * 6;
         }
 
         public void Update(World world, float dt)

@@ -6,23 +6,20 @@ namespace WorldSim.Graphics.UI;
 
 public sealed class EcologyPanelRenderer
 {
-    public int Draw(SpriteBatch spriteBatch, SpriteFont font, WorldRenderSnapshot snapshot, int startY, HudTheme theme)
+    public int Draw(SpriteBatch spriteBatch, SpriteFont font, WorldRenderSnapshot snapshot, int startX, int startY, int maxWidth, HudTheme theme)
     {
         var y = startY;
 
         var worldLine = $"Season: {snapshot.CurrentSeason} | Drought: {(snapshot.IsDroughtActive ? "ON" : "off")}";
-        spriteBatch.DrawString(font, worldLine, new Vector2(10, y), theme.AccentText);
-        y += 20;
+        y = TextWrap.DrawWrapped(spriteBatch, font, worldLine, new Vector2(startX, y), theme.AccentText, maxWidth, 20);
 
         var ecoLine =
-            $"Eco: Herb {snapshot.Ecology.Herbivores}, Pred {snapshot.Ecology.Predators}, FoodNodes {snapshot.Ecology.ActiveFoodNodes}, FoodRegrow {snapshot.Ecology.DepletedFoodNodes}, CriticalHungry {snapshot.Ecology.CriticalHungry}, StuckFix {snapshot.Ecology.AnimalStuckRecoveries}, PredDeaths {snapshot.Ecology.PredatorDeaths}, PredHits {snapshot.Ecology.PredatorHumanHits}";
-        spriteBatch.DrawString(font, ecoLine, new Vector2(10, y), theme.SecondaryText);
-        y += 20;
+            $"Eco: Herb {snapshot.Ecology.Herbivores}, Pred {snapshot.Ecology.Predators}, FoodNodes {snapshot.Ecology.ActiveFoodNodes}, FoodRegrow {snapshot.Ecology.DepletedFoodNodes}, CriticalHungry {snapshot.Ecology.CriticalHungry}, AvgFoodPerPerson {snapshot.Ecology.AverageFoodPerPerson:0.0}, EmergencyCols {snapshot.Ecology.ColoniesInFoodEmergency}, StuckFix {snapshot.Ecology.AnimalStuckRecoveries}, PredDeaths {snapshot.Ecology.PredatorDeaths}, PredHits {snapshot.Ecology.PredatorHumanHits}";
+        y = TextWrap.DrawWrapped(spriteBatch, font, ecoLine, new Vector2(startX, y), theme.SecondaryText, maxWidth, 20);
 
         var deathLine =
             $"Deaths: Age {snapshot.Ecology.DeathsOldAge}, Starv {snapshot.Ecology.DeathsStarvation}, Pred {snapshot.Ecology.DeathsPredator}, Other {snapshot.Ecology.DeathsOther} | Pred->Human {(snapshot.Ecology.PredatorHumanAttacksEnabled ? "ON" : "off")}";
-        spriteBatch.DrawString(font, deathLine, new Vector2(10, y), theme.SecondaryText);
-        y += 20;
+        y = TextWrap.DrawWrapped(spriteBatch, font, deathLine, new Vector2(startX, y), theme.SecondaryText, maxWidth, 20);
 
         return y;
     }

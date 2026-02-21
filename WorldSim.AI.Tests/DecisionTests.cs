@@ -26,8 +26,11 @@ public class DecisionTests
         var context = new NpcAiContext(
             SimulationTimeSeconds: 1f,
             Hunger: 20f,
+            Stamina: 70f,
             HomeWood: 0,
             HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
             HomeFood: 0,
             HomeHouseCount: 1,
             HouseWoodCost: 50,
@@ -37,9 +40,9 @@ public class DecisionTests
             CanBuildWithStone: false,
             HouseStoneCost: 100);
 
-        var command = planner.GetNextCommand(context);
+        var decision = planner.GetNextCommand(context);
 
-        Assert.Equal(NpcCommand.GatherWood, command);
+        Assert.Equal(NpcCommand.GatherWood, decision.Command);
     }
 
     [Fact]
@@ -68,8 +71,11 @@ public class DecisionTests
         var context = new NpcAiContext(
             SimulationTimeSeconds: 3f,
             Hunger: 10f,
+            Stamina: 90f,
             HomeWood: 80,
             HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
             HomeFood: 3,
             HomeHouseCount: 1,
             HouseWoodCost: 50,
@@ -79,8 +85,10 @@ public class DecisionTests
             CanBuildWithStone: false,
             HouseStoneCost: 100);
 
-        var command = brain.Think(context);
+        var result = brain.Think(context);
 
-        Assert.Equal(NpcCommand.BuildHouse, command);
+        Assert.Equal(NpcCommand.BuildHouse, result.Command);
+        Assert.Equal("Goap", result.Trace.PlannerName);
+        Assert.NotEmpty(result.Trace.GoalScores);
     }
 }

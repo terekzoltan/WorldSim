@@ -4,7 +4,19 @@ using System.Linq;
 
 namespace WorldSim.Simulation;
 
-public enum Job { Idle, GatherWood, GatherStone, GatherFood, EatFood, Rest, BuildHouse }
+public enum Job
+{
+    Idle,
+    GatherWood,
+    GatherStone,
+    GatherIron,
+    GatherGold,
+    GatherFood,
+    EatFood,
+    Rest,
+    BuildHouse,
+    CraftTools
+}
 public enum Profession { Generalist, Lumberjack, Miner, Farmer, Hunter, Builder }
 public enum PersonDeathReason { None, OldAge, Starvation, Predator, Other }
 
@@ -33,14 +45,19 @@ public class Person
     public HashSet<string> Traits { get; } = new();
 
     // Utility/GOAP AI via runtime adapter boundary
-    private readonly RuntimeNpcBrain _brain = new();
+    private readonly RuntimeNpcBrain _brain;
+    internal RuntimeAiDecision? LastAiDecision => _brain.LastDecision;
 
     const int WoodWorkTime = 5;
     const int StoneWorkTime = 8;
+    const int IronWorkTime = 10;
+    const int GoldWorkTime = 12;
     const int FoodWorkTime = 4;
     const int EatWorkTime = 2;
     const int RestWorkTime = 4;
     const int BuildHouseTime = 20;
+    const int CraftToolsTime = 14;
+    const float AgingTickDivisor = 90f;
 
     int _doingJob = 0; // csinalni hogy ideig dolgozzon ne instant
 
@@ -49,9 +66,10 @@ public class Person
     float _loiterThresholdSeconds; // randomized per person
     (int x, int y) _lastPos;
 
-    private Person(Colony home, (int, int) pos, bool newborn)
+    private Person(Colony home, (int, int) pos, bool newborn, RuntimeNpcBrain brain)
     {
         _home = home;
+        _brain = brain;
         Pos = pos;
         _lastPos = pos;
         Strength = _rng.Next(3, 11);
@@ -67,12 +85,12 @@ public class Person
         _loiterThresholdSeconds = 2.5f + (float)_rng.NextDouble() * 2.5f; // 2.5..5.0s
     }
 
-    public static Person Spawn(Colony home, (int, int) pos)
-        => new Person(home, pos, newborn: false);
+    public static Person Spawn(Colony home, (int, int) pos, RuntimeNpcBrain brain)
+        => new Person(home, pos, newborn: false, brain);
 
-    public static Person SpawnWithBonus(Colony home, (int, int) pos, World world)
+    public static Person SpawnWithBonus(Colony home, (int, int) pos, World world, RuntimeNpcBrain brain)
     {
-        var person = new Person(home, pos, newborn: true);
+        var person = new Person(home, pos, newborn: true, brain);
         person.Strength = Math.Min(20, person.Strength + world.StrengthBonus);
         person.Intelligence = Math.Min(20, person.Intelligence + world.IntelligenceBonus);
         person.Health += world.HealthBonus;
@@ -151,7 +169,7 @@ public class Person
         // perception step
         Perceive(w);
 
-        Age += dt / 10;
+        Age += dt / AgingTickDivisor;
         if (Age > w.MaxAge)
         {
             LastDeathReason = PersonDeathReason.OldAge;
@@ -160,7 +178,7 @@ public class Person
 
         // Needs időbeli változása
         if (Needs.TryGetValue("Hunger", out var h))
-            Needs["Hunger"] = Math.Clamp(h + dt * 1.8f, 0f, 100f);
+            Needs["Hunger"] = Math.Clamp(h + dt * 1.65f, 0f, 100f);
 
         if (Current == Job.Idle)
             Stamina = Math.Clamp(Stamina + dt * 2.2f, 0f, 100f);
@@ -169,9 +187,9 @@ public class Person
 
         float hunger = Needs.GetValueOrDefault("Hunger", 0f);
         if (hunger >= 95f)
-            Health -= dt * 3.0f;
+            Health -= dt * 2.6f;
         else if (hunger >= 85f)
-            Health -= dt * 1.4f;
+            Health -= dt * 1.2f;
 
         if (Health <= 0f)
         {
@@ -203,18 +221,24 @@ public class Person
 
         // simple reproduction chance if there is housing capacity
         int colonyPop = w._people.Count(p => p.Home == _home);
+        int colonyFoodStock = _home.Stock[Resource.Food];
         int capacity = _home.HouseCount * w.HouseCapacity;
         int adultsInColony = w._people.Count(p => p.Home == _home && p.Age >= 18f && p.Health > 0f);
         bool hasHousingRoom = colonyPop < capacity;
-        bool socialGate = adultsInColony >= 2 && _home.Morale >= 28f;
-        if (Age >= 18 && Age <= 60 && hasHousingRoom && socialGate && _rng.NextDouble() < (0.001 * w.BirthRateMultiplier))
+        bool recoveryMode = colonyPop < 8 && hasHousingRoom && colonyFoodStock >= Math.Max(4, colonyPop / 2 + 2);
+        bool socialGate = adultsInColony >= 2 && (_home.Morale >= 28f || (recoveryMode && _home.Morale >= 20f));
+        double birthChance = 0.001 * w.BirthRateMultiplier;
+        if (recoveryMode)
+            birthChance *= colonyPop <= 4 ? 3.2 : 2.1;
+
+        if (Age >= 18 && Age <= 60 && hasHousingRoom && socialGate && _rng.NextDouble() < birthChance)
         {
-            births.Add(Person.SpawnWithBonus(_home, Pos, w));
+            births.Add(Person.SpawnWithBonus(_home, Pos, w, w.CreateNpcBrain(_home)));
         }
 
-        int colonyFoodStock = _home.Stock[Resource.Food];
-        bool emergencyFood = colonyFoodStock <= Math.Max(5, colonyPop + 1);
-        bool veryLowFood = colonyFoodStock <= Math.Max(2, colonyPop / 2);
+        int reserveBonus = _home.FoodReserveBonus;
+        bool emergencyFood = colonyFoodStock <= Math.Max(5 + reserveBonus, colonyPop + 1 + reserveBonus);
+        bool veryLowFood = colonyFoodStock <= Math.Max(2 + reserveBonus / 2, colonyPop / 2 + reserveBonus / 2);
 
         if (_doingJob > 0 && Current != Job.Idle)
         {
@@ -231,6 +255,7 @@ public class Person
                             _home.Stock[Resource.Wood] += GetGatherAmount(Resource.Wood, w.WoodYield);
                         else
                             Wander(w);
+                        TryConsumeToolCharge();
                         break;
 
                     case Job.GatherStone:
@@ -238,6 +263,23 @@ public class Person
                             _home.Stock[Resource.Stone] += GetGatherAmount(Resource.Stone, w.StoneYield);
                         else
                             Wander(w);
+                        TryConsumeToolCharge();
+                        break;
+
+                    case Job.GatherIron:
+                        if (w.TryHarvest(Pos, Resource.Iron, 1))
+                            _home.Stock[Resource.Iron] += GetGatherAmount(Resource.Iron, w.IronYield);
+                        else
+                            Wander(w);
+                        TryConsumeToolCharge();
+                        break;
+
+                    case Job.GatherGold:
+                        if (w.TryHarvest(Pos, Resource.Gold, 1))
+                            _home.Stock[Resource.Gold] += GetGatherAmount(Resource.Gold, w.GoldYield);
+                        else
+                            Wander(w);
+                        TryConsumeToolCharge();
                         break;
 
                     case Job.BuildHouse:
@@ -257,6 +299,16 @@ public class Person
                                 _home.HouseCount++;
                                 w.AddHouse(_home, Pos);
                             }
+                        }
+                        TryConsumeToolCharge();
+                        break;
+
+                    case Job.CraftTools:
+                        if (_home.Stock[Resource.Wood] >= 2 && _home.Stock[Resource.Iron] >= 2)
+                        {
+                            _home.Stock[Resource.Wood] -= 2;
+                            _home.Stock[Resource.Iron] -= 2;
+                            _home.ToolCharges += 8 + _home.WorkshopCount * 2;
                         }
                         break;
 
@@ -301,7 +353,7 @@ public class Person
                 return true;
             }
 
-            float eatThreshold = emergencyFood ? 64f : 70f;
+            float eatThreshold = emergencyFood ? 60f : 66f;
             if (localHunger >= eatThreshold && _home.Stock[Resource.Food] > 0)
             {
                 Current = Job.EatFood;
@@ -311,7 +363,7 @@ public class Person
                 return true;
             }
 
-            float gatherFoodThreshold = emergencyFood ? 48f : 55f;
+            float gatherFoodThreshold = emergencyFood ? 45f : 52f;
             if (localHunger >= gatherFoodThreshold)
             {
                 var hereFood = w.GetTile(Pos.x, Pos.y).Node;
@@ -367,10 +419,26 @@ public class Person
                     _lastPos = Pos;
                     return true;
                 }
+                if (hereNode.Type == Resource.Iron)
+                {
+                    Current = Job.GatherIron;
+                    _doingJob = ComputeTicks(IronWorkTime, w, isHeavyWork: true);
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
+                if (hereNode.Type == Resource.Gold)
+                {
+                    Current = Job.GatherGold;
+                    _doingJob = ComputeTicks(GoldWorkTime, w, isHeavyWork: true);
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
             }
 
             // 2) Move one step toward nearest resource in small radius
-            if (TryMoveTowardsNearestResource(w, searchRadius: 2, Resource.Wood, Resource.Stone))
+            if (TryMoveTowardsNearestResource(w, searchRadius: 2, Resource.Wood, Resource.Stone, Resource.Iron, Resource.Gold))
             {
                 _idleTimeSeconds = 0f; // movement → not idle
                 _lastPos = Pos;
@@ -386,10 +454,13 @@ public class Person
                 {
                     Job.GatherWood  => Math.Max(1, (int)MathF.Ceiling(WoodWorkTime  / w.WorkEfficiencyMultiplier)),
                     Job.GatherStone => Math.Max(1, (int)MathF.Ceiling(StoneWorkTime / w.WorkEfficiencyMultiplier)),
+                    Job.GatherIron  => Math.Max(1, (int)MathF.Ceiling(IronWorkTime / w.WorkEfficiencyMultiplier)),
+                    Job.GatherGold  => Math.Max(1, (int)MathF.Ceiling(GoldWorkTime / w.WorkEfficiencyMultiplier)),
                     Job.GatherFood  => ComputeTicks(FoodWorkTime, w, isHeavyWork: true),
                     Job.EatFood     => ComputeTicks(EatWorkTime, w, isHeavyWork: false),
                     Job.Rest        => ComputeTicks(RestWorkTime, w, isHeavyWork: false),
                     Job.BuildHouse  => Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier)),
+                    Job.CraftTools  => ComputeTicks(CraftToolsTime, w, isHeavyWork: true),
                     _ => 0
                 };
                 _idleTimeSeconds = 0f;
@@ -423,12 +494,14 @@ public class Person
             Profession.Builder when baseTicks == BuildHouseTime => 1.18f,
             Profession.Farmer when baseTicks == FoodWorkTime => 1.16f,
             Profession.Lumberjack when baseTicks == WoodWorkTime => 1.15f,
-            Profession.Miner when baseTicks == StoneWorkTime => 1.15f,
+            Profession.Miner when baseTicks == StoneWorkTime || baseTicks == IronWorkTime || baseTicks == GoldWorkTime => 1.15f,
             Profession.Hunter when baseTicks == FoodWorkTime => 1.08f,
             _ => 1f
         };
 
-        float effectiveSpeed = Math.Max(0.2f, w.WorkEfficiencyMultiplier * staminaFactor * professionSpeed);
+        float toolSpeed = _home.ToolCharges > 0 ? 1.08f : 1f;
+
+        float effectiveSpeed = Math.Max(0.2f, w.WorkEfficiencyMultiplier * _home.ColonyWorkMultiplier * staminaFactor * professionSpeed * toolSpeed);
         return Math.Max(1, (int)MathF.Ceiling(baseTicks / effectiveSpeed));
     }
 
@@ -438,6 +511,8 @@ public class Person
         {
             Resource.Wood => _home.WoodGatherMultiplier,
             Resource.Stone => _home.StoneGatherMultiplier,
+            Resource.Iron => _home.IronGatherMultiplier,
+            Resource.Gold => _home.GoldGatherMultiplier,
             Resource.Food => _home.FoodGatherMultiplier,
             _ => 1f
         };
@@ -446,6 +521,8 @@ public class Person
         {
             (Resource.Wood, Profession.Lumberjack) => 1.22f,
             (Resource.Stone, Profession.Miner) => 1.22f,
+            (Resource.Iron, Profession.Miner) => 1.2f,
+            (Resource.Gold, Profession.Miner) => 1.14f,
             (Resource.Food, Profession.Farmer) => 1.2f,
             (Resource.Food, Profession.Hunter) => 1.12f,
             _ => 1f
@@ -459,6 +536,13 @@ public class Person
         switch (Profession)
         {
             case Profession.Builder:
+                if (_home.ToolCharges <= 2 && _home.Stock[Resource.Iron] >= 2 && _home.Stock[Resource.Wood] >= 2)
+                {
+                    Current = Job.CraftTools;
+                    _doingJob = ComputeTicks(CraftToolsTime, w, isHeavyWork: true);
+                    return true;
+                }
+
                 if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost / 2)
                 {
                     Current = Job.BuildHouse;
@@ -471,7 +555,14 @@ public class Person
                     return true;
                 break;
             case Profession.Miner:
-                if (TryMoveTowardsNearestResource(w, searchRadius: 4, Resource.Stone))
+                if (_home.ToolCharges <= 1 && _home.Stock[Resource.Iron] >= 2 && _home.Stock[Resource.Wood] >= 2)
+                {
+                    Current = Job.CraftTools;
+                    _doingJob = ComputeTicks(CraftToolsTime, w, isHeavyWork: true);
+                    return true;
+                }
+
+                if (TryMoveTowardsNearestResource(w, searchRadius: 5, Resource.Iron, Resource.Gold, Resource.Stone))
                     return true;
                 break;
             case Profession.Farmer:
@@ -488,6 +579,12 @@ public class Person
         }
 
         return false;
+    }
+
+    void TryConsumeToolCharge()
+    {
+        if (_home.ToolCharges > 0)
+            _home.ToolCharges--;
     }
 
     public void ApplyDamage(float amount, string source)
@@ -581,6 +678,16 @@ public class Person
             {
                 Current = Job.GatherFood;
                 _doingJob = ComputeTicks(FoodWorkTime, w, isHeavyWork: true);
+            }
+            else if (bestType == Resource.Iron)
+            {
+                Current = Job.GatherIron;
+                _doingJob = ComputeTicks(IronWorkTime, w, isHeavyWork: true);
+            }
+            else if (bestType == Resource.Gold)
+            {
+                Current = Job.GatherGold;
+                _doingJob = ComputeTicks(GoldWorkTime, w, isHeavyWork: true);
             }
             return true;
         }

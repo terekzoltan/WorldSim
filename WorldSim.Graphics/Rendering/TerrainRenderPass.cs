@@ -1,13 +1,20 @@
 using Microsoft.Xna.Framework.Graphics;
-using WorldSim.Graphics.Assets;
 using WorldSim.Runtime.ReadModel;
 
 namespace WorldSim.Graphics.Rendering;
 
-public sealed class TerrainRenderPass
+public sealed class TerrainRenderPass : IRenderPass
 {
-    public void Draw(SpriteBatch spriteBatch, WorldRenderSnapshot snapshot, TextureCatalog textures, WorldRenderSettings settings, WorldRenderTheme theme)
+    public string Name => "Terrain";
+
+    public void Draw(in RenderFrameContext context)
     {
+        var spriteBatch = context.SpriteBatch;
+        var snapshot = context.Snapshot;
+        var textures = context.Textures;
+        var settings = context.Settings;
+        var theme = context.Theme;
+
         foreach (var tile in snapshot.Tiles)
         {
             var color = tile.Ground switch

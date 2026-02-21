@@ -39,6 +39,14 @@ public static class WorldSnapshotBuilder
             .Select(h => new HouseRenderData(h.Pos.x, h.Pos.y, h.Owner.Id))
             .ToList();
 
+        var specializedBuildings = world.SpecializedBuildings
+            .Select(b => new SpecializedBuildingRenderData(
+                b.Pos.x,
+                b.Pos.y,
+                b.Owner.Id,
+                MapSpecializedBuildingKind(b.Kind)))
+            .ToList();
+
         var people = world._people
             .Select(p => new PersonRenderData(p.Pos.x, p.Pos.y, p.Home.Id))
             .ToList();
@@ -57,6 +65,8 @@ public static class WorldSnapshotBuilder
                 var avgStamina = colonyPeople.Count == 0
                     ? 0f
                     : colonyPeople.Average(p => p.Stamina);
+                var foodPerPerson = colony.Stock[Resource.Food] / (float)Math.Max(1, colonyPeople.Count);
+                var deathStats = world.GetColonyDeathStats(colony.Id);
                 var profSummary = string.Join(",", colonyPeople
                     .Where(p => p.Age >= 16f)
                     .GroupBy(p => p.Profession)
@@ -74,7 +84,16 @@ public static class WorldSnapshotBuilder
                     colony.Stock[Resource.Iron],
                     colony.Stock[Resource.Gold],
                     colony.HouseCount,
+                    colony.FarmPlotCount,
+                    colony.WorkshopCount,
+                    colony.StorehouseCount,
+                    colony.ToolCharges,
                     colonyPeople.Count,
+                    foodPerPerson,
+                    deathStats.OldAge,
+                    deathStats.Starvation,
+                    deathStats.Predator,
+                    deathStats.Other,
                     avgHunger,
                     avgStamina,
                     profSummary
@@ -95,7 +114,9 @@ public static class WorldSnapshotBuilder
             world.TotalDeathsStarvation,
             world.TotalDeathsPredator,
             world.TotalDeathsOther,
-            world.EnablePredatorHumanAttacks
+            world.EnablePredatorHumanAttacks,
+            ComputeAverageFoodPerPerson(world),
+            world._colonies.Count(c => c.Stock[Resource.Food] <= Math.Max(3, world._people.Count(p => p.Home == c && p.Health > 0f) / 2))
         );
 
         return new WorldRenderSnapshot(
@@ -103,6 +124,7 @@ public static class WorldSnapshotBuilder
             world.Height,
             tiles,
             houses,
+            specializedBuildings,
             people,
             animals,
             colonies,
@@ -144,4 +166,21 @@ public static class WorldSnapshotBuilder
         Season.Winter => SeasonView.Winter,
         _ => SeasonView.Spring
     };
+
+    private static SpecializedBuildingKindView MapSpecializedBuildingKind(SpecializedBuildingKind kind) => kind switch
+    {
+        SpecializedBuildingKind.Workshop => SpecializedBuildingKindView.Workshop,
+        SpecializedBuildingKind.Storehouse => SpecializedBuildingKindView.Storehouse,
+        _ => SpecializedBuildingKindView.FarmPlot
+    };
+
+    private static float ComputeAverageFoodPerPerson(World world)
+    {
+        int livingPeople = world._people.Count(p => p.Health > 0f);
+        if (livingPeople == 0)
+            return 0f;
+
+        int totalFood = world._colonies.Sum(c => c.Stock[Resource.Food]);
+        return totalFood / (float)livingPeople;
+    }
 }

@@ -77,12 +77,38 @@ public class PatchCommandTranslationTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => executor.Execute(runtime, commands));
         Assert.Contains("unknown techId", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("loadedTechCount=", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Runtime_LoadsKnownTechs_FromTechnologiesJson()
+    {
+        var runtime = CreateRuntime();
+
+        Assert.True(runtime.LoadedTechCount > 0);
+        Assert.True(runtime.IsKnownTech("agriculture"));
     }
 
     private static SimulationRuntime CreateRuntime()
     {
-        var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+        var repoRoot = FindRepoRoot();
         var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
         return new SimulationRuntime(32, 32, 10, techPath);
+    }
+
+    private static string FindRepoRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var techPath = Path.Combine(current.FullName, "Tech", "technologies.json");
+            if (File.Exists(techPath))
+            {
+                return current.FullName;
+            }
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not locate repository root containing Tech/technologies.json");
     }
 }

@@ -4,79 +4,113 @@
       "id": "woodcutting",
       "name": "Efficient Woodcutting",
       "description": "Gathering wood yields one extra wood.",
-      "effect": "extra_wood"
+      "effect": "extra_wood",
+      "prerequisites": [],
+      "cost": { "wood": 18 }
     },
     {
       "id": "construction",
       "name": "Improved Construction",
       "description": "Houses cost half as much wood.",
-      "effect": "cheap_houses"
+      "effect": "cheap_houses",
+      "prerequisites": ["woodcutting"],
+      "cost": { "wood": 24, "stone": 8 }
     },
     {
       "id": "mining",
       "name": "Advanced Mining",
-      "description": "Increases stone gathering efficiency and yields.",
-      "effect": "better_mining"
+      "description": "Increases stone and iron gathering efficiency and yields.",
+      "effect": "better_mining",
+      "prerequisites": ["woodcutting"],
+      "cost": { "stone": 20, "wood": 10 }
     },
     {
       "id": "agriculture",
       "name": "Agricultural Techniques",
       "description": "Improves food production and crop yields.",
-      "effect": "better_farming"
+      "effect": "better_farming",
+      "prerequisites": ["woodcutting"],
+      "cost": { "wood": 14, "stone": 6 }
     },
     {
       "id": "medicine",
       "name": "Basic Medicine",
       "description": "Increases population health and lifespan.",
-      "effect": "health_boost"
+      "effect": "health_boost",
+      "prerequisites": ["agriculture"],
+      "cost": { "food": 18, "wood": 12 }
     },
     {
       "id": "tools",
       "name": "Metal Tools",
       "description": "Workers are more efficient at all tasks.",
-      "effect": "work_efficiency"
+      "effect": "work_efficiency",
+      "prerequisites": ["mining"],
+      "cost": { "iron": 16, "wood": 14 }
     },
     {
       "id": "housing",
       "name": "Dense Housing",
       "description": "Houses can accommodate more people.",
-      "effect": "more_capacity"
+      "effect": "more_capacity",
+      "prerequisites": ["construction"],
+      "cost": { "wood": 20, "stone": 10 }
     },
     {
       "id": "logistics",
       "name": "Improved Logistics",
       "description": "Resources are shared more efficiently between colonies.",
-      "effect": "resource_sharing"
+      "effect": "resource_sharing",
+      "prerequisites": ["construction", "agriculture"],
+      "cost": { "wood": 16, "stone": 16, "gold": 4 }
     },
     {
       "id": "education",
       "name": "Education System",
       "description": "Increases intelligence of new births.",
-      "effect": "smarter_people"
+      "effect": "smarter_people",
+      "prerequisites": ["housing"],
+      "cost": { "wood": 14, "stone": 10, "food": 10 }
     },
     {
       "id": "fitness",
       "name": "Physical Training",
       "description": "Increases strength of new births.",
-      "effect": "stronger_people"
+      "effect": "stronger_people",
+      "prerequisites": ["housing"],
+      "cost": { "food": 12, "stone": 10 }
     },
     {
       "id": "exploration",
       "name": "Exploration Techniques",
       "description": "People move faster and discover resources more efficiently.",
-      "effect": "faster_movement"
+      "effect": "faster_movement",
+      "prerequisites": ["tools"],
+      "cost": { "wood": 12, "iron": 10 }
     },
     {
       "id": "demographics",
       "name": "Population Management",
       "description": "Increases birth rates in suitable conditions.",
-      "effect": "higher_birthrate"
+      "effect": "higher_birthrate",
+      "prerequisites": ["medicine", "housing"],
+      "cost": { "food": 16, "wood": 10 }
     },
     {
       "id": "masonry",
       "name": "Stone Masonry",
       "description": "Enables building with stone for more durable structures.",
-      "effect": "stone_buildings"
+      "effect": "stone_buildings",
+      "prerequisites": ["mining", "construction"],
+      "cost": { "stone": 24, "wood": 8 }
+    },
+    {
+      "id": "trade_charters",
+      "name": "Trade Charters",
+      "description": "Turns surplus gold into demographic and morale momentum.",
+      "effect": "golden_trade",
+      "prerequisites": ["logistics", "tools"],
+      "cost": { "gold": 12, "wood": 8 }
     }
   ]
 }

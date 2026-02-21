@@ -116,6 +116,9 @@ Scope:
 - `Game1` draw/update vizualis reszeinek kiszervezese `WorldSim.Graphics` ala.
 - Kamera, render pass-ok, HUD, tech menu overlay.
 
+Detailed execution plan:
+- `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md`
+
 Deliverable:
 - `GameHost` csak host legyen; render logika kulon osztalyokban.
 
@@ -167,6 +170,21 @@ Definition of Done:
 - Fixture es live mod parity mukodik.
 - Unknown op/tech kezelese determinisztikus hibaval tortenik.
 
+Current Track D focus (Season Director program):
+- Director checkpoint alapu beavatkozas (nem per-frame AI): seasononkent / X tick alapjan.
+- Egy snapshotbol ket kimenet: `story beat` + `planner nudge`.
+- Beat/nudge kulon-kulon kapcsolhato legyen (mindketto, csak egyik, csak masik, egyik sem).
+- LLM kreativitas kihasznalasa, de formalis Refinery gate tartja kontroll alatt a hibakat/hallucinaciot.
+
+Track D implementation plan doc:
+- `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`
+
+Track D design principles (OnlabRefinery parity):
+- Felelosseg szetvalasztas: LLM javasol, Refinery validal/repair-el, runtime csak alkalmaz.
+- Layering: Design/Model/Runtime jellegu szeparacio a director oldali formalis modellben.
+- Iterativ feedback loop: invalid candidate -> feedback -> retry -> deterministic fallback.
+- Determinisztikus output policy debugginghoz: ugyanarra a checkpoint inputra reprodukalhato eredmeny.
+
 ## Javasolt implementacios sorrend
 
 1. `WorldSim.Contracts` letrehozas (dto + versioning).
@@ -194,3 +212,17 @@ A telemetry/persistence/scenario-runner feladatok nem kulon trackkent kezeltek, 
 - Telemetry: Track A (HUD/debug overlay) + Track B (runtime counters)
 - Persistence: Track B (runtime allapot) + Track D (patch dedupe state)
 - Scenario runner/headless: Track B incremental toolkent, ha CI vagy balansz igenyli
+
+## Kozos uzenofal (cross-track notes)
+
+Cel:
+- Olyan rovid, gyakorlati megjegyzesek gyujtohelye, amik tobb tracket is erintenek.
+
+Formatum:
+- `[YYYY-MM-DD][Track] rovid cim - hatas - kovetkezo lepes`.
+
+Entries:
+- `[2026-02-21][Track D] Season Director roadmap elinditva - Runtime/Graphics/AI feladatokat is erint - reszletes terv: WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`.
+- `[2026-02-21][Track D] A Refinery hasznos mukodesehez runtime oldali director state + idozitett hatas + colony directive kell - Track B-vel osszehangolt command endpointok szuksegesek`.
+- `[2026-02-21][Track D] Graphics oldalon story beat es nudge allapot vizualizalasa szukseges (HUD/event feed), kulonben nehezen verifikalhato a checkpoint hatas`.
+- `[2026-02-21][Track D] LLM stage csak gated modban induljon (default OFF), Refinery gate maradjon kotelezo minosegkapu`.
