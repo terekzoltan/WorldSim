@@ -13,6 +13,8 @@ public sealed class TextureCatalog
     public Texture2D Gold { get; }
     public Texture2D SylvarPerson { get; }
     public Texture2D ObsidariPerson { get; }
+    public Texture2D AetheriPerson { get; }
+    public Texture2D ChiritaPerson { get; }
     public Texture2D SylvarHouse { get; }
     public Texture2D ObsidariHouse { get; }
     public Texture2D AetheriHouse { get; }
@@ -38,6 +40,8 @@ public sealed class TextureCatalog
 
         SylvarPerson = LoadOrFallback(content, "Sylvar");
         ObsidariPerson = LoadOrFallback(content, "Obsidiari");
+        AetheriPerson = LoadOrFallback(content, "Aetheri");
+        ChiritaPerson = LoadOrFallback(content, "Chirita");
 
         SylvarHouse = LoadOrFallback(content, "SylvarHouse");
         ObsidariHouse = LoadOrFallback(content, "ObsidiariHouse");
@@ -63,6 +67,8 @@ public sealed class TextureCatalog
         {
             0 => SylvarPerson,
             1 => ObsidariPerson,
+            2 => AetheriPerson,
+            3 => ChiritaPerson,
             _ => null
         };
     }

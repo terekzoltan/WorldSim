@@ -102,7 +102,10 @@ public sealed record EcoHudData(
     int DeathsStarvation,
     int DeathsPredator,
     int DeathsOther,
+    int DeathsStarvationRecent60s,
+    int DeathsStarvationWithFood,
     bool PredatorHumanAttacksEnabled,
     float AverageFoodPerPerson,
-    int ColoniesInFoodEmergency
+    int ColoniesInFoodEmergency,
+    float FoodPerPersonSpread
 );

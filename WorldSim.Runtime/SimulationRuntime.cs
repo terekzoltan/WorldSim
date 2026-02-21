@@ -13,6 +13,8 @@ public sealed class SimulationRuntime
     private readonly Queue<string> _recentAiDecisions = new();
     private long _lastObservedDecisionSequence;
     private AiDebugSnapshot _latestAiDebugSnapshot;
+    private int _trackedNpcCursor;
+    private bool _manualTracking;
     public NpcPlannerMode PlannerMode { get; }
     public NpcPolicyMode PolicyMode { get; }
 
@@ -54,6 +56,24 @@ public sealed class SimulationRuntime
     public WorldRenderSnapshot GetSnapshot() => WorldSnapshotBuilder.Build(_world);
 
     public AiDebugSnapshot GetAiDebugSnapshot() => _latestAiDebugSnapshot;
+
+    public void CycleTrackedNpc(int delta)
+    {
+        var tracked = GetTrackedDecisions();
+        if (tracked.Count == 0)
+            return;
+
+        _manualTracking = true;
+        _trackedNpcCursor = NormalizeTrackedIndex(_trackedNpcCursor + Math.Sign(delta), tracked.Count);
+        RefreshAiDebugSnapshot();
+    }
+
+    public void ResetTrackedNpc()
+    {
+        _manualTracking = false;
+        _trackedNpcCursor = 0;
+        RefreshAiDebugSnapshot();
+    }
 
     public int NormalizeColonyIndex(int index)
     {
@@ -180,11 +200,8 @@ public sealed class SimulationRuntime
 
     private void RefreshAiDebugSnapshot()
     {
-        var latest = _world._people
-            .Select(person => person.LastAiDecision)
-            .Where(decision => decision != null)
-            .OrderByDescending(decision => decision!.Sequence)
-            .FirstOrDefault();
+        var tracked = GetTrackedDecisions();
+        var latest = tracked.FirstOrDefault();
 
         if (latest == null)
         {
@@ -192,30 +209,65 @@ public sealed class SimulationRuntime
             return;
         }
 
+        if (_manualTracking)
+            _trackedNpcCursor = NormalizeTrackedIndex(_trackedNpcCursor, tracked.Count);
+        else
+            _trackedNpcCursor = 0;
+
+        var selectedIndex = _manualTracking ? _trackedNpcCursor : 0;
+        var selected = tracked[selectedIndex];
+
         if (latest.Sequence > _lastObservedDecisionSequence)
         {
             _lastObservedDecisionSequence = latest.Sequence;
             var summary = $"{latest.Trace.PolicyName} | Goal {latest.Trace.SelectedGoal} -> {latest.Job}";
             _recentAiDecisions.Enqueue(summary);
-            while (_recentAiDecisions.Count > 8)
+            while (_recentAiDecisions.Count > 24)
                 _recentAiDecisions.Dequeue();
         }
 
         _latestAiDebugSnapshot = new AiDebugSnapshot(
             HasData: true,
-            PlannerMode: latest.Trace.PlannerName,
-            PolicyMode: latest.Trace.PolicyName,
-            TrackedColonyId: latest.ColonyId,
-            TrackedX: latest.X,
-            TrackedY: latest.Y,
-            SelectedGoal: latest.Trace.SelectedGoal,
-            NextCommand: latest.Job.ToString(),
-            PlanLength: latest.Trace.PlanLength,
-            GoalScores: latest.Trace.GoalScores
+            PlannerMode: selected.Trace.PlannerName,
+            PolicyMode: selected.Trace.PolicyName,
+            TrackingMode: _manualTracking ? "Manual" : "Latest",
+            TrackedNpcIndex: selectedIndex + 1,
+            TrackedNpcCount: tracked.Count,
+            DecisionSequence: selected.Sequence,
+            TrackedColonyId: selected.ColonyId,
+            TrackedX: selected.X,
+            TrackedY: selected.Y,
+            SelectedGoal: selected.Trace.SelectedGoal,
+            NextCommand: selected.Job.ToString(),
+            PlanLength: selected.Trace.PlanLength,
+            PlanCost: selected.Trace.PlanCost,
+            ReplanReason: selected.Trace.ReplanReason,
+            MethodName: selected.Trace.MethodName,
+            GoalScores: selected.Trace.GoalScores
                 .OrderByDescending(score => score.Score)
-                .Take(6)
                 .Select(score => new AiGoalScoreData(score.GoalName, score.Score, score.IsOnCooldown))
                 .ToList(),
             RecentDecisions: _recentAiDecisions.ToList());
+    }
+
+    private List<RuntimeAiDecision> GetTrackedDecisions()
+    {
+        return _world._people
+            .Select(person => person.LastAiDecision)
+            .Where(decision => decision != null)
+            .Select(decision => decision!)
+            .OrderByDescending(decision => decision.Sequence)
+            .ToList();
+    }
+
+    private static int NormalizeTrackedIndex(int index, int count)
+    {
+        if (count <= 0)
+            return 0;
+
+        var normalized = index % count;
+        if (normalized < 0)
+            normalized += count;
+        return normalized;
     }
 }

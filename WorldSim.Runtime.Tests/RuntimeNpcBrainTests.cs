@@ -90,6 +90,42 @@ public class RuntimeNpcBrainTests
         Assert.NotEmpty(snapshot.GoalScores);
     }
 
+    [Fact]
+    public void SimulationRuntime_CycleTrackedNpc_ChangesTrackingModeAndIndex()
+    {
+        var repoRoot = FindRepoRoot();
+        var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
+        var runtime = new SimulationRuntime(16, 16, 10, techPath);
+
+        runtime.AdvanceTick(0.25f);
+        var before = runtime.GetAiDebugSnapshot();
+
+        runtime.CycleTrackedNpc(1);
+        var after = runtime.GetAiDebugSnapshot();
+
+        Assert.True(after.HasData);
+        Assert.Equal("Manual", after.TrackingMode);
+        Assert.True(after.TrackedNpcIndex >= 1);
+        Assert.True(after.TrackedNpcCount >= 1);
+        Assert.NotEqual(before.TrackingMode, after.TrackingMode);
+    }
+
+    [Fact]
+    public void SimulationRuntime_ResetTrackedNpc_ReturnsToLatestMode()
+    {
+        var repoRoot = FindRepoRoot();
+        var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
+        var runtime = new SimulationRuntime(16, 16, 10, techPath);
+
+        runtime.AdvanceTick(0.25f);
+        runtime.CycleTrackedNpc(1);
+        runtime.ResetTrackedNpc();
+        var snapshot = runtime.GetAiDebugSnapshot();
+
+        Assert.Equal("Latest", snapshot.TrackingMode);
+        Assert.True(snapshot.TrackedNpcIndex <= 1);
+    }
+
     private sealed class FixedBrain : INpcDecisionBrain
     {
         private readonly NpcCommand _command;
@@ -101,13 +137,16 @@ public class RuntimeNpcBrainTests
 
         public AiDecisionResult Think(in NpcAiContext context)
         {
-            var trace = new AiDecisionTrace(
-                SelectedGoal: "Fixed",
-                PlannerName: "Fixed",
-                PolicyName: "Test",
-                PlanLength: 1,
-                PlanPreview: new[] { _command },
-                GoalScores: Array.Empty<GoalScoreEntry>());
+        var trace = new AiDecisionTrace(
+            SelectedGoal: "Fixed",
+            PlannerName: "Fixed",
+            PolicyName: "Test",
+            PlanLength: 1,
+            PlanPreview: new[] { _command },
+            PlanCost: 1,
+            ReplanReason: "Fixed",
+            MethodName: "FixedMethod",
+            GoalScores: Array.Empty<GoalScoreEntry>());
             return new AiDecisionResult(_command, trace);
         }
     }

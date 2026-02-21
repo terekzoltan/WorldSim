@@ -3,17 +3,19 @@ namespace WorldSim.AI;
 public sealed class SimplePlanner : IPlanner
 {
     private Goal? _goal;
+    private bool _goalChanged;
     public string Name => "Simple";
 
     public void SetGoal(Goal goal)
     {
+        _goalChanged = _goal?.Name != goal.Name;
         _goal = goal;
     }
 
     public PlannerDecision GetNextCommand(in NpcAiContext context)
     {
         if (_goal == null)
-            return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>());
+            return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>(), 0, "NoGoal", "SimpleRule");
 
         var command = _goal.Name switch
         {
@@ -30,8 +32,10 @@ public sealed class SimplePlanner : IPlanner
         };
 
         if (command == NpcCommand.Idle)
-            return new PlannerDecision(command, 0, Array.Empty<NpcCommand>());
+            return new PlannerDecision(command, 0, Array.Empty<NpcCommand>(), 0, _goalChanged ? "GoalChanged" : "NoRule", "SimpleRule");
 
-        return new PlannerDecision(command, 1, new[] { command });
+        var reason = _goalChanged ? "GoalChanged" : "RuleMatch";
+        _goalChanged = false;
+        return new PlannerDecision(command, 1, new[] { command }, 1, reason, "SimpleRule");
     }
 }

@@ -36,6 +36,9 @@ public sealed class HudRenderer
         TechMenuView? techMenu,
         AiDebugSnapshot aiDebug,
         bool showAiDebug,
+        bool aiDebugCompact,
+        int aiScoreOffset,
+        int aiHistoryOffset,
         int viewportWidth,
         int viewportHeight,
         RenderStats? renderStats = null)
@@ -69,14 +72,14 @@ public sealed class HudRenderer
         if (techMenu == null)
         {
             if (showAiDebug)
-                _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme);
+                _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
             return;
         }
 
         _techMenuPanel.Draw(spriteBatch, font, techMenu.Value, Theme);
 
         if (showAiDebug)
-            _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme);
+            _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
     }
 
     private void DrawPanel(SpriteBatch spriteBatch, Texture2D pixel, Rectangle rect)

@@ -186,6 +186,30 @@ public class Person
             Stamina = Math.Clamp(Stamina - dt * 1.6f, 0f, 100f);
 
         float hunger = Needs.GetValueOrDefault("Hunger", 0f);
+
+        // Critical hunger preemption happens before starvation damage to avoid dying with available food.
+        if (hunger >= 78f && _home.Stock[Resource.Food] > 0 && Current != Job.EatFood)
+        {
+            if (hunger >= 96f)
+            {
+                _home.Stock[Resource.Food] -= 1;
+                Needs["Hunger"] = Math.Max(0f, hunger - 28f);
+                Stamina = Math.Clamp(Stamina + 8f, 0f, 100f);
+                Health = Math.Min(100f + w.HealthBonus, Health + 0.8f);
+                Current = Job.Idle;
+                _doingJob = 0;
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
+            }
+
+            Current = Job.EatFood;
+            _doingJob = 1;
+            _idleTimeSeconds = 0f;
+            _lastPos = Pos;
+            return true;
+        }
+
         if (hunger >= 95f)
             Health -= dt * 2.6f;
         else if (hunger >= 85f)
@@ -237,8 +261,10 @@ public class Person
         }
 
         int reserveBonus = _home.FoodReserveBonus;
+        float foodPerPerson = colonyFoodStock / (float)Math.Max(1, colonyPop);
         bool emergencyFood = colonyFoodStock <= Math.Max(5 + reserveBonus, colonyPop + 1 + reserveBonus);
         bool veryLowFood = colonyFoodStock <= Math.Max(2 + reserveBonus / 2, colonyPop / 2 + reserveBonus / 2);
+        bool abundantFood = foodPerPerson >= 20f;
 
         if (_doingJob > 0 && Current != Job.Idle)
         {
@@ -353,8 +379,27 @@ public class Person
                 return true;
             }
 
-            float eatThreshold = emergencyFood ? 60f : 66f;
-            if (localHunger >= eatThreshold && _home.Stock[Resource.Food] > 0)
+            float eatNowThreshold = emergencyFood ? 54f : 62f;
+            if (abundantFood)
+                eatNowThreshold = Math.Min(eatNowThreshold, 58f);
+
+            float seekFoodThreshold = emergencyFood ? 42f : 50f;
+            if (abundantFood)
+                seekFoodThreshold += 8f;
+
+            if (_home.Stock[Resource.Food] > 0 && localHunger >= 86f)
+            {
+                Current = Job.EatFood;
+                _doingJob = 1;
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
+            }
+
+            if (abundantFood && localHunger < 58f)
+                veryLowFood = false;
+
+            if (localHunger >= eatNowThreshold && _home.Stock[Resource.Food] > 0)
             {
                 Current = Job.EatFood;
                 _doingJob = ComputeTicks(EatWorkTime, w, isHeavyWork: false);
@@ -363,8 +408,7 @@ public class Person
                 return true;
             }
 
-            float gatherFoodThreshold = emergencyFood ? 45f : 52f;
-            if (localHunger >= gatherFoodThreshold)
+            if (localHunger >= seekFoodThreshold)
             {
                 var hereFood = w.GetTile(Pos.x, Pos.y).Node;
                 if (hereFood != null && hereFood.Type == Resource.Food && hereFood.Amount > 0)

@@ -64,6 +64,8 @@ namespace WorldSim.Simulation
         public int TotalDeathsStarvation { get; private set; }
         public int TotalDeathsPredator { get; private set; }
         public int TotalDeathsOther { get; private set; }
+        public int RecentDeathsStarvation60s => _recentStarvationDeaths.Count;
+        public int TotalStarvationDeathsWithFood { get; private set; }
 
         readonly Random _rng = new();
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
@@ -71,16 +73,20 @@ namespace WorldSim.Simulation
         readonly HashSet<int> _houseMilestones = new();
         readonly HashSet<int> _extinctionMilestones = new();
         readonly Dictionary<int, ColonyDeathStats> _colonyDeathStats = new();
+        readonly Queue<float> _recentStarvationDeaths = new();
 
+        float _simulationTimeSeconds;
         float _seasonTimer;
         float _droughtTimer;
         float _professionRebalanceTimer;
         float _specializedBuildTimer;
+        float _foodParityTimer;
 
         const float SeasonDurationSeconds = 90f;
         const float DroughtDurationSeconds = 35f;
         const float ProfessionRebalancePeriod = 12f;
         const float SpecializedBuildPeriod = 14f;
+        const float FoodParityPeriod = 6f;
 
         public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null)
         {
@@ -123,7 +129,9 @@ namespace WorldSim.Simulation
             }
 
             // 2. Multiple colonies on the map (completely random positions)
-            int colonyCount = 2; // 4 in future
+            int colonyCount = 4;
+            int basePopPerColony = Math.Max(1, initialPop / colonyCount);
+            int extraPop = Math.Max(0, initialPop - (basePopPerColony * colonyCount));
             for (int ci = 0; ci < colonyCount; ci++)
             {
                 // Ensure colony origin is not on water
@@ -146,7 +154,7 @@ namespace WorldSim.Simulation
                 // 3: Chitáriak
 
                 // Residents near origin (avoid water tiles)
-                int pop = initialPop / colonyCount;
+                int pop = basePopPerColony + (ci < extraPop ? 1 : 0);
                 for (int i = 0; i < pop; i++)
                 {
                     int spawnRadius = 5;
@@ -171,6 +179,7 @@ namespace WorldSim.Simulation
 
         public void Update(float dt)
         {
+            _simulationTimeSeconds += Math.Max(0f, dt);
             UpdateSeasonsAndEvents(dt);
             UpdateFoodRegrowth(dt);
 
@@ -203,6 +212,13 @@ namespace WorldSim.Simulation
 
             foreach (Colony c in _colonies) c.Update(this, dt);
 
+            _foodParityTimer += dt;
+            if (_foodParityTimer >= FoodParityPeriod)
+            {
+                _foodParityTimer = 0f;
+                ApplySoftFoodParityTransfer();
+            }
+
             // Animals: update and remove the dead
             for (int i = _animals.Count - 1; i >= 0; i--)
             {
@@ -224,6 +240,8 @@ namespace WorldSim.Simulation
                         c.Stock[res] = share;
                 }
             }
+
+            TrimRecentDeathWindows();
         }
 
         // Delegates to Tile.Harvest which uses the Node
@@ -264,6 +282,9 @@ namespace WorldSim.Simulation
                     break;
                 case PersonDeathReason.Starvation:
                     TotalDeathsStarvation++;
+                    _recentStarvationDeaths.Enqueue(_simulationTimeSeconds);
+                    if (person.Home.Stock.GetValueOrDefault(Resource.Food, 0) > 0)
+                        TotalStarvationDeathsWithFood++;
                     break;
                 case PersonDeathReason.Predator:
                     TotalDeathsPredator++;
@@ -294,6 +315,15 @@ namespace WorldSim.Simulation
                     colonyStats.Other++;
                     break;
             }
+
+            TrimRecentDeathWindows();
+        }
+
+        private void TrimRecentDeathWindows()
+        {
+            const float rollingWindowSeconds = 60f;
+            while (_recentStarvationDeaths.Count > 0 && (_simulationTimeSeconds - _recentStarvationDeaths.Peek()) > rollingWindowSeconds)
+                _recentStarvationDeaths.Dequeue();
         }
 
         // --- Biome generation (cheap, blob-like) ---
@@ -506,6 +536,8 @@ namespace WorldSim.Simulation
                     AddEvent("Drought ended");
                 }
             }
+
+            TrimRecentDeathWindows();
         }
 
         void AddEvent(string text)
@@ -563,6 +595,50 @@ namespace WorldSim.Simulation
             }
         }
 
+        void ApplySoftFoodParityTransfer()
+        {
+            if (_colonies.Count < 2 || ResourceSharingEnabled)
+                return;
+
+            var living = _colonies
+                .Select(colony => new
+                {
+                    Colony = colony,
+                    Living = _people.Count(p => p.Home == colony && p.Health > 0f)
+                })
+                .Where(x => x.Living > 0)
+                .ToList();
+
+            if (living.Count < 2)
+                return;
+
+            var richest = living
+                .Select(x => new { x.Colony, FoodPerPerson = x.Colony.Stock[Resource.Food] / (float)x.Living, x.Living })
+                .OrderByDescending(x => x.FoodPerPerson)
+                .First();
+
+            var poorest = living
+                .Select(x => new { x.Colony, FoodPerPerson = x.Colony.Stock[Resource.Food] / (float)x.Living, x.Living })
+                .OrderBy(x => x.FoodPerPerson)
+                .First();
+
+            if (ReferenceEquals(richest.Colony, poorest.Colony))
+                return;
+
+            var spread = richest.FoodPerPerson - poorest.FoodPerPerson;
+            if (spread < 7f)
+                return;
+
+            int donorFood = richest.Colony.Stock[Resource.Food];
+            int transfer = Math.Clamp((int)MathF.Round(spread * 0.45f), 2, 14);
+            transfer = Math.Min(transfer, Math.Max(0, donorFood - 20));
+            if (transfer <= 0)
+                return;
+
+            richest.Colony.Stock[Resource.Food] -= transfer;
+            poorest.Colony.Stock[Resource.Food] += transfer;
+        }
+
         void TryAutoConstructSpecializedBuildings()
         {
             foreach (var colony in _colonies)
@@ -583,9 +659,10 @@ namespace WorldSim.Simulation
                     continue;
                 }
 
-                if (foodPerCapita >= 1.2f && colony.WorkshopCount < 1 && colony.Stock[Resource.Wood] >= 16 && colony.Stock[Resource.Stone] >= 8 && colony.Stock[Resource.Iron] >= 4)
+                int targetWorkshops = people >= 18 ? 2 : 1;
+                if (foodPerCapita >= 1.05f && colony.WorkshopCount < targetWorkshops && colony.Stock[Resource.Wood] >= 12 && colony.Stock[Resource.Stone] >= 6 && colony.Stock[Resource.Iron] >= 3)
                 {
-                    if (TryPlaceSpecialized(colony, SpecializedBuildingKind.Workshop, woodCost: 16, stoneCost: 8, ironCost: 4, goldCost: 0))
+                    if (TryPlaceSpecialized(colony, SpecializedBuildingKind.Workshop, woodCost: 12, stoneCost: 6, ironCost: 3, goldCost: 0))
                         AddEvent($"{colony.Name} built Workshop");
                     continue;
                 }

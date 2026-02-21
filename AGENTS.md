@@ -185,19 +185,7 @@ Track D design principles (OnlabRefinery parity):
 - Iterativ feedback loop: invalid candidate -> feedback -> retry -> deterministic fallback.
 - Determinisztikus output policy debugginghoz: ugyanarra a checkpoint inputra reprodukalhato eredmeny.
 
-## Javasolt implementacios sorrend
 
-1. `WorldSim.Contracts` letrehozas (dto + versioning).
-2. `WorldSim.Runtime` kiszervezes + snapshot API.
-3. `WorldSim.Graphics` kiszervezes + `GameHost` vekonyitas.
-4. `WorldSim.RefineryAdapter` bevezetese a jelenlegi integration fole.
-5. `WorldSim.AI` modul kivetele es interfeszes visszakotese.
-
-## Branch/PR iranyelv
-
-- `feature/track-a-*`, `feature/track-b-*`, `feature/track-c-*`, `feature/track-d-*` naming.
-- Minden PR egy boundary-t mozgasson; keruld a "mindent egyszerre" refaktort.
-- Elso korben viselkedesazonos refaktor (no gameplay change).
 
 ## Kockazatok es mitigacio
 
@@ -226,3 +214,6 @@ Entries:
 - `[2026-02-21][Track D] A Refinery hasznos mukodesehez runtime oldali director state + idozitett hatas + colony directive kell - Track B-vel osszehangolt command endpointok szuksegesek`.
 - `[2026-02-21][Track D] Graphics oldalon story beat es nudge allapot vizualizalasa szukseges (HUD/event feed), kulonben nehezen verifikalhato a checkpoint hatas`.
 - `[2026-02-21][Track D] LLM stage csak gated modban induljon (default OFF), Refinery gate maradjon kotelezo minosegkapu`.
+- `[2026-02-21][Track C] AI debug panel tracked NPC valtas bekerult (PgUp/PgDn, Home) - HUD/input szinkront erint - kovetkezo lepes: tracked replay/export opcio`.
+- `[2026-02-21][Track C] GOAP/HTN trace bovitve (plan cost, replan reason, method) - Track A debug olvashatosaghoz plusz mezok kellenek - kovetkezo lepes: compact+page UX finomitas`.
+- `[2026-02-21][Track C] Policy mix aktiv (Global/FactionMix/HtnPilot) es Aetheri HTN pilot - Track B balanszparametereket erint - kovetkezo lepes: config tablaba emeles hardcode switch helyett`.

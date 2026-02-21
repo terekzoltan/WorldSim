@@ -9,10 +9,12 @@ public sealed class GoapPlanner : IPlanner
     private readonly List<GoapAction> _actions = CreateActions();
     private readonly Queue<GoapAction> _currentPlan = new();
     private Goal? _goal;
+    private bool _goalChanged;
     public string Name => "Goap";
 
     public void SetGoal(Goal goal)
     {
+        _goalChanged = _goal?.Name != goal.Name;
         _goal = goal;
         _currentPlan.Clear();
     }
@@ -20,7 +22,9 @@ public sealed class GoapPlanner : IPlanner
     public PlannerDecision GetNextCommand(in NpcAiContext context)
     {
         if (_goal == null)
-            return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>());
+            return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>(), 0, "NoGoal", "GoapSearch");
+
+        var reason = _goalChanged ? "GoalChanged" : "PlanContinue";
 
         if (_currentPlan.Count == 0)
         {
@@ -29,17 +33,25 @@ public sealed class GoapPlanner : IPlanner
             {
                 foreach (var action in plan)
                     _currentPlan.Enqueue(action);
+                reason = _goalChanged ? "GoalChanged" : "PlanBuilt";
             }
+            else
+            {
+                reason = "NoPlan";
+            }
+
+            _goalChanged = false;
         }
 
         var command = _currentPlan.Count > 0 ? _currentPlan.Dequeue().Command : NpcCommand.Idle;
         if (command == NpcCommand.Idle)
-            return new PlannerDecision(command, 0, Array.Empty<NpcCommand>());
+            return new PlannerDecision(command, 0, Array.Empty<NpcCommand>(), 0, reason, "GoapSearch");
 
         var planLength = 1 + _currentPlan.Count;
         var preview = new List<NpcCommand>(1 + Math.Min(4, _currentPlan.Count)) { command };
         preview.AddRange(_currentPlan.Take(4).Select(action => action.Command));
-        return new PlannerDecision(command, planLength, preview);
+        var cost = preview.Count;
+        return new PlannerDecision(command, planLength, preview, cost, reason, "GoapSearch");
     }
 
     private List<GoapAction>? BuildPlan(in NpcAiContext context, Goal goal)

@@ -52,7 +52,11 @@ public class Game1 : Game
     private bool _isFullscreen = true;
     private bool _fullscreenKeyDown;
     private bool _showAiDebugPanel;
+    private bool _aiDebugCompact;
+    private int _aiGoalScoreOffset;
+    private int _aiHistoryOffset;
     private bool _showRenderStats;
+    private bool _showTelemetryHud = true;
     private int _themeIndex;
 
     public Game1()
@@ -136,8 +140,13 @@ public class Game1 : Game
         if (keys.IsKeyDown(Keys.F8) && !_previousKeys.IsKeyDown(Keys.F8))
             _showAiDebugPanel = !_showAiDebugPanel;
 
+        HandleAiDebugInput(keys);
+
         if (keys.IsKeyDown(Keys.F3) && !_previousKeys.IsKeyDown(Keys.F3))
             _showRenderStats = !_showRenderStats;
+
+        if (keys.IsKeyDown(Keys.T) && !_previousKeys.IsKeyDown(Keys.T))
+            _showTelemetryHud = !_showTelemetryHud;
 
         HandleCameraInput(keys, mouse);
         HandleTechMenuInput(keys);
@@ -219,6 +228,36 @@ public class Game1 : Game
             if (keys.IsKeyDown(hotkey) && !_previousKeys.IsKeyDown(hotkey))
                 _runtime.UnlockLockedTechBySlot(_selectedColony, i);
         }
+    }
+
+    private void HandleAiDebugInput(KeyboardState keys)
+    {
+        if (!_showAiDebugPanel)
+            return;
+
+        if (keys.IsKeyDown(Keys.PageUp) && !_previousKeys.IsKeyDown(Keys.PageUp))
+            _runtime.CycleTrackedNpc(-1);
+
+        if (keys.IsKeyDown(Keys.PageDown) && !_previousKeys.IsKeyDown(Keys.PageDown))
+            _runtime.CycleTrackedNpc(1);
+
+        if (keys.IsKeyDown(Keys.Home) && !_previousKeys.IsKeyDown(Keys.Home))
+            _runtime.ResetTrackedNpc();
+
+        if (keys.IsKeyDown(Keys.F4) && !_previousKeys.IsKeyDown(Keys.F4))
+            _aiDebugCompact = !_aiDebugCompact;
+
+        if (keys.IsKeyDown(Keys.Up) && !_previousKeys.IsKeyDown(Keys.Up))
+            _aiHistoryOffset++;
+
+        if (keys.IsKeyDown(Keys.Down) && !_previousKeys.IsKeyDown(Keys.Down))
+            _aiHistoryOffset = Math.Max(0, _aiHistoryOffset - 1);
+
+        if (keys.IsKeyDown(Keys.Left) && !_previousKeys.IsKeyDown(Keys.Left))
+            _aiGoalScoreOffset++;
+
+        if (keys.IsKeyDown(Keys.Right) && !_previousKeys.IsKeyDown(Keys.Right))
+            _aiGoalScoreOffset = Math.Max(0, _aiGoalScoreOffset - 1);
     }
 
 #if DEBUG
@@ -342,24 +381,30 @@ public class Game1 : Game
         }
 
         _spriteBatch.Begin();
-        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode}";
+        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T)";
 #if DEBUG
-        plannerStatus += " (F7 planner, F8 AI panel, F3 render stats, F9/F10 theme)";
+        plannerStatus += " (F7 planner, F8 AI panel, PgUp/PgDn tracked NPC, Home latest, F4 compact)";
 #endif
-        var aiDebug = _runtime.GetAiDebugSnapshot();
-        _hudRenderer.Draw(
-            _spriteBatch,
-            _textures.Pixel,
-            _font,
-            snapshot,
-            $"{_refineryRuntime.LastStatus} | {_runtime.LastTechActionStatus} | Theme: {ThemePresets[_themeIndex].Name}",
-            plannerStatus,
-            techMenu,
-            aiDebug,
-            _showAiDebugPanel,
-            GraphicsDevice.Viewport.Width,
-            GraphicsDevice.Viewport.Height,
-            _showRenderStats ? _worldRenderer.LastRenderStats : null);
+        if (_showTelemetryHud)
+        {
+            var aiDebug = _runtime.GetAiDebugSnapshot();
+            _hudRenderer.Draw(
+                _spriteBatch,
+                _textures.Pixel,
+                _font,
+                snapshot,
+                $"{_refineryRuntime.LastStatus} | {_runtime.LastTechActionStatus} | Theme: {ThemePresets[_themeIndex].Name}",
+                plannerStatus,
+                techMenu,
+                aiDebug,
+                _showAiDebugPanel,
+                _aiDebugCompact,
+                _aiGoalScoreOffset,
+                _aiHistoryOffset,
+                GraphicsDevice.Viewport.Width,
+                GraphicsDevice.Viewport.Height,
+                _showRenderStats ? _worldRenderer.LastRenderStats : null);
+        }
         _spriteBatch.End();
 
         base.Draw(gameTime);

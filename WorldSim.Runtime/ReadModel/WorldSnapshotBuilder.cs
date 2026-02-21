@@ -114,9 +114,12 @@ public static class WorldSnapshotBuilder
             world.TotalDeathsStarvation,
             world.TotalDeathsPredator,
             world.TotalDeathsOther,
+            world.RecentDeathsStarvation60s,
+            world.TotalStarvationDeathsWithFood,
             world.EnablePredatorHumanAttacks,
             ComputeAverageFoodPerPerson(world),
-            world._colonies.Count(c => c.Stock[Resource.Food] <= Math.Max(3, world._people.Count(p => p.Home == c && p.Health > 0f) / 2))
+            world._colonies.Count(c => c.Stock[Resource.Food] <= Math.Max(3, world._people.Count(p => p.Home == c && p.Health > 0f) / 2)),
+            ComputeFoodPerPersonSpread(world)
         );
 
         return new WorldRenderSnapshot(
@@ -182,5 +185,21 @@ public static class WorldSnapshotBuilder
 
         int totalFood = world._colonies.Sum(c => c.Stock[Resource.Food]);
         return totalFood / (float)livingPeople;
+    }
+
+    private static float ComputeFoodPerPersonSpread(World world)
+    {
+        var values = world._colonies
+            .Select(colony =>
+            {
+                int living = world._people.Count(p => p.Home == colony && p.Health > 0f);
+                return colony.Stock[Resource.Food] / (float)Math.Max(1, living);
+            })
+            .ToList();
+
+        if (values.Count <= 1)
+            return 0f;
+
+        return values.Max() - values.Min();
     }
 }
