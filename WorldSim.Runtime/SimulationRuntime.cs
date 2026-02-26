@@ -10,17 +10,18 @@ namespace WorldSim.Runtime;
 public sealed class SimulationRuntime
 {
     private readonly World _world;
+    private readonly NpcPlannerMode _plannerMode;
+    private readonly NpcPolicyMode _policyMode;
     private readonly Queue<string> _recentAiDecisions = new();
     private long _lastObservedDecisionSequence;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
     private bool _manualTracking;
-    public NpcPlannerMode PlannerMode { get; }
-    public NpcPolicyMode PolicyMode { get; }
+    public string PlannerMode => _plannerMode.ToString();
+    public string PolicyMode => _policyMode.ToString();
 
     public long Tick { get; private set; }
     public string LastTechActionStatus { get; private set; } = "No tech action";
-    public string LastRuntimeCommandStatus { get; private set; } = "No runtime command";
     public int LoadedTechCount => TechTree.Techs.Count;
 
     public int Width => _world.Width;
@@ -35,10 +36,10 @@ public sealed class SimulationRuntime
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath, RuntimeAiOptions? aiOptions = null)
     {
         var resolvedOptions = aiOptions ?? RuntimeAiOptions.FromEnvironment();
-        PlannerMode = resolvedOptions.PlannerMode;
-        PolicyMode = resolvedOptions.PolicyMode;
+        _plannerMode = resolvedOptions.PlannerMode;
+        _policyMode = resolvedOptions.PolicyMode;
         _world = new World(width, height, initialPopulation, colony => CreateBrain(colony, resolvedOptions));
-        _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode.ToString(), PolicyMode.ToString());
+        _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode, PolicyMode);
         TechTree.Load(technologyFilePath);
 
         if (LoadedTechCount == 0)
@@ -178,51 +179,20 @@ public sealed class SimulationRuntime
             throw new InvalidOperationException($"Cannot unlock tech '{techId}': {result.Reason}");
     }
 
-    public RuntimeFeatureFlags GetFeatureFlags()
+    public RuntimeAiOptions CreateOptionsWithNextPlannerMode()
     {
-        return new RuntimeFeatureFlags(
-            _world.EnableCombatPrimitives,
-            _world.EnableDiplomacy,
-            _world.EnableFortifications,
-            _world.EnableSiege,
-            _world.EnableSupply,
-            _world.EnableCampaigns,
-            _world.EnablePredatorHumanAttacks);
-    }
-
-    public RuntimeCommandResult SetFeatureFlags(RuntimeFeatureFlags flags)
-    {
-        _world.EnableCombatPrimitives = flags.EnableCombatPrimitives;
-        _world.EnableDiplomacy = flags.EnableDiplomacy;
-        _world.EnableFortifications = flags.EnableFortifications;
-        _world.EnableSiege = flags.EnableSiege;
-        _world.EnableSupply = flags.EnableSupply;
-        _world.EnableCampaigns = flags.EnableCampaigns;
-        _world.EnablePredatorHumanAttacks = flags.EnablePredatorHumanAttacks;
-
-        LastRuntimeCommandStatus =
-            $"Flags set: Combat={flags.EnableCombatPrimitives}, Diplo={flags.EnableDiplomacy}, Fort={flags.EnableFortifications}, Siege={flags.EnableSiege}, Supply={flags.EnableSupply}, Campaign={flags.EnableCampaigns}, PredHuman={flags.EnablePredatorHumanAttacks}";
-        return RuntimeCommandResult.Ok(LastRuntimeCommandStatus);
-    }
-
-    public RuntimeCommandResult DeclareWar(int factionA, int factionB)
-    {
-        if (!_world.EnableDiplomacy)
+        var next = _plannerMode switch
         {
-            LastRuntimeCommandStatus = "DeclareWar ignored: diplomacy disabled";
-            return RuntimeCommandResult.Fail(LastRuntimeCommandStatus);
-        }
+            NpcPlannerMode.Goap => NpcPlannerMode.Simple,
+            NpcPlannerMode.Simple => NpcPlannerMode.Htn,
+            _ => NpcPlannerMode.Goap
+        };
 
-        LastRuntimeCommandStatus = $"DeclareWar scaffold accepted for factions {factionA} vs {factionB} (runtime state machine pending)";
-        return RuntimeCommandResult.Ok(LastRuntimeCommandStatus);
-    }
-
-    public RuntimeCommandResult SetColonyDirective(int colonyId, string directive, float intensity, long expiryTick)
-    {
-        var boundedIntensity = Math.Clamp(intensity, 0f, 1f);
-        LastRuntimeCommandStatus =
-            $"Directive scaffold accepted: colony={colonyId}, directive={directive}, intensity={boundedIntensity:0.###}, expiryTick={expiryTick}";
-        return RuntimeCommandResult.Ok(LastRuntimeCommandStatus);
+        return new RuntimeAiOptions
+        {
+            PlannerMode = next,
+            PolicyMode = _policyMode
+        };
     }
 
     private RuntimeNpcBrain CreateBrain(Colony colony, RuntimeAiOptions options)
@@ -248,7 +218,7 @@ public sealed class SimulationRuntime
 
         if (latest == null)
         {
-            _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode.ToString(), PolicyMode.ToString());
+            _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode, PolicyMode);
             return;
         }
 

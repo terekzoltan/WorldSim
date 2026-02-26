@@ -12,6 +12,10 @@ public readonly record struct RenderFrameContext(
     WorldRenderTheme Theme,
     RenderStats Stats,
     float TimeSeconds,
-    float TickAlpha,
-    float FxIntensity
+    float FxIntensity,
+    float CameraX,
+    float CameraY,
+    float CameraZoom,
+    int ViewportWidth,
+    int ViewportHeight
 );

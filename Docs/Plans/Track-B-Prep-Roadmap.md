@@ -19,11 +19,29 @@ Prepare `WorldSim.Runtime` for the cross-track Combat/Fortification/Campaign mas
 - `B-Prep 2` AI context contract lock (implemented baseline)
   - P0/P1 context fields wired in runtime adapter
   - mixed cadence support (per-tick + periodic strategic sampling)
+  - fallback terulet/warrior jelek helyett runtime war state + contested tile + warrior count forras
 - `B-Prep 3` Snapshot vNext lock (implemented baseline)
   - `PersonRenderData` expanded with combat-relevant fields (HP/combat/role/defense)
 - `B-Prep 4` Navigation/occupancy foundation (implemented baseline)
   - topology versioning in world + navigation grid/pathfinder/path cache scaffold
   - runtime tests for version invalidation and BFS detour behavior
+
+## Follow-up shipped after B-Prep 2/3/4
+
+- Territory ownership baseline model landed:
+  - tile owner + contested flags computed periodically in runtime.
+- Role mobilization baseline landed:
+  - colony war state driven warrior assignment policy and counts.
+- Snapshot contract updated:
+  - person combat fields + colony war state/warrior count + tile ownership/contested fields.
+
+## Additional pre-masterplan hardening
+
+- Territory influence formula refined and tunable runtime constants introduced:
+  - `TerritoryBaseColonyInfluence`, `TerritoryPopulationInfluenceWeight`,
+    `TerritoryWarriorInfluenceWeight`, `TerritoryContestedThreshold`.
+- Runtime-facing planner/policy labels exposed as strings on `SimulationRuntime`
+  to reduce `NpcPlannerMode` enum leakage at host boundary.
 
 ## Implemented mini plans
 

@@ -48,15 +48,7 @@ public static class WorldSnapshotBuilder
             .ToList();
 
         var people = world._people
-            .Select(p => new PersonRenderData(
-                p.Pos.x,
-                p.Pos.y,
-                p.Home.Id,
-                Health: MathF.Round(Math.Clamp(p.Health, 0f, 150f), 2),
-                IsInCombat: p.IsInCombat,
-                LastCombatTick: p.LastCombatTick,
-                IsWarrior: p.Roles.HasFlag(PersonRole.Warrior) || p.Profession == Profession.Hunter,
-                Defense: MathF.Round(Math.Clamp(p.Defense, 0f, 100f), 2)))
+            .Select(p => new PersonRenderData(p.Pos.x, p.Pos.y, p.Home.Id))
             .ToList();
 
         var animals = world._animals

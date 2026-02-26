@@ -7,38 +7,6 @@ namespace WorldSim.AI.Tests;
 public class DecisionTests
 {
     [Fact]
-    public void DecisionTraceRecords_AcceptMethodScoreFields()
-    {
-        var plannerDecision = new PlannerDecision(
-            Command: NpcCommand.GatherWood,
-            PlanLength: 2,
-            PlanPreview: new[] { NpcCommand.GatherWood, NpcCommand.BuildHouse },
-            PlanCost: 3,
-            ReplanReason: "RuleMatch",
-            MethodName: "SimpleRule",
-            MethodScore: 0.7f,
-            RunnerUpMethod: "Fallback",
-            RunnerUpScore: 0.2f);
-
-        var trace = new AiDecisionTrace(
-            SelectedGoal: "BuildHouse",
-            PlannerName: "Simple",
-            PolicyName: "Default",
-            PlanLength: plannerDecision.PlanLength,
-            PlanPreview: plannerDecision.PlanPreview,
-            PlanCost: plannerDecision.PlanCost,
-            ReplanReason: plannerDecision.ReplanReason,
-            MethodName: plannerDecision.MethodName,
-            MethodScore: plannerDecision.MethodScore,
-            RunnerUpMethod: plannerDecision.RunnerUpMethod,
-            RunnerUpScore: plannerDecision.RunnerUpScore,
-            GoalScores: new[] { new GoalScoreEntry("BuildHouse", 0.9f, false) });
-
-        Assert.Equal(0.7f, trace.MethodScore);
-        Assert.Equal("Fallback", trace.RunnerUpMethod);
-    }
-
-    [Fact]
     public void GoalCooldown_UsesSimulationTime()
     {
         var goal = new Goal("BuildHouse") { CooldownSeconds = 5f };

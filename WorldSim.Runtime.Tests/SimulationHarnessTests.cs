@@ -52,7 +52,7 @@ public class SimulationHarnessTests
                 .OrderByDescending(decision => decision.Sequence)
                 .FirstOrDefault();
             trace.Add(latest != null
-                ? $"{latest.Trace.PlannerName}|{latest.Trace.PolicyName}|{latest.Trace.SelectedGoal}|{latest.Job}|{latest.Trace.ReplanReason}|{latest.Trace.MethodName}|{latest.Trace.MethodScore:0.000}"
+                ? $"{latest.Trace.PlannerName}|{latest.Trace.PolicyName}|{latest.Trace.SelectedGoal}|{latest.Job}|{latest.Trace.ReplanReason}|{latest.Trace.MethodName}"
                 : "NoData");
         }
 

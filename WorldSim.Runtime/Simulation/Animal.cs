@@ -19,7 +19,7 @@ public abstract class Animal
     protected int Speed { get; init; }
     protected int Vision { get; init; }
 
-    protected readonly Random _rng;
+    protected readonly Random _rng = new();
 
     // Toggle that enforces StepTowards only occurring every second invocation.
     // True means the next StepTowards call is allowed; after allowing it we set it to false.
@@ -27,12 +27,11 @@ public abstract class Animal
     private (int x, int y) _lastPosForStuck;
     private int _stuckFrames;
 
-    protected Animal((int x, int y) pos, int speed, int vision, Random random)
+    protected Animal((int x, int y) pos, int speed, int vision)
     {
         Pos = pos;
         Speed = Math.Max(1, speed);
         Vision = Math.Max(1, vision);
-        _rng = random;
         _lastPosForStuck = pos;
     }
 
@@ -41,12 +40,12 @@ public abstract class Animal
     protected virtual double RandomStepChance => 0.7;
 
     // Factory: produces either Herbivore (prey) or Predator (carnivore)
-    public static Animal Spawn((int x, int y) pos, Random random)
+    public static Animal Spawn((int x, int y) pos)
     {
         // Simple ratio: 70% herbivores, 30% predators
-        return random.NextDouble() < 0.7
-            ? new Herbivore(pos, random)
-            : new Predator(pos, random);
+        return new Random().NextDouble() < 0.7
+            ? new Herbivore(pos)
+            : new Predator(pos);
     }
 
     public abstract void Update(World w, float dt);
@@ -159,7 +158,7 @@ public sealed class Herbivore : Animal
 {
     public override AnimalKind Kind => AnimalKind.Herbivore;
 
-    public Herbivore((int x, int y) pos, Random random) : base(pos, speed: 1, vision: 5, random) { }
+    public Herbivore((int x, int y) pos) : base(pos, speed: 1, vision: 5) { }
 
     // Herbivores wander less frequently
     protected override double RandomStepChance => 0.5;
@@ -261,7 +260,7 @@ public sealed class Predator : Animal
     public override AnimalKind Kind => AnimalKind.Predator;
 
 
-    public Predator((int x, int y) pos, Random random) : base(pos, speed: 1, vision: 6, random) { }
+    public Predator((int x, int y) pos) : base(pos, speed: 1, vision: 6) { }
 
     // Mild nerf so herbivores do not collapse too early.
     private const double CaptureSuccessChance = 0.65;
@@ -358,7 +357,7 @@ public sealed class Predator : Animal
         StepTowards(w, nearest.Pos, Speed);
         if (Pos == nearest.Pos)
         {
-            nearest.ApplyDamage(w.PredatorHumanDamage, "Predator", w.CurrentTick);
+            nearest.ApplyDamage(w.PredatorHumanDamage, "Predator");
             w.ReportPredatorHumanHit();
             return true;
         }

@@ -15,16 +15,7 @@ public sealed class SimplePlanner : IPlanner
     public PlannerDecision GetNextCommand(in NpcAiContext context)
     {
         if (_goal == null)
-            return new PlannerDecision(
-                Command: NpcCommand.Idle,
-                PlanLength: 0,
-                PlanPreview: Array.Empty<NpcCommand>(),
-                PlanCost: 0,
-                ReplanReason: "NoGoal",
-                MethodName: "SimpleRule",
-                MethodScore: 0f,
-                RunnerUpMethod: "None",
-                RunnerUpScore: 0f);
+            return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>(), 0, "NoGoal", "SimpleRule");
 
         var command = _goal.Name switch
         {
@@ -41,28 +32,10 @@ public sealed class SimplePlanner : IPlanner
         };
 
         if (command == NpcCommand.Idle)
-            return new PlannerDecision(
-                Command: command,
-                PlanLength: 0,
-                PlanPreview: Array.Empty<NpcCommand>(),
-                PlanCost: 0,
-                ReplanReason: _goalChanged ? "GoalChanged" : "NoRule",
-                MethodName: "SimpleRule",
-                MethodScore: 0f,
-                RunnerUpMethod: "None",
-                RunnerUpScore: 0f);
+            return new PlannerDecision(command, 0, Array.Empty<NpcCommand>(), 0, _goalChanged ? "GoalChanged" : "NoRule", "SimpleRule");
 
         var reason = _goalChanged ? "GoalChanged" : "RuleMatch";
         _goalChanged = false;
-        return new PlannerDecision(
-            Command: command,
-            PlanLength: 1,
-            PlanPreview: new[] { command },
-            PlanCost: 1,
-            ReplanReason: reason,
-            MethodName: "SimpleRule",
-            MethodScore: 1f,
-            RunnerUpMethod: "Fallback",
-            RunnerUpScore: 0f);
+        return new PlannerDecision(command, 1, new[] { command }, 1, reason, "SimpleRule");
     }
 }

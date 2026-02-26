@@ -29,9 +29,6 @@ public sealed class UtilityGoapBrain : INpcDecisionBrain
             PlanCost: plannerDecision.PlanCost,
             ReplanReason: plannerDecision.ReplanReason,
             MethodName: plannerDecision.MethodName,
-            MethodScore: plannerDecision.MethodScore,
-            RunnerUpMethod: plannerDecision.RunnerUpMethod,
-            RunnerUpScore: plannerDecision.RunnerUpScore,
             GoalScores: selection.Scores);
         return new AiDecisionResult(plannerDecision.Command, trace);
     }

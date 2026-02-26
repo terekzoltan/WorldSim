@@ -24,6 +24,7 @@ WorldSim.Contracts/           # KozoS DTO/Schema C# oldalon (Java parityhoz)
 WorldSim.RefineryAdapter/     # Java patch -> runtime command mapping
 WorldSim.RefineryClient/      # HTTP client + patch parser/applier (mar megvan)
 WorldSim.RefineryClient.Tests/
+WorldSim.ScenarioRunner/      # Headless balance/perf runner (seeds x ticks, assert mode)
 refinery-service-java/        # Kulon Java service (mar megvan)
 
 Tech/                         # Data (technologies.json)
@@ -96,6 +97,9 @@ WorldSim.RefineryAdapter
 
 WorldSim.RefineryClient
   -> WorldSim.Contracts
+
+WorldSim.ScenarioRunner
+  -> WorldSim.Runtime
 ```
 
 Tiltott: `Runtime -> Graphics`, `Runtime -> App`, `AI -> Graphics`, kozvetlen `Graphics -> Simulation mutable state`.
@@ -127,26 +131,6 @@ Definition of Done:
 - F1/F6 UI flow nem torik.
 - Zoom/pan mukodik.
 - Ugyanaz a gameplay vizualisan korrekt marad.
-
-Current Track A focus (Phase 1, Sprint 2 closeout):
-- Snapshot interpolation pipeline stabilizalasa (`previous/current` + `tickAlpha`).
-- Atmosphere layer: `FogHazeRenderPass` + finom terrain/resource animaciok (water/grass modulation, food pulse, ore glint).
-- Camera feel polish: smooth travel tracked NPC fokuszra (`F2`), nagy map clamp/fit stabilitas.
-- 16:9 map preset workflow: `384x216` default, `F5` preset cycle, windowed 16:9 fallback.
-- HUD compact telemetry: hosszabb sorok blokkositasa (colony/ecology/events/status), jobb olvashatosag.
-
-Track A integration guardrails (build-break megelozes):
-- Ha valtozik `WorldRenderSnapshot`, ugyanabban a PR-ben frissiteni kell:
-  - `WorldSnapshotInterpolator`
-  - erintett render passok (`ActorRenderPass`, stb.)
-- Ha valtozik `RenderFrameContext`, ugyanabban a PR-ben frissiteni kell:
-  - minden pass, ami uj mezot hasznal (`FogHazeRenderPass`, `TerrainRenderPass`, `ResourceRenderPass`, stb.)
-  - `WorldRenderer` context konstrukcio
-- Snapshot contract valtozasnal kotelezo smoke:
-  - `dotnet build WorldSim.sln`
-  - `dotnet test WorldSim.ArchTests/WorldSim.ArchTests.csproj`
-
-Megjegyzes: `Game1` -> `GameHost` atnevezes megtortent; uj valtoztatasok mar `WorldSim.App/GameHost.cs`-ra hivatkozzanak.
 
 ### Track B - Runtime Core
 
@@ -206,7 +190,23 @@ Track D design principles (OnlabRefinery parity):
 - Iterativ feedback loop: invalid candidate -> feedback -> retry -> deterministic fallback.
 - Determinisztikus output policy debugginghoz: ugyanarra a checkpoint inputra reprodukalhato eredmeny.
 
+## Session Plans (cross-track coordination sessions)
 
+A kovetkezo sessionok a Meta Coordinator altal kezelt operativ munkacsoportok.
+Mindegyik sajat plan dokumentummal rendelkezik, es a Meta Coordinator Runbook-bol triggerelheto.
+
+| Session | Plan doc | Trigger | Status |
+|---------|----------|---------|--------|
+| **Combat Coordinator** | `Docs/Plans/Session-Combat-Coordinator-Plan.md` | Track A Sprint 3 complete + Phase 0 green-lit | Ready to launch |
+| **Performance Profiling** | `Docs/Plans/Session-Perf-Profiling-Plan.md` | Combat Phase 3, or FPS < 60 | Planned |
+| **Balance/QA Agent** | `Docs/Plans/Session-Balance-QA-Plan.md` | Combat Phase 0 end, or balance regressions | Planned |
+
+Meta Coordinator Runbook: `Docs/Plans/Meta-Coordinator-Runbook.md`
+
+> **PERF EMLEKEZTETOK:** Minden session megnyitasakor olvasd el a
+> `Docs/Plans/Session-Perf-Profiling-Plan.md` -> "EMLEKEZTETOK" szekciot.
+> Ha FPS < 60 barmelyik map preseten, azonnal nyiss Perf Profiling session-t.
+> Reszletek: perf plan szekció 1-2.
 
 ## Kockazatok es mitigacio
 
@@ -231,6 +231,7 @@ Formatum:
 - `[YYYY-MM-DD][Track] rovid cim - hatas - kovetkezo lepes`.
 
 Entries:
+- `[2026-02-21][Track D] Season Director roadmap elinditva - Runtime/Graphics/AI feladatokat is erint - reszletes terv: WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`.
 - `[2026-02-21][Track D] A Refinery hasznos mukodesehez runtime oldali director state + idozitett hatas + colony directive kell - Track B-vel osszehangolt command endpointok szuksegesek`.
 - `[2026-02-21][Track D] Graphics oldalon story beat es nudge allapot vizualizalasa szukseges (HUD/event feed), kulonben nehezen verifikalhato a checkpoint hatas`.
 - `[2026-02-21][Track D] LLM stage csak gated modban induljon (default OFF), Refinery gate maradjon kotelezo minosegkapu`.
@@ -238,9 +239,9 @@ Entries:
 - `[2026-02-21][Track C] GOAP/HTN trace bovitve (plan cost, replan reason, method) - Track A debug olvashatosaghoz plusz mezok kellenek - kovetkezo lepes: compact+page UX finomitas`.
 - `[2026-02-21][Track C] Policy mix aktiv (Global/FactionMix/HtnPilot) es Aetheri HTN pilot - Track B balanszparametereket erint - kovetkezo lepes: config tablaba emeles hardcode switch helyett`.
 - `[2026-02-21][Track C] GOAP invalidation+backoff es HTN method scoring bekotve, faction policy table env-bol konfiguralhato - Track B runtime balansz/ops finomhangolast erint - kovetkezo lepes: policy tabla JSON-ra emelese`.
-- `[2026-02-26][Track B] AI Context Contract v1 visszaigazolva Track C fele (P0/P1 mezolista + cadence + determinism policy) - dokumentum: Docs/Plans/Track-C-AI-Context-Contract-v1.md - kovetkezo lepes: fallback mezok kivaltasa valodi diplomacy/territory/role allapottal`.
-- `[2026-02-26][Track B] B-Prep 2/3/4 baseline leszallitva (AI context cadence cache + snapshot combat fields + navigation topology scaffold) - dokumentum: Docs/Plans/Track-B-Prep-Roadmap.md - kovetkezo lepes: territory ownership valodi modell es role mobilization runtime policy`.
-- `[2026-02-26][Track A] Sprint 2 closeout aktiv: interpolation + haze + compact HUD + 16:9 large map preset - Track B snapshot shape/perf erzekeny - kovetkezo lepes: snapshot/entity id stabilitas es viewport culling policy`.
-- `[2026-02-26][Track A] Render context/schema drift build breaket okozott (snapshot/context mismatch) - cross-track tanulsag: contract valtozas egy-PR-ben frissuljon minden downstream renderer komponensben - kovetkezo lepes: integration guardrails formalizalasa`.
-- `[2026-02-26][Track C] AI compile blocker elharitva (DecisionTrace signature + planner/brain callsite sync) es Runtime test harness stabilizalva - teljes solution ujra zold - kovetkezo lepes: Sprint 3 LLM stage strict gate mellett, fallback policy megtartasaval`.
-- `[2026-02-26][Track C] Track B contract alapjan context cadence cache bekerult (War/Territory 10 tick, WarriorCount 5 tick), fallback mezok runtime forrasra allitva (diplomacy+hostile overlap+role flag) - kovetkezo lepes: valodi territory/diplomacy state kivaltja a proxy logikat`.
+- `[2026-02-26][Track C] Phase0 preflight checklist felveve: Docs/Plans/Track-C-Phase0-Preflight-Checklist.md - C-R1 freeze + staged combat extension dokumentalva - kovetkezo lepes: Track B combat primitives utan C-R2 aktivalas`.
+- `[2026-02-26][Track C] Combat masterplan readiness roadmap formalizalva: Docs/Plans/Track-C-Combat-Masterplan-Readiness-Roadmap.md (C-R1 split, C-R2 Phase0-gated, C-R4 partial) - kovetkezo lepes: C-R1 freeze + Phase0 checklist`.
+- `[2026-02-26][Track B] Territory influence formula finomitva (base/(1+dist)+pop/warrior hatas, contested threshold tunable) es role mobilization baseline periodikus allapotfrissitessel - kovetkezo lepes: Phase0 combat primitivek (fight/flee, combat cooldown, bidirectional predator loop)`.
+- `[2026-02-26][Meta] Session planok letrehozva: Combat Coordinator, Perf Profiling, Balance/QA - reszletek: Docs/Plans/Session-*.md - kovetkezo lepes: perf-check workflow beepitese a Runbook-ba`.
+- `[2026-02-26][Track A] Sprint 3 S3-4/S3-5 leszallitva: frame avg/p99 telemetry, viewport culling, territory/combat overlay pass scaffold, diplomacy/campaign panel scaffold - Track B combat snapshot boviteshez vizualis hook kesz - kovetkezo lepes: smoke matrix es capture flow validalas`.
+- `[2026-02-26][Track A] Sprint 3 S3-4/S3-5 leszallitva: frame avg/p99 telemetry, viewport culling, territory/combat overlay pass scaffold, diplomacy/campaign panel scaffold - Track B combat snapshot boviteshez vizualis hook kesz - kovetkezo lepes: smoke matrix es capture flow validalas`.

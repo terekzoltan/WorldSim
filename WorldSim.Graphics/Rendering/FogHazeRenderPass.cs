@@ -15,7 +15,7 @@ public sealed class FogHazeRenderPass : IRenderPass
         var settings = context.Settings;
         var textures = context.Textures;
         var time = context.TimeSeconds;
-        var fx = Math.Clamp(context.FxIntensity, 0f, 2f);
+        float fx = context.FxIntensity;
 
         var mapWidthPx = snapshot.Width * settings.TileSize;
         var mapHeightPx = snapshot.Height * settings.TileSize;

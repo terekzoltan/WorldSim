@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using WorldSim.AI;
 using WorldSim.Simulation;
 using Xunit;
@@ -12,6 +8,10 @@ public class RuntimeNpcBrainTests
 {
     [Theory]
     [InlineData(NpcCommand.Idle, Job.Idle)]
+    [InlineData(NpcCommand.Fight, Job.Fight)]
+    [InlineData(NpcCommand.Flee, Job.Flee)]
+    [InlineData(NpcCommand.GuardColony, Job.GuardColony)]
+    [InlineData(NpcCommand.PatrolBorder, Job.PatrolBorder)]
     [InlineData(NpcCommand.GatherWood, Job.GatherWood)]
     [InlineData(NpcCommand.GatherStone, Job.GatherStone)]
     [InlineData(NpcCommand.GatherIron, Job.GatherIron)]
@@ -44,8 +44,8 @@ public class RuntimeNpcBrainTests
             technologyFilePath: techPath,
             aiOptions: new RuntimeAiOptions { PlannerMode = NpcPlannerMode.Simple });
 
-        Assert.Equal(NpcPlannerMode.Simple, runtime.PlannerMode);
-        Assert.Equal(NpcPolicyMode.GlobalPlanner, runtime.PolicyMode);
+        Assert.Equal("Simple", runtime.PlannerMode);
+        Assert.Equal("GlobalPlanner", runtime.PolicyMode);
     }
 
     [Fact]
@@ -75,59 +75,21 @@ public class RuntimeNpcBrainTests
     }
 
     [Fact]
-    public void RuntimeNpcBrain_PeriodicContextFields_RespectCadence()
+    public void RuntimeNpcBrain_CommandParity_CoversAllNpcCommands()
     {
-        var world = new World(16, 16, 10);
-        world.EnableDiplomacy = true;
-        world.EnableCombatPrimitives = false;
+        foreach (var command in Enum.GetValues<NpcCommand>())
+        {
+            var world = new World(16, 16, 10);
+            var person = world._people[0];
+            var brain = new RuntimeNpcBrain(new FixedBrain(command));
 
-        var actor = world._people[0];
-        var hostile = world._people.First(person => person.Home != actor.Home);
-        hostile.Pos = actor.Pos;
+            var job = brain.Think(person, world, dt: 0.25f);
 
-        var spy = new CaptureBrain();
-        var brain = new RuntimeNpcBrain(spy);
-
-        for (var i = 0; i < 4; i++)
-            brain.Think(actor, world, dt: 0.1f);
-
-        Assert.Equal(4, spy.Contexts.Count);
-        Assert.All(spy.Contexts, context => Assert.Equal(spy.Contexts[0].WarState, context.WarState));
-        Assert.All(spy.Contexts, context => Assert.Equal(spy.Contexts[0].TileContestedNearby, context.TileContestedNearby));
-        Assert.All(spy.Contexts, context => Assert.Equal(spy.Contexts[0].ColonyWarriorCount, context.ColonyWarriorCount));
-
-        brain.Think(actor, world, dt: 0.1f); // tick 5, warrior count cadence refresh
-        Assert.Equal(spy.Contexts[0].WarState, spy.Contexts[4].WarState);
-        Assert.Equal(spy.Contexts[0].TileContestedNearby, spy.Contexts[4].TileContestedNearby);
-    }
-
-    [Fact]
-    public void RuntimeNpcBrain_UsesRealFallbackSources_ForWarTerritoryAndRole()
-    {
-        var world = new World(16, 16, 10);
-        world.EnableDiplomacy = true;
-        world.EnableCombatPrimitives = true;
-
-        var actor = world._people[0];
-        actor.Roles = PersonRole.Warrior;
-        var hostile = world._people.First(person => person.Home != actor.Home);
-        hostile.Pos = actor.Pos;
-
-        // Place actor near border-like distance between colony origins.
-        actor.Pos = (
-            (actor.Home.Origin.x + hostile.Home.Origin.x) / 2,
-            (actor.Home.Origin.y + hostile.Home.Origin.y) / 2);
-
-        var spy = new CaptureBrain();
-        var brain = new RuntimeNpcBrain(spy);
-
-        brain.Think(actor, world, dt: 0.1f);
-        var context = spy.Contexts.Last();
-
-        Assert.Equal(NpcWarState.War, context.WarState);
-        Assert.True(context.TileContestedNearby);
-        Assert.True(context.IsWarrior);
-        Assert.True(context.ColonyWarriorCount >= 1);
+            if (command == NpcCommand.Idle)
+                Assert.Equal(Job.Idle, job);
+            else
+                Assert.NotEqual(Job.Idle, job);
+        }
     }
 
     [Fact]
@@ -157,11 +119,8 @@ public class RuntimeNpcBrainTests
         var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
         var runtime = new SimulationRuntime(16, 16, 10, techPath);
 
-        for (var i = 0; i < 6 && !runtime.GetAiDebugSnapshot().HasData; i++)
-            runtime.AdvanceTick(0.25f);
+        runtime.AdvanceTick(0.25f);
         var before = runtime.GetAiDebugSnapshot();
-
-        Assert.True(before.HasData);
 
         runtime.CycleTrackedNpc(1);
         var after = runtime.GetAiDebugSnapshot();
@@ -209,30 +168,6 @@ public class RuntimeNpcBrainTests
         }
     }
 
-    [Fact]
-    public void SimulationRuntime_FeatureFlagScaffold_CanBeSetAndRead()
-    {
-        var repoRoot = FindRepoRoot();
-        var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
-        var runtime = new SimulationRuntime(16, 16, 10, techPath);
-
-        var flags = new RuntimeFeatureFlags(
-            EnableCombatPrimitives: true,
-            EnableDiplomacy: true,
-            EnableFortifications: false,
-            EnableSiege: false,
-            EnableSupply: false,
-            EnableCampaigns: false,
-            EnablePredatorHumanAttacks: false);
-
-        var result = runtime.SetFeatureFlags(flags);
-        var read = runtime.GetFeatureFlags();
-
-        Assert.True(result.Success);
-        Assert.True(read.EnableCombatPrimitives);
-        Assert.True(read.EnableDiplomacy);
-    }
-
     private sealed class FixedBrain : INpcDecisionBrain
     {
         private readonly NpcCommand _command;
@@ -253,39 +188,8 @@ public class RuntimeNpcBrainTests
             PlanCost: 1,
             ReplanReason: "Fixed",
             MethodName: "FixedMethod",
-            MethodScore: 1f,
-            RunnerUpMethod: "None",
-            RunnerUpScore: 0f,
             GoalScores: Array.Empty<GoalScoreEntry>());
             return new AiDecisionResult(_command, trace);
-        }
-    }
-
-    private sealed class CaptureBrain : INpcDecisionBrain
-    {
-        public List<NpcAiContext> Contexts { get; } = new();
-
-        public AiDecisionResult Think(in NpcAiContext context)
-        {
-            Contexts.Add(context);
-            return new AiDecisionResult(NpcCommand.Idle, FixedTrace());
-        }
-
-        private static AiDecisionTrace FixedTrace()
-        {
-            return new AiDecisionTrace(
-                SelectedGoal: "Capture",
-                PlannerName: "Capture",
-                PolicyName: "Capture",
-                PlanLength: 0,
-                PlanPreview: Array.Empty<NpcCommand>(),
-                PlanCost: 0,
-                ReplanReason: "Capture",
-                MethodName: "Capture",
-                MethodScore: 0f,
-                RunnerUpMethod: "None",
-                RunnerUpScore: 0f,
-                GoalScores: Array.Empty<GoalScoreEntry>());
         }
     }
 

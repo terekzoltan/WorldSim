@@ -10,6 +10,8 @@ public enum NpcWarState
 public enum NpcCommand
 {
     Idle,
+
+    // Economy baseline (frozen in C-R1)
     GatherWood,
     GatherStone,
     GatherIron,
@@ -18,7 +20,13 @@ public enum NpcCommand
     EatFood,
     Rest,
     BuildHouse,
-    CraftTools
+    CraftTools,
+
+    // Combat extension minimum (staged for Combat Master Plan Phase 0)
+    Fight,
+    Flee,
+    GuardColony,
+    PatrolBorder
 }
 
 public readonly record struct NpcAiContext(

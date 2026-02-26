@@ -35,12 +35,7 @@ public static class WorldSnapshotInterpolator
             result.Add(new PersonRenderData(
                 (int)MathF.Round(MathHelper.Lerp(prev.X, cur.X, alpha)),
                 (int)MathF.Round(MathHelper.Lerp(prev.Y, cur.Y, alpha)),
-                cur.ColonyId,
-                cur.Health,
-                cur.IsInCombat,
-                cur.LastCombatTick,
-                cur.IsWarrior,
-                cur.Defense));
+                cur.ColonyId));
         }
 
         for (int i = shared; i < current.Count; i++)
