@@ -25,7 +25,16 @@ public sealed class GoapPlanner : IPlanner
     public PlannerDecision GetNextCommand(in NpcAiContext context)
     {
         if (_goal == null)
-            return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>(), 0, "NoGoal", "GoapSearch");
+            return new PlannerDecision(
+                Command: NpcCommand.Idle,
+                PlanLength: 0,
+                PlanPreview: Array.Empty<NpcCommand>(),
+                PlanCost: 0,
+                ReplanReason: "NoGoal",
+                MethodName: "GoapSearch",
+                MethodScore: 0f,
+                RunnerUpMethod: "None",
+                RunnerUpScore: 0f);
 
         var reason = _goalChanged ? "GoalChanged" : "PlanContinue";
 
@@ -41,7 +50,16 @@ public sealed class GoapPlanner : IPlanner
             if (context.SimulationTimeSeconds < _nextReplanAllowedAtSeconds)
             {
                 _goalChanged = false;
-                return new PlannerDecision(NpcCommand.Idle, 0, Array.Empty<NpcCommand>(), 0, "ReplanBackoff", "GoapSearch");
+                return new PlannerDecision(
+                    Command: NpcCommand.Idle,
+                    PlanLength: 0,
+                    PlanPreview: Array.Empty<NpcCommand>(),
+                    PlanCost: 0,
+                    ReplanReason: "ReplanBackoff",
+                    MethodName: "GoapSearch",
+                    MethodScore: 0f,
+                    RunnerUpMethod: "None",
+                    RunnerUpScore: 0f);
             }
 
             var plan = BuildPlan(context, _goal);
@@ -66,14 +84,35 @@ public sealed class GoapPlanner : IPlanner
         GoapAction? currentAction = _currentPlan.Count > 0 ? _currentPlan.Dequeue() : null;
         var command = currentAction?.Command ?? NpcCommand.Idle;
         if (command == NpcCommand.Idle)
-            return new PlannerDecision(command, 0, Array.Empty<NpcCommand>(), 0, reason, "GoapSearch");
+            return new PlannerDecision(
+                Command: command,
+                PlanLength: 0,
+                PlanPreview: Array.Empty<NpcCommand>(),
+                PlanCost: 0,
+                ReplanReason: reason,
+                MethodName: "GoapSearch",
+                MethodScore: 0f,
+                RunnerUpMethod: "None",
+                RunnerUpScore: 0f);
 
         var planLength = 1 + _currentPlan.Count;
         var preview = new List<NpcCommand>(1 + Math.Min(4, _currentPlan.Count)) { command };
         preview.AddRange(_currentPlan.Take(4).Select(action => action.Command));
         var cost = Math.Max(1, _cachedRemainingPlanCost);
         _cachedRemainingPlanCost = Math.Max(0, _cachedRemainingPlanCost - (currentAction?.Cost ?? 1));
-        return new PlannerDecision(command, planLength, preview, cost, reason, "GoapSearch");
+        var methodScore = 1f / (1f + cost);
+        var runnerUpMethod = _currentPlan.Count > 0 ? _currentPlan.Peek().Name : "None";
+        var runnerUpScore = _currentPlan.Count > 0 ? Math.Max(0f, methodScore - 0.1f) : 0f;
+        return new PlannerDecision(
+            Command: command,
+            PlanLength: planLength,
+            PlanPreview: preview,
+            PlanCost: cost,
+            ReplanReason: reason,
+            MethodName: "GoapSearch",
+            MethodScore: methodScore,
+            RunnerUpMethod: runnerUpMethod,
+            RunnerUpScore: runnerUpScore);
     }
 
     private static bool CanExecuteCurrentAction(in NpcAiContext context, GoapAction action)

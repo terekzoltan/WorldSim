@@ -33,6 +33,10 @@ namespace WorldSim.Simulation
         public List<SpecializedBuilding> SpecializedBuildings = new();
         public List<Animal> _animals = new();
 
+        public IReadOnlyList<Person> People => _people;
+        public IReadOnlyList<Colony> Colonies => _colonies;
+        public IReadOnlyList<Animal> Animals => _animals;
+
         // Technology-affected properties
         public int WoodYield { get; set; } = 1; // Fa kitermelés hozama (mennyi fát kapnak egy gyűjtéskor)
         public int StoneYield { get; set; } = 1; // Kő kitermelés hozama
@@ -50,6 +54,13 @@ namespace WorldSim.Simulation
         public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
         public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
         public bool AllowFreeTechUnlocks { get; set; }
+        public bool EnableCombatPrimitives { get; set; }
+        public bool EnableDiplomacy { get; set; }
+        public bool EnableFortifications { get; set; }
+        public bool EnableSiege { get; set; }
+        public bool EnableSupply { get; set; }
+        public bool EnableCampaigns { get; set; }
+        public RuntimeBalanceOptions Balance { get; } = new();
         // Disabled by default until bidirectional combat/retaliation exists.
         public bool EnablePredatorHumanAttacks { get; set; } = false;
         public float PredatorHumanDamage { get; set; } = 10f;
@@ -66,8 +77,10 @@ namespace WorldSim.Simulation
         public int TotalDeathsOther { get; private set; }
         public int RecentDeathsStarvation60s => _recentStarvationDeaths.Count;
         public int TotalStarvationDeathsWithFood { get; private set; }
+        public long CurrentTick { get; private set; }
+        public int NavigationTopologyVersion { get; private set; }
 
-        readonly Random _rng = new();
+        readonly Random _rng;
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
         readonly List<string> _recentEvents = new();
         readonly HashSet<int> _houseMilestones = new();
@@ -88,8 +101,9 @@ namespace WorldSim.Simulation
         const float SpecializedBuildPeriod = 14f;
         const float FoodParityPeriod = 6f;
 
-        public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null)
+        public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null, int? randomSeed = null)
         {
+            _rng = randomSeed.HasValue ? new Random(randomSeed.Value) : new Random();
             _brainFactory = brainFactory ?? (_ => new RuntimeNpcBrain());
             Width = width;
             Height = height;
@@ -167,18 +181,19 @@ namespace WorldSim.Simulation
                         py = Math.Clamp(col.Origin.y + _rng.Next(-spawnRadius, spawnRadius + 1), 0, Height - 1);
                     } while (_map[px, py].Ground == Ground.Water && ++attempts < 64);
 
-                    _people.Add(Person.Spawn(col, (px, py), CreateNpcBrain(col)));
+                    _people.Add(Person.Spawn(col, (px, py), CreateNpcBrain(col), CreateEntityRandom()));
                 }
             }
 
             // 3. Animals
             int animalCount = Math.Max(10, (Width * Height) / 256);
             for (int i = 0; i < animalCount; i++)
-                _animals.Add(Animal.Spawn(RandomFreePos()));
+                _animals.Add(Animal.Spawn(RandomFreePos(), CreateEntityRandom()));
         }
 
         public void Update(float dt)
         {
+            CurrentTick++;
             _simulationTimeSeconds += Math.Max(0f, dt);
             UpdateSeasonsAndEvents(dt);
             UpdateFoodRegrowth(dt);
@@ -259,10 +274,18 @@ namespace WorldSim.Simulation
 
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
         public Tile GetTile(int x, int y) => _map[x, y];
-        public void AddHouse(Colony colony, (int x, int y) pos) => Houses.Add(new House(colony, pos, HouseCapacity));
+        public void AddHouse(Colony colony, (int x, int y) pos)
+        {
+            Houses.Add(new House(colony, pos, HouseCapacity));
+            NavigationTopologyVersion++;
+        }
         public void AddSpecializedBuilding(Colony colony, (int x, int y) pos, SpecializedBuildingKind kind)
-            => SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
+        {
+            SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
+            NavigationTopologyVersion++;
+        }
         internal RuntimeNpcBrain CreateNpcBrain(Colony colony) => _brainFactory(colony);
+        internal Random CreateEntityRandom() => new(_rng.Next());
 
         public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;
         public void ReportPredatorDeath() => TotalPredatorDeaths++;
@@ -522,7 +545,7 @@ namespace WorldSim.Simulation
                 {
                     IsDroughtActive = true;
                     _droughtTimer = 0f;
-                    AddEvent("Drought started");
+                    AddEvent(EventFeedCatalog.DroughtStarted);
                 }
             }
 
@@ -533,7 +556,7 @@ namespace WorldSim.Simulation
                 {
                     IsDroughtActive = false;
                     _droughtTimer = 0f;
-                    AddEvent("Drought ended");
+                    AddEvent(EventFeedCatalog.DroughtEnded);
                 }
             }
 
@@ -557,12 +580,12 @@ namespace WorldSim.Simulation
 
             if (herbivores < Math.Max(8, (Width * Height) / 400))
             {
-                _animals.Add(new Herbivore(RandomFreePos()));
+                _animals.Add(new Herbivore(RandomFreePos(), CreateEntityRandom()));
                 return;
             }
 
             if (predators < Math.Max(3, herbivores / 6) && _rng.NextDouble() < 0.5)
-                _animals.Add(new Predator(RandomFreePos()));
+                _animals.Add(new Predator(RandomFreePos(), CreateEntityRandom()));
         }
 
         void UpdateMilestones()
@@ -572,14 +595,14 @@ namespace WorldSim.Simulation
                 if (colony.HouseCount > 0 && !_houseMilestones.Contains(colony.Id))
                 {
                     _houseMilestones.Add(colony.Id);
-                    AddEvent($"{colony.Name} built first house");
+                    AddEvent(string.Format(EventFeedCatalog.FirstHouseBuilt, colony.Name));
                 }
 
                 int people = _people.Count(p => p.Home == colony && p.Health > 0f);
                 if (people == 0 && !_extinctionMilestones.Contains(colony.Id))
                 {
                     _extinctionMilestones.Add(colony.Id);
-                    AddEvent($"{colony.Name} collapsed");
+                    AddEvent(string.Format(EventFeedCatalog.ColonyCollapsed, colony.Name));
                 }
             }
         }
@@ -655,7 +678,7 @@ namespace WorldSim.Simulation
                 if (colony.FarmPlotCount < targetFarms && colony.Stock[Resource.Wood] >= 12 && colony.Stock[Resource.Stone] >= 4)
                 {
                     if (TryPlaceSpecialized(colony, SpecializedBuildingKind.FarmPlot, woodCost: 12, stoneCost: 4, ironCost: 0, goldCost: 0))
-                        AddEvent($"{colony.Name} built FarmPlot");
+                        AddEvent(string.Format(EventFeedCatalog.BuiltFarmPlot, colony.Name));
                     continue;
                 }
 
@@ -663,14 +686,14 @@ namespace WorldSim.Simulation
                 if (foodPerCapita >= 1.05f && colony.WorkshopCount < targetWorkshops && colony.Stock[Resource.Wood] >= 12 && colony.Stock[Resource.Stone] >= 6 && colony.Stock[Resource.Iron] >= 3)
                 {
                     if (TryPlaceSpecialized(colony, SpecializedBuildingKind.Workshop, woodCost: 12, stoneCost: 6, ironCost: 3, goldCost: 0))
-                        AddEvent($"{colony.Name} built Workshop");
+                        AddEvent(string.Format(EventFeedCatalog.BuiltWorkshop, colony.Name));
                     continue;
                 }
 
                 if (foodPerCapita >= 1.1f && colony.StorehouseCount < 1 && colony.Stock[Resource.Wood] >= 14 && colony.Stock[Resource.Stone] >= 10 && colony.Stock[Resource.Gold] >= 1)
                 {
                     if (TryPlaceSpecialized(colony, SpecializedBuildingKind.Storehouse, woodCost: 14, stoneCost: 10, ironCost: 0, goldCost: 1))
-                        AddEvent($"{colony.Name} built Storehouse");
+                        AddEvent(string.Format(EventFeedCatalog.BuiltStorehouse, colony.Name));
                 }
             }
         }

@@ -10,5 +10,8 @@ public readonly record struct RenderFrameContext(
     TextureCatalog Textures,
     WorldRenderSettings Settings,
     WorldRenderTheme Theme,
-    RenderStats Stats
+    RenderStats Stats,
+    float TimeSeconds,
+    float TickAlpha,
+    float FxIntensity
 );

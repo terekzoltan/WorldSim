@@ -60,7 +60,16 @@ public sealed record HouseRenderData(int X, int Y, int ColonyId);
 
 public sealed record SpecializedBuildingRenderData(int X, int Y, int ColonyId, SpecializedBuildingKindView Kind);
 
-public sealed record PersonRenderData(int X, int Y, int ColonyId);
+public sealed record PersonRenderData(
+    int X,
+    int Y,
+    int ColonyId,
+    float Health,
+    bool IsInCombat,
+    long LastCombatTick,
+    bool IsWarrior,
+    float Defense
+);
 
 public sealed record AnimalRenderData(int X, int Y, AnimalKindView Kind);
 

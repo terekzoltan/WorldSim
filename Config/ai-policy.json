@@ -1,0 +1,9 @@
+{
+  "defaultPlanner": "Goap",
+  "factions": {
+    "Sylvars": "Goap",
+    "Obsidari": "Simple",
+    "Aetheri": "Htn",
+    "Chirita": "Goap"
+  }
+}

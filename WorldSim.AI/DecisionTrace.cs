@@ -8,7 +8,10 @@ public readonly record struct PlannerDecision(
     IReadOnlyList<NpcCommand> PlanPreview,
     int PlanCost,
     string ReplanReason,
-    string MethodName);
+    string MethodName,
+    float MethodScore,
+    string RunnerUpMethod,
+    float RunnerUpScore);
 
 public sealed record AiDecisionTrace(
     string SelectedGoal,
@@ -19,6 +22,9 @@ public sealed record AiDecisionTrace(
     int PlanCost,
     string ReplanReason,
     string MethodName,
+    float MethodScore,
+    string RunnerUpMethod,
+    float RunnerUpScore,
     IReadOnlyList<GoalScoreEntry> GoalScores);
 
 public readonly record struct AiDecisionResult(NpcCommand Command, AiDecisionTrace Trace);

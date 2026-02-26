@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "6f5f34e7-1f8d-4ca8-a4ec-8be2f2a91d3a",
+  "seed": 321,
+  "tick": 128,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "width": 192,
+      "height": 108,
+      "colonyCount": 4,
+      "storyBeatCooldownTicks": 0
+    }
+  }
+}

@@ -20,6 +20,7 @@ public sealed class SimulationRuntime
 
     public long Tick { get; private set; }
     public string LastTechActionStatus { get; private set; } = "No tech action";
+    public string LastRuntimeCommandStatus { get; private set; } = "No runtime command";
     public int LoadedTechCount => TechTree.Techs.Count;
 
     public int Width => _world.Width;
@@ -175,6 +176,53 @@ public sealed class SimulationRuntime
         var result = TechTree.TryUnlock(techId, _world, colony);
         if (!result.Success)
             throw new InvalidOperationException($"Cannot unlock tech '{techId}': {result.Reason}");
+    }
+
+    public RuntimeFeatureFlags GetFeatureFlags()
+    {
+        return new RuntimeFeatureFlags(
+            _world.EnableCombatPrimitives,
+            _world.EnableDiplomacy,
+            _world.EnableFortifications,
+            _world.EnableSiege,
+            _world.EnableSupply,
+            _world.EnableCampaigns,
+            _world.EnablePredatorHumanAttacks);
+    }
+
+    public RuntimeCommandResult SetFeatureFlags(RuntimeFeatureFlags flags)
+    {
+        _world.EnableCombatPrimitives = flags.EnableCombatPrimitives;
+        _world.EnableDiplomacy = flags.EnableDiplomacy;
+        _world.EnableFortifications = flags.EnableFortifications;
+        _world.EnableSiege = flags.EnableSiege;
+        _world.EnableSupply = flags.EnableSupply;
+        _world.EnableCampaigns = flags.EnableCampaigns;
+        _world.EnablePredatorHumanAttacks = flags.EnablePredatorHumanAttacks;
+
+        LastRuntimeCommandStatus =
+            $"Flags set: Combat={flags.EnableCombatPrimitives}, Diplo={flags.EnableDiplomacy}, Fort={flags.EnableFortifications}, Siege={flags.EnableSiege}, Supply={flags.EnableSupply}, Campaign={flags.EnableCampaigns}, PredHuman={flags.EnablePredatorHumanAttacks}";
+        return RuntimeCommandResult.Ok(LastRuntimeCommandStatus);
+    }
+
+    public RuntimeCommandResult DeclareWar(int factionA, int factionB)
+    {
+        if (!_world.EnableDiplomacy)
+        {
+            LastRuntimeCommandStatus = "DeclareWar ignored: diplomacy disabled";
+            return RuntimeCommandResult.Fail(LastRuntimeCommandStatus);
+        }
+
+        LastRuntimeCommandStatus = $"DeclareWar scaffold accepted for factions {factionA} vs {factionB} (runtime state machine pending)";
+        return RuntimeCommandResult.Ok(LastRuntimeCommandStatus);
+    }
+
+    public RuntimeCommandResult SetColonyDirective(int colonyId, string directive, float intensity, long expiryTick)
+    {
+        var boundedIntensity = Math.Clamp(intensity, 0f, 1f);
+        LastRuntimeCommandStatus =
+            $"Directive scaffold accepted: colony={colonyId}, directive={directive}, intensity={boundedIntensity:0.###}, expiryTick={expiryTick}";
+        return RuntimeCommandResult.Ok(LastRuntimeCommandStatus);
     }
 
     private RuntimeNpcBrain CreateBrain(Colony colony, RuntimeAiOptions options)

@@ -1,5 +1,12 @@
 namespace WorldSim.AI;
 
+public enum NpcWarState
+{
+    Peace,
+    Tense,
+    War
+}
+
 public enum NpcCommand
 {
     Idle,
@@ -29,7 +36,16 @@ public readonly record struct NpcAiContext(
     int HouseCapacity,
     bool StoneBuildingsEnabled,
     bool CanBuildWithStone,
-    int HouseStoneCost);
+    int HouseStoneCost,
+    float Health = 100f,
+    int Strength = 5,
+    float Defense = 0f,
+    int NearbyPredators = 0,
+    int NearbyHostilePeople = 0,
+    NpcWarState WarState = NpcWarState.Peace,
+    bool TileContestedNearby = false,
+    bool IsWarrior = false,
+    int ColonyWarriorCount = 0);
 
 public interface IPlanner
 {

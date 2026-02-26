@@ -7,6 +7,7 @@ using Microsoft.Xna.Framework.Input;
 using WorldSim.Graphics.Assets;
 using WorldSim.Graphics.Camera;
 using WorldSim.Graphics.Rendering;
+using WorldSim.Graphics.Rendering.PostFx;
 using WorldSim.Graphics.UI;
 using WorldSim.RefineryAdapter;
 using WorldSim.Runtime;
@@ -15,7 +16,7 @@ using WorldSim.Simulation;
 
 namespace WorldSim;
 
-public class Game1 : Game
+public class GameHost : Game
 {
     private static readonly (string Name, WorldRenderTheme Theme)[] ThemePresets =
     {
@@ -58,8 +59,10 @@ public class Game1 : Game
     private bool _showRenderStats;
     private bool _showTelemetryHud = true;
     private int _themeIndex;
+    private bool _postFxEnabled = true;
+    private PostFxQuality _postFxQuality = PostFxQuality.Medium;
 
-    public Game1()
+    public GameHost()
     {
         _graphics = new GraphicsDeviceManager(this);
         Content.RootDirectory = "Content";
@@ -76,6 +79,8 @@ public class Game1 : Game
 
         _refineryRuntime = new RefineryTriggerAdapter(AppDomain.CurrentDomain.BaseDirectory);
         _hudRenderer.SetTheme(HudTheme.FromWorldTheme(_worldRenderer.Theme));
+        _worldRenderer.SetPostFxEnabled(_postFxEnabled);
+        _worldRenderer.SetPostFxQuality(_postFxQuality);
     }
 
     protected override void Initialize()
@@ -107,6 +112,7 @@ public class Game1 : Game
     {
         var keys = Keyboard.GetState();
         var mouse = Mouse.GetState();
+        bool shift = keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift);
 
         _camera.Step((float)gameTime.ElapsedGameTime.TotalSeconds);
 
@@ -143,7 +149,28 @@ public class Game1 : Game
         HandleAiDebugInput(keys);
 
         if (keys.IsKeyDown(Keys.F3) && !_previousKeys.IsKeyDown(Keys.F3))
-            _showRenderStats = !_showRenderStats;
+        {
+            if (shift)
+            {
+                _postFxEnabled = !_postFxEnabled;
+                _worldRenderer.SetPostFxEnabled(_postFxEnabled);
+            }
+            else
+            {
+                _showRenderStats = !_showRenderStats;
+            }
+        }
+
+        if (keys.IsKeyDown(Keys.F4) && !_previousKeys.IsKeyDown(Keys.F4) && shift)
+        {
+            _postFxQuality = _postFxQuality switch
+            {
+                PostFxQuality.Low => PostFxQuality.Medium,
+                PostFxQuality.Medium => PostFxQuality.High,
+                _ => PostFxQuality.Low
+            };
+            _worldRenderer.SetPostFxQuality(_postFxQuality);
+        }
 
         if (keys.IsKeyDown(Keys.T) && !_previousKeys.IsKeyDown(Keys.T))
             _showTelemetryHud = !_showTelemetryHud;
@@ -370,7 +397,15 @@ public class Game1 : Game
         GraphicsDevice.Clear(_worldRenderer.Theme.Background);
 
         var snapshot = _runtime.GetSnapshot();
-        _worldRenderer.Draw(_spriteBatch, snapshot, _camera, _textures);
+        var tickAlpha = Math.Clamp(_accumulator / SimulationTickDuration, 0f, 1f);
+        _worldRenderer.Draw(
+            _spriteBatch,
+            snapshot,
+            _camera,
+            _textures,
+            (float)gameTime.TotalGameTime.TotalSeconds,
+            tickAlpha,
+            1f);
 
         TechMenuView? techMenu = null;
         if (_showTechMenu && _runtime.ColonyCount > 0)
@@ -381,9 +416,9 @@ public class Game1 : Game
         }
 
         _spriteBatch.Begin();
-        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T)";
+        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")}";
 #if DEBUG
-        plannerStatus += " (F7 planner, F8 AI panel, PgUp/PgDn tracked NPC, Home latest, F4 compact)";
+        plannerStatus += " (Shift+F3 postfx, Shift+F4 quality, F7 planner, F8 AI panel, PgUp/PgDn tracked NPC, Home latest, F4 compact)";
 #endif
         if (_showTelemetryHud)
         {

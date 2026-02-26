@@ -25,20 +25,24 @@ public class Person
     public (int x, int y) Pos;
     public Job Current = Job.Idle;
     public float Health = 100;  
+    public float Defense = 0f;
     public float Age = 0;
     public float Stamina { get; private set; } = 100f;
+    public bool IsInCombat { get; private set; }
+    public long LastCombatTick { get; private set; }
+    public PersonRole Roles { get; set; } = PersonRole.None;
     public Profession Profession { get; internal set; }
     public PersonDeathReason LastDeathReason { get; private set; } = PersonDeathReason.None;
     public int Strength, Intelligence;
     public Colony Home => _home;
 
     Colony _home;
-    Random _rng = new();
+    readonly Random _rng;
 
     // Perception and internal state
     public Blackboard Blackboard { get; } = new();
     public Memory Memory { get; } = new();
-    public List<Sensor> Sensors { get; } = new() { new EnvironmentSensor() };
+    public List<Sensor> Sensors { get; } = new() { new EnvironmentSensor(), new ThreatSensor() };
 
     public Dictionary<string, float> Needs { get; } = new();
     public Dictionary<string, float> Emotions { get; } = new();
@@ -57,7 +61,6 @@ public class Person
     const int RestWorkTime = 4;
     const int BuildHouseTime = 20;
     const int CraftToolsTime = 14;
-    const float AgingTickDivisor = 90f;
 
     int _doingJob = 0; // csinalni hogy ideig dolgozzon ne instant
 
@@ -66,16 +69,17 @@ public class Person
     float _loiterThresholdSeconds; // randomized per person
     (int x, int y) _lastPos;
 
-    private Person(Colony home, (int, int) pos, bool newborn, RuntimeNpcBrain brain)
+    private Person(Colony home, (int, int) pos, bool newborn, RuntimeNpcBrain brain, Random random)
     {
         _home = home;
         _brain = brain;
+        _rng = random;
         Pos = pos;
         _lastPos = pos;
         Strength = _rng.Next(3, 11);
         Intelligence = _rng.Next(3, 11);
         Age = newborn ? 0f : 18f + (float)_rng.NextDouble() * 22f;
-        Profession = PickInitialProfession(home);
+        Profession = PickInitialProfession(home, _rng);
 
         // Needs/Emotions baseline-ok
         Needs["Hunger"] = 20f; // 0..100, kisebb = jobb (jóllakott)
@@ -85,21 +89,21 @@ public class Person
         _loiterThresholdSeconds = 2.5f + (float)_rng.NextDouble() * 2.5f; // 2.5..5.0s
     }
 
-    public static Person Spawn(Colony home, (int, int) pos, RuntimeNpcBrain brain)
-        => new Person(home, pos, newborn: false, brain);
+    public static Person Spawn(Colony home, (int, int) pos, RuntimeNpcBrain brain, Random random)
+        => new Person(home, pos, newborn: false, brain, random);
 
-    public static Person SpawnWithBonus(Colony home, (int, int) pos, World world, RuntimeNpcBrain brain)
+    public static Person SpawnWithBonus(Colony home, (int, int) pos, World world, RuntimeNpcBrain brain, Random random)
     {
-        var person = new Person(home, pos, newborn: true, brain);
+        var person = new Person(home, pos, newborn: true, brain, random);
         person.Strength = Math.Min(20, person.Strength + world.StrengthBonus);
         person.Intelligence = Math.Min(20, person.Intelligence + world.IntelligenceBonus);
         person.Health += world.HealthBonus;
         return person;
     }
 
-    private static Profession PickInitialProfession(Colony colony)
+    private static Profession PickInitialProfession(Colony colony, Random random)
     {
-        var roll = Random.Shared.NextDouble();
+        var roll = random.NextDouble();
         return colony.Faction switch
         {
             Faction.Sylvars => roll switch
@@ -169,7 +173,10 @@ public class Person
         // perception step
         Perceive(w);
 
-        Age += dt / AgingTickDivisor;
+        if (IsInCombat && (w.CurrentTick - LastCombatTick) > 12)
+            IsInCombat = false;
+
+        Age += dt / Math.Max(1f, w.Balance.AgingTickDivisor);
         if (Age > w.MaxAge)
         {
             LastDeathReason = PersonDeathReason.OldAge;
@@ -178,7 +185,7 @@ public class Person
 
         // Needs időbeli változása
         if (Needs.TryGetValue("Hunger", out var h))
-            Needs["Hunger"] = Math.Clamp(h + dt * 1.65f, 0f, 100f);
+            Needs["Hunger"] = Math.Clamp(h + dt * w.Balance.HungerPerSecond, 0f, 100f);
 
         if (Current == Job.Idle)
             Stamina = Math.Clamp(Stamina + dt * 2.2f, 0f, 100f);
@@ -188,9 +195,9 @@ public class Person
         float hunger = Needs.GetValueOrDefault("Hunger", 0f);
 
         // Critical hunger preemption happens before starvation damage to avoid dying with available food.
-        if (hunger >= 78f && _home.Stock[Resource.Food] > 0)
+        if (hunger >= w.Balance.CriticalEatPreemptThreshold && _home.Stock[Resource.Food] > 0)
         {
-            if (hunger >= 96f)
+            if (hunger >= w.Balance.EmergencyInstantEatThreshold)
             {
                 _home.Stock[Resource.Food] -= 1;
                 Needs["Hunger"] = Math.Max(0f, hunger - 28f);
@@ -211,9 +218,9 @@ public class Person
         }
 
         if (hunger >= 95f)
-            Health -= dt * 2.6f;
+            Health -= dt * w.Balance.StarvationDamageSevere;
         else if (hunger >= 85f)
-            Health -= dt * 1.2f;
+            Health -= dt * w.Balance.StarvationDamageLight;
 
         if (Health <= 0f)
         {
@@ -270,7 +277,7 @@ public class Person
 
         if (Age >= 18 && Age <= 60 && hasHousingRoom && socialGate && _rng.NextDouble() < birthChance)
         {
-            births.Add(Person.SpawnWithBonus(_home, Pos, w, w.CreateNpcBrain(_home)));
+            births.Add(Person.SpawnWithBonus(_home, Pos, w, w.CreateNpcBrain(_home), w.CreateEntityRandom()));
         }
 
         int reserveBonus = _home.FoodReserveBonus;
@@ -392,11 +399,11 @@ public class Person
                 return true;
             }
 
-            float eatNowThreshold = emergencyFood ? 54f : 62f;
+            float eatNowThreshold = emergencyFood ? w.Balance.EatThresholdEmergency : w.Balance.EatThresholdNormal;
             if (abundantFood)
                 eatNowThreshold = Math.Min(eatNowThreshold, 58f);
 
-            float seekFoodThreshold = emergencyFood ? 42f : 50f;
+            float seekFoodThreshold = emergencyFood ? w.Balance.SeekFoodThresholdEmergency : w.Balance.SeekFoodThresholdNormal;
             if (abundantFood)
                 seekFoodThreshold += 8f;
 
@@ -644,10 +651,12 @@ public class Person
             _home.ToolCharges--;
     }
 
-    public void ApplyDamage(float amount, string source)
+    public void ApplyDamage(float amount, string source, long tick = -1)
     {
         if (amount <= 0f || Health <= 0f)
             return;
+
+        MarkCombatActivity(tick);
 
         Health -= amount;
         if (Health <= 0f)
@@ -656,6 +665,13 @@ public class Person
                 ? PersonDeathReason.Predator
                 : PersonDeathReason.Other;
         }
+    }
+
+    public void MarkCombatActivity(long tick = -1)
+    {
+        IsInCombat = true;
+        if (tick >= 0)
+            LastCombatTick = tick;
     }
 
     bool HasNearbyOwnHouse(World w, int radius)

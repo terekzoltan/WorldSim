@@ -19,7 +19,7 @@ Use the modular projects above for active development.
 
 ## Build and test
 
-```bash
+```powershell
 dotnet build WorldSim.sln
 dotnet test WorldSim.ArchTests/WorldSim.ArchTests.csproj
 ```

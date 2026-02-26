@@ -8,6 +8,9 @@ public sealed class HtnPlanner : IPlanner
     private Goal? _goal;
     private readonly Queue<NpcCommand> _plan = new();
     private string _methodName = "None";
+    private float _methodScore;
+    private string _runnerUpMethod = "None";
+    private float _runnerUpScore;
     private bool _goalChanged;
 
     public string Name => "Htn";
@@ -18,12 +21,24 @@ public sealed class HtnPlanner : IPlanner
         _goal = goal;
         _plan.Clear();
         _methodName = "None";
+        _methodScore = 0f;
+        _runnerUpMethod = "None";
+        _runnerUpScore = 0f;
     }
 
     public PlannerDecision GetNextCommand(in NpcAiContext context)
     {
         if (_goal == null)
-            return new PlannerDecision(NpcCommand.Idle, 0, System.Array.Empty<NpcCommand>(), 0, "NoGoal", "None");
+            return new PlannerDecision(
+                Command: NpcCommand.Idle,
+                PlanLength: 0,
+                PlanPreview: System.Array.Empty<NpcCommand>(),
+                PlanCost: 0,
+                ReplanReason: "NoGoal",
+                MethodName: "None",
+                MethodScore: 0f,
+                RunnerUpMethod: "None",
+                RunnerUpScore: 0f);
 
         var reason = _goalChanged ? "GoalChanged" : "PlanContinue";
 
@@ -35,13 +50,31 @@ public sealed class HtnPlanner : IPlanner
         }
 
         if (_plan.Count == 0)
-            return new PlannerDecision(NpcCommand.Idle, 0, System.Array.Empty<NpcCommand>(), 0, "NoMethod", _methodName);
+            return new PlannerDecision(
+                Command: NpcCommand.Idle,
+                PlanLength: 0,
+                PlanPreview: System.Array.Empty<NpcCommand>(),
+                PlanCost: 0,
+                ReplanReason: "NoMethod",
+                MethodName: _methodName,
+                MethodScore: _methodScore,
+                RunnerUpMethod: _runnerUpMethod,
+                RunnerUpScore: _runnerUpScore);
 
         var command = _plan.Dequeue();
         var planLength = 1 + _plan.Count;
         var preview = new List<NpcCommand> { command };
         preview.AddRange(_plan.Take(4));
-        return new PlannerDecision(command, planLength, preview, planLength, reason, _methodName);
+        return new PlannerDecision(
+            Command: command,
+            PlanLength: planLength,
+            PlanPreview: preview,
+            PlanCost: planLength,
+            ReplanReason: reason,
+            MethodName: _methodName,
+            MethodScore: _methodScore,
+            RunnerUpMethod: _runnerUpMethod,
+            RunnerUpScore: _runnerUpScore);
     }
 
     private void Decompose(string goalName, in NpcAiContext context)
@@ -115,12 +148,19 @@ public sealed class HtnPlanner : IPlanner
         if (selected == null)
         {
             _methodName = "FallbackIdle";
+            _methodScore = 0f;
+            _runnerUpMethod = "None";
+            _runnerUpScore = 0f;
             _plan.Enqueue(NpcCommand.Idle);
             return;
         }
 
-        _methodName = selected.Name;
-        foreach (var command in selected.Commands)
+        var ranked = candidates.OrderByDescending(candidate => candidate.Score).ToList();
+        _methodName = ranked[0].Name;
+        _methodScore = ranked[0].Score;
+        _runnerUpMethod = ranked.Count > 1 ? ranked[1].Name : "None";
+        _runnerUpScore = ranked.Count > 1 ? ranked[1].Score : 0f;
+        foreach (var command in ranked[0].Commands)
             _plan.Enqueue(command);
     }
 
