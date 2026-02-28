@@ -133,11 +133,32 @@ public class GameHost : Game
         }
     }
 
+    private bool IsPlainPressed(KeyboardState keys, Keys key)
+    {
+        return keys.IsKeyDown(key)
+            && !_previousKeys.IsKeyDown(key)
+            && !IsCtrlDown(keys)
+            && !IsShiftDown(keys)
+            && !IsAltDown(keys);
+    }
+
+    private static bool IsShiftDown(KeyboardState keys)
+        => keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift);
+
+    private static bool IsCtrlDown(KeyboardState keys)
+        => keys.IsKeyDown(Keys.LeftControl) || keys.IsKeyDown(Keys.RightControl);
+
+    private static bool IsAltDown(KeyboardState keys)
+        => keys.IsKeyDown(Keys.LeftAlt) || keys.IsKeyDown(Keys.RightAlt);
+
     protected override void Update(GameTime gameTime)
     {
         var keys = Keyboard.GetState();
         var mouse = Mouse.GetState();
-        bool shift = keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift);
+        bool shift = IsShiftDown(keys);
+        bool ctrl = IsCtrlDown(keys);
+        bool alt = IsAltDown(keys);
+        bool anyModifier = shift || ctrl || alt;
         float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
 
         if (_cameraRoutePlayer.IsActive)
@@ -163,105 +184,102 @@ public class GameHost : Game
             _fullscreenKeyDown = false;
         }
 
-        if (keys.IsKeyDown(Keys.F1) && !_previousKeys.IsKeyDown(Keys.F1))
+        if (IsPlainPressed(keys, Keys.A))
         {
-            if (shift)
-            {
-                _showDiplomacyPanel = !_showDiplomacyPanel;
-                _showCampaignPanel = false;
-                _showTechMenu = false;
-                SetToast($"Diplomacy panel: {(_showDiplomacyPanel ? "ON" : "OFF")}");
-            }
-            else
-                _showTechMenu = !_showTechMenu;
+            _showDiplomacyPanel = !_showDiplomacyPanel;
+            _showCampaignPanel = false;
+            _showTechMenu = false;
+            SetToast($"Diplomacy panel: {(_showDiplomacyPanel ? "ON" : "OFF")}");
         }
 
-        if (keys.IsKeyDown(Keys.F2) && !_previousKeys.IsKeyDown(Keys.F2))
+        if (IsPlainPressed(keys, Keys.F1))
         {
-            if (shift)
-            {
-                _showCampaignPanel = !_showCampaignPanel;
-                _showDiplomacyPanel = false;
-                _showTechMenu = false;
-                SetToast($"Campaign panel: {(_showCampaignPanel ? "ON" : "OFF")}");
-            }
-            else
-            {
-                FocusCameraOnTrackedNpc();
-            }
+            _showTechMenu = !_showTechMenu;
+            SetToast($"Tech menu: {(_showTechMenu ? "ON" : "OFF")}");
         }
 
-        if (!shift && keys.IsKeyDown(Keys.F9) && !_previousKeys.IsKeyDown(Keys.F9))
-            CycleTheme(-1);
+        if (IsPlainPressed(keys, Keys.S))
+        {
+            _showCampaignPanel = !_showCampaignPanel;
+            _showDiplomacyPanel = false;
+            _showTechMenu = false;
+            SetToast($"Campaign panel: {(_showCampaignPanel ? "ON" : "OFF")}");
+        }
 
-        if (!shift && keys.IsKeyDown(Keys.F10) && !_previousKeys.IsKeyDown(Keys.F10))
-            CycleTheme(1);
+        if (IsPlainPressed(keys, Keys.F2))
+        {
+            FocusCameraOnTrackedNpc();
+        }
 
-        if (shift && keys.IsKeyDown(Keys.F5) && !_previousKeys.IsKeyDown(Keys.F5))
-            CycleQualityProfile();
-
-        if (shift && keys.IsKeyDown(Keys.F6) && !_previousKeys.IsKeyDown(Keys.F6))
-            CycleHudScale();
-
-        if (shift && keys.IsKeyDown(Keys.F9) && !_previousKeys.IsKeyDown(Keys.F9))
+        if (IsPlainPressed(keys, Keys.L))
             ToggleCinematicRoute();
 
-        if (shift && keys.IsKeyDown(Keys.F10) && !_previousKeys.IsKeyDown(Keys.F10))
+        if (IsPlainPressed(keys, Keys.F9))
+            CycleTheme(-1);
+
+        if (IsPlainPressed(keys, Keys.P))
         {
             _screenshotRequested = true;
             SetToast("Screenshot requested");
         }
 
-        if (shift && keys.IsKeyDown(Keys.F12) && !_previousKeys.IsKeyDown(Keys.F12))
+        if (IsPlainPressed(keys, Keys.F10))
+            CycleTheme(1);
+
+        if (IsPlainPressed(keys, Keys.G))
+            CycleQualityProfile();
+
+        if (IsPlainPressed(keys, Keys.H))
+            CycleHudScale();
+
+        if (IsPlainPressed(keys, Keys.O))
         {
             _showSettingsOverlay = !_showSettingsOverlay;
             SetToast($"Settings overlay: {(_showSettingsOverlay ? "ON" : "OFF")}");
         }
 
-        if (shift && keys.IsKeyDown(Keys.F7) && !_previousKeys.IsKeyDown(Keys.F7))
+        if (IsPlainPressed(keys, Keys.J))
         {
             _worldRenderer.TerritoryOverlayEnabled = !_worldRenderer.TerritoryOverlayEnabled;
             SetToast($"Territory overlay: {(_worldRenderer.TerritoryOverlayEnabled ? "ON" : "OFF")}");
         }
 
-        if (shift && keys.IsKeyDown(Keys.F8) && !_previousKeys.IsKeyDown(Keys.F8))
+        if (IsPlainPressed(keys, Keys.K))
         {
             _worldRenderer.CombatOverlayEnabled = !_worldRenderer.CombatOverlayEnabled;
             SetToast($"Combat overlay: {(_worldRenderer.CombatOverlayEnabled ? "ON" : "OFF")}");
         }
 
-        if (keys.IsKeyDown(Keys.F12) && !_previousKeys.IsKeyDown(Keys.F12) && !shift)
+        if (IsPlainPressed(keys, Keys.F12))
         {
             _cleanShotMode = !_cleanShotMode;
             SetToast($"Clean shot: {(_cleanShotMode ? "ON" : "OFF")}");
         }
 
-        if (!shift && keys.IsKeyDown(Keys.F6) && !_previousKeys.IsKeyDown(Keys.F6))
+        if (IsPlainPressed(keys, Keys.F6))
             _refineryRuntime.Trigger(_runtime, _runtime.Tick);
 
 #if DEBUG
-        HandlePlannerToggleDebug(keys);
+        HandlePlannerToggleDebug(keys, anyModifier);
 #endif
 
-        if (!shift && keys.IsKeyDown(Keys.F8) && !_previousKeys.IsKeyDown(Keys.F8))
+        if (IsPlainPressed(keys, Keys.F8))
             _showAiDebugPanel = !_showAiDebugPanel;
 
-        HandleAiDebugInput(keys, shift);
+        HandleAiDebugInput(keys, anyModifier);
 
-        if (keys.IsKeyDown(Keys.F3) && !_previousKeys.IsKeyDown(Keys.F3))
+        if (IsPlainPressed(keys, Keys.D))
         {
-            if (shift)
-            {
-                _postFxEnabled = !_postFxEnabled;
-                _worldRenderer.SetPostFxEnabled(_postFxEnabled);
-            }
-            else
-            {
-                _showRenderStats = !_showRenderStats;
-            }
+            _postFxEnabled = !_postFxEnabled;
+            _worldRenderer.SetPostFxEnabled(_postFxEnabled);
+            SetToast($"PostFx: {(_postFxEnabled ? "ON" : "OFF")}");
+        }
+        else if (IsPlainPressed(keys, Keys.F3))
+        {
+            _showRenderStats = !_showRenderStats;
         }
 
-        if (keys.IsKeyDown(Keys.F4) && !_previousKeys.IsKeyDown(Keys.F4) && shift)
+        if (IsPlainPressed(keys, Keys.F))
         {
             _postFxQuality = _postFxQuality switch
             {
@@ -273,7 +291,7 @@ public class GameHost : Game
             SetToast($"PostFx quality: {_postFxQuality}");
         }
 
-        if (keys.IsKeyDown(Keys.T) && !_previousKeys.IsKeyDown(Keys.T))
+        if (IsPlainPressed(keys, Keys.T))
             _showTelemetryHud = !_showTelemetryHud;
 
         if (!_cameraRoutePlayer.IsActive)
@@ -359,7 +377,7 @@ public class GameHost : Game
         }
     }
 
-    private void HandleAiDebugInput(KeyboardState keys, bool shift)
+    private void HandleAiDebugInput(KeyboardState keys, bool modifiersDown)
     {
         if (!_showAiDebugPanel)
             return;
@@ -367,22 +385,22 @@ public class GameHost : Game
         if (keys.IsKeyDown(Keys.PageUp) && !_previousKeys.IsKeyDown(Keys.PageUp))
         {
             _runtime.CycleTrackedNpc(-1);
-            SetToast("Tracked NPC: previous");
+            SetTrackedNpcToast("Tracked NPC: previous");
         }
 
         if (keys.IsKeyDown(Keys.PageDown) && !_previousKeys.IsKeyDown(Keys.PageDown))
         {
             _runtime.CycleTrackedNpc(1);
-            SetToast("Tracked NPC: next");
+            SetTrackedNpcToast("Tracked NPC: next");
         }
 
         if (keys.IsKeyDown(Keys.Home) && !_previousKeys.IsKeyDown(Keys.Home))
         {
             _runtime.ResetTrackedNpc();
-            SetToast("Tracked NPC: latest");
+            SetTrackedNpcToast("Tracked NPC: latest");
         }
 
-        if (!shift && keys.IsKeyDown(Keys.F4) && !_previousKeys.IsKeyDown(Keys.F4))
+        if (!modifiersDown && keys.IsKeyDown(Keys.F4) && !_previousKeys.IsKeyDown(Keys.F4))
             _aiDebugCompact = !_aiDebugCompact;
 
         if (keys.IsKeyDown(Keys.Up) && !_previousKeys.IsKeyDown(Keys.Up))
@@ -399,16 +417,22 @@ public class GameHost : Game
     }
 
 #if DEBUG
-    private void HandlePlannerToggleDebug(KeyboardState keys)
+    private void HandlePlannerToggleDebug(KeyboardState keys, bool modifiersDown)
     {
-        bool shift = keys.IsKeyDown(Keys.LeftShift) || keys.IsKeyDown(Keys.RightShift);
-        if (shift)
+        if (modifiersDown)
             return;
 
         if (!keys.IsKeyDown(Keys.F7) || _previousKeys.IsKeyDown(Keys.F7))
             return;
 
-        _runtime = CreateRuntime(_runtime.CreateOptionsWithNextPlannerMode());
+        var nextMode = _runtime.PlannerMode switch
+        {
+            NpcPlannerMode.Simple => NpcPlannerMode.Goap,
+            NpcPlannerMode.Goap => NpcPlannerMode.Htn,
+            _ => NpcPlannerMode.Simple
+        };
+        _runtime = CreateRuntime(new RuntimeAiOptions { PlannerMode = nextMode, PolicyMode = _runtime.PolicyMode });
+        SetToast($"Planner mode: {nextMode}");
         _showTechMenu = false;
         _cameraRoutePlayer.Stop();
         _cameraInitialized = false;
@@ -442,6 +466,18 @@ public class GameHost : Game
     {
         _toastMessage = message;
         _toastTimer = 1.8f;
+    }
+
+    private void SetTrackedNpcToast(string prefix)
+    {
+        var ai = _runtime.GetAiDebugSnapshot();
+        if (!ai.HasData)
+        {
+            SetToast($"{prefix} (no AI data)");
+            return;
+        }
+
+        SetToast($"{prefix} #{ai.TrackedNpcIndex + 1}/{Math.Max(1, ai.TrackedNpcCount)} C{ai.TrackedColonyId} @({ai.TrackedX},{ai.TrackedY})");
     }
 
     private static SimulationRuntime CreateRuntime()
@@ -546,22 +582,19 @@ public class GameHost : Game
             case VisualQualityProfile.Low:
                 _postFxEnabled = false;
                 _postFxQuality = PostFxQuality.Low;
-                _worldRenderer.SetPostFxEnabled(false);
-                _worldRenderer.SetPostFxQuality(PostFxQuality.Low);
                 break;
             case VisualQualityProfile.High:
                 _postFxEnabled = true;
                 _postFxQuality = PostFxQuality.High;
-                _worldRenderer.SetPostFxEnabled(true);
-                _worldRenderer.SetPostFxQuality(PostFxQuality.High);
                 break;
             default:
                 _postFxEnabled = true;
                 _postFxQuality = PostFxQuality.Medium;
-                _worldRenderer.SetPostFxEnabled(true);
-                _worldRenderer.SetPostFxQuality(PostFxQuality.Medium);
                 break;
         }
+
+        _worldRenderer.SetPostFxEnabled(_postFxEnabled);
+        _worldRenderer.SetPostFxQuality(_postFxQuality);
 
         SetToast($"Quality profile: {profile}");
     }
@@ -650,10 +683,12 @@ public class GameHost : Game
             using var stream = File.Create(path);
             texture.SaveAsPng(stream, width, height);
             _lastCaptureStatus = filename;
+            SetToast($"Captured: {filename}");
         }
         catch (Exception ex)
         {
             _lastCaptureStatus = $"Capture failed: {ex.Message}";
+            SetToast(_lastCaptureStatus);
         }
     }
 
@@ -683,7 +718,7 @@ public class GameHost : Game
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: Matrix.CreateScale(hudScale, hudScale, 1f));
         var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile}";
 #if DEBUG
-        plannerStatus += " (F2 tracked focus | Shift+F1/F2 panels | Shift+F3/F4 postfx | Shift+F5 quality | Shift+F6 HUD scale | Shift+F7/F8 overlays | Shift+F9 route | Shift+F10 screenshot | Shift+F12 settings)";
+        plannerStatus += " (F1 tech | F2 tracked focus | A/S panels | D/F postfx | G quality | H HUD scale | J/K overlays | L route | O settings | P screenshot)";
 #endif
         if (_showTelemetryHud && !_cleanShotMode && !panelExclusive)
         {

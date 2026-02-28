@@ -6,7 +6,6 @@ namespace WorldSim.Simulation;
 
 public sealed class RuntimeNpcBrain
 {
-    private const int ThreatRadius = 4;
     private readonly INpcDecisionBrain _brain;
     private float _simulationTimeSeconds;
     private long _decisionSequence;
@@ -54,10 +53,6 @@ public sealed class RuntimeNpcBrain
     {
         var job = command switch
         {
-            NpcCommand.Fight => Job.Fight,
-            NpcCommand.Flee => Job.Flee,
-            NpcCommand.GuardColony => Job.GuardColony,
-            NpcCommand.PatrolBorder => Job.PatrolBorder,
             NpcCommand.GatherWood => Job.GatherWood,
             NpcCommand.GatherStone => Job.GatherStone,
             NpcCommand.GatherIron => Job.GatherIron,
@@ -87,22 +82,11 @@ public sealed class RuntimeNpcBrain
     {
         var hunger = actor.Needs.TryGetValue("Hunger", out var value) ? value : 20f;
         var colonyPopulation = world._people.Count(person => person.Home == actor.Home && person.Health > 0f);
-        var nearbyPredators = world._animals.Count(animal =>
-            animal is Predator predator
-            && predator.IsAlive
-            && Manhattan(actor.Pos, predator.Pos) <= ThreatRadius);
-        var nearbyHostilePeople = world._people.Count(person =>
-            person != actor
-            && person.Health > 0f
-            && person.Home != actor.Home
-            && Manhattan(actor.Pos, person.Pos) <= ThreatRadius);
-        var warState = MapWarState(world.GetColonyWarState(actor.Home.Id));
-        var contestedNearby = world.IsTileContested(actor.Pos.x, actor.Pos.y) || world.HasContestedTileNear(actor.Pos, radius: 2);
 
         return new NpcAiContext(
-            SimulationTimeSeconds: Round3(_simulationTimeSeconds),
-            Hunger: ClampRound(hunger, 0f, 100f),
-            Stamina: ClampRound(actor.Stamina, 0f, 100f),
+            SimulationTimeSeconds: _simulationTimeSeconds,
+            Hunger: hunger,
+            Stamina: actor.Stamina,
             HomeWood: actor.Home.Stock[Resource.Wood],
             HomeStone: actor.Home.Stock[Resource.Stone],
             HomeIron: actor.Home.Stock[Resource.Iron],
@@ -114,31 +98,6 @@ public sealed class RuntimeNpcBrain
             HouseCapacity: world.HouseCapacity,
             StoneBuildingsEnabled: world.StoneBuildingsEnabled,
             CanBuildWithStone: actor.Home.CanBuildWithStone,
-            HouseStoneCost: actor.Home.HouseStoneCost,
-            Health: ClampRound(actor.Health, 0f, 150f),
-            Strength: Math.Clamp(actor.Strength, 0, 50),
-            Defense: ClampRound(actor.Defense, 0f, 100f),
-            NearbyPredators: nearbyPredators,
-            NearbyHostilePeople: nearbyHostilePeople,
-            WarState: warState,
-            TileContestedNearby: contestedNearby,
-            IsWarrior: actor.Roles.HasFlag(PersonRole.Warrior),
-            ColonyWarriorCount: world.GetColonyWarriorCount(actor.Home.Id));
+            HouseStoneCost: actor.Home.HouseStoneCost);
     }
-
-    private static int Manhattan((int x, int y) a, (int x, int y) b)
-        => Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y);
-
-    private static float ClampRound(float value, float min, float max)
-        => MathF.Round(Math.Clamp(value, min, max), 3);
-
-    private static float Round3(float value)
-        => MathF.Round(value, 3);
-
-    private static NpcWarState MapWarState(ColonyWarState state) => state switch
-    {
-        ColonyWarState.War => NpcWarState.War,
-        ColonyWarState.Tense => NpcWarState.Tense,
-        _ => NpcWarState.Peace
-    };
 }

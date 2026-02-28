@@ -266,7 +266,14 @@ public class Game1 : Game
         if (!keys.IsKeyDown(Keys.F7) || _previousKeys.IsKeyDown(Keys.F7))
             return;
 
-        _runtime = CreateRuntime(_runtime.CreateOptionsWithNextPlannerMode());
+        var nextMode = _runtime.PlannerMode switch
+        {
+            NpcPlannerMode.Goap => NpcPlannerMode.Simple,
+            NpcPlannerMode.Simple => NpcPlannerMode.Htn,
+            _ => NpcPlannerMode.Goap
+        };
+
+        _runtime = CreateRuntime(new RuntimeAiOptions { PlannerMode = nextMode, PolicyMode = _runtime.PolicyMode });
         _showTechMenu = false;
     }
 #endif

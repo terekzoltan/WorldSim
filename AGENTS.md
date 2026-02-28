@@ -24,7 +24,6 @@ WorldSim.Contracts/           # KozoS DTO/Schema C# oldalon (Java parityhoz)
 WorldSim.RefineryAdapter/     # Java patch -> runtime command mapping
 WorldSim.RefineryClient/      # HTTP client + patch parser/applier (mar megvan)
 WorldSim.RefineryClient.Tests/
-WorldSim.ScenarioRunner/      # Headless balance/perf runner (seeds x ticks, assert mode)
 refinery-service-java/        # Kulon Java service (mar megvan)
 
 Tech/                         # Data (technologies.json)
@@ -97,9 +96,6 @@ WorldSim.RefineryAdapter
 
 WorldSim.RefineryClient
   -> WorldSim.Contracts
-
-WorldSim.ScenarioRunner
-  -> WorldSim.Runtime
 ```
 
 Tiltott: `Runtime -> Graphics`, `Runtime -> App`, `AI -> Graphics`, kozvetlen `Graphics -> Simulation mutable state`.
@@ -117,12 +113,11 @@ Tiltott: `Runtime -> Graphics`, `Runtime -> App`, `AI -> Graphics`, kozvetlen `G
 ### Track A - Graphics/UI
 
 Scope:
-- `GameHost` draw/update vizualis reszeinek kiszervezese `WorldSim.Graphics` ala.
+- `Game1` draw/update vizualis reszeinek kiszervezese `WorldSim.Graphics` ala.
 - Kamera, render pass-ok, HUD, tech menu overlay.
 
 Detailed execution plan:
 - `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md`
-- `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Sprint3-Execution-Plan.md`
 
 Deliverable:
 - `GameHost` csak host legyen; render logika kulon osztalyokban.
@@ -190,27 +185,11 @@ Track D design principles (OnlabRefinery parity):
 - Iterativ feedback loop: invalid candidate -> feedback -> retry -> deterministic fallback.
 - Determinisztikus output policy debugginghoz: ugyanarra a checkpoint inputra reprodukalhato eredmeny.
 
-## Session Plans (cross-track coordination sessions)
 
-A kovetkezo sessionok a Meta Coordinator altal kezelt operativ munkacsoportok.
-Mindegyik sajat plan dokumentummal rendelkezik, es a Meta Coordinator Runbook-bol triggerelheto.
-
-| Session | Plan doc | Trigger | Status |
-|---------|----------|---------|--------|
-| **Combat Coordinator** | `Docs/Plans/Session-Combat-Coordinator-Plan.md` | Track A Sprint 3 complete + Phase 0 green-lit | Ready to launch |
-| **Performance Profiling** | `Docs/Plans/Session-Perf-Profiling-Plan.md` | Combat Phase 3, or FPS < 60 | Planned |
-| **Balance/QA Agent** | `Docs/Plans/Session-Balance-QA-Plan.md` | Combat Phase 0 end, or balance regressions | Planned |
-
-Meta Coordinator Runbook: `Docs/Plans/Meta-Coordinator-Runbook.md`
-
-> **PERF EMLEKEZTETOK:** Minden session megnyitasakor olvasd el a
-> `Docs/Plans/Session-Perf-Profiling-Plan.md` -> "EMLEKEZTETOK" szekciot.
-> Ha FPS < 60 barmelyik map preseten, azonnal nyiss Perf Profiling session-t.
-> Reszletek: perf plan szekció 1-2.
 
 ## Kockazatok es mitigacio
 
-- Nagy `GameHost` refaktor regressziot okozhat -> kis, lepesenkenti PR-ek.
+- Nagy `Game1` refaktor regressziot okozhat -> kis, lepesenkenti PR-ek.
 - Content path torhet projektmozgasnal -> smoke test minden PR utan.
 - Tulsagosan gyors encapsulation lassithat -> snapshot adapterrel fokozatos atallas.
 
@@ -239,9 +218,4 @@ Entries:
 - `[2026-02-21][Track C] GOAP/HTN trace bovitve (plan cost, replan reason, method) - Track A debug olvashatosaghoz plusz mezok kellenek - kovetkezo lepes: compact+page UX finomitas`.
 - `[2026-02-21][Track C] Policy mix aktiv (Global/FactionMix/HtnPilot) es Aetheri HTN pilot - Track B balanszparametereket erint - kovetkezo lepes: config tablaba emeles hardcode switch helyett`.
 - `[2026-02-21][Track C] GOAP invalidation+backoff es HTN method scoring bekotve, faction policy table env-bol konfiguralhato - Track B runtime balansz/ops finomhangolast erint - kovetkezo lepes: policy tabla JSON-ra emelese`.
-- `[2026-02-26][Track C] Phase0 preflight checklist felveve: Docs/Plans/Track-C-Phase0-Preflight-Checklist.md - C-R1 freeze + staged combat extension dokumentalva - kovetkezo lepes: Track B combat primitives utan C-R2 aktivalas`.
-- `[2026-02-26][Track C] Combat masterplan readiness roadmap formalizalva: Docs/Plans/Track-C-Combat-Masterplan-Readiness-Roadmap.md (C-R1 split, C-R2 Phase0-gated, C-R4 partial) - kovetkezo lepes: C-R1 freeze + Phase0 checklist`.
-- `[2026-02-26][Track B] Territory influence formula finomitva (base/(1+dist)+pop/warrior hatas, contested threshold tunable) es role mobilization baseline periodikus allapotfrissitessel - kovetkezo lepes: Phase0 combat primitivek (fight/flee, combat cooldown, bidirectional predator loop)`.
-- `[2026-02-26][Meta] Session planok letrehozva: Combat Coordinator, Perf Profiling, Balance/QA - reszletek: Docs/Plans/Session-*.md - kovetkezo lepes: perf-check workflow beepitese a Runbook-ba`.
-- `[2026-02-26][Track A] Sprint 3 S3-4/S3-5 leszallitva: frame avg/p99 telemetry, viewport culling, territory/combat overlay pass scaffold, diplomacy/campaign panel scaffold - Track B combat snapshot boviteshez vizualis hook kesz - kovetkezo lepes: smoke matrix es capture flow validalas`.
-- `[2026-02-26][Track A] Sprint 3 S3-4/S3-5 leszallitva: frame avg/p99 telemetry, viewport culling, territory/combat overlay pass scaffold, diplomacy/campaign panel scaffold - Track B combat snapshot boviteshez vizualis hook kesz - kovetkezo lepes: smoke matrix es capture flow validalas`.
+- `[2026-02-28][Track A/B] Build drift javitas: World.NavigationTopologyVersion + randomSeed ctor + territory/mobilization accessor kompatibilitas visszaallitva; RenderFrameContext TimeSeconds/FxIntensity es WorldRenderer overlay/postfx API sync megtortent - kovetkezo lepes: smoke keymap + HUD panel overlap ellenorzes minden session utan`.

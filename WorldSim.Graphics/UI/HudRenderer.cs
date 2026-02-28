@@ -45,6 +45,15 @@ public sealed class HudRenderer
         float opacity = 1f)
     {
         var drawTheme = ApplyOpacity(Theme, opacity);
+
+        if (techMenu != null)
+        {
+            _techMenuPanel.Draw(spriteBatch, pixel, font, techMenu.Value, viewportWidth, viewportHeight, drawTheme);
+            if (showAiDebug)
+                _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, drawTheme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
+            return;
+        }
+
         var margin = 14;
         var leftX = margin;
         var panelWidth = Math.Max(420, (int)(viewportWidth * 0.58f));
@@ -68,24 +77,8 @@ public sealed class HudRenderer
         if (renderStats != null)
         {
             var passSummary = string.Join(" | ", renderStats.PassSamples.Select(s => $"{s.PassName}:{s.Milliseconds:0.00}ms"));
-            TextWrap.DrawWrapped(
-                spriteBatch,
-                font,
-                $"Frame {renderStats.LastFrameMilliseconds:0.00}ms | Avg {renderStats.AverageFrameMilliseconds:0.00}ms | P99 {renderStats.P99FrameMilliseconds:0.00}ms | {passSummary}",
-                new Vector2(leftX, y),
-                drawTheme.SecondaryText,
-                contentWidth,
-                20);
+            TextWrap.DrawWrapped(spriteBatch, font, $"Render {renderStats.LastFrameMilliseconds:0.00}ms | {passSummary}", new Vector2(leftX, y), drawTheme.SecondaryText, contentWidth, 20);
         }
-
-        if (techMenu == null)
-        {
-            if (showAiDebug)
-                _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, drawTheme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
-            return;
-        }
-
-        _techMenuPanel.Draw(spriteBatch, font, techMenu.Value, drawTheme);
 
         if (showAiDebug)
             _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, drawTheme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);

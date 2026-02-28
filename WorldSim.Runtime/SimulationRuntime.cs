@@ -10,15 +10,13 @@ namespace WorldSim.Runtime;
 public sealed class SimulationRuntime
 {
     private readonly World _world;
-    private readonly NpcPlannerMode _plannerMode;
-    private readonly NpcPolicyMode _policyMode;
     private readonly Queue<string> _recentAiDecisions = new();
     private long _lastObservedDecisionSequence;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
     private bool _manualTracking;
-    public string PlannerMode => _plannerMode.ToString();
-    public string PolicyMode => _policyMode.ToString();
+    public NpcPlannerMode PlannerMode { get; }
+    public NpcPolicyMode PolicyMode { get; }
 
     public long Tick { get; private set; }
     public string LastTechActionStatus { get; private set; } = "No tech action";
@@ -36,10 +34,10 @@ public sealed class SimulationRuntime
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath, RuntimeAiOptions? aiOptions = null)
     {
         var resolvedOptions = aiOptions ?? RuntimeAiOptions.FromEnvironment();
-        _plannerMode = resolvedOptions.PlannerMode;
-        _policyMode = resolvedOptions.PolicyMode;
+        PlannerMode = resolvedOptions.PlannerMode;
+        PolicyMode = resolvedOptions.PolicyMode;
         _world = new World(width, height, initialPopulation, colony => CreateBrain(colony, resolvedOptions));
-        _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode, PolicyMode);
+        _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode.ToString(), PolicyMode.ToString());
         TechTree.Load(technologyFilePath);
 
         if (LoadedTechCount == 0)
@@ -179,22 +177,6 @@ public sealed class SimulationRuntime
             throw new InvalidOperationException($"Cannot unlock tech '{techId}': {result.Reason}");
     }
 
-    public RuntimeAiOptions CreateOptionsWithNextPlannerMode()
-    {
-        var next = _plannerMode switch
-        {
-            NpcPlannerMode.Goap => NpcPlannerMode.Simple,
-            NpcPlannerMode.Simple => NpcPlannerMode.Htn,
-            _ => NpcPlannerMode.Goap
-        };
-
-        return new RuntimeAiOptions
-        {
-            PlannerMode = next,
-            PolicyMode = _policyMode
-        };
-    }
-
     private RuntimeNpcBrain CreateBrain(Colony colony, RuntimeAiOptions options)
     {
         return options.PolicyMode switch
@@ -218,7 +200,7 @@ public sealed class SimulationRuntime
 
         if (latest == null)
         {
-            _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode, PolicyMode);
+            _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode.ToString(), PolicyMode.ToString());
             return;
         }
 

@@ -50,12 +50,6 @@ namespace WorldSim.Simulation
         public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
         public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
         public bool AllowFreeTechUnlocks { get; set; }
-        public bool EnableCombatPrimitives { get; set; }
-        public bool EnableDiplomacy { get; set; }
-        public float TerritoryBaseColonyInfluence { get; set; } = 24f;
-        public float TerritoryPopulationInfluenceWeight { get; set; } = 0.12f;
-        public float TerritoryWarriorInfluenceWeight { get; set; } = 0.8f;
-        public float TerritoryContestedThreshold { get; set; } = 0.55f;
         // Disabled by default until bidirectional combat/retaliation exists.
         public bool EnablePredatorHumanAttacks { get; set; } = false;
         public float PredatorHumanDamage { get; set; } = 10f;
@@ -72,7 +66,6 @@ namespace WorldSim.Simulation
         public int TotalDeathsOther { get; private set; }
         public int RecentDeathsStarvation60s => _recentStarvationDeaths.Count;
         public int TotalStarvationDeathsWithFood { get; private set; }
-        public long CurrentTick { get; private set; }
         public int NavigationTopologyVersion { get; private set; }
 
         readonly Random _rng;
@@ -82,10 +75,6 @@ namespace WorldSim.Simulation
         readonly HashSet<int> _extinctionMilestones = new();
         readonly Dictionary<int, ColonyDeathStats> _colonyDeathStats = new();
         readonly Queue<float> _recentStarvationDeaths = new();
-        readonly int[,] _tileOwnerColonyId;
-        readonly bool[,] _tileContested;
-        readonly Dictionary<int, ColonyWarState> _colonyWarStates = new();
-        readonly Dictionary<int, int> _colonyWarriorCounts = new();
 
         float _simulationTimeSeconds;
         float _seasonTimer;
@@ -93,16 +82,15 @@ namespace WorldSim.Simulation
         float _professionRebalanceTimer;
         float _specializedBuildTimer;
         float _foodParityTimer;
-        long _lastTerritoryTick;
-        long _lastMobilizationTick;
 
         const float SeasonDurationSeconds = 90f;
         const float DroughtDurationSeconds = 35f;
         const float ProfessionRebalancePeriod = 12f;
         const float SpecializedBuildPeriod = 14f;
         const float FoodParityPeriod = 6f;
-        const int TerritoryCadenceTicks = 10;
-        const int MobilizationCadenceTicks = 5;
+
+        public bool EnableDiplomacy { get; set; }
+        public bool EnableCombatPrimitives { get; set; }
 
         public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null, int? randomSeed = null)
         {
@@ -111,11 +99,6 @@ namespace WorldSim.Simulation
             Width = width;
             Height = height;
             _map = new Tile[width, height];
-            _tileOwnerColonyId = new int[width, height];
-            _tileContested = new bool[width, height];
-            for (int y = 0; y < height; y++)
-                for (int x = 0; x < width; x++)
-                    _tileOwnerColonyId[x, y] = -1;
 
             // 1) Biomes (Grass/Dirt/Water) via cheap seeded region growing
             Ground[,] grounds = GenerateBiomes();
@@ -168,8 +151,6 @@ namespace WorldSim.Simulation
                 Colony col = new Colony(ci, colPos);
                 _colonies.Add(col);
                 _colonyDeathStats[col.Id] = new ColonyDeathStats();
-                _colonyWarStates[col.Id] = ColonyWarState.Peace;
-                _colonyWarriorCounts[col.Id] = 0;
 
                 // Faction setup kept for reference; explicit color assignment removed (using icons instead)
                 // 0: Sylvars
@@ -199,29 +180,13 @@ namespace WorldSim.Simulation
             int animalCount = Math.Max(10, (Width * Height) / 256);
             for (int i = 0; i < animalCount; i++)
                 _animals.Add(Animal.Spawn(RandomFreePos()));
-
-            RecomputeTerritoryOwnership();
-            UpdateMobilizationState();
         }
 
         public void Update(float dt)
         {
-            CurrentTick++;
             _simulationTimeSeconds += Math.Max(0f, dt);
             UpdateSeasonsAndEvents(dt);
             UpdateFoodRegrowth(dt);
-
-            if (_lastTerritoryTick == 0 || (CurrentTick - _lastTerritoryTick) >= TerritoryCadenceTicks)
-            {
-                RecomputeTerritoryOwnership();
-                _lastTerritoryTick = CurrentTick;
-            }
-
-            if (_lastMobilizationTick == 0 || (CurrentTick - _lastMobilizationTick) >= MobilizationCadenceTicks)
-            {
-                UpdateMobilizationState();
-                _lastMobilizationTick = CurrentTick;
-            }
 
             List<Person> births = new();
             for (int i = _people.Count - 1; i >= 0; i--)
@@ -299,39 +264,72 @@ namespace WorldSim.Simulation
 
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
         public Tile GetTile(int x, int y) => _map[x, y];
+
         public int GetTileOwnerColonyId(int x, int y)
-            => x < 0 || y < 0 || x >= Width || y >= Height ? -1 : _tileOwnerColonyId[x, y];
-        public bool IsTileContested(int x, int y)
-            => x >= 0 && y >= 0 && x < Width && y < Height && _tileContested[x, y];
-        public bool HasContestedTileNear((int x, int y) pos, int radius)
         {
-            int r = Math.Max(0, radius);
-            int minX = Math.Max(0, pos.x - r);
-            int maxX = Math.Min(Width - 1, pos.x + r);
-            int minY = Math.Max(0, pos.y - r);
-            int maxY = Math.Min(Height - 1, pos.y + r);
-            for (int y = minY; y <= maxY; y++)
-                for (int x = minX; x <= maxX; x++)
-                    if (_tileContested[x, y])
-                        return true;
-            return false;
+            if (x < 0 || y < 0 || x >= Width || y >= Height)
+                return -1;
+            if (_map[x, y].Ground == Ground.Water)
+                return -1;
+
+            var best = _colonies[0];
+            int bestDist = DistanceSquared(best.Origin, (x, y));
+            for (int i = 1; i < _colonies.Count; i++)
+            {
+                var candidate = _colonies[i];
+                int dist = DistanceSquared(candidate.Origin, (x, y));
+                if (dist < bestDist)
+                {
+                    best = candidate;
+                    bestDist = dist;
+                }
+            }
+
+            return best.Id;
         }
-        public ColonyWarState GetColonyWarState(int colonyId)
-            => _colonyWarStates.TryGetValue(colonyId, out var state) ? state : ColonyWarState.Peace;
-        public int GetColonyWarriorCount(int colonyId)
-            => _colonyWarriorCounts.TryGetValue(colonyId, out var count) ? count : 0;
+
         public void AddHouse(Colony colony, (int x, int y) pos)
         {
             Houses.Add(new House(colony, pos, HouseCapacity));
             NavigationTopologyVersion++;
         }
+
         public void AddSpecializedBuilding(Colony colony, (int x, int y) pos, SpecializedBuildingKind kind)
         {
             SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
             NavigationTopologyVersion++;
         }
+
+        public ColonyWarState GetColonyWarState(int colonyId)
+        {
+            if (!EnableDiplomacy)
+                return ColonyWarState.Peace;
+
+            int warriors = GetColonyWarriorCount(colonyId);
+            if (EnableCombatPrimitives && warriors >= 3)
+                return ColonyWarState.War;
+            if (warriors > 0)
+                return ColonyWarState.Tense;
+            return ColonyWarState.Peace;
+        }
+
+        public int GetColonyWarriorCount(int colonyId)
+        {
+            if (!EnableCombatPrimitives)
+                return 0;
+
+            int adults = _people.Count(p => p.Home.Id == colonyId && p.Health > 0f && p.Age >= 16f);
+            return adults <= 0 ? 0 : Math.Max(1, adults / 6);
+        }
+
+        private static int DistanceSquared((int x, int y) a, (int x, int y) b)
+        {
+            int dx = a.x - b.x;
+            int dy = a.y - b.y;
+            return (dx * dx) + (dy * dy);
+        }
+
         internal RuntimeNpcBrain CreateNpcBrain(Colony colony) => _brainFactory(colony);
-        internal Random CreateEntityRandom() => new(_rng.Next());
 
         public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;
         public void ReportPredatorDeath() => TotalPredatorDeaths++;
@@ -650,101 +648,6 @@ namespace WorldSim.Simulation
                     _extinctionMilestones.Add(colony.Id);
                     AddEvent($"{colony.Name} collapsed");
                 }
-            }
-        }
-
-        void RecomputeTerritoryOwnership()
-        {
-            if (_colonies.Count == 0)
-                return;
-
-            var colonyPop = _colonies.ToDictionary(
-                c => c.Id,
-                c => _people.Count(p => p.Home == c && p.Health > 0f));
-
-            for (int y = 0; y < Height; y++)
-            {
-                for (int x = 0; x < Width; x++)
-                {
-                    if (_map[x, y].Ground == Ground.Water)
-                    {
-                        _tileOwnerColonyId[x, y] = -1;
-                        _tileContested[x, y] = false;
-                        continue;
-                    }
-
-                    int bestColony = -1;
-                    float bestScore = float.MinValue;
-                    float secondScore = float.MinValue;
-
-                    foreach (var colony in _colonies)
-                    {
-                        int dist = Math.Abs(colony.Origin.x - x) + Math.Abs(colony.Origin.y - y);
-                        float score = (TerritoryBaseColonyInfluence / (1f + dist))
-                                      + colonyPop[colony.Id] * TerritoryPopulationInfluenceWeight
-                                      + GetColonyWarriorCount(colony.Id) * TerritoryWarriorInfluenceWeight;
-
-                        if (score > bestScore)
-                        {
-                            secondScore = bestScore;
-                            bestScore = score;
-                            bestColony = colony.Id;
-                        }
-                        else if (score > secondScore)
-                        {
-                            secondScore = score;
-                        }
-                    }
-
-                    _tileOwnerColonyId[x, y] = bestColony;
-                    _tileContested[x, y] = (bestScore - secondScore) <= TerritoryContestedThreshold;
-                }
-            }
-        }
-
-        void UpdateMobilizationState()
-        {
-            foreach (var colony in _colonies)
-            {
-                int nearbyHostiles = _people.Count(p =>
-                    p.Home != colony
-                    && p.Health > 0f
-                    && (Math.Abs(p.Pos.x - colony.Origin.x) + Math.Abs(p.Pos.y - colony.Origin.y)) <= 8);
-
-                bool contestedNearOrigin = HasContestedTileNear(colony.Origin, 4);
-                ColonyWarState state = ColonyWarState.Peace;
-                if (EnableDiplomacy)
-                {
-                    if (EnableCombatPrimitives && nearbyHostiles >= 2)
-                        state = ColonyWarState.War;
-                    else if (nearbyHostiles > 0 || contestedNearOrigin)
-                        state = ColonyWarState.Tense;
-                }
-
-                _colonyWarStates[colony.Id] = state;
-
-                var adults = _people
-                    .Where(p => p.Home == colony && p.Health > 0f && p.Age >= 16f)
-                    .OrderByDescending(p => p.Strength)
-                    .ThenByDescending(p => p.Stamina)
-                    .ToList();
-
-                int targetWarriors = state switch
-                {
-                    ColonyWarState.War => Math.Max(2, adults.Count / 3),
-                    ColonyWarState.Tense => Math.Max(1, adults.Count / 6),
-                    _ => 0
-                };
-
-                for (int i = 0; i < adults.Count; i++)
-                {
-                    if (i < targetWarriors)
-                        adults[i].Roles |= PersonRole.Warrior;
-                    else
-                        adults[i].Roles &= ~PersonRole.Warrior;
-                }
-
-                _colonyWarriorCounts[colony.Id] = adults.Count(p => p.Roles.HasFlag(PersonRole.Warrior));
             }
         }
 

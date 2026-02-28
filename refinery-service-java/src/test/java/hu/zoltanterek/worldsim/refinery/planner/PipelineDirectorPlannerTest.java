@@ -45,6 +45,7 @@ class PipelineDirectorPlannerTest {
         assertEquals("setColonyDirective", body.path("patch").get(0).path("op").asText());
         assertTrue(arrayContains(body.path("explain"), "directorStage:mock"));
         assertTrue(arrayContains(body.path("explain"), "directorOutputMode:nudge_only"));
+        assertTrue(arrayContains(body.path("explain"), "llmStage:disabled"));
     }
 
     private JsonNode callPatch(String requestBody) throws Exception {

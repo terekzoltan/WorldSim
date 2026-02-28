@@ -12,7 +12,7 @@ public sealed class PostFxOverlayPass : IRenderPass
         var snapshot = context.Snapshot;
         var settings = context.Settings;
         var pixel = context.Textures.Pixel;
-        float fx = Math.Clamp(context.FxIntensity, 0f, 2f);
+        var fx = context.FxIntensity;
 
         int width = snapshot.Width * settings.TileSize;
         int height = snapshot.Height * settings.TileSize;

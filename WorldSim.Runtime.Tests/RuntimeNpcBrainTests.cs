@@ -8,10 +8,6 @@ public class RuntimeNpcBrainTests
 {
     [Theory]
     [InlineData(NpcCommand.Idle, Job.Idle)]
-    [InlineData(NpcCommand.Fight, Job.Fight)]
-    [InlineData(NpcCommand.Flee, Job.Flee)]
-    [InlineData(NpcCommand.GuardColony, Job.GuardColony)]
-    [InlineData(NpcCommand.PatrolBorder, Job.PatrolBorder)]
     [InlineData(NpcCommand.GatherWood, Job.GatherWood)]
     [InlineData(NpcCommand.GatherStone, Job.GatherStone)]
     [InlineData(NpcCommand.GatherIron, Job.GatherIron)]
@@ -44,8 +40,8 @@ public class RuntimeNpcBrainTests
             technologyFilePath: techPath,
             aiOptions: new RuntimeAiOptions { PlannerMode = NpcPlannerMode.Simple });
 
-        Assert.Equal("Simple", runtime.PlannerMode);
-        Assert.Equal("GlobalPlanner", runtime.PolicyMode);
+        Assert.Equal(NpcPlannerMode.Simple, runtime.PlannerMode);
+        Assert.Equal(NpcPolicyMode.GlobalPlanner, runtime.PolicyMode);
     }
 
     [Fact]
@@ -72,24 +68,6 @@ public class RuntimeNpcBrainTests
         Assert.NotNull(brain.LastDecision);
         Assert.Equal("Fixed", brain.LastDecision!.Trace.SelectedGoal);
         Assert.Equal("Test", brain.LastDecision.Trace.PolicyName);
-    }
-
-    [Fact]
-    public void RuntimeNpcBrain_CommandParity_CoversAllNpcCommands()
-    {
-        foreach (var command in Enum.GetValues<NpcCommand>())
-        {
-            var world = new World(16, 16, 10);
-            var person = world._people[0];
-            var brain = new RuntimeNpcBrain(new FixedBrain(command));
-
-            var job = brain.Think(person, world, dt: 0.25f);
-
-            if (command == NpcCommand.Idle)
-                Assert.Equal(Job.Idle, job);
-            else
-                Assert.NotEqual(Job.Idle, job);
-        }
     }
 
     [Fact]

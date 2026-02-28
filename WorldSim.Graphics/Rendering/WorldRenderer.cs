@@ -12,35 +12,12 @@ public sealed class WorldRenderer
     private readonly RenderStats _renderStats = new();
     private readonly TerritoryOverlayPass _territoryOverlayPass = new();
     private readonly CombatOverlayPass _combatOverlayPass = new();
+    private float _timeSeconds;
+    private float _fxIntensity = 1f;
 
     public WorldRenderSettings Settings { get; }
     public WorldRenderTheme Theme { get; private set; }
     public RenderStats LastRenderStats => _renderStats;
-    public bool PostFxEnabled { get; private set; } = true;
-    public PostFxQuality PostFxQuality { get; private set; } = PostFxQuality.Medium;
-
-    public WorldRenderer(WorldRenderSettings? settings = null, WorldRenderTheme? theme = null)
-    {
-        Settings = settings ?? new WorldRenderSettings();
-        Theme = theme ?? WorldRenderTheme.Default;
-        _passes = new IRenderPass[]
-        {
-            new TerrainRenderPass(),
-            new ResourceRenderPass(),
-            new StructureRenderPass(),
-            new ActorRenderPass(),
-            new FogHazeRenderPass(),
-            new PostFxOverlayPass(),
-            _territoryOverlayPass,
-            _combatOverlayPass
-        };
-    }
-
-    public void SetTheme(WorldRenderTheme theme)
-    {
-        Theme = theme;
-    }
-
     public bool TerritoryOverlayEnabled
     {
         get => _territoryOverlayPass.Enabled;
@@ -53,44 +30,48 @@ public sealed class WorldRenderer
         set => _combatOverlayPass.Enabled = value;
     }
 
+    public PostFxSettings PostFxSettings { get; private set; } = new(true, PostFxQuality.Medium);
+
+    public WorldRenderer(WorldRenderSettings? settings = null, WorldRenderTheme? theme = null)
+    {
+        Settings = settings ?? new WorldRenderSettings();
+        Theme = theme ?? WorldRenderTheme.Default;
+        _passes = new IRenderPass[]
+        {
+            new TerrainRenderPass(),
+            new ResourceRenderPass(),
+            new StructureRenderPass(),
+            new ActorRenderPass(),
+            _territoryOverlayPass,
+            _combatOverlayPass,
+            new FogHazeRenderPass(),
+            new PostFxOverlayPass()
+        };
+    }
+
+    public void SetTheme(WorldRenderTheme theme)
+    {
+        Theme = theme;
+    }
+
     public void SetPostFxEnabled(bool enabled)
     {
-        PostFxEnabled = enabled;
+        PostFxSettings = PostFxSettings with { Enabled = enabled };
+        _fxIntensity = enabled ? 1f : 0f;
     }
 
     public void SetPostFxQuality(PostFxQuality quality)
     {
-        PostFxQuality = quality;
+        PostFxSettings = PostFxSettings with { Quality = quality };
     }
 
     public void Draw(SpriteBatch spriteBatch, WorldRenderSnapshot snapshot, Camera2D camera, TextureCatalog textures)
     {
-        float fxIntensity = PostFxEnabled
-            ? PostFxQuality switch
-            {
-                PostFxQuality.Low => 0.35f,
-                PostFxQuality.Medium => 1f,
-                _ => 1.85f
-            }
-            : 0.15f;
-
         _renderStats.BeginFrame();
         spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: camera.BuildMatrix());
+        _timeSeconds += 1f / 60f;
 
-        var context = new RenderFrameContext(
-            spriteBatch,
-            snapshot,
-            textures,
-            Settings,
-            Theme,
-            _renderStats,
-            Environment.TickCount64 / 1000f,
-            fxIntensity,
-            camera.Position.X,
-            camera.Position.Y,
-            camera.Zoom,
-            spriteBatch.GraphicsDevice.Viewport.Width,
-            spriteBatch.GraphicsDevice.Viewport.Height);
+        var context = new RenderFrameContext(spriteBatch, snapshot, textures, Settings, Theme, _renderStats, _timeSeconds, _fxIntensity);
         foreach (var pass in _passes)
         {
             var started = _renderStats.BeginPass();

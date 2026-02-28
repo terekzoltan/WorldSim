@@ -33,19 +33,19 @@ public sealed class SettingsPanelRenderer
         int lineY = y + 10;
         spriteBatch.DrawString(font, "Settings Overlay", new Vector2(x + 10, lineY), theme.AccentText);
         lineY += 26;
-        spriteBatch.DrawString(font, $"Quality Profile: {quality} (Shift+F5)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"Quality Profile: {quality} (G)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, $"PostFx: {postFx} (Shift+F3, Shift+F4)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"PostFx: {postFx} (D toggle, F quality)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, $"HUD Scale: {hudScale} (Shift+F6)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"HUD Scale: {hudScale} (H)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, $"Cinematic Route: {cinematic} (Shift+F9)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"Cinematic Route: {cinematic} (L)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, "Screenshot: Shift+F10 | CleanShot: F12", new Vector2(x + 10, lineY), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Screenshot: P | CleanShot: F12", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, "Panels: Shift+F1 diplomacy, Shift+F2 campaign", new Vector2(x + 10, lineY), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Panels: A diplomacy, S campaign, O settings", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, "Overlays: Shift+F7 territory, Shift+F8 combat", new Vector2(x + 10, lineY), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Overlays: J territory, K combat", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
         spriteBatch.DrawString(font, $"Capture: {captureStatus}", new Vector2(x + 10, lineY), theme.SuccessText);
     }

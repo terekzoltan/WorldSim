@@ -1,6 +1,7 @@
 package hu.zoltanterek.worldsim.refinery.planner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -47,7 +48,16 @@ class PipelineDirectorOutputModeTest {
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         assertEquals("setColonyDirective", body.path("patch").get(0).path("op").asText());
         assertEquals(1, body.path("patch").size());
-        assertEquals("directorStage:mock", body.path("explain").get(1).asText());
-        assertEquals("directorOutputMode:nudge_only", body.path("explain").get(2).asText());
+        assertTrue(arrayContains(body.path("explain"), "directorOutputMode:nudge_only"));
+        assertTrue(arrayContains(body.path("explain"), "llmStage:disabled"));
+    }
+
+    private static boolean arrayContains(JsonNode array, String expected) {
+        for (JsonNode item : array) {
+            if (expected.equals(item.asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

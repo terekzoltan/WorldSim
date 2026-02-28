@@ -48,6 +48,7 @@ class PipelineDirectorRefineryEnabledTest {
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
         assertTrue(arrayContains(body.path("explain"), "directorStage:refinery-validated"));
         assertTrue(arrayContains(body.path("explain"), "directorOutputMode:both"));
+        assertTrue(arrayContains(body.path("explain"), "llmStage:disabled"));
     }
 
     private static boolean arrayContains(JsonNode array, String expected) {

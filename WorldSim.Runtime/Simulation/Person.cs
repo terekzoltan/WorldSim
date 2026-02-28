@@ -15,13 +15,7 @@ public enum Job
     EatFood,
     Rest,
     BuildHouse,
-    CraftTools,
-
-    // Combat extension minimum (Phase 0 ready)
-    Fight,
-    Flee,
-    GuardColony,
-    PatrolBorder
+    CraftTools
 }
 public enum Profession { Generalist, Lumberjack, Miner, Farmer, Hunter, Builder }
 public enum PersonDeathReason { None, OldAge, Starvation, Predator, Other }
@@ -31,10 +25,8 @@ public class Person
     public (int x, int y) Pos;
     public Job Current = Job.Idle;
     public float Health = 100;  
-    public float Defense = 0f;
     public float Age = 0;
     public float Stamina { get; private set; } = 100f;
-    public PersonRole Roles { get; set; } = PersonRole.None;
     public Profession Profession { get; internal set; }
     public PersonDeathReason LastDeathReason { get; private set; } = PersonDeathReason.None;
     public int Strength, Intelligence;
@@ -382,13 +374,6 @@ public class Person
                         float restGain = HasNearbyOwnHouse(w, radius: 2) ? 30f : 22f;
                         Stamina = Math.Clamp(Stamina + restGain, 0f, 100f);
                         break;
-
-                    case Job.Fight:
-                    case Job.Flee:
-                    case Job.GuardColony:
-                    case Job.PatrolBorder:
-                        // Pre-Phase0 placeholder: concrete combat behavior is owned by Track B combat primitives.
-                        break;
                 }
 
                 Current = Job.Idle;
@@ -533,10 +518,6 @@ public class Person
                     Job.Rest        => ComputeTicks(RestWorkTime, w, isHeavyWork: false),
                     Job.BuildHouse  => Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier)),
                     Job.CraftTools  => ComputeTicks(CraftToolsTime, w, isHeavyWork: true),
-                    Job.Fight       => 1,
-                    Job.Flee        => 1,
-                    Job.GuardColony => 1,
-                    Job.PatrolBorder => 1,
                     _ => 0
                 };
                 _idleTimeSeconds = 0f;
