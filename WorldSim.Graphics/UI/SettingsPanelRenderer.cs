@@ -33,19 +33,19 @@ public sealed class SettingsPanelRenderer
         int lineY = y + 10;
         spriteBatch.DrawString(font, "Settings Overlay", new Vector2(x + 10, lineY), theme.AccentText);
         lineY += 26;
-        spriteBatch.DrawString(font, $"Quality Profile: {quality} (G)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"Quality Profile: {quality} (Ctrl+F5)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, $"PostFx: {postFx} (D toggle, F quality)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"PostFx: {postFx} (Ctrl+F3, Ctrl+F4)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, $"HUD Scale: {hudScale} (H)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"HUD Scale: {hudScale} (Ctrl+F6)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, $"Cinematic Route: {cinematic} (L)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"Cinematic Route: {cinematic} (Ctrl+F9)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, "Screenshot: P | CleanShot: F12", new Vector2(x + 10, lineY), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Screenshot: Ctrl+F10 | CleanShot: F12", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, "Panels: A diplomacy, S campaign, O settings", new Vector2(x + 10, lineY), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Panels: Ctrl+F1 diplomacy, Ctrl+F2 campaign, Ctrl+F12 settings", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, "Overlays: J territory, K combat", new Vector2(x + 10, lineY), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Overlays: Ctrl+F7 territory, Ctrl+F8 combat", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
         spriteBatch.DrawString(font, $"Capture: {captureStatus}", new Vector2(x + 10, lineY), theme.SuccessText);
     }
