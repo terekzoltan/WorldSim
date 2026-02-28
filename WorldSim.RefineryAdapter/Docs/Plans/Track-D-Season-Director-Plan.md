@@ -1,7 +1,14 @@
 # Track D - Season Director Plan
 
-Status: planning approved, implementation pending
+Status: superseded by strategic master plan (remains valid as tactical sprint reference)
+Superseded by: `Docs/Plans/Director-Integration-Master-Plan.md`
 Owner: Track D (Refinery boundary)
+
+> **Note:** This document is the original tactical sprint plan (3 sprints).
+> The strategic master plan (`Director-Integration-Master-Plan.md`, 2300+ lines, 5 phases, 7+ sprints)
+> supersedes this document for architectural decisions, vocabulary design, and phasing.
+> Sprint 1 epics here are largely aligned with Phase 0 of the master plan.
+> When discrepancies exist, the master plan takes precedence.
 
 ## 1. Goal
 

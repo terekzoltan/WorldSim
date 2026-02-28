@@ -176,8 +176,16 @@ Current Track D focus (Season Director program):
 - Beat/nudge kulon-kulon kapcsolhato legyen (mindketto, csak egyik, csak masik, egyik sem).
 - LLM kreativitas kihasznalasa, de formalis Refinery gate tartja kontroll alatt a hibakat/hallucinaciot.
 
-Track D implementation plan doc:
-- `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`
+Track D master plan:
+- `Docs/Plans/Director-Integration-Master-Plan.md` (strategiai master plan, 5 fazis, 7+ sprint)
+- `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md` (taktikai sprint referencia, a master plan altal superseded)
+
+Track D fo architekturalis dontes (Effect Vocabulary rendszer):
+- Generic domain modifier engine + goal bias engine a runtime-ban (nem enum-alapu switch/case).
+- LLM szabadon komponalhat effekteket a vocabulary-bol, a Refinery formalis modell validalja a kompoziciot.
+- Kreativitasi gradient: Phase 0-1 mock → Phase 2 Refinery gate → Phase 3 LLM kreativitas → Phase 4+ instance assertions.
+- 3-retegu influence tuning: per-effect intensity + global dampening + checkpoint budget.
+- v2 contract namespace a Director opoknak.
 
 Track D design principles (OnlabRefinery parity):
 - Felelosseg szetvalasztas: LLM javasol, Refinery validal/repair-el, runtime csak alkalmaz.
@@ -185,7 +193,18 @@ Track D design principles (OnlabRefinery parity):
 - Iterativ feedback loop: invalid candidate -> feedback -> retry -> deterministic fallback.
 - Determinisztikus output policy debugginghoz: ugyanarra a checkpoint inputra reprodukalhato eredmeny.
 
+## Session Plans (cross-track coordination sessions) 
 
+A kovetkezo sessionok a Meta Coordinator altal kezelt operativ munkacsoportok.
+Mindegyik sajat plan dokumentummal rendelkezik, es a Meta Coordinator Runbook-bol triggerelheto.
+
+| Session | Plan doc | Trigger | Status |
+|---------|----------|---------|--------|
+| **Combat Coordinator** | `Docs/Plans/Session-Combat-Coordinator-Plan.md` | Track A Sprint 3 complete + Phase 0 green-lit | Ready to launch |
+| **Performance Profiling** | `Docs/Plans/Session-Perf-Profiling-Plan.md` | Combat Phase 3, or FPS < 60 | Planned |
+| **Balance/QA Agent** | `Docs/Plans/Session-Balance-QA-Plan.md` | Combat Phase 0 end, or balance regressions | Planned |
+
+Meta Coordinator Runbook: `Docs/Plans/Meta-Coordinator-Runbook.md
 
 ## Kockazatok es mitigacio
 
@@ -219,3 +238,4 @@ Entries:
 - `[2026-02-21][Track C] Policy mix aktiv (Global/FactionMix/HtnPilot) es Aetheri HTN pilot - Track B balanszparametereket erint - kovetkezo lepes: config tablaba emeles hardcode switch helyett`.
 - `[2026-02-21][Track C] GOAP invalidation+backoff es HTN method scoring bekotve, faction policy table env-bol konfiguralhato - Track B runtime balansz/ops finomhangolast erint - kovetkezo lepes: policy tabla JSON-ra emelese`.
 - `[2026-02-28][Track A/B] Build drift javitas: World.NavigationTopologyVersion + randomSeed ctor + territory/mobilization accessor kompatibilitas visszaallitva; RenderFrameContext TimeSeconds/FxIntensity es WorldRenderer overlay/postfx API sync megtortent - kovetkezo lepes: smoke keymap + HUD panel overlap ellenorzes minden session utan`.
+- `[2026-02-28][Track D] Director Integration Master Plan elkeszult (2300+ sor, 5 fazis, 7+ sprint) - Effect Vocabulary rendszer: generic modifier/bias engine, LLM kreativitas Refinery gate mogott - cross-track: Track B (modifier+bias engine), Track C (goal bias integration), Track A (HUD/event feed) - kovetkezo lepes: Phase 0 Sprint 1 inditas`.
