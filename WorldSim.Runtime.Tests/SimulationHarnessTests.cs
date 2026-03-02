@@ -23,6 +23,8 @@ public class SimulationHarnessTests
     public void HeadlessSmoke_1000Ticks_MaintainsBasicInvariants()
     {
         var world = CreateWorld(seed: 4242);
+        world.EnablePredatorHumanAttacks = true;
+        world.EnableCombatPrimitives = true;
 
         for (var i = 0; i < 1000; i++)
             world.Update(0.25f);
@@ -36,6 +38,10 @@ public class SimulationHarnessTests
             Assert.True(colony.Stock[Resource.Iron] >= 0);
             Assert.True(colony.Stock[Resource.Gold] >= 0);
         });
+
+        Assert.True(world.TotalPredatorHumanHits >= 0);
+        Assert.True(world.TotalPredatorKillsByHumans >= 0);
+        Assert.True(world.TotalCombatEngagements >= 0);
     }
 
     private static List<string> RunAiTrace(int seed, int ticks)

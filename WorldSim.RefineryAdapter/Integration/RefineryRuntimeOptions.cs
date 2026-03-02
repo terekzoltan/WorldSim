@@ -1,3 +1,5 @@
+using WorldSim.Contracts.V2;
+
 namespace WorldSim.RefineryAdapter.Integration;
 
 public sealed record RefineryRuntimeOptions(
@@ -34,12 +36,16 @@ public sealed record RefineryRuntimeOptions(
         var applyToWorld = string.Equals(System.Environment.GetEnvironmentVariable("REFINERY_APPLY_TO_WORLD"), "true", System.StringComparison.OrdinalIgnoreCase);
         var minTriggerIntervalMs = ParseIntEnv("REFINERY_MIN_TRIGGER_MS", 500);
 
+        var defaultFixtureFile = string.Equals(goal, DirectorGoals.SeasonDirectorCheckpoint, System.StringComparison.Ordinal)
+            ? "patch-season-director-v1.expected.json"
+            : "patch-tech-tree-v1.expected.json";
+
         var defaultFixture = System.IO.Path.Combine(
             FindRepoRoot(baseDirectory),
             "refinery-service-java",
             "examples",
             "responses",
-            "patch-tech-tree-v1.expected.json"
+            defaultFixtureFile
         );
         var fixtureResponsePath = System.Environment.GetEnvironmentVariable("REFINERY_FIXTURE_RESPONSE") ?? defaultFixture;
 

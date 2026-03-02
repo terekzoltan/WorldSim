@@ -93,6 +93,30 @@ public sealed class LowStoneStockConsideration : Consideration
     }
 }
 
+public sealed class ThreatNearbyConsideration : Consideration
+{
+    private readonly int _threatCap;
+
+    public ThreatNearbyConsideration(int threatCap = 3)
+    {
+        _threatCap = Math.Max(1, threatCap);
+    }
+
+    public override float Evaluate(in NpcAiContext context)
+    {
+        var threats = Math.Max(0, context.NearbyPredators) + Math.Max(0, context.NearbyHostilePeople);
+        return Math.Clamp(threats / (float)_threatCap, 0f, 1f);
+    }
+}
+
+public sealed class LowHealthConsideration : Consideration
+{
+    public override float Evaluate(in NpcAiContext context)
+    {
+        return Math.Clamp((60f - context.Health) / 60f, 0f, 1f);
+    }
+}
+
 public sealed class InvertedConsideration : Consideration
 {
     private readonly Consideration _inner;

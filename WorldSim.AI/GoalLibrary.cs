@@ -8,6 +8,13 @@ public static class GoalLibrary
     {
         var goals = new List<Goal>();
 
+        var defendSelf = new Goal("DefendSelf")
+        {
+            CooldownSeconds = 0.2f
+        };
+        defendSelf.Considerations.Add(new ThreatNearbyConsideration(threatCap: 3));
+        goals.Add(defendSelf);
+
         var gatherWood = new Goal("GatherWood")
         {
             CooldownSeconds = 2f

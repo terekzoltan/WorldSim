@@ -181,4 +181,70 @@ public class DecisionTests
         Assert.Equal(NpcCommand.EatFood, decision.Command);
         Assert.Equal("EmergencyEat", decision.MethodName);
     }
+
+    [Fact]
+    public void SimplePlanner_DefendSelf_ChoosesFight_WhenStrongAndHealthy()
+    {
+        var planner = new SimplePlanner();
+        planner.SetGoal(new Goal("DefendSelf"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 5f,
+            Hunger: 35f,
+            Stamina: 70f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 88f,
+            Strength: 16,
+            Defense: 20,
+            NearbyPredators: 1,
+            NearbyHostilePeople: 0);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.Fight, decision.Command);
+    }
+
+    [Fact]
+    public void GoapPlanner_DefendSelf_ChoosesFlee_WhenLowHealth()
+    {
+        var planner = new GoapPlanner();
+        planner.SetGoal(new Goal("DefendSelf"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 6f,
+            Hunger: 25f,
+            Stamina: 60f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 24f,
+            Strength: 18,
+            Defense: 30,
+            NearbyPredators: 1,
+            NearbyHostilePeople: 1);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.Flee, decision.Command);
+    }
 }

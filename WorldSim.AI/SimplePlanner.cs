@@ -1,3 +1,5 @@
+using System;
+
 namespace WorldSim.AI;
 
 public sealed class SimplePlanner : IPlanner
@@ -19,6 +21,7 @@ public sealed class SimplePlanner : IPlanner
 
         var command = _goal.Name switch
         {
+            "DefendSelf" => ShouldFight(context) ? NpcCommand.Fight : NpcCommand.Flee,
             "GatherWood" => NpcCommand.GatherWood,
             "GatherStone" => NpcCommand.GatherStone,
             "SecureFood" => context.Hunger >= 68f && context.HomeFood > 0 ? NpcCommand.EatFood : NpcCommand.GatherFood,
@@ -37,5 +40,21 @@ public sealed class SimplePlanner : IPlanner
         var reason = _goalChanged ? "GoalChanged" : "RuleMatch";
         _goalChanged = false;
         return new PlannerDecision(command, 1, new[] { command }, 1, reason, "SimpleRule");
+    }
+
+    private static bool ShouldFight(in NpcAiContext context)
+    {
+        var predators = Math.Max(0, context.NearbyPredators);
+        var hostiles = Math.Max(0, context.NearbyHostilePeople);
+        var threats = predators + hostiles;
+        if (threats <= 0)
+            return false;
+
+        if (context.Health < 40f)
+            return false;
+
+        var power = context.Strength + (context.Defense / 2f);
+        var threatLoad = 6f * predators + 8f * hostiles;
+        return power >= threatLoad;
     }
 }

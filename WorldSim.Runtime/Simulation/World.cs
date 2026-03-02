@@ -85,6 +85,7 @@ namespace WorldSim.Simulation
         int _navigationTopologyVersion;
 
         float _simulationTimeSeconds;
+        int _tickCounter;
         float _seasonTimer;
         float _droughtTimer;
         float _professionRebalanceTimer;
@@ -194,6 +195,7 @@ namespace WorldSim.Simulation
 
         public void Update(float dt)
         {
+            _tickCounter++;
             _simulationTimeSeconds += Math.Max(0f, dt);
             UpdateSeasonsAndEvents(dt);
             UpdateFoodRegrowth(dt);
@@ -312,6 +314,8 @@ namespace WorldSim.Simulation
 
         public int GetColonyWarriorCount(int colonyId)
             => _colonyWarriorCounts.TryGetValue(colonyId, out var count) ? count : 0;
+
+        public int CurrentTick => _tickCounter;
 
         private void ReportPersonDeath(Person person)
         {
@@ -443,7 +447,7 @@ namespace WorldSim.Simulation
                 else
                 {
                     _colonyWarStates[colony.Id] = ColonyWarState.Tense;
-                    _colonyWarriorCounts[colony.Id] = Math.Max(0, living / 10);
+                    _colonyWarriorCounts[colony.Id] = Math.Max(1, living / 10);
                 }
             }
         }

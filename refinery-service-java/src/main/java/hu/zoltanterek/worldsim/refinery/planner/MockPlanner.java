@@ -3,6 +3,7 @@ package hu.zoltanterek.worldsim.refinery.planner;
 import java.util.List;
 import java.util.Random;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,22 +19,38 @@ import hu.zoltanterek.worldsim.refinery.util.DeterministicIds;
 public class MockPlanner implements PatchPlanner {
     private static final String SCHEMA_VERSION = "v1";
     private final ObjectMapper objectMapper;
+    private final String directorOutputMode;
 
-    public MockPlanner(ObjectMapper objectMapper) {
+    public MockPlanner(
+            ObjectMapper objectMapper,
+            @Value("${planner.director.outputMode:both}") String directorOutputMode
+    ) {
         this.objectMapper = objectMapper;
+        this.directorOutputMode = normalizeOutputMode(directorOutputMode);
     }
 
     @Override
     public PatchResponse plan(PatchRequest request) {
         Random random = new Random(DeterministicIds.combineSeed(request.seed(), request.tick(), request.goal().name()));
 
-        PatchOp op = switch (request.goal()) {
-            case Goal.TECH_TREE_PATCH -> planTechTreePatch(request);
-            case Goal.WORLD_EVENT -> planWorldEvent(request, random);
-            case Goal.NPC_POLICY -> planNpcPolicy(request, random);
+        List<PatchOp> patch = switch (request.goal()) {
+            case Goal.TECH_TREE_PATCH -> List.of(planTechTreePatch(request));
+            case Goal.WORLD_EVENT -> List.of(planWorldEvent(request, random));
+            case Goal.NPC_POLICY -> List.of(planNpcPolicy(request, random));
+            case Goal.SEASON_DIRECTOR_CHECKPOINT -> applyDirectorOutputMode(
+                    planDirectorCheckpoint(request),
+                    directorOutputMode
+            );
         };
 
-        List<String> explain = List.of(
+        List<String> explain = request.goal() == Goal.SEASON_DIRECTOR_CHECKPOINT
+                ? List.of(
+                "directorStage:mock",
+                "directorOutputMode:" + directorOutputMode,
+                "MockPlanner produced deterministic director checkpoint output.",
+                "Given the same goal, seed, and tick, this service returns the same patch."
+        )
+                : List.of(
                 "MockPlanner produced a deterministic response for pipeline testing.",
                 "Given the same goal, seed, and tick, this service returns the same patch."
         );
@@ -43,7 +60,7 @@ public class MockPlanner implements PatchPlanner {
                 SCHEMA_VERSION,
                 request.requestId(),
                 request.seed(),
-                List.of(op),
+                patch,
                 explain,
                 List.of()
         );
@@ -98,5 +115,42 @@ public class MockPlanner implements PatchPlanner {
         double delta = random.nextBoolean() ? 0.05 : -0.05;
         String opId = DeterministicIds.opId(request.seed(), request.tick(), request.goal().name(), "tweakTech", field + ":" + delta);
         return new PatchOp.TweakTech(opId, "POLICY_GLOBAL", field, delta);
+    }
+
+    private List<PatchOp> planDirectorCheckpoint(PatchRequest request) {
+        String directive = "PrioritizeFood";
+
+        PatchOp.AddStoryBeat storyBeat = new PatchOp.AddStoryBeat(
+                "op_director_story_1",
+                "BEAT_SAMPLE_1",
+                "Rations tighten this season; avoid expansion and secure food routes.",
+                24
+        );
+
+        PatchOp.SetColonyDirective directiveOp = new PatchOp.SetColonyDirective(
+                "op_director_nudge_1",
+                0,
+                directive,
+                18
+        );
+
+        return List.of(storyBeat, directiveOp);
+    }
+
+    private static String normalizeOutputMode(String rawMode) {
+        String mode = rawMode == null ? "both" : rawMode.trim().toLowerCase();
+        return switch (mode) {
+            case "both", "story_only", "nudge_only", "off" -> mode;
+            default -> "both";
+        };
+    }
+
+    private static List<PatchOp> applyDirectorOutputMode(List<PatchOp> patch, String outputMode) {
+        return switch (outputMode) {
+            case "story_only" -> patch.stream().filter(op -> op instanceof PatchOp.AddStoryBeat).toList();
+            case "nudge_only" -> patch.stream().filter(op -> op instanceof PatchOp.SetColonyDirective).toList();
+            case "off" -> List.of();
+            default -> patch;
+        };
     }
 }

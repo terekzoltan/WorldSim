@@ -15,7 +15,9 @@ public enum Job
     EatFood,
     Rest,
     BuildHouse,
-    CraftTools
+    CraftTools,
+    Fight,
+    Flee
 }
 public enum Profession { Generalist, Lumberjack, Miner, Farmer, Hunter, Builder }
 public enum PersonDeathReason { None, OldAge, Starvation, Predator, Combat, Other }
@@ -31,6 +33,8 @@ public class Person
     public PersonDeathReason LastDeathReason { get; private set; } = PersonDeathReason.None;
     public int Strength, Intelligence;
     public int Defense { get; set; }
+    public bool IsInCombat { get; private set; }
+    public int LastCombatTick { get; private set; } = -1;
     public Colony Home => _home;
 
     Colony _home;
@@ -66,6 +70,7 @@ public class Person
     float _idleTimeSeconds = 0f;
     float _loiterThresholdSeconds; // randomized per person
     (int x, int y) _lastPos;
+    float _combatMarkerSeconds;
 
     private Person(Colony home, (int, int) pos, bool newborn, RuntimeNpcBrain brain)
     {
@@ -186,7 +191,14 @@ public class Person
         else
             Stamina = Math.Clamp(Stamina - dt * 1.6f, 0f, 100f);
 
+        _combatMarkerSeconds = Math.Max(0f, _combatMarkerSeconds - dt);
+        if (_combatMarkerSeconds <= 0f)
+            IsInCombat = false;
+
         float hunger = Needs.GetValueOrDefault("Hunger", 0f);
+
+        if (LastAiDecision == null)
+            _ = _brain.Think(this, w, dt);
 
         // Critical hunger preemption happens before starvation damage to avoid dying with available food.
         if (hunger >= 78f && _home.Stock[Resource.Food] > 0)
@@ -375,6 +387,14 @@ public class Person
                         float restGain = HasNearbyOwnHouse(w, radius: 2) ? 30f : 22f;
                         Stamina = Math.Clamp(Stamina + restGain, 0f, 100f);
                         break;
+
+                    case Job.Fight:
+                        ExecuteFightAction(w);
+                        break;
+
+                    case Job.Flee:
+                        ExecuteFleeAction(w);
+                        break;
                 }
 
                 Current = Job.Idle;
@@ -450,6 +470,13 @@ public class Person
                 }
             }
 
+            if (w.EnableCombatPrimitives && TryHandleThreatResponse(w, dt))
+            {
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
+            }
+
             if (TryProfessionDirectedAction(w, veryLowFood))
             {
                 _idleTimeSeconds = 0f;
@@ -519,6 +546,8 @@ public class Person
                     Job.Rest        => ComputeTicks(RestWorkTime, w, isHeavyWork: false),
                     Job.BuildHouse  => Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier)),
                     Job.CraftTools  => ComputeTicks(CraftToolsTime, w, isHeavyWork: true),
+                    Job.Fight       => 1,
+                    Job.Flee        => 1,
                     _ => 0
                 };
                 _idleTimeSeconds = 0f;
@@ -639,6 +668,165 @@ public class Person
         return false;
     }
 
+    bool TryHandleThreatResponse(World w, float dt)
+    {
+        int nearbyPredators = CountNearbyPredators(w, radius: 4);
+        int nearbyHostiles = CountNearbyHostilePeople(w, radius: 4);
+        if (nearbyPredators + nearbyHostiles <= 0)
+            return false;
+
+        var next = _brain.Think(this, w, dt);
+        if (next != Job.Fight && next != Job.Flee)
+            next = ShouldFight(nearbyPredators, nearbyHostiles) ? Job.Fight : Job.Flee;
+
+        Current = next;
+        _doingJob = 1;
+        return true;
+    }
+
+    bool ShouldFight(int nearbyPredators, int nearbyHostiles)
+    {
+        if (Health < 40f)
+            return false;
+
+        float power = Strength + (Defense / 2f);
+        float threatLoad = (6f * nearbyPredators) + (8f * nearbyHostiles);
+        return power >= threatLoad;
+    }
+
+    int CountNearbyPredators(World w, int radius)
+    {
+        int count = 0;
+        foreach (var animal in w._animals)
+        {
+            if (animal is not Predator predator || !predator.IsAlive)
+                continue;
+
+            int dist = Math.Abs(predator.Pos.x - Pos.x) + Math.Abs(predator.Pos.y - Pos.y);
+            if (dist <= radius)
+                count++;
+        }
+
+        return count;
+    }
+
+    int CountNearbyHostilePeople(World w, int radius)
+    {
+        int count = 0;
+        foreach (var person in w._people)
+        {
+            if (person == this || person.Health <= 0f || person.Home == _home)
+                continue;
+
+            int dist = Math.Abs(person.Pos.x - Pos.x) + Math.Abs(person.Pos.y - Pos.y);
+            if (dist <= radius)
+                count++;
+        }
+
+        return count;
+    }
+
+    void ExecuteFightAction(World w)
+    {
+        if (!w.EnableCombatPrimitives)
+            return;
+
+        Predator? nearest = null;
+        int best = int.MaxValue;
+        foreach (var animal in w._animals)
+        {
+            if (animal is not Predator predator || !predator.IsAlive)
+                continue;
+
+            int dist = Math.Abs(predator.Pos.x - Pos.x) + Math.Abs(predator.Pos.y - Pos.y);
+            if (dist < best)
+            {
+                best = dist;
+                nearest = predator;
+            }
+        }
+
+        if (nearest == null)
+            return;
+
+        if (best > 1)
+        {
+            MoveTowards(w, nearest.Pos, 1);
+            return;
+        }
+
+        w.ReportCombatEngagement();
+        float fightAdvantage = Strength + (Defense / 2f);
+        float winChance = Math.Clamp(0.35f + (fightAdvantage / 55f), 0.2f, 0.95f);
+        if (_rng.NextDouble() < winChance)
+        {
+            nearest.IsAlive = false;
+            w.ReportPredatorKilledByHumans();
+            return;
+        }
+
+        ApplyCombatDamage(w, Math.Max(1f, w.PredatorHumanDamage * 0.65f), "Predator");
+    }
+
+    void ExecuteFleeAction(World w)
+    {
+        var nearestThreat = FindNearestThreat(w, radius: 6);
+        if (nearestThreat == null)
+        {
+            MoveTowards(w, _home.Origin, 1);
+            return;
+        }
+
+        int dx = Pos.x - nearestThreat.Value.x;
+        int dy = Pos.y - nearestThreat.Value.y;
+        int stepX = Pos.x + Math.Sign(dx == 0 ? (_rng.NextDouble() < 0.5 ? -1 : 1) : dx);
+        int stepY = Pos.y + Math.Sign(dy == 0 ? (_rng.NextDouble() < 0.5 ? -1 : 1) : dy);
+
+        stepX = Math.Clamp(stepX, 0, w.Width - 1);
+        stepY = Math.Clamp(stepY, 0, w.Height - 1);
+        if (w.GetTile(stepX, stepY).Ground != Ground.Water)
+        {
+            Pos = (stepX, stepY);
+            return;
+        }
+
+        Wander(w);
+    }
+
+    (int x, int y)? FindNearestThreat(World w, int radius)
+    {
+        (int x, int y)? bestPos = null;
+        int bestDist = int.MaxValue;
+
+        foreach (var animal in w._animals)
+        {
+            if (animal is not Predator predator || !predator.IsAlive)
+                continue;
+
+            int dist = Math.Abs(predator.Pos.x - Pos.x) + Math.Abs(predator.Pos.y - Pos.y);
+            if (dist <= radius && dist < bestDist)
+            {
+                bestDist = dist;
+                bestPos = predator.Pos;
+            }
+        }
+
+        foreach (var person in w._people)
+        {
+            if (person == this || person.Health <= 0f || person.Home == _home)
+                continue;
+
+            int dist = Math.Abs(person.Pos.x - Pos.x) + Math.Abs(person.Pos.y - Pos.y);
+            if (dist <= radius && dist < bestDist)
+            {
+                bestDist = dist;
+                bestPos = person.Pos;
+            }
+        }
+
+        return bestPos;
+    }
+
     void TryConsumeToolCharge()
     {
         if (_home.ToolCharges > 0)
@@ -651,6 +839,7 @@ public class Person
             return;
 
         Health -= amount;
+        EnterCombat(world: null);
         if (Health <= 0f)
         {
             LastDeathReason = source.Contains("Predator", StringComparison.OrdinalIgnoreCase)
@@ -665,8 +854,16 @@ public class Person
             return;
 
         Health -= amount;
+        EnterCombat(world);
         if (Health <= 0f)
             LastDeathReason = PersonDeathReason.Combat;
+    }
+
+    private void EnterCombat(World? world)
+    {
+        IsInCombat = true;
+        _combatMarkerSeconds = 1.25f;
+        LastCombatTick = world?.CurrentTick ?? (LastCombatTick + 1);
     }
 
     bool HasNearbyOwnHouse(World w, int radius)

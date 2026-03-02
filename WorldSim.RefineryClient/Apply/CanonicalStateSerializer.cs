@@ -11,7 +11,12 @@ public static class CanonicalStateSerializer
         var payload = new
         {
             techIds = state.TechIds.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
-            eventIds = state.EventIds.OrderBy(x => x, StringComparer.Ordinal).ToArray()
+            eventIds = state.EventIds.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+            storyBeatIds = state.StoryBeatIds.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+            colonyDirectives = state.ColonyDirectives
+                .OrderBy(x => x.Key)
+                .Select(x => new { colonyId = x.Key, directive = x.Value })
+                .ToArray()
         };
 
         return JsonSerializer.Serialize(payload);

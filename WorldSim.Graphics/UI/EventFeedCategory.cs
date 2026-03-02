@@ -19,7 +19,7 @@ public static class EventFeedClassifier
         if (string.IsNullOrWhiteSpace(evt))
             return EventFeedCategory.World;
 
-        if (evt.StartsWith("[Combat]", StringComparison.OrdinalIgnoreCase) || ContainsAny(evt, "combat", "battle", "predator hit", "flee", "fight"))
+        if (evt.StartsWith("[Combat]", StringComparison.OrdinalIgnoreCase) || ContainsAny(evt, "combat", "battle", "predator", "flee", "fight", "retaliat"))
             return EventFeedCategory.Combat;
 
         if (evt.StartsWith("[Siege]", StringComparison.OrdinalIgnoreCase) || ContainsAny(evt, "siege", "breach", "tower", "wall"))

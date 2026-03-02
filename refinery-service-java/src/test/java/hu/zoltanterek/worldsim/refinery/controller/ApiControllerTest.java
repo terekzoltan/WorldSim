@@ -58,6 +58,11 @@ class ApiControllerTest {
     }
 
     @Test
+    void patchSeasonDirectorFixtureMatchesExpectedResponse() throws Exception {
+        assertPatchFixture("patch-season-director-v1");
+    }
+
+    @Test
     void patchBadSchemaReturns400WithErrorFields() throws Exception {
         JsonNode body = postFixture("examples/negative/requests/patch-bad-schema.json", status().isBadRequest());
         assertEquals("Bad request", body.path("message").asText());

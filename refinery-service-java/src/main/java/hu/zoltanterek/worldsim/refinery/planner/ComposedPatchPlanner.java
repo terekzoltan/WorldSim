@@ -19,18 +19,24 @@ public class ComposedPatchPlanner implements PatchPlanner {
     private final MockPlanner mockPlanner;
     private final LlmPlanner llmPlanner;
     private final RefineryPlanner refineryPlanner;
+    private final DirectorRefineryPlanner directorRefineryPlanner;
     private final String plannerMode;
+    private final String directorOutputMode;
 
     public ComposedPatchPlanner(
             MockPlanner mockPlanner,
             LlmPlanner llmPlanner,
             RefineryPlanner refineryPlanner,
-            @Value("${planner.mode:mock}") String plannerMode
+            DirectorRefineryPlanner directorRefineryPlanner,
+            @Value("${planner.mode:mock}") String plannerMode,
+            @Value("${planner.director.outputMode:both}") String directorOutputMode
     ) {
         this.mockPlanner = mockPlanner;
         this.llmPlanner = llmPlanner;
         this.refineryPlanner = refineryPlanner;
+        this.directorRefineryPlanner = directorRefineryPlanner;
         this.plannerMode = plannerMode;
+        this.directorOutputMode = normalizeOutputMode(directorOutputMode);
     }
 
     @Override
@@ -40,6 +46,14 @@ public class ComposedPatchPlanner implements PatchPlanner {
             return mockResponse;
         }
 
+        if (request.goal() == Goal.SEASON_DIRECTOR_CHECKPOINT) {
+            return planDirectorPipeline(request, mockResponse);
+        }
+
+        return planLegacyPipeline(request, mockResponse);
+    }
+
+    private PatchResponse planLegacyPipeline(PatchRequest request, PatchResponse mockResponse) {
         Optional<List<PatchOp>> llmProposal = llmPlanner.propose(request);
         List<PatchOp> candidatePatch = llmProposal.orElseGet(mockResponse::patch);
         List<PatchOp> validatedPatch;
@@ -83,5 +97,86 @@ public class ComposedPatchPlanner implements PatchPlanner {
                 explain,
                 warnings
         );
+    }
+
+    private PatchResponse planDirectorPipeline(PatchRequest request, PatchResponse mockResponse) {
+        Optional<List<PatchOp>> llmProposal = llmPlanner.propose(request);
+        List<PatchOp> candidatePatch = applyDirectorOutputMode(
+                llmProposal.orElseGet(mockResponse::patch),
+                directorOutputMode
+        );
+
+        List<PatchOp> validatedPatch = candidatePatch;
+        boolean validationFailed = false;
+        DirectorRefineryPlanner.DirectorValidationResult validationResult;
+        try {
+            validationResult = directorRefineryPlanner.validateAndRepair(request, candidatePatch);
+            validatedPatch = applyDirectorOutputMode(validationResult.patch(), directorOutputMode);
+        } catch (IllegalArgumentException ex) {
+            validationResult = new DirectorRefineryPlanner.DirectorValidationResult(
+                    applyDirectorOutputMode(mockResponse.patch(), directorOutputMode),
+                    false,
+                    List.of(),
+                    List.of(ex.getMessage())
+            );
+            validatedPatch = validationResult.patch();
+            validationFailed = true;
+        }
+
+        String stage = validationResult.validated()
+                ? "directorStage:refinery-validated"
+                : validationFailed ? "directorStage:fallback-mock" : "directorStage:mock";
+
+        List<String> explain = new ArrayList<>();
+        explain.add(stage);
+        explain.add("directorOutputMode:" + directorOutputMode);
+        explain.add(llmProposal.isPresent() ? "llmStage:candidate" : "llmStage:disabled");
+        if (llmProposal.isPresent()) {
+            explain.add("LLM planner proposed director candidate patch.");
+        } else {
+            explain.add("LLM planner unavailable for director; deterministic mock candidate used.");
+        }
+        if (validationResult.validated()) {
+            explain.add("Director candidate passed formal validation.");
+        } else if (validationFailed) {
+            explain.add("Director validation failed; deterministic mock fallback applied.");
+        } else {
+            explain.add("Director formal validation gate disabled; pass-through mode.");
+        }
+
+        List<String> warnings = new ArrayList<>();
+        warnings.addAll(validationResult.warnings());
+        if (llmProposal.isEmpty()) {
+            warnings.add("LLM disabled or missing credentials; using mock planner output.");
+        }
+        if (!validationResult.feedback().isEmpty()) {
+            warnings.addAll(validationResult.feedback().stream().map(msg -> "directorFeedback:" + msg).toList());
+        }
+
+        return new PatchResponse(
+                mockResponse.schemaVersion(),
+                mockResponse.requestId(),
+                mockResponse.seed(),
+                validatedPatch,
+                explain,
+                warnings
+        );
+    }
+
+    private static String normalizeOutputMode(String rawMode) {
+        String mode = rawMode == null ? "both" : rawMode.trim().toLowerCase();
+        return switch (mode) {
+            case "both", "story_only", "nudge_only", "off" -> mode;
+            default -> "both";
+        };
+    }
+
+    private static List<PatchOp> applyDirectorOutputMode(List<PatchOp> patch, String outputMode) {
+        return switch (outputMode) {
+            case "story_only" -> patch.stream().filter(op -> op instanceof PatchOp.AddStoryBeat).toList();
+            case "nudge_only" -> patch.stream().filter(op -> op instanceof PatchOp.SetColonyDirective).toList();
+            case "off" -> List.of();
+            default -> patch;
+        };
     }
 }

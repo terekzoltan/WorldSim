@@ -201,6 +201,18 @@ A telemetry/persistence/scenario-runner feladatok nem kulon trackkent kezeltek, 
 - Persistence: Track B (runtime allapot) + Track D (patch dedupe state)
 - Scenario runner/headless: Track B incremental toolkent, ha CI vagy balansz igenyli
 
+## Wave turn-gate protocol (all track agents)
+
+Cel:
+- A wave/sprint sorrend es dependency-k kotelezo betartasa, hogy ne induljon el blokkolo elofeltetel nelkul implementacio.
+
+Szabaly:
+- Minden implementacio elejen az adott agent ellenorzi a `Docs/Plans/Combined-Execution-Sequencing-Plan.md` statuszait es dependency sorrendjet.
+- Ha elofeltetel hianyzik: kotelezo `NOT READY` jelzes a usernek/koordinatornak, es nincs kodolas az adott epicen.
+- Ha minden elofeltetel kesz: `READY` jelzes, majd az adott epic statusza `⬜ -> 🔄`.
+- Lezaraskor (build/test/smoke zold): `🔄 -> ✅`.
+- Masik track epicjet `✅`-re allitani csak owner visszajelzes vagy explicit koordinator jovahagyas alapjan lehet.
+
 ## Kozos uzenofal (cross-track notes)
 
 Cel:
@@ -218,3 +230,8 @@ Entries:
 - `[2026-02-21][Track C] GOAP/HTN trace bovitve (plan cost, replan reason, method) - Track A debug olvashatosaghoz plusz mezok kellenek - kovetkezo lepes: compact+page UX finomitas`.
 - `[2026-02-21][Track C] Policy mix aktiv (Global/FactionMix/HtnPilot) es Aetheri HTN pilot - Track B balanszparametereket erint - kovetkezo lepes: config tablaba emeles hardcode switch helyett`.
 - `[2026-02-21][Track C] GOAP invalidation+backoff es HTN method scoring bekotve, faction policy table env-bol konfiguralhato - Track B runtime balansz/ops finomhangolast erint - kovetkezo lepes: policy tabla JSON-ra emelese`.
+- `[2026-03-02][Track B] P0-D(B)/P0-E implementalva - snapshot person combat mezok (Health/IsInCombat/LastCombatTick) es 1000 tick headless smoke gate bovitve, teljes build+test zold - kovetkezo lepes: Track A P0-D vizualis HP/combat marker render befejezese`.
+- `[2026-03-02][Track C] P0-C implementalas elinditva (Fight/Flee threat response) - AI contract/planner/runtime mapping erintett - kovetkezo lepes: teszt gate + statuszaras`.
+- `[2026-03-02][Track C] P0-C status zarva (Fight/Flee threat response) - AI contract+planner+runtime mapping bekotve, build+test zold - kovetkezo lepes: P0-D/P0-E cross-track verifikacio`.
+- `[2026-03-02][Track D] Wave1 D1 S1-A/B/C/D status zarva (✅) - v1 wire megtartva, additiv C# contracts/v2 namespace, Java director goal+ops+output-mode mock, C# parser/applier+adapter director op tamogatas kesz - kovetkezo lepes: Wave2 S2-A/B/C cross-track handshake Track B/C-vel`.
+- `[2026-03-02][Track A] Wave1 P0-D status zarva (✅) - HP bar + in-combat marker render es event feed category color mapping bekotve, build+arch+runtime test zold - kovetkezo lepes: Wave2 Track A P1-E varakozas Track B snapshot stance/territory readiness jelzesig`.

@@ -130,6 +130,68 @@
                 "type": "integer"
               }
             }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "opId",
+              "beatId",
+              "text",
+              "durationTicks"
+            ],
+            "properties": {
+              "op": {
+                "const": "addStoryBeat"
+              },
+              "opId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "beatId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              },
+              "durationTicks": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "opId",
+              "colonyId",
+              "directive",
+              "durationTicks"
+            ],
+            "properties": {
+              "op": {
+                "const": "setColonyDirective"
+              },
+              "opId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "colonyId": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "directive": {
+                "type": "string",
+                "minLength": 1
+              },
+              "durationTicks": {
+                "type": "integer"
+              }
+            }
           }
         ]
       }

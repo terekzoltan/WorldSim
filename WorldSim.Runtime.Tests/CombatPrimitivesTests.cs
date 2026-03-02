@@ -1,4 +1,5 @@
 using System.Linq;
+using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
 using WorldSim.Simulation.Combat;
 using Xunit;
@@ -59,5 +60,34 @@ public class CombatPrimitivesTests
         Assert.True(world.TotalPredatorHumanHits > 0);
         Assert.True(world.TotalPredatorKillsByHumans >= 0);
         Assert.True(world.TotalCombatEngagements >= 0);
+        Assert.True(primary.LastCombatTick >= 0);
+    }
+
+    [Fact]
+    public void SnapshotBuilder_PopulatesPersonCombatFields()
+    {
+        var world = new World(width: 24, height: 16, initialPop: 8, randomSeed: 303)
+        {
+            EnablePredatorHumanAttacks = true
+        };
+
+        world._animals.Clear();
+        world._animals.Add(new Predator((8, 8)));
+
+        var target = world._people[0];
+        target.Pos = (8, 8);
+        target.Health = 120f;
+        foreach (var person in world._people.Skip(1))
+            person.Pos = (0, 0);
+
+        for (int i = 0; i < 12; i++)
+            world.Update(0.25f);
+
+        var snapshot = WorldSnapshotBuilder.Build(world);
+        var renderPerson = snapshot.People.First(p => p.ColonyId == target.Home.Id && p.X == target.Pos.x && p.Y == target.Pos.y);
+
+        Assert.Equal(target.Health, renderPerson.Health, 3);
+        Assert.Equal(target.IsInCombat, renderPerson.IsInCombat);
+        Assert.Equal(target.LastCombatTick, renderPerson.LastCombatTick);
     }
 }

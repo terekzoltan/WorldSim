@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using WorldSimRefineryClient.Apply;
 using WorldSim.Contracts.V1;
+using WorldSim.Contracts.V2;
 
 namespace WorldSimRefineryClient.Serialization;
 
@@ -16,20 +17,101 @@ public sealed class PatchResponseParser
     {
         options ??= new PatchApplyOptions();
 
-        ValidateKnownOps(json);
+        var root = JsonNode.Parse(json)?.AsObject() ?? throw new PatchApplyException("Invalid JSON object.");
+
+        ValidateKnownOps(root);
 
         if (options.StrictMode)
         {
-            ValidateRootShape(json);
+            ValidateRootShape(root);
         }
 
-        var parsed = JsonSerializer.Deserialize<PatchResponse>(json, SerializerOptions);
-        return parsed ?? throw new PatchApplyException("Invalid patch response JSON.");
+        var schemaVersion = root["schemaVersion"]?.GetValue<string>()
+                            ?? throw new PatchApplyException("PatchResponse.schemaVersion is required.");
+        var requestId = root["requestId"]?.GetValue<string>()
+                        ?? throw new PatchApplyException("PatchResponse.requestId is required.");
+        var seed = root["seed"]?.GetValue<long>()
+                   ?? throw new PatchApplyException("PatchResponse.seed is required.");
+        if (root["patch"] is not JsonArray patchArray)
+        {
+            throw new PatchApplyException("PatchResponse.patch must be an array.");
+        }
+
+        var patch = ParsePatchArray(patchArray);
+        var explain = ParseStringArray(root["explain"], "PatchResponse.explain");
+        var warnings = ParseStringArray(root["warnings"], "PatchResponse.warnings");
+
+        return new PatchResponse(schemaVersion, requestId, seed, patch, explain, warnings);
     }
 
-    private static void ValidateKnownOps(string json)
+    private static IReadOnlyList<PatchOp> ParsePatchArray(JsonArray patchArray)
     {
-        var obj = JsonNode.Parse(json)?.AsObject() ?? throw new PatchApplyException("Invalid JSON object.");
+        var patch = new List<PatchOp>(patchArray.Count);
+        foreach (var opNode in patchArray)
+        {
+            if (opNode is not JsonObject opObject)
+            {
+                throw new PatchApplyException("Patch operation must be object.");
+            }
+
+            var op = opObject["op"]?.GetValue<string>()
+                     ?? throw new PatchApplyException("Patch operation missing op.");
+            patch.Add(ParseSingleOp(opObject, op));
+        }
+
+        return patch;
+    }
+
+    private static PatchOp ParseSingleOp(JsonObject opObject, string op)
+    {
+        return op switch
+        {
+            "addTech" => DeserializeOp<AddTechOp>(opObject, op),
+            "tweakTech" => DeserializeOp<TweakTechOp>(opObject, op),
+            "addWorldEvent" => DeserializeOp<AddWorldEventOp>(opObject, op),
+            "addStoryBeat" => DeserializeOp<AddStoryBeatOp>(opObject, op),
+            "setColonyDirective" => DeserializeOp<SetColonyDirectiveOp>(opObject, op),
+            _ => throw new PatchApplyException($"Unknown op '{op}'.")
+        };
+    }
+
+    private static T DeserializeOp<T>(JsonObject opObject, string op)
+        where T : PatchOp
+    {
+        try
+        {
+            var parsed = opObject.Deserialize<T>(SerializerOptions);
+            return parsed ?? throw new PatchApplyException($"Invalid '{op}' operation payload.");
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
+        {
+            throw new PatchApplyException($"Invalid '{op}' operation payload: {ex.Message}");
+        }
+    }
+
+    private static IReadOnlyList<string> ParseStringArray(JsonNode? node, string fieldName)
+    {
+        if (node is not JsonArray array)
+        {
+            throw new PatchApplyException($"{fieldName} must be an array.");
+        }
+
+        var values = new List<string>(array.Count);
+        foreach (var item in array)
+        {
+            if (item is null)
+            {
+                throw new PatchApplyException($"{fieldName} must contain strings only.");
+            }
+
+            values.Add(item.GetValue<string>());
+        }
+
+        return values;
+    }
+
+    private static void ValidateKnownOps(JsonObject obj)
+    {
         if (obj["patch"] is not JsonArray patchArray)
         {
             throw new PatchApplyException("PatchResponse.patch must be an array.");
@@ -44,16 +126,15 @@ public sealed class PatchResponseParser
 
             var op = opObj["op"]?.GetValue<string>()
                      ?? throw new PatchApplyException("Patch operation missing op.");
-            if (op is not ("addTech" or "tweakTech" or "addWorldEvent"))
+            if (op is not ("addTech" or "tweakTech" or "addWorldEvent" or "addStoryBeat" or "setColonyDirective"))
             {
                 throw new PatchApplyException($"Unknown op '{op}'.");
             }
         }
     }
 
-    private static void ValidateRootShape(string json)
+    private static void ValidateRootShape(JsonObject obj)
     {
-        var obj = JsonNode.Parse(json)?.AsObject() ?? throw new PatchApplyException("Invalid JSON object.");
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
             "schemaVersion", "requestId", "seed", "patch", "explain", "warnings"

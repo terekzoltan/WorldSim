@@ -1,6 +1,8 @@
 using System.Text.Json.Nodes;
+using Xunit;
 using WorldSimRefineryClient.Apply;
 using WorldSim.Contracts.V1;
+using WorldSim.Contracts.V2;
 
 namespace WorldSim.RefineryClient.Tests;
 
@@ -113,5 +115,45 @@ public sealed class PatchApplySemanticsTests
 
         var ex = Assert.Throws<PatchApplyException>(() => applier.Apply(state, response));
         Assert.Contains("requires existing tech", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DirectorOps_AreAppliedAndDedupedByOpId()
+    {
+        var state = SimulationPatchState.CreateBaseline();
+        var applier = new PatchApplier();
+
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-4",
+            987,
+            new List<PatchOp>
+            {
+                new AddStoryBeatOp
+                {
+                    OpId = "op_story_1",
+                    BeatId = "BEAT_SAMPLE_1",
+                    Text = "A restless wind crosses the valley.",
+                    DurationTicks = 24
+                },
+                new SetColonyDirectiveOp
+                {
+                    OpId = "op_nudge_1",
+                    ColonyId = 0,
+                    Directive = "PrioritizeFood",
+                    DurationTicks = 18
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var first = applier.Apply(state, response);
+        var second = applier.Apply(state, response);
+
+        Assert.Equal(2, first.AppliedCount);
+        Assert.Equal(2, second.DedupedCount);
+        Assert.Contains("BEAT_SAMPLE_1", state.StoryBeatIds);
+        Assert.Equal("PrioritizeFood", state.ColonyDirectives[0]);
     }
 }

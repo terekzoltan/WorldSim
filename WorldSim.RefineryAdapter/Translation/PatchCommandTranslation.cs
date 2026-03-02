@@ -1,11 +1,8 @@
 using WorldSim.Contracts.V1;
+using WorldSim.Contracts.V2;
 using WorldSim.Runtime;
 
 namespace WorldSim.RefineryAdapter.Translation;
-
-public abstract record RuntimePatchCommand;
-
-public sealed record UnlockTechCommand(string TechId) : RuntimePatchCommand;
 
 public sealed class PatchCommandTranslator
 {
@@ -18,11 +15,25 @@ public sealed class PatchCommandTranslator
             switch (op)
             {
                 case AddTechOp addTech:
-                    commands.Add(new UnlockTechCommand(addTech.TechId));
+                    commands.Add(new UnlockTechRuntimeCommand(addTech.TechId));
+                    break;
+                case AddStoryBeatOp addStoryBeat:
+                    commands.Add(new ApplyStoryBeatRuntimeCommand(
+                        addStoryBeat.BeatId,
+                        addStoryBeat.Text,
+                        addStoryBeat.DurationTicks
+                    ));
+                    break;
+                case SetColonyDirectiveOp setColonyDirective:
+                    commands.Add(new ApplyColonyDirectiveRuntimeCommand(
+                        setColonyDirective.ColonyId,
+                        setColonyDirective.Directive,
+                        setColonyDirective.DurationTicks
+                    ));
                     break;
                 default:
                     throw new NotSupportedException(
-                        $"Adapter supports only addTech currently. Unsupported op: {op.GetType().Name}"
+                        $"Adapter supports addTech/addStoryBeat/setColonyDirective only. Unsupported op: {op.GetType().Name}"
                     );
             }
         }
@@ -39,7 +50,7 @@ public sealed class RuntimePatchCommandExecutor
         {
             switch (command)
             {
-                case UnlockTechCommand unlockTech:
+                case UnlockTechRuntimeCommand unlockTech:
                     if (!runtime.IsKnownTech(unlockTech.TechId))
                     {
                         throw new InvalidOperationException(
@@ -50,6 +61,16 @@ public sealed class RuntimePatchCommandExecutor
                     }
 
                     runtime.UnlockTechForPrimaryColony(unlockTech.TechId);
+                    break;
+                case ApplyStoryBeatRuntimeCommand storyBeat:
+                    runtime.ApplyStoryBeat(storyBeat.BeatId, storyBeat.Text, storyBeat.DurationTicks);
+                    break;
+                case ApplyColonyDirectiveRuntimeCommand directive:
+                    runtime.ApplyColonyDirective(
+                        directive.ColonyId,
+                        directive.Directive,
+                        directive.DurationTicks
+                    );
                     break;
                 default:
                     throw new NotSupportedException(

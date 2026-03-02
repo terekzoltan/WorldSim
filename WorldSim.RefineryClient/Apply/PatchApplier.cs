@@ -1,4 +1,5 @@
 using WorldSim.Contracts.V1;
+using WorldSim.Contracts.V2;
 
 namespace WorldSimRefineryClient.Apply;
 
@@ -45,6 +46,12 @@ public sealed class PatchApplier
                     break;
                 case AddWorldEventOp addWorldEvent:
                     changed = state.EventIds.Add(addWorldEvent.EventId);
+                    break;
+                case AddStoryBeatOp addStoryBeat:
+                    changed = state.StoryBeatIds.Add(addStoryBeat.BeatId);
+                    break;
+                case SetColonyDirectiveOp setColonyDirective:
+                    changed = state.SetColonyDirective(setColonyDirective.ColonyId, setColonyDirective.Directive);
                     break;
                 default:
                     if (options.StrictMode)

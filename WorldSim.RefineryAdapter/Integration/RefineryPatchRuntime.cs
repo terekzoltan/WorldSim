@@ -130,7 +130,9 @@ public sealed class RefineryPatchRuntime
         _circuitBreakerUntilUtc = DateTime.MinValue;
 
         var afterHash = CanonicalStateSerializer.Sha256(_patchState);
-        var stageMarker = response.Explain.FirstOrDefault(item => item.StartsWith("refineryStage:", StringComparison.Ordinal))
+        var stageMarker = response.Explain.FirstOrDefault(item =>
+                               item.StartsWith("refineryStage:", StringComparison.Ordinal)
+                               || item.StartsWith("directorStage:", StringComparison.Ordinal))
                           ?? "refineryStage:unknown";
         var warningHead = response.Warnings.FirstOrDefault();
         LastStatus =

@@ -11,7 +11,9 @@ public enum NpcCommand
     EatFood,
     Rest,
     BuildHouse,
-    CraftTools
+    CraftTools,
+    Fight,
+    Flee
 }
 
 public readonly record struct NpcAiContext(
@@ -29,7 +31,12 @@ public readonly record struct NpcAiContext(
     int HouseCapacity,
     bool StoneBuildingsEnabled,
     bool CanBuildWithStone,
-    int HouseStoneCost);
+    int HouseStoneCost,
+    float Health = 100f,
+    int Strength = 0,
+    int Defense = 0,
+    int NearbyPredators = 0,
+    int NearbyHostilePeople = 0);
 
 public interface IPlanner
 {

@@ -1,3 +1,4 @@
+using System.Linq;
 using WorldSim.AI;
 using WorldSim.Simulation;
 using Xunit;
@@ -17,6 +18,8 @@ public class RuntimeNpcBrainTests
     [InlineData(NpcCommand.Rest, Job.Rest)]
     [InlineData(NpcCommand.BuildHouse, Job.BuildHouse)]
     [InlineData(NpcCommand.CraftTools, Job.CraftTools)]
+    [InlineData(NpcCommand.Fight, Job.Fight)]
+    [InlineData(NpcCommand.Flee, Job.Flee)]
     public void Think_MapsAiCommandToRuntimeJob(NpcCommand command, Job expected)
     {
         var world = new World(16, 16, 10);
@@ -146,6 +149,38 @@ public class RuntimeNpcBrainTests
         }
     }
 
+    [Fact]
+    public void Think_BuildsThreatAndCombatContextFields()
+    {
+        var world = new World(16, 16, 10, randomSeed: 42)
+        {
+            EnableCombatPrimitives = true
+        };
+
+        world._animals.Clear();
+        world._animals.Add(new Predator((5, 5)));
+
+        var actor = world._people[0];
+        actor.Pos = (5, 5);
+        actor.Health = 77f;
+        actor.Strength = 14;
+        actor.Defense = 12;
+
+        var hostile = world._people.First(person => person != actor && person.Home != actor.Home);
+        hostile.Pos = (6, 5);
+
+        var brain = new RuntimeNpcBrain(new CapturingBrain());
+        _ = brain.Think(actor, world, dt: 1f);
+
+        Assert.NotNull(brain.LastDecision);
+        Assert.NotNull(CapturingBrain.LastContext);
+        Assert.Equal(77f, CapturingBrain.LastContext!.Value.Health);
+        Assert.Equal(14, CapturingBrain.LastContext.Value.Strength);
+        Assert.Equal(12, CapturingBrain.LastContext.Value.Defense);
+        Assert.True(CapturingBrain.LastContext.Value.NearbyPredators >= 1);
+        Assert.True(CapturingBrain.LastContext.Value.NearbyHostilePeople >= 1);
+    }
+
     private sealed class FixedBrain : INpcDecisionBrain
     {
         private readonly NpcCommand _command;
@@ -168,6 +203,27 @@ public class RuntimeNpcBrainTests
             MethodName: "FixedMethod",
             GoalScores: Array.Empty<GoalScoreEntry>());
             return new AiDecisionResult(_command, trace);
+        }
+    }
+
+    private sealed class CapturingBrain : INpcDecisionBrain
+    {
+        public static NpcAiContext? LastContext { get; private set; }
+
+        public AiDecisionResult Think(in NpcAiContext context)
+        {
+            LastContext = context;
+            var trace = new AiDecisionTrace(
+                SelectedGoal: "Capture",
+                PlannerName: "Capture",
+                PolicyName: "Capture",
+                PlanLength: 1,
+                PlanPreview: new[] { NpcCommand.Idle },
+                PlanCost: 1,
+                ReplanReason: "Capture",
+                MethodName: "CaptureMethod",
+                GoalScores: Array.Empty<GoalScoreEntry>());
+            return new AiDecisionResult(NpcCommand.Idle, trace);
         }
     }
 

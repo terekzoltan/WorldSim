@@ -10,6 +10,10 @@ planner:
     enabled: ${PLANNER_REFINERY_ENABLED:false}
   llm:
     enabled: ${PLANNER_LLM_ENABLED:false}
+    apiKey: ${PLANNER_LLM_API_KEY:}
+  director:
+    outputMode: ${PLANNER_DIRECTOR_OUTPUT_MODE:both}
+    maxRetries: ${PLANNER_DIRECTOR_MAX_RETRIES:2}
 
 logging:
   pattern:

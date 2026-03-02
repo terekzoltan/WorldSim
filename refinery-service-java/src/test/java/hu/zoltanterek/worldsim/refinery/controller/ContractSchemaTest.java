@@ -50,6 +50,7 @@ class ContractSchemaTest {
         assertSchemaValid(patchRequestSchema, readJson("examples/requests/patch-tech-tree-v1.json"));
         assertSchemaValid(patchRequestSchema, readJson("examples/requests/patch-world-event-v1.json"));
         assertSchemaValid(patchRequestSchema, readJson("examples/requests/patch-npc-policy-v1.json"));
+        assertSchemaValid(patchRequestSchema, readJson("examples/requests/patch-season-director-v1.json"));
     }
 
     @Test
@@ -57,6 +58,7 @@ class ContractSchemaTest {
         assertSchemaValid(patchResponseSchema, readJson("examples/responses/patch-tech-tree-v1.expected.json"));
         assertSchemaValid(patchResponseSchema, readJson("examples/responses/patch-world-event-v1.expected.json"));
         assertSchemaValid(patchResponseSchema, readJson("examples/responses/patch-npc-policy-v1.expected.json"));
+        assertSchemaValid(patchResponseSchema, readJson("examples/responses/patch-season-director-v1.expected.json"));
     }
 
     @Test
@@ -71,6 +73,7 @@ class ContractSchemaTest {
         assertLivePatchResponseSchema("examples/requests/patch-tech-tree-v1.json");
         assertLivePatchResponseSchema("examples/requests/patch-world-event-v1.json");
         assertLivePatchResponseSchema("examples/requests/patch-npc-policy-v1.json");
+        assertLivePatchResponseSchema("examples/requests/patch-season-director-v1.json");
     }
 
     @Test

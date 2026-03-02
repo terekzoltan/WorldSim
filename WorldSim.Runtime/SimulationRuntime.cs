@@ -9,8 +9,17 @@ namespace WorldSim.Runtime;
 
 public sealed class SimulationRuntime
 {
+    private static readonly HashSet<string> KnownDirectorDirectives = new(StringComparer.Ordinal)
+    {
+        "PrioritizeFood",
+        "StabilizeMorale",
+        "BoostIndustry"
+    };
+
     private readonly World _world;
     private readonly Queue<string> _recentAiDecisions = new();
+    private readonly HashSet<string> _appliedStoryBeatIds = new(StringComparer.Ordinal);
+    private readonly Dictionary<int, AppliedDirectiveState> _appliedDirectives = new();
     private long _lastObservedDecisionSequence;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
@@ -20,6 +29,7 @@ public sealed class SimulationRuntime
 
     public long Tick { get; private set; }
     public string LastTechActionStatus { get; private set; } = "No tech action";
+    public string LastDirectorActionStatus { get; private set; } = "No director action";
     public int LoadedTechCount => TechTree.Techs.Count;
 
     public int Width => _world.Width;
@@ -166,6 +176,11 @@ public sealed class SimulationRuntime
 
     public bool IsKnownTech(string techId) => TechTree.Techs.Any(t => t.Id == techId);
 
+    public bool IsKnownDirectorDirective(string directive)
+    {
+        return !string.IsNullOrWhiteSpace(directive) && KnownDirectorDirectives.Contains(directive);
+    }
+
     public void UnlockTechForPrimaryColony(string techId)
     {
         if (ColonyCount == 0)
@@ -175,6 +190,47 @@ public sealed class SimulationRuntime
         var result = TechTree.TryUnlock(techId, _world, colony);
         if (!result.Success)
             throw new InvalidOperationException($"Cannot unlock tech '{techId}': {result.Reason}");
+    }
+
+    public void ApplyStoryBeat(string beatId, string text, long durationTicks)
+    {
+        if (string.IsNullOrWhiteSpace(beatId))
+            throw new InvalidOperationException("Cannot apply story beat: beatId is required.");
+
+        if (string.IsNullOrWhiteSpace(text))
+            throw new InvalidOperationException("Cannot apply story beat: text is required.");
+
+        if (durationTicks <= 0)
+            throw new InvalidOperationException($"Cannot apply story beat '{beatId}': durationTicks must be > 0.");
+
+        _appliedStoryBeatIds.Add(beatId);
+        LastDirectorActionStatus = $"Applied story beat '{beatId}' ({durationTicks} ticks)";
+    }
+
+    public void ApplyColonyDirective(int colonyId, string directive, long durationTicks)
+    {
+        if (colonyId < 0 || colonyId >= ColonyCount)
+        {
+            throw new InvalidOperationException(
+                $"Cannot apply colony directive: unknown colonyId '{colonyId}'. colonyCount={ColonyCount}"
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(directive))
+            throw new InvalidOperationException("Cannot apply colony directive: directive is required.");
+
+        if (!IsKnownDirectorDirective(directive))
+            throw new InvalidOperationException($"Cannot apply colony directive: unknown directive '{directive}'.");
+
+        if (durationTicks <= 0)
+        {
+            throw new InvalidOperationException(
+                $"Cannot apply colony directive '{directive}': durationTicks must be > 0."
+            );
+        }
+
+        _appliedDirectives[colonyId] = new AppliedDirectiveState(directive, durationTicks);
+        LastDirectorActionStatus = $"Applied directive '{directive}' to colony {colonyId} ({durationTicks} ticks)";
     }
 
     private RuntimeNpcBrain CreateBrain(Colony colony, RuntimeAiOptions options)
@@ -265,4 +321,6 @@ public sealed class SimulationRuntime
             normalized += count;
         return normalized;
     }
+
+    private sealed record AppliedDirectiveState(string Directive, long DurationTicks);
 }

@@ -60,10 +60,10 @@ Turn-gate legend (agent handoff safety):
 
 > Director Plan > Phase 0 Sprint 1
 
-- ⬜ **S1-A** Contract v2 expansion — create `WorldSim.Contracts/v2/` namespace
-- ⬜ **S1-B** Java PatchOp/Goal expansion + mock director planner
-- ⬜ **S1-C** C# parser/applier expansion for v2 ops
-- ⬜ **S1-D** Adapter translation paths — addStoryBeat/setColonyDirective -> commands
+- ✅ **S1-A** Contract v2 expansion — create `WorldSim.Contracts/v2/` namespace
+- ✅ **S1-B** Java PatchOp/Goal expansion + mock director planner
+- ✅ **S1-C** C# parser/applier expansion for v2 ops
+- ✅ **S1-D** Adapter translation paths — addStoryBeat/setColonyDirective -> commands
 
 ### Sprint C1: Combat Primitives (Track B -> C -> A)
 
@@ -71,9 +71,9 @@ Turn-gate legend (agent handoff safety):
 
 - ✅ **P0-A** Core damage model — Strength used, Defense added (Track B)
 - ✅ **P0-B** Bidirectional predator combat — retaliation (Track B)
-- ⬜ **P0-C** AI threat response Fight/Flee (Track C, after P0-A/B)
-- ⬜ **P0-D** Snapshot + UI feedback — health bars, combat markers (Track B -> A)
-- ⬜ **P0-E** Test harness + balance smoke tests (Track B)
+- ✅ **P0-C** AI threat response Fight/Flee (Track C, after P0-A/B)
+- ✅ **P0-D** Snapshot + UI feedback — health bars, combat markers (Track B + Track A complete)
+- ✅ **P0-E** Test harness + balance smoke tests (Track B)
 
 **Parallelism:** D1 and C1 are **fully parallel** (zero file overlap).
 

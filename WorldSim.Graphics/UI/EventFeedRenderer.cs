@@ -10,9 +10,23 @@ public sealed class EventFeedRenderer
         var y = startY;
         foreach (var evt in events)
         {
-            y = TextWrap.DrawWrapped(spriteBatch, font, $"Event: {evt}", new Vector2(startX, y), theme.EventText, maxWidth, 18);
+            var category = EventFeedClassifier.Classify(evt);
+            var color = GetColor(theme, category);
+            y = TextWrap.DrawWrapped(spriteBatch, font, $"Event: {evt}", new Vector2(startX, y), color, maxWidth, 18);
         }
 
         return y;
+    }
+
+    private static Color GetColor(HudTheme theme, EventFeedCategory category)
+    {
+        return category switch
+        {
+            EventFeedCategory.Combat => theme.CombatEventText,
+            EventFeedCategory.Siege => theme.SiegeEventText,
+            EventFeedCategory.Campaign => theme.CampaignEventText,
+            EventFeedCategory.Director => theme.DirectorEventText,
+            _ => theme.EventText
+        };
     }
 }
