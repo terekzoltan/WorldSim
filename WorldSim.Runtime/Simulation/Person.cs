@@ -724,7 +724,6 @@ public class Person
                     }
                 }
             }
-
             if (bestPos != null) break; // legközelebbi megvan
         }
 

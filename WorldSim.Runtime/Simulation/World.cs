@@ -308,14 +308,10 @@ namespace WorldSim.Simulation
         }
 
         public ColonyWarState GetColonyWarState(int colonyId)
-            => _colonyWarStates.TryGetValue(colonyId, out var state)
-                ? state
-                : ColonyWarState.Peace;
+            => _colonyWarStates.TryGetValue(colonyId, out var state) ? state : ColonyWarState.Peace;
 
         public int GetColonyWarriorCount(int colonyId)
-            => _colonyWarriorCounts.TryGetValue(colonyId, out var count)
-                ? count
-                : 0;
+            => _colonyWarriorCounts.TryGetValue(colonyId, out var count) ? count : 0;
 
         private void ReportPersonDeath(Person person)
         {
@@ -383,19 +379,19 @@ namespace WorldSim.Simulation
                         continue;
                     }
 
-                    int bestColonyId = -1;
-                    int bestDistance = int.MaxValue;
+                    int bestId = -1;
+                    int bestDist = int.MaxValue;
                     foreach (var colony in _colonies)
                     {
-                        int distance = Math.Abs(x - colony.Origin.x) + Math.Abs(y - colony.Origin.y);
-                        if (distance < bestDistance)
+                        int d = Math.Abs(x - colony.Origin.x) + Math.Abs(y - colony.Origin.y);
+                        if (d < bestDist)
                         {
-                            bestDistance = distance;
-                            bestColonyId = colony.Id;
+                            bestDist = d;
+                            bestId = colony.Id;
                         }
                     }
 
-                    _tileOwnerColonyIds[x, y] = bestColonyId;
+                    _tileOwnerColonyIds[x, y] = bestId;
                 }
             }
         }
@@ -411,22 +407,24 @@ namespace WorldSim.Simulation
             if (!EnableDiplomacy || !EnableCombatPrimitives)
                 return;
 
-            var hostileContact = new HashSet<int>();
+            var hostileColonyIds = new HashSet<int>();
             for (int i = 0; i < _people.Count; i++)
             {
                 var a = _people[i];
                 if (a.Health <= 0f)
                     continue;
+
                 for (int j = i + 1; j < _people.Count; j++)
                 {
                     var b = _people[j];
                     if (b.Health <= 0f || a.Home == b.Home)
                         continue;
-                    int distance = Math.Abs(a.Pos.x - b.Pos.x) + Math.Abs(a.Pos.y - b.Pos.y);
-                    if (distance <= 2)
+
+                    int d = Math.Abs(a.Pos.x - b.Pos.x) + Math.Abs(a.Pos.y - b.Pos.y);
+                    if (d <= 2)
                     {
-                        hostileContact.Add(a.Home.Id);
-                        hostileContact.Add(b.Home.Id);
+                        hostileColonyIds.Add(a.Home.Id);
+                        hostileColonyIds.Add(b.Home.Id);
                     }
                 }
             }
@@ -434,16 +432,18 @@ namespace WorldSim.Simulation
             foreach (var colony in _colonies)
             {
                 int living = _people.Count(p => p.Home == colony && p.Health > 0f);
-                int warriors = Math.Max(1, living / 6);
-                if (hostileContact.Contains(colony.Id))
+                if (living <= 0)
+                    continue;
+
+                if (hostileColonyIds.Contains(colony.Id))
                 {
                     _colonyWarStates[colony.Id] = ColonyWarState.War;
-                    _colonyWarriorCounts[colony.Id] = warriors;
+                    _colonyWarriorCounts[colony.Id] = Math.Max(1, living / 5);
                 }
-                else if (living > 0)
+                else
                 {
                     _colonyWarStates[colony.Id] = ColonyWarState.Tense;
-                    _colonyWarriorCounts[colony.Id] = Math.Max(1, living / 10);
+                    _colonyWarriorCounts[colony.Id] = Math.Max(0, living / 10);
                 }
             }
         }
