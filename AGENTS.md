@@ -201,18 +201,6 @@ A telemetry/persistence/scenario-runner feladatok nem kulon trackkent kezeltek, 
 - Persistence: Track B (runtime allapot) + Track D (patch dedupe state)
 - Scenario runner/headless: Track B incremental toolkent, ha CI vagy balansz igenyli
 
-## Wave turn-gate protocol (all track agents)
-
-Cel:
-- A wave/sprint sorrend es dependency-k kotelezo betartasa, hogy ne induljon el blokkolo elofeltetel nelkul implementacio.
-
-Szabaly:
-- Minden implementacio elejen az adott agent ellenorzi a `Docs/Plans/Combined-Execution-Sequencing-Plan.md` statuszait es dependency sorrendjet.
-- Ha elofeltetel hianyzik: kotelezo `NOT READY` jelzes a usernek/koordinatornak, es nincs kodolas az adott epicen.
-- Ha minden elofeltetel kesz: `READY` jelzes, majd az adott epic statusza `⬜ -> 🔄`.
-- Lezaraskor (build/test/smoke zold): `🔄 -> ✅`.
-- Masik track epicjet `✅`-re allitani csak owner visszajelzes vagy explicit koordinator jovahagyas alapjan lehet.
-
 ## Kozos uzenofal (cross-track notes)
 
 Cel:
@@ -230,4 +218,3 @@ Entries:
 - `[2026-02-21][Track C] GOAP/HTN trace bovitve (plan cost, replan reason, method) - Track A debug olvashatosaghoz plusz mezok kellenek - kovetkezo lepes: compact+page UX finomitas`.
 - `[2026-02-21][Track C] Policy mix aktiv (Global/FactionMix/HtnPilot) es Aetheri HTN pilot - Track B balanszparametereket erint - kovetkezo lepes: config tablaba emeles hardcode switch helyett`.
 - `[2026-02-21][Track C] GOAP invalidation+backoff es HTN method scoring bekotve, faction policy table env-bol konfiguralhato - Track B runtime balansz/ops finomhangolast erint - kovetkezo lepes: policy tabla JSON-ra emelese`.
-- `[2026-03-02][Meta] Wave turn-gate protocol formalizalva (Combined plan + AGENTS) - minden track agentnek kotelezo statusz/dependency ellenorzes implementacio elott - kovetkezo lepes: blokkolt agentek expliciten NOT READY allapotot jelentenek, es csak READY eseten indul kodolas`.

@@ -52,14 +52,19 @@ namespace WorldSim.Simulation
         public bool AllowFreeTechUnlocks { get; set; }
         // Disabled by default until bidirectional combat/retaliation exists.
         public bool EnablePredatorHumanAttacks { get; set; } = false;
+        public bool EnableCombatPrimitives { get; set; }
+        public bool EnableDiplomacy { get; set; }
         public float PredatorHumanDamage { get; set; } = 10f;
+        public int NavigationTopologyVersion => _navigationTopologyVersion;
 
         public Season CurrentSeason { get; private set; } = Season.Spring;
         public bool IsDroughtActive { get; private set; }
         public IReadOnlyList<string> RecentEvents => _recentEvents;
         public int TotalAnimalStuckRecoveries { get; private set; }
         public int TotalPredatorDeaths { get; private set; }
+        public int TotalPredatorKillsByHumans { get; private set; }
         public int TotalPredatorHumanHits { get; private set; }
+        public int TotalCombatEngagements { get; private set; }
         public int TotalDeathsOldAge { get; private set; }
         public int TotalDeathsStarvation { get; private set; }
         public int TotalDeathsPredator { get; private set; }
@@ -67,13 +72,17 @@ namespace WorldSim.Simulation
         public int RecentDeathsStarvation60s => _recentStarvationDeaths.Count;
         public int TotalStarvationDeathsWithFood { get; private set; }
 
-        readonly Random _rng = new();
+        readonly Random _rng;
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
         readonly List<string> _recentEvents = new();
         readonly HashSet<int> _houseMilestones = new();
         readonly HashSet<int> _extinctionMilestones = new();
         readonly Dictionary<int, ColonyDeathStats> _colonyDeathStats = new();
         readonly Queue<float> _recentStarvationDeaths = new();
+        readonly int[,] _tileOwnerColonyIds;
+        readonly Dictionary<int, ColonyWarState> _colonyWarStates = new();
+        readonly Dictionary<int, int> _colonyWarriorCounts = new();
+        int _navigationTopologyVersion;
 
         float _simulationTimeSeconds;
         float _seasonTimer;
@@ -88,12 +97,14 @@ namespace WorldSim.Simulation
         const float SpecializedBuildPeriod = 14f;
         const float FoodParityPeriod = 6f;
 
-        public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null)
+        public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null, int? randomSeed = null)
         {
             _brainFactory = brainFactory ?? (_ => new RuntimeNpcBrain());
+            _rng = randomSeed.HasValue ? new Random(randomSeed.Value) : new Random();
             Width = width;
             Height = height;
             _map = new Tile[width, height];
+            _tileOwnerColonyIds = new int[width, height];
 
             // 1) Biomes (Grass/Dirt/Water) via cheap seeded region growing
             Ground[,] grounds = GenerateBiomes();
@@ -146,6 +157,8 @@ namespace WorldSim.Simulation
                 Colony col = new Colony(ci, colPos);
                 _colonies.Add(col);
                 _colonyDeathStats[col.Id] = new ColonyDeathStats();
+                _colonyWarStates[col.Id] = ColonyWarState.Peace;
+                _colonyWarriorCounts[col.Id] = 0;
 
                 // Faction setup kept for reference; explicit color assignment removed (using icons instead)
                 // 0: Sylvars
@@ -175,6 +188,8 @@ namespace WorldSim.Simulation
             int animalCount = Math.Max(10, (Width * Height) / 256);
             for (int i = 0; i < animalCount; i++)
                 _animals.Add(Animal.Spawn(RandomFreePos()));
+
+            RecomputeTerritoryOwnership();
         }
 
         public void Update(float dt)
@@ -241,6 +256,9 @@ namespace WorldSim.Simulation
                 }
             }
 
+            RecomputeTerritoryOwnership();
+            RecomputeMobilizationState();
+
             TrimRecentDeathWindows();
         }
 
@@ -259,18 +277,45 @@ namespace WorldSim.Simulation
 
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
         public Tile GetTile(int x, int y) => _map[x, y];
-        public void AddHouse(Colony colony, (int x, int y) pos) => Houses.Add(new House(colony, pos, HouseCapacity));
+        public void AddHouse(Colony colony, (int x, int y) pos)
+        {
+            Houses.Add(new House(colony, pos, HouseCapacity));
+            _navigationTopologyVersion++;
+        }
+
         public void AddSpecializedBuilding(Colony colony, (int x, int y) pos, SpecializedBuildingKind kind)
-            => SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
+        {
+            SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
+            _navigationTopologyVersion++;
+        }
         internal RuntimeNpcBrain CreateNpcBrain(Colony colony) => _brainFactory(colony);
 
         public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;
         public void ReportPredatorDeath() => TotalPredatorDeaths++;
+        public void ReportPredatorKilledByHumans() => TotalPredatorKillsByHumans++;
         public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
+        public void ReportCombatEngagement() => TotalCombatEngagements++;
         public ColonyDeathStats GetColonyDeathStats(int colonyId)
             => _colonyDeathStats.TryGetValue(colonyId, out var stats)
                 ? stats
                 : new ColonyDeathStats();
+
+        public int GetTileOwnerColonyId(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= Width || y >= Height)
+                return -1;
+            return _tileOwnerColonyIds[x, y];
+        }
+
+        public ColonyWarState GetColonyWarState(int colonyId)
+            => _colonyWarStates.TryGetValue(colonyId, out var state)
+                ? state
+                : ColonyWarState.Peace;
+
+        public int GetColonyWarriorCount(int colonyId)
+            => _colonyWarriorCounts.TryGetValue(colonyId, out var count)
+                ? count
+                : 0;
 
         private void ReportPersonDeath(Person person)
         {
@@ -324,6 +369,83 @@ namespace WorldSim.Simulation
             const float rollingWindowSeconds = 60f;
             while (_recentStarvationDeaths.Count > 0 && (_simulationTimeSeconds - _recentStarvationDeaths.Peek()) > rollingWindowSeconds)
                 _recentStarvationDeaths.Dequeue();
+        }
+
+        private void RecomputeTerritoryOwnership()
+        {
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    if (_map[x, y].Ground == Ground.Water || _colonies.Count == 0)
+                    {
+                        _tileOwnerColonyIds[x, y] = -1;
+                        continue;
+                    }
+
+                    int bestColonyId = -1;
+                    int bestDistance = int.MaxValue;
+                    foreach (var colony in _colonies)
+                    {
+                        int distance = Math.Abs(x - colony.Origin.x) + Math.Abs(y - colony.Origin.y);
+                        if (distance < bestDistance)
+                        {
+                            bestDistance = distance;
+                            bestColonyId = colony.Id;
+                        }
+                    }
+
+                    _tileOwnerColonyIds[x, y] = bestColonyId;
+                }
+            }
+        }
+
+        private void RecomputeMobilizationState()
+        {
+            foreach (var colony in _colonies)
+            {
+                _colonyWarStates[colony.Id] = ColonyWarState.Peace;
+                _colonyWarriorCounts[colony.Id] = 0;
+            }
+
+            if (!EnableDiplomacy || !EnableCombatPrimitives)
+                return;
+
+            var hostileContact = new HashSet<int>();
+            for (int i = 0; i < _people.Count; i++)
+            {
+                var a = _people[i];
+                if (a.Health <= 0f)
+                    continue;
+                for (int j = i + 1; j < _people.Count; j++)
+                {
+                    var b = _people[j];
+                    if (b.Health <= 0f || a.Home == b.Home)
+                        continue;
+                    int distance = Math.Abs(a.Pos.x - b.Pos.x) + Math.Abs(a.Pos.y - b.Pos.y);
+                    if (distance <= 2)
+                    {
+                        hostileContact.Add(a.Home.Id);
+                        hostileContact.Add(b.Home.Id);
+                    }
+                }
+            }
+
+            foreach (var colony in _colonies)
+            {
+                int living = _people.Count(p => p.Home == colony && p.Health > 0f);
+                int warriors = Math.Max(1, living / 6);
+                if (hostileContact.Contains(colony.Id))
+                {
+                    _colonyWarStates[colony.Id] = ColonyWarState.War;
+                    _colonyWarriorCounts[colony.Id] = warriors;
+                }
+                else if (living > 0)
+                {
+                    _colonyWarStates[colony.Id] = ColonyWarState.Tense;
+                    _colonyWarriorCounts[colony.Id] = Math.Max(1, living / 10);
+                }
+            }
         }
 
         // --- Biome generation (cheap, blob-like) ---

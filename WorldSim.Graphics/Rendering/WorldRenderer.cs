@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using WorldSim.Graphics.Assets;
 using WorldSim.Graphics.Camera;
+using WorldSim.Graphics.Rendering.PostFx;
 using WorldSim.Runtime.ReadModel;
 
 namespace WorldSim.Graphics.Rendering;
@@ -13,6 +14,8 @@ public sealed class WorldRenderer
     public WorldRenderSettings Settings { get; }
     public WorldRenderTheme Theme { get; private set; }
     public RenderStats LastRenderStats => _renderStats;
+    public bool TerritoryOverlayEnabled { get; set; }
+    public bool CombatOverlayEnabled { get; set; }
 
     public WorldRenderer(WorldRenderSettings? settings = null, WorldRenderTheme? theme = null)
     {
@@ -30,6 +33,14 @@ public sealed class WorldRenderer
     public void SetTheme(WorldRenderTheme theme)
     {
         Theme = theme;
+    }
+
+    public void SetPostFxEnabled(bool enabled)
+    {
+    }
+
+    public void SetPostFxQuality(PostFxQuality quality)
+    {
     }
 
     public void Draw(SpriteBatch spriteBatch, WorldRenderSnapshot snapshot, Camera2D camera, TextureCatalog textures)

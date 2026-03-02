@@ -69,8 +69,8 @@ Turn-gate legend (agent handoff safety):
 
 > Combat Plan > Phase 0 Sprint 1
 
-- ⬜ **P0-A** Core damage model — Strength used, Defense added (Track B)
-- ⬜ **P0-B** Bidirectional predator combat — retaliation (Track B)
+- ✅ **P0-A** Core damage model — Strength used, Defense added (Track B)
+- ✅ **P0-B** Bidirectional predator combat — retaliation (Track B)
 - ⬜ **P0-C** AI threat response Fight/Flee (Track C, after P0-A/B)
 - ⬜ **P0-D** Snapshot + UI feedback — health bars, combat markers (Track B -> A)
 - ⬜ **P0-E** Test harness + balance smoke tests (Track B)

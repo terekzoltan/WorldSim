@@ -18,7 +18,7 @@ public enum Job
     CraftTools
 }
 public enum Profession { Generalist, Lumberjack, Miner, Farmer, Hunter, Builder }
-public enum PersonDeathReason { None, OldAge, Starvation, Predator, Other }
+public enum PersonDeathReason { None, OldAge, Starvation, Predator, Combat, Other }
 
 public class Person
 {
@@ -30,6 +30,7 @@ public class Person
     public Profession Profession { get; internal set; }
     public PersonDeathReason LastDeathReason { get; private set; } = PersonDeathReason.None;
     public int Strength, Intelligence;
+    public int Defense { get; set; }
     public Colony Home => _home;
 
     Colony _home;
@@ -658,6 +659,16 @@ public class Person
         }
     }
 
+    public void ApplyCombatDamage(World world, float amount, string source)
+    {
+        if (amount <= 0f || Health <= 0f)
+            return;
+
+        Health -= amount;
+        if (Health <= 0f)
+            LastDeathReason = PersonDeathReason.Combat;
+    }
+
     bool HasNearbyOwnHouse(World w, int radius)
     {
         int r = Math.Max(0, radius);
@@ -713,6 +724,7 @@ public class Person
                     }
                 }
             }
+
             if (bestPos != null) break; // legközelebbi megvan
         }
 

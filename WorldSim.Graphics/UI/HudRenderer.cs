@@ -41,7 +41,8 @@ public sealed class HudRenderer
         int aiHistoryOffset,
         int viewportWidth,
         int viewportHeight,
-        RenderStats? renderStats = null)
+        RenderStats? renderStats = null,
+        float hudOpacity = 1f)
     {
         var margin = 14;
         var leftX = margin;
