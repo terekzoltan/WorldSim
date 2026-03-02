@@ -66,9 +66,8 @@ namespace WorldSim.Simulation
         public int TotalDeathsOther { get; private set; }
         public int RecentDeathsStarvation60s => _recentStarvationDeaths.Count;
         public int TotalStarvationDeathsWithFood { get; private set; }
-        public int NavigationTopologyVersion { get; private set; }
 
-        readonly Random _rng;
+        readonly Random _rng = new();
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
         readonly List<string> _recentEvents = new();
         readonly HashSet<int> _houseMilestones = new();
@@ -89,12 +88,8 @@ namespace WorldSim.Simulation
         const float SpecializedBuildPeriod = 14f;
         const float FoodParityPeriod = 6f;
 
-        public bool EnableDiplomacy { get; set; }
-        public bool EnableCombatPrimitives { get; set; }
-
-        public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null, int? randomSeed = null)
+        public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null)
         {
-            _rng = randomSeed.HasValue ? new Random(randomSeed.Value) : new Random();
             _brainFactory = brainFactory ?? (_ => new RuntimeNpcBrain());
             Width = width;
             Height = height;
@@ -264,71 +259,9 @@ namespace WorldSim.Simulation
 
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
         public Tile GetTile(int x, int y) => _map[x, y];
-
-        public int GetTileOwnerColonyId(int x, int y)
-        {
-            if (x < 0 || y < 0 || x >= Width || y >= Height)
-                return -1;
-            if (_map[x, y].Ground == Ground.Water)
-                return -1;
-
-            var best = _colonies[0];
-            int bestDist = DistanceSquared(best.Origin, (x, y));
-            for (int i = 1; i < _colonies.Count; i++)
-            {
-                var candidate = _colonies[i];
-                int dist = DistanceSquared(candidate.Origin, (x, y));
-                if (dist < bestDist)
-                {
-                    best = candidate;
-                    bestDist = dist;
-                }
-            }
-
-            return best.Id;
-        }
-
-        public void AddHouse(Colony colony, (int x, int y) pos)
-        {
-            Houses.Add(new House(colony, pos, HouseCapacity));
-            NavigationTopologyVersion++;
-        }
-
+        public void AddHouse(Colony colony, (int x, int y) pos) => Houses.Add(new House(colony, pos, HouseCapacity));
         public void AddSpecializedBuilding(Colony colony, (int x, int y) pos, SpecializedBuildingKind kind)
-        {
-            SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
-            NavigationTopologyVersion++;
-        }
-
-        public ColonyWarState GetColonyWarState(int colonyId)
-        {
-            if (!EnableDiplomacy)
-                return ColonyWarState.Peace;
-
-            int warriors = GetColonyWarriorCount(colonyId);
-            if (EnableCombatPrimitives && warriors >= 3)
-                return ColonyWarState.War;
-            if (warriors > 0)
-                return ColonyWarState.Tense;
-            return ColonyWarState.Peace;
-        }
-
-        public int GetColonyWarriorCount(int colonyId)
-        {
-            if (!EnableCombatPrimitives)
-                return 0;
-
-            int adults = _people.Count(p => p.Home.Id == colonyId && p.Health > 0f && p.Age >= 16f);
-            return adults <= 0 ? 0 : Math.Max(1, adults / 6);
-        }
-
-        private static int DistanceSquared((int x, int y) a, (int x, int y) b)
-        {
-            int dx = a.x - b.x;
-            int dy = a.y - b.y;
-            return (dx * dx) + (dy * dy);
-        }
-
+            => SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
         internal RuntimeNpcBrain CreateNpcBrain(Colony colony) => _brainFactory(colony);
 
         public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;

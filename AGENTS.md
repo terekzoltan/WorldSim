@@ -176,16 +176,8 @@ Current Track D focus (Season Director program):
 - Beat/nudge kulon-kulon kapcsolhato legyen (mindketto, csak egyik, csak masik, egyik sem).
 - LLM kreativitas kihasznalasa, de formalis Refinery gate tartja kontroll alatt a hibakat/hallucinaciot.
 
-Track D master plan:
-- `Docs/Plans/Director-Integration-Master-Plan.md` (strategiai master plan, 5 fazis, 7+ sprint)
-- `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md` (taktikai sprint referencia, a master plan altal superseded)
-
-Track D fo architekturalis dontes (Effect Vocabulary rendszer):
-- Generic domain modifier engine + goal bias engine a runtime-ban (nem enum-alapu switch/case).
-- LLM szabadon komponalhat effekteket a vocabulary-bol, a Refinery formalis modell validalja a kompoziciot.
-- Kreativitasi gradient: Phase 0-1 mock → Phase 2 Refinery gate → Phase 3 LLM kreativitas → Phase 4+ instance assertions.
-- 3-retegu influence tuning: per-effect intensity + global dampening + checkpoint budget.
-- v2 contract namespace a Director opoknak.
+Track D implementation plan doc:
+- `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`
 
 Track D design principles (OnlabRefinery parity):
 - Felelosseg szetvalasztas: LLM javasol, Refinery validal/repair-el, runtime csak alkalmaz.
@@ -193,18 +185,7 @@ Track D design principles (OnlabRefinery parity):
 - Iterativ feedback loop: invalid candidate -> feedback -> retry -> deterministic fallback.
 - Determinisztikus output policy debugginghoz: ugyanarra a checkpoint inputra reprodukalhato eredmeny.
 
-## Session Plans (cross-track coordination sessions) 
 
-A kovetkezo sessionok a Meta Coordinator altal kezelt operativ munkacsoportok.
-Mindegyik sajat plan dokumentummal rendelkezik, es a Meta Coordinator Runbook-bol triggerelheto.
-
-| Session | Plan doc | Trigger | Status |
-|---------|----------|---------|--------|
-| **Combat Coordinator** | `Docs/Plans/Session-Combat-Coordinator-Plan.md` | Track A Sprint 3 complete + Phase 0 green-lit | Ready to launch |
-| **Performance Profiling** | `Docs/Plans/Session-Perf-Profiling-Plan.md` | Combat Phase 3, or FPS < 60 | Planned |
-| **Balance/QA Agent** | `Docs/Plans/Session-Balance-QA-Plan.md` | Combat Phase 0 end, or balance regressions | Planned |
-
-Meta Coordinator Runbook: `Docs/Plans/Meta-Coordinator-Runbook.md
 
 ## Kockazatok es mitigacio
 
@@ -219,6 +200,18 @@ A telemetry/persistence/scenario-runner feladatok nem kulon trackkent kezeltek, 
 - Telemetry: Track A (HUD/debug overlay) + Track B (runtime counters)
 - Persistence: Track B (runtime allapot) + Track D (patch dedupe state)
 - Scenario runner/headless: Track B incremental toolkent, ha CI vagy balansz igenyli
+
+## Wave turn-gate protocol (all track agents)
+
+Cel:
+- A wave/sprint sorrend es dependency-k kotelezo betartasa, hogy ne induljon el blokkolo elofeltetel nelkul implementacio.
+
+Szabaly:
+- Minden implementacio elejen az adott agent ellenorzi a `Docs/Plans/Combined-Execution-Sequencing-Plan.md` statuszait es dependency sorrendjet.
+- Ha elofeltetel hianyzik: kotelezo `NOT READY` jelzes a usernek/koordinatornak, es nincs kodolas az adott epicen.
+- Ha minden elofeltetel kesz: `READY` jelzes, majd az adott epic statusza `⬜ -> 🔄`.
+- Lezaraskor (build/test/smoke zold): `🔄 -> ✅`.
+- Masik track epicjet `✅`-re allitani csak owner visszajelzes vagy explicit koordinator jovahagyas alapjan lehet.
 
 ## Kozos uzenofal (cross-track notes)
 
@@ -237,6 +230,4 @@ Entries:
 - `[2026-02-21][Track C] GOAP/HTN trace bovitve (plan cost, replan reason, method) - Track A debug olvashatosaghoz plusz mezok kellenek - kovetkezo lepes: compact+page UX finomitas`.
 - `[2026-02-21][Track C] Policy mix aktiv (Global/FactionMix/HtnPilot) es Aetheri HTN pilot - Track B balanszparametereket erint - kovetkezo lepes: config tablaba emeles hardcode switch helyett`.
 - `[2026-02-21][Track C] GOAP invalidation+backoff es HTN method scoring bekotve, faction policy table env-bol konfiguralhato - Track B runtime balansz/ops finomhangolast erint - kovetkezo lepes: policy tabla JSON-ra emelese`.
-- `[2026-02-28][Track A/B] Build drift javitas: World.NavigationTopologyVersion + randomSeed ctor + territory/mobilization accessor kompatibilitas visszaallitva; RenderFrameContext TimeSeconds/FxIntensity es WorldRenderer overlay/postfx API sync megtortent - kovetkezo lepes: smoke keymap + HUD panel overlap ellenorzes minden session utan`.
-- `[2026-02-28][Track D] Director Integration Master Plan elkeszult (2300+ sor, 5 fazis, 7+ sprint) - Effect Vocabulary rendszer: generic modifier/bias engine, LLM kreativitas Refinery gate mogott - cross-track: Track B (modifier+bias engine), Track C (goal bias integration), Track A (HUD/event feed) - kovetkezo lepes: Phase 0 Sprint 1 inditas`.
-- `[2026-02-28][Track A/B] Host entrypoint unifikacio: Program GameHost-ot indit, Game1 csak kompatibilitasi shim; Ctrl+F* keymap visszaallitva dedikalt chord kezelessel - kovetkezo lepes: laptop billentyuzet smoke (Ctrl+F1..F12 konfliktusok)`.
+- `[2026-03-02][Meta] Wave turn-gate protocol formalizalva (Combined plan + AGENTS) - minden track agentnek kotelezo statusz/dependency ellenorzes implementacio elott - kovetkezo lepes: blokkolt agentek expliciten NOT READY allapotot jelentenek, es csak READY eseten indul kodolas`.

@@ -74,7 +74,7 @@ public class BoundaryRulesTests
     [Fact]
     public void AppGameHost_DoesNotUseDirectWorldOrTechTreeMutation()
     {
-        var gameHost = Read("WorldSim.App/GameHost.cs");
+        var gameHost = Read("WorldSim.App/Game1.cs");
 
         Assert.DoesNotContain("_world.", gameHost, StringComparison.Ordinal);
         Assert.DoesNotContain("TechTree.", gameHost, StringComparison.Ordinal);
