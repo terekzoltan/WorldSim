@@ -17,17 +17,37 @@ public sealed class TerritoryOverlayPass : IRenderPass
         var spriteBatch = context.SpriteBatch;
         var pixel = context.Textures.Pixel;
 
-        var colorA = new Color(93, 145, 212) * 0.18f;
-        var colorB = new Color(212, 155, 93) * 0.18f;
-
-        int stripeStep = Math.Max(16, settings.TileSize * 10);
-        int maxX = snapshot.Width * settings.TileSize;
-        int maxY = snapshot.Height * settings.TileSize;
-
-        for (int x = 0; x < maxX; x += stripeStep)
+        int tileSize = settings.TileSize;
+        int contourThickness = Math.Max(1, tileSize / 4);
+        foreach (var tile in snapshot.Tiles)
         {
-            var color = ((x / stripeStep) % 2 == 0) ? colorA : colorB;
-            spriteBatch.Draw(pixel, new Rectangle(x, 0, 2, maxY), color);
+            int x = tile.X * tileSize;
+            int y = tile.Y * tileSize;
+            var tileRect = new Rectangle(x, y, tileSize, tileSize);
+
+            if (tile.OwnerFactionId >= 0)
+                spriteBatch.Draw(pixel, tileRect, GetFactionColor(tile.OwnerFactionId));
+
+            if (!tile.IsContested)
+                continue;
+
+            var contested = new Color(248, 214, 126) * 0.55f;
+            spriteBatch.Draw(pixel, new Rectangle(x, y, tileSize, contourThickness), contested);
+            spriteBatch.Draw(pixel, new Rectangle(x, y + tileSize - contourThickness, tileSize, contourThickness), contested);
+            spriteBatch.Draw(pixel, new Rectangle(x, y, contourThickness, tileSize), contested);
+            spriteBatch.Draw(pixel, new Rectangle(x + tileSize - contourThickness, y, contourThickness, tileSize), contested);
         }
+    }
+
+    private static Color GetFactionColor(int factionId)
+    {
+        return factionId switch
+        {
+            0 => new Color(94, 149, 214) * 0.2f,
+            1 => new Color(216, 131, 93) * 0.2f,
+            2 => new Color(120, 194, 128) * 0.2f,
+            3 => new Color(181, 140, 232) * 0.2f,
+            _ => new Color(160, 160, 160) * 0.16f
+        };
     }
 }

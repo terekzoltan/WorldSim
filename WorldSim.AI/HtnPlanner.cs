@@ -109,11 +109,11 @@ public sealed class HtnPlanner : IPlanner
             case "DefendSelf":
                 candidates.Add(new MethodCandidate(
                     "FightBack",
-                    ShouldFight(context) ? 1.0f : 0.4f,
+                    ThreatDecisionPolicy.ShouldFight(context) ? 1.0f : 0.4f,
                     new[] { NpcCommand.Fight }));
                 candidates.Add(new MethodCandidate(
                     "TacticalFlee",
-                    ShouldFight(context) ? 0.55f : 0.95f,
+                    ThreatDecisionPolicy.ShouldFight(context) ? 0.55f : 0.95f,
                     new[] { NpcCommand.Flee }));
                 break;
 
@@ -133,22 +133,6 @@ public sealed class HtnPlanner : IPlanner
         _methodName = selected.Name;
         foreach (var command in selected.Commands)
             _plan.Enqueue(command);
-    }
-
-    private static bool ShouldFight(in NpcAiContext context)
-    {
-        var predators = System.Math.Max(0, context.NearbyPredators);
-        var hostiles = System.Math.Max(0, context.NearbyHostilePeople);
-        var threats = predators + hostiles;
-        if (threats <= 0)
-            return false;
-
-        if (context.Health < 45f)
-            return false;
-
-        var power = context.Strength + (context.Defense / 2f);
-        var threatLoad = 6f * predators + 8f * hostiles;
-        return power >= threatLoad;
     }
 
     private sealed record MethodCandidate(string Name, float Score, IReadOnlyList<NpcCommand> Commands);

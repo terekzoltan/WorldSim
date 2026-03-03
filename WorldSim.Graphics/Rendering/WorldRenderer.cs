@@ -10,6 +10,8 @@ public sealed class WorldRenderer
 {
     private readonly IReadOnlyList<IRenderPass> _passes;
     private readonly RenderStats _renderStats = new();
+    private readonly TerritoryOverlayPass _territoryOverlayPass = new();
+    private readonly CombatOverlayPass _combatOverlayPass = new();
 
     public WorldRenderSettings Settings { get; }
     public WorldRenderTheme Theme { get; private set; }
@@ -48,6 +50,9 @@ public sealed class WorldRenderer
         _renderStats.BeginFrame();
         spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: camera.BuildMatrix());
 
+        _territoryOverlayPass.Enabled = TerritoryOverlayEnabled;
+        _combatOverlayPass.Enabled = CombatOverlayEnabled;
+
         var context = new RenderFrameContext(spriteBatch, snapshot, textures, Settings, Theme, _renderStats);
         foreach (var pass in _passes)
         {
@@ -55,6 +60,14 @@ public sealed class WorldRenderer
             pass.Draw(in context);
             _renderStats.EndPass(pass.Name, started);
         }
+
+        var territoryStarted = _renderStats.BeginPass();
+        _territoryOverlayPass.Draw(in context);
+        _renderStats.EndPass(_territoryOverlayPass.Name, territoryStarted);
+
+        var combatStarted = _renderStats.BeginPass();
+        _combatOverlayPass.Draw(in context);
+        _renderStats.EndPass(_combatOverlayPass.Name, combatStarted);
 
         spriteBatch.End();
         _renderStats.EndFrame();

@@ -208,7 +208,10 @@ public class DecisionTests
             Strength: 16,
             Defense: 20,
             NearbyPredators: 1,
-            NearbyHostilePeople: 0);
+            NearbyHostilePeople: 0,
+            IsHostileStance: true,
+            IsWarriorRole: true,
+            LocalThreatScore: 0.45f);
 
         var decision = planner.GetNextCommand(context);
 
@@ -246,5 +249,130 @@ public class DecisionTests
         var decision = planner.GetNextCommand(context);
 
         Assert.Equal(NpcCommand.Flee, decision.Command);
+    }
+
+    [Fact]
+    public void UtilityGoapBrain_AppliesGoalBias_WhenSelectingGoal()
+    {
+        var gatherWood = new Goal("GatherWood")
+        {
+            CooldownSeconds = 0f
+        };
+        gatherWood.Considerations.Add(new FixedConsideration(0.3f));
+
+        var buildHouse = new Goal("BuildHouse")
+        {
+            CooldownSeconds = 0f
+        };
+        buildHouse.Considerations.Add(new FixedConsideration(0.3f));
+
+        var goals = new List<Goal> { gatherWood, buildHouse };
+        var brain = new UtilityGoapBrain(new SimplePlanner(), goals);
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 7f,
+            Hunger: 20f,
+            Stamina: 80f,
+            HomeWood: 80,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 8,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            BiasGathering: 0.0f,
+            BiasBuilding: 0.25f);
+
+        var result = brain.Think(context);
+
+        Assert.Equal("BuildHouse", result.Trace.SelectedGoal);
+        Assert.Equal(NpcCommand.BuildHouse, result.Command);
+    }
+
+    [Fact]
+    public void ThreatDecisionPolicy_WarriorInContestedWar_PrefersFight()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 1f,
+            Hunger: 15f,
+            Stamina: 80f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 88f,
+            Strength: 18,
+            Defense: 14,
+            NearbyHostilePeople: 1,
+            IsWarStance: true,
+            IsContestedTile: true,
+            IsWarriorRole: true,
+            NearbyEnemyCount: 1,
+            HostileProximityScore: 0.6f,
+            LocalThreatScore: 0.75f);
+
+        Assert.True(ThreatDecisionPolicy.ShouldFight(context));
+    }
+
+    [Fact]
+    public void ThreatDecisionPolicy_CivilianUnderThreat_PrefersFlee()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 1f,
+            Hunger: 15f,
+            Stamina: 80f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 92f,
+            Strength: 17,
+            Defense: 16,
+            NearbyHostilePeople: 2,
+            IsWarStance: true,
+            IsContestedTile: true,
+            IsWarriorRole: false,
+            NearbyEnemyCount: 2,
+            HostileProximityScore: 0.9f,
+            LocalThreatScore: 0.85f);
+
+        Assert.False(ThreatDecisionPolicy.ShouldFight(context));
+        Assert.True(ThreatDecisionPolicy.ShouldPrioritizeDefense(context));
+    }
+
+    private sealed class FixedConsideration : Consideration
+    {
+        private readonly float _value;
+
+        public FixedConsideration(float value)
+        {
+            _value = value;
+        }
+
+        public override float Evaluate(in NpcAiContext context)
+        {
+            return _value;
+        }
     }
 }

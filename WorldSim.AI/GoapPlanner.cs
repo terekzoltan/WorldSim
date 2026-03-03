@@ -29,7 +29,7 @@ public sealed class GoapPlanner : IPlanner
 
         if (_goal.Name == "DefendSelf")
         {
-            var threatCommand = ShouldFight(context) ? NpcCommand.Fight : NpcCommand.Flee;
+            var threatCommand = ThreatDecisionPolicy.ShouldFight(context) ? NpcCommand.Fight : NpcCommand.Flee;
             var threatReason = _goalChanged ? "GoalChanged" : "ThreatResponse";
             _goalChanged = false;
             return new PlannerDecision(threatCommand, 1, new[] { threatCommand }, 1, threatReason, "GoapThreatRule");
@@ -219,22 +219,6 @@ public sealed class GoapPlanner : IPlanner
         }
 
         return plan;
-    }
-
-    private static bool ShouldFight(in NpcAiContext context)
-    {
-        var predators = Math.Max(0, context.NearbyPredators);
-        var hostiles = Math.Max(0, context.NearbyHostilePeople);
-        var threats = predators + hostiles;
-        if (threats <= 0)
-            return false;
-
-        if (context.Health < 42f)
-            return false;
-
-        var power = context.Strength + (context.Defense / 2f);
-        var threatLoad = 6f * predators + 8f * hostiles;
-        return power >= threatLoad;
     }
 
     private sealed record Node(GoapState State, Node? Parent, GoapAction? Action, int G);

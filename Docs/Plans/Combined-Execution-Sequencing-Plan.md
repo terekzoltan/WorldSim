@@ -85,19 +85,19 @@ Turn-gate legend (agent handoff safety):
 
 > Director Plan > Phase 1 Sprint 2
 
-- 🔄 **S2-A** Domain Modifier Engine — timed modifier engine in `WorldSim.Runtime` (Track B)
-- ⬜ **S2-B** Goal Bias Engine — timed bias engine + Track C integration (Track B + C)
-- ⬜ **S2-C** Director State + tick integration + command endpoints (Track B)
+- ✅ **S2-A** Domain Modifier Engine — timed modifier engine in `WorldSim.Runtime` (Track B)
+- ✅ **S2-B** Goal Bias Engine — timed bias engine + Track C integration (Track B + C)
+- ✅ **S2-C** Director State + tick integration + command endpoints (Track B)
 
 ### Sprint C2: Diplomacy & Territory (Track B -> C -> A)
 
 > Combat Plan > Phase 1 Sprint 2
 
-- ⬜ **P1-A** Faction stance matrix + persistence (Track B)
-- ⬜ **P1-B** Relation dynamics triggers — tension/hostility/war (Track B)
-- ⬜ **P1-C** Territory influence + contested tiles (Track B)
-- ⬜ **P1-D** Enemy sensing in AI + role system (Track B + C)
-- ⬜ **P1-E** Diplomacy panel + territory overlay (Track A)
+- ✅ **P1-A** Faction stance matrix + persistence (Track B)
+- ✅ **P1-B** Relation dynamics triggers — tension/hostility/war (Track B)
+- ✅ **P1-C** Territory influence + contested tiles (Track B)
+- ✅ **P1-D** Enemy sensing in AI + role system (Track B + C)
+- ✅ **P1-E** Diplomacy panel + territory overlay (Track A)
 
 **Parallelism:** D2 and C2 are **parallel with caution** (MR-1).
 Both add fields to `WorldSnapshotBuilder` / `WorldRenderSnapshot`.

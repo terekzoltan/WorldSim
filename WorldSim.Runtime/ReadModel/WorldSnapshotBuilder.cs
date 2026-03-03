@@ -1,5 +1,6 @@
 using System.Linq;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Diplomacy;
 
 namespace WorldSim.Runtime.ReadModel;
 
@@ -7,6 +8,7 @@ public static class WorldSnapshotBuilder
 {
     public static WorldRenderSnapshot Build(World world)
     {
+        var colonyFactionById = world._colonies.ToDictionary(colony => colony.Id, colony => colony.Faction);
         var tiles = new List<TileRenderData>(world.Width * world.Height);
         var activeFoodNodes = 0;
         var depletedFoodNodes = 0;
@@ -18,6 +20,12 @@ public static class WorldSnapshotBuilder
                 var tile = world.GetTile(x, y);
                 var nodeType = tile.Node?.Type ?? Resource.None;
                 var nodeAmount = tile.Node?.Amount ?? 0;
+                var ownerColonyId = world.GetTileOwnerColonyId(x, y);
+                var ownerFactionId = ownerColonyId < 0
+                    ? -1
+                    : colonyFactionById.TryGetValue(ownerColonyId, out var ownerFaction)
+                        ? (int)ownerFaction
+                        : -1;
                 if (nodeType == Resource.Food)
                 {
                     if (nodeAmount > 0)
@@ -31,7 +39,9 @@ public static class WorldSnapshotBuilder
                     y,
                     MapGround(tile.Ground),
                     MapResource(nodeType),
-                    nodeAmount));
+                    nodeAmount,
+                    ownerFactionId,
+                    world.IsTileContested(x, y)));
             }
         }
 
@@ -107,6 +117,13 @@ public static class WorldSnapshotBuilder
             })
             .ToList();
 
+        var factionStances = world.GetFactionStanceMatrix()
+            .Select(entry => new FactionStanceRenderData(
+                (int)entry.Left,
+                (int)entry.Right,
+                entry.Stance.ToString()))
+            .ToList();
+
         var ecology = new EcoHudData(
             world._animals.Count(a => a is Herbivore && a.IsAlive),
             world._animals.Count(a => a is Predator && a.IsAlive),
@@ -137,6 +154,7 @@ public static class WorldSnapshotBuilder
             people,
             animals,
             colonies,
+            factionStances,
             ecology,
             MapSeason(world.CurrentSeason),
             world.IsDroughtActive,

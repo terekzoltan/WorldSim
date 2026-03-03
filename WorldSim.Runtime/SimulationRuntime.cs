@@ -18,8 +18,7 @@ public sealed class SimulationRuntime
 
     private readonly World _world;
     private readonly Queue<string> _recentAiDecisions = new();
-    private readonly HashSet<string> _appliedStoryBeatIds = new(StringComparer.Ordinal);
-    private readonly Dictionary<int, AppliedDirectiveState> _appliedDirectives = new();
+    private readonly DirectorState _directorState = new();
     private long _lastObservedDecisionSequence;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
@@ -59,6 +58,7 @@ public sealed class SimulationRuntime
     public void AdvanceTick(float dt)
     {
         _world.Update(dt);
+        _directorState.Tick();
         RefreshAiDebugSnapshot();
         Tick++;
     }
@@ -170,7 +170,8 @@ public sealed class SimulationRuntime
                 ["ironYield"] = _world.IronYield,
                 ["goldYield"] = _world.GoldYield
             },
-            ["colonies"] = colonies
+            ["colonies"] = colonies,
+            ["director"] = BuildDirectorSnapshotJson()
         };
     }
 
@@ -203,8 +204,11 @@ public sealed class SimulationRuntime
         if (durationTicks <= 0)
             throw new InvalidOperationException($"Cannot apply story beat '{beatId}': durationTicks must be > 0.");
 
-        _appliedStoryBeatIds.Add(beatId);
-        LastDirectorActionStatus = $"Applied story beat '{beatId}' ({durationTicks} ticks)";
+        var result = _directorState.ApplyStoryBeat(beatId, text, (int)durationTicks, DirectorBeatSeverity.Major);
+        if (!result.Success)
+            throw new InvalidOperationException($"Cannot apply story beat '{beatId}': {result.Message}");
+
+        LastDirectorActionStatus = result.Message;
     }
 
     public void ApplyColonyDirective(int colonyId, string directive, long durationTicks)
@@ -229,8 +233,59 @@ public sealed class SimulationRuntime
             );
         }
 
-        _appliedDirectives[colonyId] = new AppliedDirectiveState(directive, durationTicks);
-        LastDirectorActionStatus = $"Applied directive '{directive}' to colony {colonyId} ({durationTicks} ticks)";
+        var result = _directorState.ApplyDirective(colonyId, directive, (int)durationTicks);
+        LastDirectorActionStatus = result.Message;
+    }
+
+    private JsonObject BuildDirectorSnapshotJson()
+    {
+        int livingPopulation = _world._people.Count(person => person.Health > 0f);
+        int totalFood = _world._colonies.Sum(colony => colony.Stock.GetValueOrDefault(Resource.Food, 0));
+        double foodReservesPct = livingPopulation <= 0
+            ? 0d
+            : Math.Clamp(totalFood / (double)(livingPopulation * 6), 0d, 1d);
+        double moraleAvg = _world._colonies.Count == 0
+            ? 0d
+            : _world._colonies.Average(colony => colony.Morale);
+        double economyOutput = _world._colonies.Count == 0
+            ? 1d
+            : _world._colonies.Average(colony => colony.ColonyWorkMultiplier);
+
+        var activeBeats = new JsonArray();
+        foreach (var beat in _directorState.ActiveBeats)
+        {
+            activeBeats.Add(new JsonObject
+            {
+                ["beatId"] = beat.BeatId,
+                ["severity"] = beat.Severity.ToString(),
+                ["remainingTicks"] = beat.RemainingTicks
+            });
+        }
+
+        var activeDirectives = new JsonArray();
+        foreach (var directive in _directorState.ActiveDirectives)
+        {
+            activeDirectives.Add(new JsonObject
+            {
+                ["colonyId"] = directive.ColonyId,
+                ["directive"] = directive.Directive,
+                ["remainingTicks"] = directive.RemainingTicks
+            });
+        }
+
+        return new JsonObject
+        {
+            ["currentTick"] = Tick,
+            ["currentSeason"] = _world.CurrentSeason.ToString(),
+            ["colonyPopulation"] = livingPopulation,
+            ["foodReservesPct"] = foodReservesPct,
+            ["moraleAvg"] = moraleAvg,
+            ["economyOutput"] = economyOutput,
+            ["activeBeats"] = activeBeats,
+            ["activeDirectives"] = activeDirectives,
+            ["beatCooldownRemainingTicks"] = _directorState.BeatCooldownRemainingTicks,
+            ["remainingInfluenceBudget"] = 1.0
+        };
     }
 
     private RuntimeNpcBrain CreateBrain(Colony colony, RuntimeAiOptions options)
@@ -321,6 +376,4 @@ public sealed class SimulationRuntime
             normalized += count;
         return normalized;
     }
-
-    private sealed record AppliedDirectiveState(string Directive, long DurationTicks);
 }

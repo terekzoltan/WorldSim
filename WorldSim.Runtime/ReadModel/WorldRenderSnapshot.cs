@@ -48,13 +48,21 @@ public sealed record WorldRenderSnapshot(
     IReadOnlyList<PersonRenderData> People,
     IReadOnlyList<AnimalRenderData> Animals,
     IReadOnlyList<ColonyHudData> Colonies,
+    IReadOnlyList<FactionStanceRenderData> FactionStances,
     EcoHudData Ecology,
     SeasonView CurrentSeason,
     bool IsDroughtActive,
     IReadOnlyList<string> RecentEvents
 );
 
-public sealed record TileRenderData(int X, int Y, TileGroundView Ground, ResourceView NodeType, int NodeAmount);
+public sealed record TileRenderData(
+    int X,
+    int Y,
+    TileGroundView Ground,
+    ResourceView NodeType,
+    int NodeAmount,
+    int OwnerFactionId,
+    bool IsContested);
 
 public sealed record HouseRenderData(int X, int Y, int ColonyId);
 
@@ -94,6 +102,8 @@ public sealed record ColonyHudData(
     float AverageStamina,
     string ProfessionSummary
 );
+
+public sealed record FactionStanceRenderData(int LeftFactionId, int RightFactionId, string Stance);
 
 public sealed record EcoHudData(
     int Herbivores,

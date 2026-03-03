@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using WorldSim.AI;
 using WorldSim.Simulation.Effects;
 
 namespace WorldSim.Simulation;
@@ -678,28 +679,33 @@ public class Person
 
     bool TryHandleThreatResponse(World w, float dt)
     {
+        var context = BuildThreatContext(w);
+
+        bool hasImmediateThreats = context.NearbyPredators + context.NearbyHostilePeople > 0;
+        bool shouldDefend = ThreatDecisionPolicy.ShouldPrioritizeDefense(context);
+        if (!hasImmediateThreats && !shouldDefend)
+            return false;
+
         int nearbyPredators = CountNearbyPredators(w, radius: 4);
         int nearbyHostiles = CountNearbyHostilePeople(w, radius: 4);
-        if (nearbyPredators + nearbyHostiles <= 0)
-            return false;
 
         var next = _brain.Think(this, w, dt);
         if (next != Job.Fight && next != Job.Flee)
-            next = ShouldFight(nearbyPredators, nearbyHostiles) ? Job.Fight : Job.Flee;
+            next = ThreatDecisionPolicy.ShouldFight(context) ? Job.Fight : Job.Flee;
+
+        bool hasFactionThreat =
+            context.NearbyEnemyCount > 0 ||
+            context.NearbyHostilePeople > 0 ||
+            context.IsWarStance ||
+            context.IsHostileStance ||
+            context.IsContestedTile ||
+            context.HasContestedTilesNearby;
+        if (hasFactionThreat && !context.IsWarriorRole)
+            next = Job.Flee;
 
         Current = next;
         _doingJob = 1;
         return true;
-    }
-
-    bool ShouldFight(int nearbyPredators, int nearbyHostiles)
-    {
-        if (Health < 40f)
-            return false;
-
-        float power = Strength + (Defense / 2f);
-        float threatLoad = (6f * nearbyPredators) + (8f * nearbyHostiles);
-        return power >= threatLoad;
     }
 
     int CountNearbyPredators(World w, int radius)
@@ -726,6 +732,10 @@ public class Person
             if (person == this || person.Health <= 0f || person.Home == _home)
                 continue;
 
+            var stance = w.GetFactionStance(_home.Faction, person.Home.Faction);
+            if (stance < WorldSim.Simulation.Diplomacy.Stance.Hostile)
+                continue;
+
             int dist = Math.Abs(person.Pos.x - Pos.x) + Math.Abs(person.Pos.y - Pos.y);
             if (dist <= radius)
                 count++;
@@ -738,6 +748,43 @@ public class Person
     {
         if (!w.EnableCombatPrimitives)
             return;
+
+        var threatContext = BuildThreatContext(w);
+        bool hasFactionThreat =
+            threatContext.NearbyEnemyCount > 0 ||
+            threatContext.NearbyHostilePeople > 0 ||
+            threatContext.IsWarStance ||
+            threatContext.IsHostileStance ||
+            threatContext.IsContestedTile ||
+            threatContext.HasContestedTilesNearby;
+        if (hasFactionThreat && !threatContext.IsWarriorRole)
+        {
+            ExecuteFleeAction(w);
+            return;
+        }
+
+        var hostilePerson = FindNearestHostilePerson(w, radius: 5);
+        if (hostilePerson != null)
+        {
+            int hostileDist = Math.Abs(hostilePerson.Value.person.Pos.x - Pos.x) + Math.Abs(hostilePerson.Value.person.Pos.y - Pos.y);
+            if (hostileDist > 1)
+            {
+                MoveTowards(w, hostilePerson.Value.person.Pos, 1);
+                return;
+            }
+
+            w.ReportCombatEngagement();
+            var enemy = hostilePerson.Value.person;
+            var myPower = Strength + (Defense / 2f);
+            var enemyPower = enemy.Strength + (enemy.Defense / 2f);
+            var duelWinChance = Math.Clamp(0.40f + ((myPower - enemyPower) / 50f), 0.15f, 0.9f);
+            if (_rng.NextDouble() < duelWinChance)
+                enemy.ApplyCombatDamage(w, Math.Max(2f, Strength * 0.8f), "FactionCombat");
+            else
+                ApplyCombatDamage(w, Math.Max(1.5f, enemy.Strength * 0.65f), "FactionCombat");
+
+            return;
+        }
 
         Predator? nearest = null;
         int best = int.MaxValue;
@@ -755,7 +802,18 @@ public class Person
         }
 
         if (nearest == null)
+        {
+            if (threatContext.IsContestedTile || threatContext.HasContestedTilesNearby)
+            {
+                var patrolTarget = FindNearestContestedTile(w, radius: 6);
+                if (patrolTarget != null)
+                    MoveTowards(w, patrolTarget.Value, 1);
+                else
+                    MoveTowards(w, _home.Origin, 1);
+            }
+
             return;
+        }
 
         if (best > 1)
         {
@@ -778,6 +836,14 @@ public class Person
 
     void ExecuteFleeAction(World w)
     {
+        var threatContext = BuildThreatContext(w);
+        if (!threatContext.IsWarriorRole &&
+            (threatContext.IsHostileStance || threatContext.IsWarStance || threatContext.IsContestedTile || threatContext.HasContestedTilesNearby))
+        {
+            MoveTowards(w, _home.Origin, 1);
+            return;
+        }
+
         var nearestThreat = FindNearestThreat(w, radius: 6);
         if (nearestThreat == null)
         {
@@ -799,6 +865,153 @@ public class Person
         }
 
         Wander(w);
+    }
+
+    private NpcAiContext BuildThreatContext(World w)
+    {
+        var nearbyPredators = CountNearbyPredators(w, radius: 4);
+        var nearbyHostiles = CountNearbyHostilePeople(w, radius: 4);
+        var colonyId = _home.Id;
+        var warState = w.GetColonyWarState(colonyId);
+        var isWarStance = warState == ColonyWarState.War;
+        var isHostileStance = warState == ColonyWarState.Tense || isWarStance;
+        var isContestedTile = w.IsTileContested(Pos.x, Pos.y);
+        var hasContestedTilesNearby = HasContestedTileNearby(w, radius: 2);
+        var nearbyEnemyCount = nearbyHostiles;
+        var hostileProximity = Math.Clamp(nearbyEnemyCount / 4f, 0f, 1f);
+        var localThreat = Math.Clamp(
+            (nearbyPredators / 3f) * 0.45f +
+            (nearbyHostiles / 4f) * 0.55f +
+            (isContestedTile ? 0.2f : 0f) +
+            (hasContestedTilesNearby ? 0.15f : 0f) +
+            (isHostileStance ? 0.1f : 0f) +
+            (isWarStance ? 0.15f : 0f),
+            0f,
+            1f);
+
+        return new NpcAiContext(
+            SimulationTimeSeconds: 0f,
+            Hunger: Needs.GetValueOrDefault("Hunger", 0f),
+            Stamina: Stamina,
+            HomeWood: _home.Stock[Resource.Wood],
+            HomeStone: _home.Stock[Resource.Stone],
+            HomeIron: _home.Stock[Resource.Iron],
+            HomeGold: _home.Stock[Resource.Gold],
+            HomeFood: _home.Stock[Resource.Food],
+            HomeHouseCount: _home.HouseCount,
+            HouseWoodCost: _home.HouseWoodCost,
+            ColonyPopulation: w._people.Count(p => p.Home == _home && p.Health > 0f),
+            HouseCapacity: w.HouseCapacity,
+            StoneBuildingsEnabled: w.StoneBuildingsEnabled,
+            CanBuildWithStone: _home.CanBuildWithStone,
+            HouseStoneCost: _home.HouseStoneCost,
+            Health: Health,
+            Strength: Strength,
+            Defense: Defense,
+            NearbyPredators: nearbyPredators,
+            NearbyHostilePeople: nearbyHostiles,
+            IsWarStance: isWarStance,
+            IsHostileStance: isHostileStance,
+            IsContestedTile: isContestedTile,
+            HasContestedTilesNearby: hasContestedTilesNearby,
+            IsWarriorRole: IsWarriorRole(w),
+            NearbyEnemyCount: nearbyEnemyCount,
+            HostileProximityScore: hostileProximity,
+            LocalThreatScore: localThreat);
+    }
+
+    private bool IsWarriorRole(World w)
+    {
+        if (Profession == Profession.Hunter)
+            return true;
+
+        var warState = w.GetColonyWarState(_home.Id);
+        if (warState == ColonyWarState.Peace)
+            return false;
+
+        var warriorCount = w.GetColonyWarriorCount(_home.Id);
+        if (warriorCount <= 0)
+            return false;
+
+        var myPower = Strength + Defense;
+        var stronger = w._people.Count(person =>
+            person != this
+            && person.Home == _home
+            && person.Health > 0f
+            && (person.Strength + person.Defense) > myPower);
+        return stronger < warriorCount;
+    }
+
+    private bool HasContestedTileNearby(World w, int radius)
+    {
+        for (int dy = -radius; dy <= radius; dy++)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                if (Math.Abs(dx) + Math.Abs(dy) > radius)
+                    continue;
+
+                if (w.IsTileContested(Pos.x + dx, Pos.y + dy))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private (Person person, int dist)? FindNearestHostilePerson(World w, int radius)
+    {
+        Person? nearest = null;
+        int bestDist = int.MaxValue;
+        foreach (var person in w._people)
+        {
+            if (person == this || person.Health <= 0f || person.Home == _home)
+                continue;
+
+            var stance = w.GetFactionStance(_home.Faction, person.Home.Faction);
+            if (stance < WorldSim.Simulation.Diplomacy.Stance.Hostile)
+                continue;
+
+            int dist = Math.Abs(person.Pos.x - Pos.x) + Math.Abs(person.Pos.y - Pos.y);
+            if (dist <= radius && dist < bestDist)
+            {
+                bestDist = dist;
+                nearest = person;
+            }
+        }
+
+        if (nearest == null)
+            return null;
+
+        return (nearest, bestDist);
+    }
+
+    private (int x, int y)? FindNearestContestedTile(World w, int radius)
+    {
+        (int x, int y)? nearest = null;
+        int bestDist = int.MaxValue;
+        for (int dy = -radius; dy <= radius; dy++)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                int dist = Math.Abs(dx) + Math.Abs(dy);
+                if (dist > radius)
+                    continue;
+
+                int x = Pos.x + dx;
+                int y = Pos.y + dy;
+                if (!w.IsTileContested(x, y))
+                    continue;
+
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    nearest = (x, y);
+                }
+            }
+        }
+
+        return nearest;
     }
 
     (int x, int y)? FindNearestThreat(World w, int radius)

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace WorldSim.AI;
@@ -16,6 +17,11 @@ public sealed class GoalSelector
         {
             var onCooldown = goal.IsOnCooldown(context.SimulationTimeSeconds);
             var score = onCooldown ? 0f : _evaluator.Evaluate(goal, context);
+            if (!onCooldown)
+            {
+                var bias = GoalBiasCategories.GetBiasForGoal(goal.Name, context);
+                score = Math.Clamp(score + bias, 0f, 1f);
+            }
             scores.Add(new GoalScoreEntry(goal.Name, score, onCooldown));
 
             if (onCooldown)

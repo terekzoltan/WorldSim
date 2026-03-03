@@ -1,0 +1,53 @@
+using System;
+
+namespace WorldSim.AI;
+
+public static class ThreatDecisionPolicy
+{
+    public static bool ShouldPrioritizeDefense(in NpcAiContext context)
+    {
+        if (Math.Max(0, context.NearbyPredators) > 0)
+            return true;
+
+        if (context.LocalThreatScore >= 0.25f)
+            return true;
+
+        if ((context.IsWarStance || context.IsHostileStance) && (context.IsContestedTile || context.HasContestedTilesNearby))
+            return true;
+
+        return false;
+    }
+
+    public static bool ShouldFight(in NpcAiContext context)
+    {
+        if (!ShouldPrioritizeDefense(context))
+            return false;
+
+        var hasFactionThreat =
+            context.NearbyEnemyCount > 0 ||
+            context.NearbyHostilePeople > 0 ||
+            context.IsWarStance ||
+            context.IsHostileStance ||
+            context.IsContestedTile ||
+            context.HasContestedTilesNearby;
+        if (hasFactionThreat && !context.IsWarriorRole)
+            return false;
+
+        if (context.Health < 45f)
+            return false;
+
+        var power = context.Strength + (context.Defense / 2f);
+        var threatLoad =
+            (6f * Math.Max(0, context.NearbyPredators)) +
+            (8f * Math.Max(0, context.NearbyHostilePeople)) +
+            (10f * Math.Max(0, context.NearbyEnemyCount));
+
+        threatLoad *= 1f + Math.Clamp(context.HostileProximityScore * 0.35f, 0f, 0.35f);
+        if (context.IsContestedTile)
+            threatLoad *= 0.92f;
+        else if (context.HasContestedTilesNearby)
+            threatLoad *= 0.97f;
+
+        return power >= threatLoad;
+    }
+}

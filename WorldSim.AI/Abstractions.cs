@@ -36,7 +36,22 @@ public readonly record struct NpcAiContext(
     int Strength = 0,
     int Defense = 0,
     int NearbyPredators = 0,
-    int NearbyHostilePeople = 0);
+    int NearbyHostilePeople = 0,
+    float BiasFarming = 0f,
+    float BiasGathering = 0f,
+    float BiasBuilding = 0f,
+    float BiasCrafting = 0f,
+    float BiasRest = 0f,
+    float BiasSocial = 0f,
+    float BiasMilitary = 0f,
+    bool IsWarStance = false,
+    bool IsHostileStance = false,
+    bool IsContestedTile = false,
+    bool HasContestedTilesNearby = false,
+    bool IsWarriorRole = false,
+    int NearbyEnemyCount = 0,
+    float HostileProximityScore = 0f,
+    float LocalThreatScore = 0f);
 
 public interface IPlanner
 {

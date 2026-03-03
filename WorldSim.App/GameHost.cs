@@ -799,7 +799,8 @@ public class GameHost : Game
                 _font,
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height,
-                _hudRenderer.Theme);
+                _hudRenderer.Theme,
+                snapshot);
             _spriteBatch.End();
         }
 

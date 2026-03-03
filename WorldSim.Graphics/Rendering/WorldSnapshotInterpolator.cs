@@ -18,6 +18,7 @@ public static class WorldSnapshotInterpolator
             InterpolatePeople(previous.People, current.People, alpha),
             InterpolateAnimals(previous.Animals, current.Animals, alpha),
             current.Colonies,
+            current.FactionStances,
             current.Ecology,
             current.CurrentSeason,
             current.IsDroughtActive,

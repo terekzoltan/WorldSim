@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
 
 namespace WorldSim.Simulation
@@ -81,9 +82,14 @@ namespace WorldSim.Simulation
         readonly Dictionary<int, ColonyDeathStats> _colonyDeathStats = new();
         readonly Queue<float> _recentStarvationDeaths = new();
         readonly int[,] _tileOwnerColonyIds;
+        readonly bool[,] _tileContested;
         readonly Dictionary<int, ColonyWarState> _colonyWarStates = new();
         readonly Dictionary<int, int> _colonyWarriorCounts = new();
         readonly DomainModifierEngine _domainModifierEngine = new();
+        readonly GoalBiasEngine _goalBiasEngine = new();
+        readonly Dictionary<(Faction left, Faction right), Stance> _factionStances = new();
+        readonly Dictionary<(Faction left, Faction right), int> _contestedTilesByFactionPair = new();
+        readonly RelationManager _relationManager = new();
         int _navigationTopologyVersion;
 
         float _simulationTimeSeconds;
@@ -108,6 +114,7 @@ namespace WorldSim.Simulation
             Height = height;
             _map = new Tile[width, height];
             _tileOwnerColonyIds = new int[width, height];
+            _tileContested = new bool[width, height];
 
             // 1) Biomes (Grass/Dirt/Water) via cheap seeded region growing
             Ground[,] grounds = GenerateBiomes();
@@ -192,6 +199,8 @@ namespace WorldSim.Simulation
             for (int i = 0; i < animalCount; i++)
                 _animals.Add(Animal.Spawn(RandomFreePos(), CreateEntityRng()));
 
+            InitializeFactionStances();
+
             RecomputeTerritoryOwnership();
         }
 
@@ -200,6 +209,7 @@ namespace WorldSim.Simulation
             _tickCounter++;
             _simulationTimeSeconds += Math.Max(0f, dt);
             _domainModifierEngine.Tick();
+            _goalBiasEngine.Tick();
             UpdateSeasonsAndEvents(dt);
             UpdateFoodRegrowth(dt);
 
@@ -262,6 +272,8 @@ namespace WorldSim.Simulation
             }
 
             RecomputeTerritoryOwnership();
+            if (EnableDiplomacy)
+                _relationManager.Tick(this);
             RecomputeMobilizationState();
 
             TrimRecentDeathWindows();
@@ -313,6 +325,19 @@ namespace WorldSim.Simulation
             return _tileOwnerColonyIds[x, y];
         }
 
+        public bool IsTileContested(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= Width || y >= Height)
+                return false;
+            return _tileContested[x, y];
+        }
+
+        public int GetContestedTilesForFactionPair(Faction left, Faction right)
+        {
+            var pair = NormalizeFactionPair(left, right);
+            return _contestedTilesByFactionPair.GetValueOrDefault(pair, 0);
+        }
+
         public ColonyWarState GetColonyWarState(int colonyId)
             => _colonyWarStates.TryGetValue(colonyId, out var state) ? state : ColonyWarState.Peace;
 
@@ -332,6 +357,42 @@ namespace WorldSim.Simulation
 
         public IReadOnlyList<ActiveDomainModifierInfo> GetActiveDomainModifiers()
             => _domainModifierEngine.GetActiveModifiers();
+
+        public void RegisterGoalBiases(string sourceId, int colonyId, IReadOnlyList<GoalBiasSpec> biases, int durationTicks, double dampeningFactor)
+            => _goalBiasEngine.RegisterBiases(sourceId, colonyId, biases, durationTicks, dampeningFactor);
+
+        public void ReplaceGoalBiases(string sourceId, int colonyId, IReadOnlyList<GoalBiasSpec> biases, int durationTicks, double dampeningFactor)
+            => _goalBiasEngine.ReplaceDirective(sourceId, colonyId, biases, durationTicks, dampeningFactor);
+
+        public double GetEffectiveGoalBias(int colonyId, string goalCategory)
+            => _goalBiasEngine.GetEffectiveBias(colonyId, goalCategory);
+
+        public bool IsGoalPriorityActive(int colonyId, string goalCategory)
+            => _goalBiasEngine.IsJobPriorityActive(colonyId, goalCategory);
+
+        public IReadOnlyList<ActiveGoalBiasInfo> GetActiveGoalBiases(int colonyId)
+            => _goalBiasEngine.GetActiveBiases(colonyId);
+
+        public Stance GetFactionStance(Faction left, Faction right)
+        {
+            if (_factionStances.TryGetValue((left, right), out var stance))
+                return stance;
+            return Stance.Neutral;
+        }
+
+        public void SetFactionStance(Faction left, Faction right, Stance stance)
+        {
+            _factionStances[(left, right)] = stance;
+            _factionStances[(right, left)] = stance;
+        }
+
+        public IReadOnlyList<FactionStanceState> GetFactionStanceMatrix()
+            => _factionStances
+                .Where(entry => entry.Key.left <= entry.Key.right)
+                .Select(entry => new FactionStanceState(entry.Key.left, entry.Key.right, entry.Value))
+                .OrderBy(entry => entry.Left)
+                .ThenBy(entry => entry.Right)
+                .ToList();
 
         private void ReportPersonDeath(Person person)
         {
@@ -387,8 +448,29 @@ namespace WorldSim.Simulation
                 _recentStarvationDeaths.Dequeue();
         }
 
+        private void InitializeFactionStances()
+        {
+            var factions = (Faction[])Enum.GetValues(typeof(Faction));
+            foreach (var left in factions)
+            {
+                foreach (var right in factions)
+                    _factionStances[(left, right)] = Stance.Neutral;
+            }
+        }
+
         private void RecomputeTerritoryOwnership()
         {
+            _contestedTilesByFactionPair.Clear();
+            var livingByColony = _colonies.ToDictionary(
+                colony => colony.Id,
+                colony => _people.Count(person => person.Home == colony && person.Health > 0f));
+            var housesByColony = Houses
+                .GroupBy(house => house.Owner.Id)
+                .ToDictionary(group => group.Key, group => group.Count());
+            var specializedByColony = SpecializedBuildings
+                .GroupBy(building => building.Owner.Id)
+                .ToDictionary(group => group.Key, group => group.Count());
+
             for (int y = 0; y < Height; y++)
             {
                 for (int x = 0; x < Width; x++)
@@ -396,25 +478,62 @@ namespace WorldSim.Simulation
                     if (_map[x, y].Ground == Ground.Water || _colonies.Count == 0)
                     {
                         _tileOwnerColonyIds[x, y] = -1;
+                        _tileContested[x, y] = false;
                         continue;
                     }
 
                     int bestId = -1;
-                    int bestDist = int.MaxValue;
+                    int secondId = -1;
+                    double bestScore = double.MinValue;
+                    double secondScore = double.MinValue;
+
                     foreach (var colony in _colonies)
                     {
-                        int d = Math.Abs(x - colony.Origin.x) + Math.Abs(y - colony.Origin.y);
-                        if (d < bestDist)
+                        int distance = Math.Abs(x - colony.Origin.x) + Math.Abs(y - colony.Origin.y);
+                        int living = livingByColony.GetValueOrDefault(colony.Id, 0);
+                        int houseCount = housesByColony.GetValueOrDefault(colony.Id, 0);
+                        int specializedCount = specializedByColony.GetValueOrDefault(colony.Id, 0);
+
+                        double score = (24d / (1d + distance))
+                                     + (living * 0.12d)
+                                     + (houseCount * 0.35d)
+                                     + (specializedCount * 0.45d);
+
+                        if (score > bestScore || (Math.Abs(score - bestScore) < 0.0001d && colony.Id < bestId))
                         {
-                            bestDist = d;
+                            secondScore = bestScore;
+                            secondId = bestId;
+                            bestScore = score;
                             bestId = colony.Id;
+                        }
+                        else if (score > secondScore || (Math.Abs(score - secondScore) < 0.0001d && colony.Id < secondId))
+                        {
+                            secondScore = score;
+                            secondId = colony.Id;
                         }
                     }
 
                     _tileOwnerColonyIds[x, y] = bestId;
+
+                    bool contested = secondId >= 0 && (bestScore - secondScore) <= 2.2d;
+                    _tileContested[x, y] = contested;
+
+                    if (!contested)
+                        continue;
+
+                    var bestColony = _colonies.FirstOrDefault(colony => colony.Id == bestId);
+                    var secondColony = _colonies.FirstOrDefault(colony => colony.Id == secondId);
+                    if (bestColony == null || secondColony == null || bestColony.Faction == secondColony.Faction)
+                        continue;
+
+                    var pair = NormalizeFactionPair(bestColony.Faction, secondColony.Faction);
+                    _contestedTilesByFactionPair[pair] = _contestedTilesByFactionPair.GetValueOrDefault(pair, 0) + 1;
                 }
             }
         }
+
+        private static (Faction left, Faction right) NormalizeFactionPair(Faction left, Faction right)
+            => left <= right ? (left, right) : (right, left);
 
         private void RecomputeMobilizationState()
         {
@@ -455,15 +574,32 @@ namespace WorldSim.Simulation
                 if (living <= 0)
                     continue;
 
-                if (hostileColonyIds.Contains(colony.Id))
+                var maxStance = Stance.Neutral;
+                foreach (var other in _colonies)
+                {
+                    if (other == colony)
+                        continue;
+
+                    var stance = GetFactionStance(colony.Faction, other.Faction);
+                    if (stance > maxStance)
+                        maxStance = stance;
+                }
+
+                bool hasHostileContact = hostileColonyIds.Contains(colony.Id);
+                if (maxStance == Stance.War)
                 {
                     _colonyWarStates[colony.Id] = ColonyWarState.War;
-                    _colonyWarriorCounts[colony.Id] = Math.Max(1, living / 5);
+                    _colonyWarriorCounts[colony.Id] = Math.Max(1, living / 4);
+                }
+                else if (maxStance == Stance.Hostile || hasHostileContact)
+                {
+                    _colonyWarStates[colony.Id] = ColonyWarState.Tense;
+                    _colonyWarriorCounts[colony.Id] = Math.Max(1, living / 8);
                 }
                 else
                 {
-                    _colonyWarStates[colony.Id] = ColonyWarState.Tense;
-                    _colonyWarriorCounts[colony.Id] = Math.Max(1, living / 10);
+                    _colonyWarStates[colony.Id] = ColonyWarState.Peace;
+                    _colonyWarriorCounts[colony.Id] = 0;
                 }
             }
         }
@@ -867,8 +1003,18 @@ namespace WorldSim.Simulation
                     continue;
 
                 bool emergencyFood = colony.Stock[Resource.Food] <= Math.Max(6, adults.Count + 2);
+                bool prioritizeFarming = IsGoalPriorityActive(colony.Id, WorldSim.AI.GoalBiasCategories.Farming);
+                bool prioritizeGathering = IsGoalPriorityActive(colony.Id, WorldSim.AI.GoalBiasCategories.Gathering);
+                bool prioritizeBuilding = IsGoalPriorityActive(colony.Id, WorldSim.AI.GoalBiasCategories.Building);
+                bool prioritizeCrafting = IsGoalPriorityActive(colony.Id, WorldSim.AI.GoalBiasCategories.Crafting);
 
-                var targets = CreateProfessionTargets(adults.Count, emergencyFood);
+                var targets = CreateProfessionTargets(
+                    adults.Count,
+                    emergencyFood,
+                    prioritizeFarming,
+                    prioritizeGathering,
+                    prioritizeBuilding,
+                    prioritizeCrafting);
                 var counts = adults
                     .GroupBy(p => p.Profession)
                     .ToDictionary(g => g.Key, g => g.Count());
@@ -899,7 +1045,13 @@ namespace WorldSim.Simulation
             }
         }
 
-        Dictionary<Profession, int> CreateProfessionTargets(int adultCount, bool emergencyFood)
+        Dictionary<Profession, int> CreateProfessionTargets(
+            int adultCount,
+            bool emergencyFood,
+            bool prioritizeFarming,
+            bool prioritizeGathering,
+            bool prioritizeBuilding,
+            bool prioritizeCrafting)
         {
             var ratios = emergencyFood
                 ? new Dictionary<Profession, float>
@@ -920,6 +1072,41 @@ namespace WorldSim.Simulation
                     [Profession.Builder] = 0.14f,
                     [Profession.Generalist] = 0.1f
                 };
+
+            if (prioritizeFarming)
+            {
+                ratios[Profession.Farmer] += 0.22f;
+                ratios[Profession.Hunter] += 0.08f;
+                ratios[Profession.Generalist] = Math.Max(0.02f, ratios[Profession.Generalist] - 0.08f);
+            }
+
+            if (prioritizeGathering)
+            {
+                ratios[Profession.Lumberjack] += 0.12f;
+                ratios[Profession.Miner] += 0.12f;
+                ratios[Profession.Generalist] = Math.Max(0.02f, ratios[Profession.Generalist] - 0.06f);
+            }
+
+            if (prioritizeBuilding)
+            {
+                ratios[Profession.Builder] += 0.5f;
+                ratios[Profession.Generalist] = Math.Max(0.02f, ratios[Profession.Generalist] - 0.14f);
+            }
+
+            if (prioritizeCrafting)
+            {
+                ratios[Profession.Builder] += 0.08f;
+                ratios[Profession.Miner] += 0.14f;
+                ratios[Profession.Generalist] = Math.Max(0.02f, ratios[Profession.Generalist] - 0.06f);
+            }
+
+            var ratioTotal = ratios.Values.Sum();
+            if (ratioTotal > 0f)
+            {
+                var keys = ratios.Keys.ToList();
+                foreach (var key in keys)
+                    ratios[key] /= ratioTotal;
+            }
 
             var targets = ratios.ToDictionary(
                 kv => kv.Key,
