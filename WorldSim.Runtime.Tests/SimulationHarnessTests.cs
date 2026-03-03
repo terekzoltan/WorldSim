@@ -30,6 +30,8 @@ public class SimulationHarnessTests
             world.Update(0.25f);
 
         Assert.True(world._colonies.Any(colony => world._people.Any(person => person.Home == colony && person.Health > 0f)), "At least one colony should remain viable.");
+        Assert.True(world._people.Count(p => p.Health > 0f) > 0, "At least one person must be alive after 1000 ticks.");
+
         Assert.All(world._colonies, colony =>
         {
             Assert.True(colony.Stock[Resource.Food] >= 0);
@@ -39,9 +41,47 @@ public class SimulationHarnessTests
             Assert.True(colony.Stock[Resource.Gold] >= 0);
         });
 
+        // No NaN/Infinity may appear in health values (combat float arithmetic guard)
+        Assert.All(world._people, person =>
+        {
+            Assert.False(float.IsNaN(person.Health), $"NaN Health detected on person at {person.Pos}");
+            Assert.False(float.IsInfinity(person.Health), $"Infinity Health detected on person at {person.Pos}");
+        });
+
+        // Animal._rng is non-seeded (new Random()), so hit counts are non-deterministic across
+        // machines/runs. Controlled hit-count verification lives in CombatPrimitivesTests.
+        // Here we only assert the flag did not crash the simulation.
         Assert.True(world.TotalPredatorHumanHits >= 0);
         Assert.True(world.TotalPredatorKillsByHumans >= 0);
-        Assert.True(world.TotalCombatEngagements >= 0);
+    }
+
+    [Fact]
+    public void HeadlessSmoke_WithCombat_IsDeterministic()
+    {
+        static World BuildCombatWorld(int seed)
+        {
+            var world = CreateWorld(seed);
+            // EnableCombatPrimitives enables person-vs-person threat detection.
+            // EnablePredatorHumanAttacks is intentionally OFF: both Person._rng and Animal._rng
+            // are non-seeded (new Random()), so predator-combat counters are non-deterministic.
+            // This test verifies that the person population count is stable under same-seed worlds.
+            world.EnableCombatPrimitives = true;
+            return world;
+        }
+
+        var first  = BuildCombatWorld(seed: 1337);
+        var second = BuildCombatWorld(seed: 1337);
+
+        for (var i = 0; i < 120; i++)
+        {
+            first.Update(0.25f);
+            second.Update(0.25f);
+        }
+
+        // Animals use non-seeded RNG (Person._rng and Animal._rng are both new Random()),
+        // so any counter that depends on combat dice is non-deterministic across runs.
+        // We verify only that same-seed worlds produce the same population count.
+        Assert.Equal(first._people.Count, second._people.Count);
     }
 
     private static List<string> RunAiTrace(int seed, int ticks)

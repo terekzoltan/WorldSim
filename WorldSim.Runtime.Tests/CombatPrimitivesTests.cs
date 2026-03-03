@@ -64,6 +64,34 @@ public class CombatPrimitivesTests
     }
 
     [Fact]
+    public void ThreatResponse_AdjacentEnemies_TriggersFightOrFlee()
+    {
+        var world = new World(width: 24, height: 16, initialPop: 8, randomSeed: 42)
+        {
+            EnableCombatPrimitives = true
+        };
+
+        // Remove all animals so only person-vs-person threat can trigger response
+        world._animals.Clear();
+
+        // Pick one actor from colony 0 and one enemy from colony 1
+        var actor = world._people.First(p => p.Home == world._colonies[0]);
+        var enemy = world._people.First(p => p.Home == world._colonies[1]);
+
+        // Place them adjacent (Manhattan dist = 1, well within radius 4)
+        actor.Pos = (6, 6);
+        enemy.Pos = (7, 6);
+
+        // Ensure actor is in Idle state before ticking (force _doingJob = 0 via a fresh reset tick)
+        // Run a single update tick - TryHandleThreatResponse fires inside the Idle block
+        world.Update(0.25f);
+
+        Assert.True(
+            actor.Current == Job.Fight || actor.Current == Job.Flee,
+            $"Expected actor to Fight or Flee but got {actor.Current}");
+    }
+
+    [Fact]
     public void SnapshotBuilder_PopulatesPersonCombatFields()
     {
         var world = new World(width: 24, height: 16, initialPop: 8, randomSeed: 303)
