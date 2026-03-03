@@ -44,6 +44,14 @@ public sealed class HudRenderer
         RenderStats? renderStats = null,
         float hudOpacity = 1f)
     {
+        if (techMenu != null)
+        {
+            _techMenuPanel.Draw(spriteBatch, font, techMenu.Value, Theme);
+            if (showAiDebug)
+                _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
+            return;
+        }
+
         var margin = 14;
         var leftX = margin;
         var panelWidth = Math.Max(420, (int)(viewportWidth * 0.58f));
@@ -69,15 +77,6 @@ public sealed class HudRenderer
             var passSummary = string.Join(" | ", renderStats.PassSamples.Select(s => $"{s.PassName}:{s.Milliseconds:0.00}ms"));
             TextWrap.DrawWrapped(spriteBatch, font, $"Render {renderStats.LastFrameMilliseconds:0.00}ms | {passSummary}", new Vector2(leftX, y), Theme.SecondaryText, contentWidth, 20);
         }
-
-        if (techMenu == null)
-        {
-            if (showAiDebug)
-                _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
-            return;
-        }
-
-        _techMenuPanel.Draw(spriteBatch, font, techMenu.Value, Theme);
 
         if (showAiDebug)
             _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);

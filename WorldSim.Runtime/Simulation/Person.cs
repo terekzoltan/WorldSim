@@ -523,7 +523,7 @@ public class Person
             }
 
             // 2) Move one step toward nearest resource in small radius
-            if (TryMoveTowardsNearestResource(w, searchRadius: 2, Resource.Wood, Resource.Stone, Resource.Iron, Resource.Gold))
+            if (TryMoveTowardsNearestResource(w, searchRadius: 6, Resource.Wood, Resource.Stone, Resource.Iron, Resource.Gold))
             {
                 _idleTimeSeconds = 0f; // movement → not idle
                 _lastPos = Pos;
@@ -1023,7 +1023,7 @@ public class Person
 
     void Wander(World w)
     {
-        int moveDistance = (int)_home.MovementSpeedMultiplier;
+        int moveDistance = Math.Max(4, (int)_home.MovementSpeedMultiplier);
         int tries = 8;
         for (int i = 0; i < tries; i++)
         {

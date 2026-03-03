@@ -1,2 +1,2 @@
-﻿using var game = new WorldSim.Game1();
+using var game = new WorldSim.GameHost();
 game.Run();
