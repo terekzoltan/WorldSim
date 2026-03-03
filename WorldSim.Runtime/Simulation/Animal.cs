@@ -260,7 +260,7 @@ public sealed class Predator : Animal
     public override AnimalKind Kind => AnimalKind.Predator;
 
 
-    public Predator((int x, int y) pos) : base(pos, speed: 1, vision: 6) { }
+    public Predator((int x, int y) pos) : base(pos, speed: 2, vision: 6) { }
 
     // Mild nerf so herbivores do not collapse too early.
     private const double CaptureSuccessChance = 0.65;
