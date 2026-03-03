@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using WorldSim.Simulation.Effects;
 
 namespace WorldSim.Simulation
 {
@@ -132,6 +133,9 @@ namespace WorldSim.Simulation
             target += Math.Clamp((foodPerCapita - 2f) * 7f, -20f, 20f);
             target -= Math.Max(0f, housingPressure - 1f) * 28f;
             target -= criticalRatio * 35f;
+
+            var moraleDomainBoost = (float)world.GetDomainModifier(RuntimeDomain.Morale);
+            target += moraleDomainBoost * 25f;
 
             target = Math.Clamp(target, 5f, 95f);
             float blend = 0.12f;

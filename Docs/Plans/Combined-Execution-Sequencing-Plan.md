@@ -85,7 +85,7 @@ Turn-gate legend (agent handoff safety):
 
 > Director Plan > Phase 1 Sprint 2
 
-- ⬜ **S2-A** Domain Modifier Engine — timed modifier engine in `WorldSim.Runtime` (Track B)
+- 🔄 **S2-A** Domain Modifier Engine — timed modifier engine in `WorldSim.Runtime` (Track B)
 - ⬜ **S2-B** Goal Bias Engine — timed bias engine + Track C integration (Track B + C)
 - ⬜ **S2-C** Director State + tick integration + command endpoints (Track B)
 

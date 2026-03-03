@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using WorldSim.AI;
 using WorldSim.Simulation;
@@ -158,7 +159,7 @@ public class RuntimeNpcBrainTests
         };
 
         world._animals.Clear();
-        world._animals.Add(new Predator((5, 5)));
+        world._animals.Add(new Predator((5, 5), new Random(41)));
 
         var actor = world._people[0];
         actor.Pos = (5, 5);

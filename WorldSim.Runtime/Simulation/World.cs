@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using WorldSim.Simulation.Effects;
 
 namespace WorldSim.Simulation
 {
@@ -82,6 +83,7 @@ namespace WorldSim.Simulation
         readonly int[,] _tileOwnerColonyIds;
         readonly Dictionary<int, ColonyWarState> _colonyWarStates = new();
         readonly Dictionary<int, int> _colonyWarriorCounts = new();
+        readonly DomainModifierEngine _domainModifierEngine = new();
         int _navigationTopologyVersion;
 
         float _simulationTimeSeconds;
@@ -181,14 +183,14 @@ namespace WorldSim.Simulation
                         py = Math.Clamp(col.Origin.y + _rng.Next(-spawnRadius, spawnRadius + 1), 0, Height - 1);
                     } while (_map[px, py].Ground == Ground.Water && ++attempts < 64);
 
-                    _people.Add(Person.Spawn(col, (px, py), CreateNpcBrain(col)));
+                    _people.Add(Person.Spawn(col, (px, py), CreateNpcBrain(col), CreateEntityRng()));
                 }
             }
 
             // 3. Animals
             int animalCount = Math.Max(10, (Width * Height) / 256);
             for (int i = 0; i < animalCount; i++)
-                _animals.Add(Animal.Spawn(RandomFreePos()));
+                _animals.Add(Animal.Spawn(RandomFreePos(), CreateEntityRng()));
 
             RecomputeTerritoryOwnership();
         }
@@ -197,6 +199,7 @@ namespace WorldSim.Simulation
         {
             _tickCounter++;
             _simulationTimeSeconds += Math.Max(0f, dt);
+            _domainModifierEngine.Tick();
             UpdateSeasonsAndEvents(dt);
             UpdateFoodRegrowth(dt);
 
@@ -278,6 +281,7 @@ namespace WorldSim.Simulation
         }
 
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
+        internal Random CreateEntityRng() => new Random(_rng.Next());
         public Tile GetTile(int x, int y) => _map[x, y];
         public void AddHouse(Colony colony, (int x, int y) pos)
         {
@@ -316,6 +320,18 @@ namespace WorldSim.Simulation
             => _colonyWarriorCounts.TryGetValue(colonyId, out var count) ? count : 0;
 
         public int CurrentTick => _tickCounter;
+
+        public void RegisterDomainModifier(string sourceId, RuntimeDomain domain, double modifier, int durationTicks, double dampeningFactor)
+            => _domainModifierEngine.RegisterModifier(sourceId, domain, modifier, durationTicks, dampeningFactor);
+
+        public double GetDomainModifier(RuntimeDomain domain)
+            => _domainModifierEngine.GetEffectiveModifier(domain);
+
+        public double GetDomainMultiplier(RuntimeDomain domain)
+            => 1d + GetDomainModifier(domain);
+
+        public IReadOnlyList<ActiveDomainModifierInfo> GetActiveDomainModifiers()
+            => _domainModifierEngine.GetActiveModifiers();
 
         private void ReportPersonDeath(Person person)
         {
@@ -683,12 +699,12 @@ namespace WorldSim.Simulation
 
             if (herbivores < Math.Max(8, (Width * Height) / 400))
             {
-                _animals.Add(new Herbivore(RandomFreePos()));
+                _animals.Add(new Herbivore(RandomFreePos(), CreateEntityRng()));
                 return;
             }
 
             if (predators < Math.Max(3, herbivores / 6) && _rng.NextDouble() < 0.5)
-                _animals.Add(new Predator(RandomFreePos()));
+                _animals.Add(new Predator(RandomFreePos(), CreateEntityRng()));
         }
 
         void UpdateMilestones()

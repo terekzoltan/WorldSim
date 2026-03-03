@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
@@ -42,7 +43,7 @@ public class CombatPrimitivesTests
         };
 
         world._animals.Clear();
-        var predator = new Predator((10, 10));
+        var predator = new Predator((10, 10), new Random(17));
         world._animals.Add(predator);
 
         var primary = world._people.OrderByDescending(p => p.Strength).First();
@@ -100,7 +101,7 @@ public class CombatPrimitivesTests
         };
 
         world._animals.Clear();
-        world._animals.Add(new Predator((8, 8)));
+        world._animals.Add(new Predator((8, 8), new Random(29)));
 
         var target = world._people[0];
         target.Pos = (8, 8);
