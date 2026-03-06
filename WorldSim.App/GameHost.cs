@@ -506,13 +506,13 @@ public class GameHost : Game
     private static SimulationRuntime CreateRuntime()
     {
         var techPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tech", "technologies.json");
-        return new SimulationRuntime(width: 256, height: 256, initialPopulation: 25, technologyFilePath: techPath);
+        return new SimulationRuntime(width: 128, height: 128, initialPopulation: 25, technologyFilePath: techPath);
     }
 
     private static SimulationRuntime CreateRuntime(RuntimeAiOptions aiOptions)
     {
         var techPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Tech", "technologies.json");
-        return new SimulationRuntime(width: 256, height: 256, initialPopulation: 25, technologyFilePath: techPath, aiOptions: aiOptions);
+        return new SimulationRuntime(width: 128, height: 128, initialPopulation: 25, technologyFilePath: techPath, aiOptions: aiOptions);
     }
 
     private void ClampCamera()
