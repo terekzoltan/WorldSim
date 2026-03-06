@@ -39,9 +39,18 @@ Turn-gate legend (agent handoff safety):
 
 | Zone | Wave | Risk | Mitigation |
 |------|------|------|------------|
-| MR-1 | 2 | Track B snapshot additions for both Director engines AND diplomacy | Same Track B agent handles both |
+| MR-1 | 2 | Track B snapshot additions for both Director engines AND diplomacy | Same Track B agent handles both; becomes critical once Director state also enters render snapshot (Wave 3 S3-B) |
 | MR-2 | 6 | Director budget in DirectorState + Combat siege in tick loop | Additive changes, low risk |
 | MR-3 | 7 | Director causal chains + Combat DeclareWar both expand contracts AND runtime | Sequential sprints, not parallel |
+
+### Operator Toggles (current implementation)
+
+| Toggle | Layer | Purpose |
+|--------|-------|---------|
+| `REFINERY_DIRECTOR_DAMPENING=0.0..1.0` | Runtime | Scales applied director gameplay effects; `0.0` = narrative-only |
+| `WORLDSIM_ENABLE_DIPLOMACY=true|false` | Runtime | Enables diplomacy relation updates in live app |
+| `WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true|false` | Runtime | Enables combat primitive runtime behavior |
+| `WORLDSIM_ENABLE_PREDATOR_ATTACKS=true|false` | Runtime | Enables predator-human attack path |
 
 ### Wave Turn-Gate Protocol (all 4 track agents)
 
@@ -65,6 +74,10 @@ Turn-gate legend (agent handoff safety):
 - ✅ **S1-C** C# parser/applier expansion for v2 ops
 - ✅ **S1-D** Adapter translation paths — addStoryBeat/setColonyDirective -> commands
 
+Proof links:
+- Tests: `WorldSim.RefineryAdapter.Tests/DirectorEndToEndTests.cs`, `WorldSim.RefineryAdapter.Tests/PatchCommandTranslationTests.cs`
+- Manual: `Docs/Wave1-Manual-QA-Checklist.md` items 11-15
+
 ### Sprint C1: Combat Primitives (Track B -> C -> A)
 
 > Combat Plan > Phase 0 Sprint 1
@@ -74,6 +87,10 @@ Turn-gate legend (agent handoff safety):
 - ✅ **P0-C** AI threat response Fight/Flee (Track C, after P0-A/B)
 - ✅ **P0-D** Snapshot + UI feedback — health bars, combat markers (Track B + Track A complete)
 - ✅ **P0-E** Test harness + balance smoke tests (Track B)
+
+Proof links:
+- Tests: `WorldSim.Runtime.Tests/CombatPrimitivesTests.cs`, `WorldSim.Runtime.Tests/SimulationHarnessTests.cs`
+- Manual: `Docs/Wave1-Manual-QA-Checklist.md` items 1-10
 
 **Parallelism:** D1 and C1 are **fully parallel** (zero file overlap).
 
@@ -89,6 +106,10 @@ Turn-gate legend (agent handoff safety):
 - ✅ **S2-B** Goal Bias Engine — timed bias engine + Track C integration (Track B + C)
 - ✅ **S2-C** Director State + tick integration + command endpoints (Track B)
 
+Proof links:
+- Tests: `WorldSim.Runtime.Tests/DomainModifierEngineTests.cs`, `WorldSim.Runtime.Tests/GoalBiasEngineTests.cs`, `WorldSim.Runtime.Tests/SimulationRuntimeDirectorStateTests.cs`
+- Manual: set `REFINERY_DIRECTOR_DAMPENING` and verify director snapshot/event feed state via runtime trigger path
+
 ### Sprint C2: Diplomacy & Territory (Track B -> C -> A)
 
 > Combat Plan > Phase 1 Sprint 2
@@ -99,9 +120,46 @@ Turn-gate legend (agent handoff safety):
 - ✅ **P1-D** Enemy sensing in AI + role system (Track B + C)
 - ✅ **P1-E** Diplomacy panel + territory overlay (Track A)
 
+Proof links:
+- Tests: `WorldSim.Runtime.Tests/RelationDynamicsTests.cs`, `WorldSim.Runtime.Tests/TerritoryMobilizationTests.cs`, `WorldSim.Runtime.Tests/RuntimeNpcBrainTests.cs`
+- Manual: enable `WORLDSIM_ENABLE_DIPLOMACY=true`, then verify `Ctrl+F1` diplomacy panel and `Ctrl+F7` territory overlay
+
 **Parallelism:** D2 and C2 are **parallel with caution** (MR-1).
 Both add fields to `WorldSnapshotBuilder` / `WorldRenderSnapshot`.
 Same Track B agent should handle both sprints' snapshot additions.
+
+---
+
+## Wave 2.5 — Closeout (Plan/Code Drift + Director Wiring)
+
+Reference: `Docs/Plans/Wave-2.5-Closeout-Plan.md`
+
+Purpose:
+- Close Wave 2 gaps found during post-implementation review.
+- Make Director v2 ops produce gameplay effects (effects/biases applied), and make diplomacy activatable in-app.
+- Align master plan contract examples with actual v2 contract shape.
+
+Classification:
+- Post-review closeout wave, not a new feature-family wave.
+
+### Sprint X1: Director Wiring Closeout (Track D + Track B)
+
+- ✅ **W2.5-D1** Adapter translation carries v2 `effects`/`biases` payload into runtime commands
+- ✅ **W2.5-B1** Runtime applies beat effects via `DomainModifierEngine` (dampening + deterministic expiry)
+- ✅ **W2.5-B2** Runtime applies directive biases via `GoalBiasEngine` (dampening + deterministic expiry)
+- ✅ **W2.5-B3** Add minimal observability: `[Director]` event feed entries + snapshot debug fields
+
+### Sprint X2: Diplomacy Activation (Track B + Track A)
+
+- ✅ **W2.5-B4** Add app/runtime activation path for diplomacy (safe default OFF; env or hotkey)
+- ✅ **W2.5-A1** Fix UI/doc drift for diplomacy keybinds/legend
+
+### Sprint X3: Plan Consistency (Meta)
+
+- ✅ **W2.5-M1** Update Director master plan contract schema + wire examples to match current `WorldSim.Contracts/v2/`
+- ✅ **W2.5-M2** Update Combat master plan notes for keybind drift (suggested vs implemented)
+
+**Parallelism:** This wave is intentionally mostly sequential due to cross-file boundary wiring.
 
 ---
 

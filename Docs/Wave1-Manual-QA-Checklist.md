@@ -2,7 +2,7 @@
 
 **Scope:** Visual and runtime verification of all Wave 1 deliverables.
 **Build:** `dotnet build WorldSim.sln` must be green before starting.
-**Tests:** 65/65 passing (`dotnet test WorldSim.sln`) — confirmed 2026-03-02.
+**Tests:** full `dotnet test WorldSim.sln` gate must be green before manual QA.
 
 ---
 
@@ -61,7 +61,7 @@ dotnet run --project WorldSim.App
 | # | Action | Expected |
 |---|--------|----------|
 | 13 | Start Java service: `cd refinery-service-java && mvn spring-boot:run` | Service starts on configured port |
-| 14 | Trigger a director checkpoint (if runtime has a manual trigger key) | Story beat appears in HUD event feed; colony directive is applied |
+| 14 | Trigger a director checkpoint (if runtime has a manual trigger path) | Story beat appears in event feed; colony directive is applied |
 | 15 | Trigger same checkpoint again | Duplicate opId is ignored (idempotent); no duplicate beat in feed |
 
 ---
@@ -100,12 +100,11 @@ dotnet run --project WorldSim.App
 ## Pass criteria
 
 - All numbered items above produce expected behavior with no crashes, no exceptions, no visual corruption.
-- `dotnet test WorldSim.sln` returns 65/65 green after any code changes made during QA.
+- `dotnet test WorldSim.sln` returns fully green after any code changes made during QA.
 
 ---
 
 ## Known limitations (not bugs)
 
-- `TotalCombatEngagements` and predator kill counters are **non-deterministic** across runs (both `Person._rng` and `Animal._rng` use unseeded `new Random()`). This is a Wave 2 hardening item.
-- Director story beats and colony directives are **stub implementations** (stored but not yet biasing AI behavior). Full runtime effect wiring is Wave 2 (S2-A/B/C).
+- Runtime feature activation may depend on env toggles (`WORLDSIM_ENABLE_DIPLOMACY`, `WORLDSIM_ENABLE_COMBAT_PRIMITIVES`, `WORLDSIM_ENABLE_PREDATOR_ATTACKS`).
 - Person-vs-person damage loop does not exist yet (`CombatResolver.CalculateDamage` is defined but not called in production). Wave 2 territory.

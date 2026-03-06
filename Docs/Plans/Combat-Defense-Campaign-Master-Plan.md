@@ -530,7 +530,7 @@ public interface IDefensiveStructure
 }
 ```
 
-Diplomacy stance model:
+Diplomacy stance model (original reference target):
 
 ```csharp
 namespace WorldSim.Runtime.Simulation.Diplomacy;
@@ -587,6 +587,10 @@ Suggested new hotkeys (avoid existing bindings):
 - F12: toggle Siege overlay (or cycle overlays)
 
 Keybinds are not a shipped UX requirement; they are primarily for dev/test observability.
+
+Implementation overrides:
+- Source of truth for current dev bindings is `WorldSim.App/GameHost.cs`.
+- Current implementation override: `Ctrl+F1` = Diplomacy panel, `Ctrl+F7` = Territory overlay.
 
 ### 4.5 Resolved design decision: Roles vs Professions (Warrior representation)
 
@@ -705,19 +709,31 @@ Ownership rules:
 - Contested(t) if `maxInfluence - secondInfluence <= contestedThreshold`.
 - Suggested `contestedThreshold = 2.0`.
 
+Perf note:
+- Current implementation recomputes territory ownership every tick as a full-map scan.
+- Target behavior for this plan remains periodic recompute (recommended every 10-20 ticks, or dirty-region later).
+- Treat the current per-tick scan as accepted Wave 2 behavior but explicit perf debt.
+
 ### 5.4 Diplomacy state machine (Phase 1)
+
+Design decision (current implementation):
+- `Stance` is a faction-pair diplomacy value with 3 states: `Neutral`, `Hostile`, `War`.
+- `ColonyWarState` is a per-colony mobilization value with 3 states: `Peace`, `Tense`, `War`.
+- `ColonyWarState.Tense` is not the same concept as a `Stance.Tense` value; the latter does not exist in the
+  current runtime model.
+- The older 5-value stance ladder (`Friendly/Neutral/Tense/Hostile/War`) is retained here only as a historical
+  design target and can return in Phase 3+ if trade/alliance mechanics justify it.
 
 Stance progression is a state machine with timers and triggers.
 
 ```text
-Friendly <-> Neutral <-> Tense <-> Hostile <-> War
+Neutral <-> Hostile <-> War
 
 Triggers (examples):
-- Contested border sustained -> Tense
-- Raid success / repeated skirmishes -> Hostile
+- Contested border sustained / repeated skirmishes -> Hostile
 - Hostile sustained + war score delta -> War
 - War cooldown + war score stabilization -> Hostile
-- Peace time + no contested tiles -> Tense/Neutral
+- Peace time + no contested tiles -> Neutral
 ```
 
 Hard rules (recommended):
@@ -1105,16 +1121,20 @@ Acceptance:
 
 Tasks:
 
-- Add a Diplomacy panel rendering a 4x4 stance matrix.
+- Add a Diplomacy panel rendering a faction-level stance matrix (axis source must be faction ids, not colony ids).
 - Add a territory overlay that colors tiles by `OwnerFaction` and marks contested tiles.
-- Suggested keybinds:
+- Suggested keybinds (implementation may override):
   - F2: Diplomacy panel
   - F5: Territory overlay
+
+Note:
+- The current implementation uses `Ctrl+F1` (Diplomacy panel) and `Ctrl+F7` (Territory overlay).
 
 Acceptance:
 
 - Stance changes are observable without debugging logs.
 - Contested tiles are visually obvious.
+- Panel axis labels are sourced from faction identity consistently with `FactionStances` snapshot data.
 
 #### Sprint 2 DoD
 

@@ -147,7 +147,7 @@ Step 4: CANDIDATE GENERATION (Java)
 Step 5: RESPONSE
   Java service returns validated PatchResponse:
     ops: [ addStoryBeat {...}, setColonyDirective {...} ]
-    explain: { stage, outputMode, warnings, retryCount }
+    explain: ["directorStage:<stage>", "directorOutputMode:<mode>", ...]
 
 Step 6: TRANSLATION (C# Adapter)
   PatchCommandTranslation converts ops to runtime commands:
@@ -168,6 +168,10 @@ Step 8: VISUALIZATION
     - Event feed entries (narrative text)
     - HUD status indicators (active beat, active directive, stage marker)
     - Debug overlay (effect intensities, timers, budget spent)
+
+Current implementation note:
+- The end-to-end app trigger key is not yet wired in `GameHost`; Phase 0-1 verification primarily uses
+  parser/adapter/runtime tests and direct runtime execution paths. Future GameHost hotkey wiring remains valid scope.
 ```
 
 ### 2.2 Component Responsibility Map
@@ -844,31 +848,78 @@ Java parity:
 SEASON_DIRECTOR_CHECKPOINT
 ```
 
-### 8.3 Op: addStoryBeat Schema
+### 8.3.1 Phase 0-1 Minimal Contract: addStoryBeat
 
 ```csharp
-// WorldSim.Contracts/v2/DirectorOps.cs
-public sealed record AddStoryBeatOp(
-    string OpId,
-    string Severity,         // "minor" | "major" | "epic"
-    string BeatName,         // LLM-generated name (display/debug only)
-    string Narrative,        // LLM-generated narrative text
-    IReadOnlyList<EffectEntry> Effects,
-    CausalChainEntry? CausalChain  // Phase 3+, nullable
-) : IDirectorOp;
+// WorldSim.Contracts/v2/DirectorOps.cs (current implementation)
+public sealed record AddStoryBeatOp : PatchOp
+{
+    public required string BeatId { get; init; }
+    public required string Text { get; init; }
+    public required long DurationTicks { get; init; }
+    public IReadOnlyList<EffectEntry>? Effects { get; init; }
+}
 ```
 
-### 8.4 Op: setColonyDirective Schema
+Note:
+- Phase 0-1 uses a minimal payload (`beatId`, `text`, `durationTicks`) plus optional `effects`.
+- Beat severity/name/narrative/target fields are design-intent for later phases; until Sprint 3 (S3-A), severity
+  is treated as a runtime policy rather than a contract field.
+- `PatchOp.OpId` remains the transport-level unique id and dedupe key.
+- `BeatId` is the semantic/runtime beat identifier and may appear in debug/UI text, but is not the dedupe key.
+
+### 8.3.2 Phase 3+ Enriched Contract: addStoryBeat (planned)
+
+Planned additive fields once the LLM-driven narrative layer becomes contract-visible:
 
 ```csharp
-// WorldSim.Contracts/v2/DirectorOps.cs
-public sealed record SetColonyDirectiveOp(
-    string OpId,
-    string DirectiveName,    // LLM-generated name (display/debug only)
-    IReadOnlyList<GoalBiasEntry> Biases,
-    int DurationTicks,
-    string Target            // "colony:primary" | "colony:<id>"
-) : IDirectorOp;
+public sealed record AddStoryBeatOpVNext : PatchOp
+{
+    public required string BeatId { get; init; }
+    public required string Text { get; init; }
+    public required long DurationTicks { get; init; }
+    public string? Severity { get; init; }      // optional until the enriched contract becomes mandatory
+    public string? BeatName { get; init; }      // display/debug only
+    public string? Narrative { get; init; }     // richer text than Text if needed
+    public string? Target { get; init; }        // reserved for future scope
+    public IReadOnlyList<EffectEntry>? Effects { get; init; }
+}
+```
+
+### 8.4.1 Phase 0-1 Minimal Contract: setColonyDirective
+
+```csharp
+// WorldSim.Contracts/v2/DirectorOps.cs (current implementation)
+public sealed record SetColonyDirectiveOp : PatchOp
+{
+    public required int ColonyId { get; init; }
+    public required string Directive { get; init; }
+    public required long DurationTicks { get; init; }
+    public IReadOnlyList<GoalBiasEntry>? Biases { get; init; }
+}
+```
+
+Note:
+- In Phase 0-1, `directive` may be treated as a known directive identifier.
+- In Phase 1+, the long-term intent is: directive name is display/debug only, and the actual behavior is carried
+  by `biases` (goal bias compositions).
+- `PatchOp.OpId` remains the transport-level unique id and dedupe key.
+- `Directive` is the semantic/runtime directive identifier.
+
+### 8.4.2 Phase 3+ Enriched Contract: setColonyDirective (planned)
+
+Planned additive fields once directives carry richer LLM-facing metadata:
+
+```csharp
+public sealed record SetColonyDirectiveOpVNext : PatchOp
+{
+    public required int ColonyId { get; init; }
+    public required string Directive { get; init; }
+    public required long DurationTicks { get; init; }
+    public string? DirectiveName { get; init; } // display/debug only
+    public string? Target { get; init; }        // reserved for future scope
+    public IReadOnlyList<GoalBiasEntry>? Biases { get; init; }
+}
 ```
 
 ### 8.5 Effect Vocabulary Types
@@ -1341,6 +1392,11 @@ USER PROMPT:
 
 The LLM returns a JSON candidate that the `DirectorCandidateParser` deserializes:
 
+Important:
+- This is the internal LLM/refinery candidate format.
+- The candidate's `explanation` field is not the same thing as the wire-level PatchResponse `explain` field.
+- PatchResponse `explain` stays a marker-oriented `IReadOnlyList<string>` in the current contract.
+
 ```json
 {
   "explanation": "The colony is struggling with food. A drought event creates narrative tension and a food directive helps them respond.",
@@ -1415,8 +1471,12 @@ Director output is independently toggleable:
 
 Controlled via:
 - Java: `planner.director.outputMode` config property
-- C#: `REFINERY_DIRECTOR_OUTPUT_MODE` env var (adapter-level override)
+- C#: future adapter-level override (not enforced in the current C# runtime path)
 - Future: per-request constraint in payload
+
+Current scope note:
+- In the current implementation, output mode is primarily a planning/wire concern and may appear in explain markers.
+- Enforced `both/story_only/nudge_only/off` behavior is Phase 2+ closeout scope unless explicitly implemented.
 
 ---
 
@@ -1507,6 +1567,10 @@ The Director state is tracked. The HUD shows director status. Effects are felt i
 
 **Track ownership:** Track D primary. Cross-track requests to Track B (runtime engines) and
 Track A (HUD) and Track C (AI bias integration).
+
+Closeout note:
+- If Phase 1 was implemented but the op payload wiring (effects/biases -> engines) or plan consistency drifted,
+  use `Docs/Plans/Wave-2.5-Closeout-Plan.md` as the coordinator-level patch plan.
 
 #### Sprint 2 — Epic S2-A: Domain Modifier Engine
 
@@ -2101,6 +2165,10 @@ This master plan directly implements the pattern described in `OnlabRefineryDocu
 }
 ```
 
+Note:
+- Per-request `constraints.outputMode` / `constraints.maxBudget` are design targets.
+- In the current C# implementation, output mode is not yet enforced at runtime; treat these as planner-side hints until Phase 2+ closes the loop.
+
 ### A.2 Director Checkpoint Response (Mock, Phase 0)
 
 ```json
@@ -2110,30 +2178,29 @@ This master plan directly implements the pattern described in `OnlabRefineryDocu
     {
       "op": "addStoryBeat",
       "opId": "beat-mock-tick480-abc123",
-      "severity": "minor",
-      "beatName": "Summer Breeze",
-      "narrative": "A warm breeze carries the scent of wildflowers through the settlement.",
+      "beatId": "BEAT_SUMMER_BREEZE",
+      "text": "A warm breeze carries the scent of wildflowers through the settlement.",
+      "durationTicks": 20,
       "effects": []
     },
     {
       "op": "setColonyDirective",
       "opId": "dir-mock-tick480-def456",
-      "directiveName": "BoostIndustry",
+      "colonyId": 0,
+      "directive": "BoostIndustry",
+      "durationTicks": 25,
       "biases": [
         { "type": "goal_bias", "goalCategory": "crafting", "weight": 0.15 },
         { "type": "goal_bias", "goalCategory": "building", "weight": 0.10 }
-      ],
-      "durationTicks": 25,
-      "target": "colony:primary"
+      ]
     }
   ],
-  "explain": {
-    "directorStage": "mock",
-    "directorOutputMode": "both",
-    "retryCount": 0,
-    "budgetUsed": 1.875,
-    "warnings": []
-  }
+  "explain": [
+    "directorStage:mock",
+    "directorOutputMode:both",
+    "retryCount:0",
+    "budgetUsed:1.875"
+  ]
 }
 ```
 
@@ -2146,33 +2213,33 @@ This master plan directly implements the pattern described in `OnlabRefineryDocu
     {
       "op": "addStoryBeat",
       "opId": "beat-llm-tick960-ghi789",
-      "severity": "major",
-      "beatName": "The Whispering Blight",
-      "narrative": "Dark tendrils spread across the eastern fields overnight. Crops touched by the blight wither within hours. The elders speak of an ancient curse awakened by the summer storms.",
+      "beatId": "BEAT_WHISPERING_BLIGHT",
+      "text": "Dark tendrils spread across the eastern fields overnight. Crops touched by the blight wither within hours.",
+      "durationTicks": 25,
       "effects": [
-        { "type": "domain_modifier", "domain": "food", "modifier": -0.12, "durationTicks": 20 },
-        { "type": "domain_modifier", "domain": "morale", "modifier": -0.05, "durationTicks": 15 }
+        { "type": "domain_modifier", "domain": "food", "modifier": -0.12, "durationTicks": 25 },
+        { "type": "domain_modifier", "domain": "morale", "modifier": -0.05, "durationTicks": 25 }
       ]
     },
     {
       "op": "setColonyDirective",
       "opId": "dir-llm-tick960-jkl012",
-      "directiveName": "Emergency Harvest and Containment",
+      "colonyId": 0,
+      "directive": "Emergency Harvest and Containment",
+      "durationTicks": 25,
       "biases": [
         { "type": "goal_bias", "goalCategory": "farming", "weight": 0.20 },
         { "type": "goal_bias", "goalCategory": "gathering", "weight": 0.25 }
-      ],
-      "durationTicks": 25,
-      "target": "colony:primary"
+      ]
     }
   ],
-  "explain": {
-    "directorStage": "llm",
-    "directorOutputMode": "both",
-    "retryCount": 1,
-    "budgetUsed": 3.975,
-    "warnings": ["Initial LLM proposal had modifier -0.45, clamped by retry"]
-  }
+  "explain": [
+    "directorStage:llm",
+    "directorOutputMode:both",
+    "retryCount:1",
+    "budgetUsed:3.975",
+    "warning:Initial LLM proposal had modifier -0.45, clamped by retry"
+  ]
 }
 ```
 
@@ -2185,21 +2252,28 @@ This master plan directly implements the pattern described in `OnlabRefineryDocu
     {
       "op": "addStoryBeat",
       "opId": "beat-fallback-tick1440-mno345",
-      "severity": "minor",
-      "beatName": "A Quiet Day",
-      "narrative": "The settlement goes about its routine. Nothing remarkable happens, yet there is comfort in the ordinary.",
+      "beatId": "BEAT_QUIET_DAY",
+      "text": "The settlement goes about its routine. Nothing remarkable happens, yet there is comfort in the ordinary.",
+      "durationTicks": 20,
       "effects": []
     }
   ],
-  "explain": {
-    "directorStage": "fallback",
-    "directorOutputMode": "both",
-    "retryCount": 5,
-    "budgetUsed": 0,
-    "warnings": ["LLM retries exhausted, using deterministic fallback"]
-  }
+  "explain": [
+    "directorStage:fallback",
+    "directorOutputMode:both",
+    "retryCount:5",
+    "budgetUsed:0",
+    "warning:LLM retries exhausted, using deterministic fallback"
+  ]
 }
 ```
+
+Canonical explain markers for Phase 0-1:
+- `directorStage:<mock|refinery-validated|llm|fallback>`
+- `directorOutputMode:<both|story_only|nudge_only|off>`
+- `retryCount:<n>`
+- `budgetUsed:<decimal>`
+- optional repeated `warning:<text>` entries
 
 ---
 
