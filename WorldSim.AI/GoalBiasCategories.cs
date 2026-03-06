@@ -20,6 +20,8 @@ public static class GoalBiasCategories
         return goalName switch
         {
             "DefendSelf" => context.BiasMilitary,
+            "BuildDefenses" => Math.Max(context.BiasBuilding, context.BiasMilitary),
+            "RaidBorder" => context.BiasMilitary,
             "GatherWood" => context.BiasGathering,
             "GatherStone" => context.BiasGathering,
             "StabilizeResources" => Math.Max(context.BiasGathering, context.BiasCrafting),

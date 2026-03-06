@@ -12,6 +12,10 @@ public enum NpcCommand
     Rest,
     BuildHouse,
     CraftTools,
+    BuildWall,
+    BuildWatchtower,
+    RaidBorder,
+    AttackStructure,
     Fight,
     Flee
 }

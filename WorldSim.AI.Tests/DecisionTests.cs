@@ -361,6 +361,71 @@ public class DecisionTests
         Assert.True(ThreatDecisionPolicy.ShouldPrioritizeDefense(context));
     }
 
+    [Fact]
+    public void SimplePlanner_BuildDefenses_UsesFortificationCommands_WhenHostile()
+    {
+        var planner = new SimplePlanner();
+        planner.SetGoal(new Goal("BuildDefenses"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 12f,
+            Hunger: 22f,
+            Stamina: 75f,
+            HomeWood: 20,
+            HomeStone: 8,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 12,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            IsHostileStance: true);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.BuildWatchtower, decision.Command);
+    }
+
+    [Fact]
+    public void GoapPlanner_RaidBorder_PrefersRaid_ForWarriorInWar()
+    {
+        var planner = new GoapPlanner();
+        planner.SetGoal(new Goal("RaidBorder"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 14f,
+            Hunger: 18f,
+            Stamina: 84f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 6,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 88f,
+            Strength: 16,
+            Defense: 14,
+            IsWarStance: true,
+            IsContestedTile: true,
+            IsWarriorRole: true,
+            NearbyEnemyCount: 0,
+            LocalThreatScore: 0.5f);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.RaidBorder, decision.Command);
+    }
+
     private sealed class FixedConsideration : Consideration
     {
         private readonly float _value;

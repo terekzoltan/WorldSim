@@ -84,7 +84,7 @@ public abstract class Animal
             nx = Math.Clamp(nx, 0, w.Width - 1);
             ny = Math.Clamp(ny, 0, w.Height - 1);
 
-            if (w.GetTile(nx, ny).Ground != Ground.Water)
+            if (!w.IsMovementBlocked(nx, ny, moverColonyId: -1))
             {
                 cx = nx;
                 cy = ny;
@@ -268,6 +268,7 @@ public sealed class Predator : Animal
     private const float MaxAgeYears = 95f;
 
     private float _age;
+    private float _hp = 40f;
     private float _energy = 100f;
     private bool _reportedDeath;
 
@@ -283,12 +284,7 @@ public sealed class Predator : Animal
 
         if (_age > MaxAgeYears || _energy <= 0f)
         {
-            IsAlive = false;
-            if (!_reportedDeath)
-            {
-                _reportedDeath = true;
-                w.ReportPredatorDeath();
-            }
+            MarkDead(w);
             return;
         }
 
@@ -364,5 +360,27 @@ public sealed class Predator : Animal
         }
 
         return false;
+    }
+
+    internal void ApplyTowerDamage(World w, float damage)
+    {
+        if (!IsAlive || damage <= 0f)
+            return;
+
+        _hp -= damage;
+        if (_hp > 0f)
+            return;
+
+        MarkDead(w);
+    }
+
+    private void MarkDead(World w)
+    {
+        IsAlive = false;
+        if (_reportedDeath)
+            return;
+
+        _reportedDeath = true;
+        w.ReportPredatorDeath();
     }
 }

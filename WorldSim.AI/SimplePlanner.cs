@@ -22,6 +22,14 @@ public sealed class SimplePlanner : IPlanner
         var command = _goal.Name switch
         {
             "DefendSelf" => ThreatDecisionPolicy.ShouldFight(context) ? NpcCommand.Fight : NpcCommand.Flee,
+            "BuildDefenses" => context.HomeWood >= 16 && context.HomeStone >= 6
+                ? NpcCommand.BuildWatchtower
+                : (context.HomeWood >= 8 ? NpcCommand.BuildWall : NpcCommand.GatherWood),
+            "RaidBorder" => context.IsWarriorRole
+                ? (context.NearbyEnemyCount > 0 && ThreatDecisionPolicy.ShouldFight(context)
+                    ? NpcCommand.Fight
+                    : NpcCommand.RaidBorder)
+                : NpcCommand.Flee,
             "GatherWood" => NpcCommand.GatherWood,
             "GatherStone" => NpcCommand.GatherStone,
             "SecureFood" => context.Hunger >= 68f && context.HomeFood > 0 ? NpcCommand.EatFood : NpcCommand.GatherFood,

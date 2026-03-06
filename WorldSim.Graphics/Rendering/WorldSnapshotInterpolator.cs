@@ -15,6 +15,7 @@ public static class WorldSnapshotInterpolator
             current.Tiles,
             current.Houses,
             current.SpecializedBuildings,
+            current.DefensiveStructures,
             InterpolatePeople(previous.People, current.People, alpha),
             InterpolateAnimals(previous.Animals, current.Animals, alpha),
             current.Colonies,
@@ -22,7 +23,8 @@ public static class WorldSnapshotInterpolator
             current.Ecology,
             current.CurrentSeason,
             current.IsDroughtActive,
-            current.RecentEvents);
+            current.RecentEvents,
+            current.Director);
     }
 
     private static IReadOnlyList<PersonRenderData> InterpolatePeople(IReadOnlyList<PersonRenderData> previous, IReadOnlyList<PersonRenderData> current, float alpha)

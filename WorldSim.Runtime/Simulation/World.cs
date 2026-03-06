@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
 
@@ -33,6 +34,7 @@ namespace WorldSim.Simulation
         public List<Colony> _colonies = new();
         public List<House> Houses = new();
         public List<SpecializedBuilding> SpecializedBuildings = new();
+        public List<DefensiveStructure> DefensiveStructures = new();
         public List<Animal> _animals = new();
 
         // Technology-affected properties
@@ -92,7 +94,9 @@ namespace WorldSim.Simulation
         readonly Dictionary<(Faction left, Faction right), Stance> _factionStances = new();
         readonly Dictionary<(Faction left, Faction right), int> _contestedTilesByFactionPair = new();
         readonly RelationManager _relationManager = new();
+        readonly DefenseManager _defenseManager = new();
         int _navigationTopologyVersion;
+        int _nextDefenseStructureId = 1;
 
         float _simulationTimeSeconds;
         int _tickCounter;
@@ -244,6 +248,8 @@ namespace WorldSim.Simulation
 
             foreach (Colony c in _colonies) c.Update(this, dt);
 
+            _defenseManager.Tick(this, dt);
+
             _foodParityTimer += dt;
             if (_foodParityTimer >= FoodParityPeriod)
             {
@@ -308,6 +314,85 @@ namespace WorldSim.Simulation
             SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
             _navigationTopologyVersion++;
         }
+
+        public bool TryAddWoodWall(Colony colony, (int x, int y) pos)
+        {
+            if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
+                return false;
+
+            DefensiveStructures.Add(new WoodWallSegment(_nextDefenseStructureId++, colony, pos));
+            _navigationTopologyVersion++;
+            return true;
+        }
+
+        public bool TryAddWatchtower(Colony colony, (int x, int y) pos)
+        {
+            if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
+                return false;
+
+            DefensiveStructures.Add(new Watchtower(_nextDefenseStructureId++, colony, pos));
+            _navigationTopologyVersion++;
+            return true;
+        }
+
+        public bool TryDamageDefensiveStructure((int x, int y) pos, float damage)
+        {
+            var structure = DefensiveStructures.FirstOrDefault(s => s.Pos == pos && !s.IsDestroyed);
+            if (structure == null)
+                return false;
+
+            structure.ApplyDamage(damage);
+            if (structure.IsDestroyed)
+                _navigationTopologyVersion++;
+            return true;
+        }
+
+        internal void RemoveDestroyedDefensiveStructures()
+        {
+            int before = DefensiveStructures.Count;
+            DefensiveStructures.RemoveAll(s => s.IsDestroyed);
+            if (DefensiveStructures.Count != before)
+                _navigationTopologyVersion++;
+        }
+
+        public bool IsMovementBlocked(int x, int y, int moverColonyId)
+        {
+            if (!InBounds(x, y))
+                return true;
+
+            if (GetTile(x, y).Ground == Ground.Water)
+                return true;
+
+            if (Houses.Any(h => h.Pos.x == x && h.Pos.y == y))
+                return true;
+
+            if (SpecializedBuildings.Any(b => b.Pos.x == x && b.Pos.y == y))
+                return true;
+
+            var defense = DefensiveStructures.FirstOrDefault(s => s.Pos.x == x && s.Pos.y == y && !s.IsDestroyed);
+            if (defense == null)
+                return false;
+
+            if (moverColonyId < 0)
+                return true;
+
+            if (defense.Owner.Id == moverColonyId)
+                return false;
+
+            var moverColony = _colonies.FirstOrDefault(c => c.Id == moverColonyId);
+            if (moverColony == null)
+                return true;
+
+            return moverColony.Faction != defense.Owner.Faction;
+        }
+
+        private bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
+
+        private bool IsOccupiedByStructure(int x, int y)
+            => Houses.Any(h => h.Pos.x == x && h.Pos.y == y)
+               || SpecializedBuildings.Any(b => b.Pos.x == x && b.Pos.y == y)
+               || DefensiveStructures.Any(s => s.Pos.x == x && s.Pos.y == y && !s.IsDestroyed);
+
         internal RuntimeNpcBrain CreateNpcBrain(Colony colony) => _brainFactory(colony);
 
         public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;
@@ -386,6 +471,11 @@ namespace WorldSim.Simulation
         {
             _factionStances[(left, right)] = stance;
             _factionStances[(right, left)] = stance;
+        }
+
+        public void RegisterRaidImpact(Faction attacker, Faction defender, double pressureBoost = 60d)
+        {
+            _relationManager.RegisterRaidImpact(attacker, defender, pressureBoost);
         }
 
         public IReadOnlyList<FactionStanceState> GetFactionStanceMatrix()
@@ -985,7 +1075,8 @@ namespace WorldSim.Simulation
                     continue;
 
                 bool occupied = Houses.Any(h => h.Pos.x == x && h.Pos.y == y) ||
-                                SpecializedBuildings.Any(b => b.Pos.x == x && b.Pos.y == y);
+                                SpecializedBuildings.Any(b => b.Pos.x == x && b.Pos.y == y) ||
+                                DefensiveStructures.Any(s => s.Pos.x == x && s.Pos.y == y && !s.IsDestroyed);
                 if (!occupied)
                     return (x, y);
             }

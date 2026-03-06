@@ -118,6 +118,38 @@ public sealed class LowHealthConsideration : Consideration
     }
 }
 
+public sealed class HostileStanceConsideration : Consideration
+{
+    public override float Evaluate(in NpcAiContext context)
+    {
+        if (context.IsWarStance)
+            return 1f;
+        if (context.IsHostileStance)
+            return 0.75f;
+        return 0f;
+    }
+}
+
+public sealed class ContestedZoneConsideration : Consideration
+{
+    public override float Evaluate(in NpcAiContext context)
+    {
+        if (context.IsContestedTile)
+            return 1f;
+        if (context.HasContestedTilesNearby)
+            return 0.7f;
+        return 0f;
+    }
+}
+
+public sealed class WarriorRoleConsideration : Consideration
+{
+    public override float Evaluate(in NpcAiContext context)
+    {
+        return context.IsWarriorRole ? 1f : 0f;
+    }
+}
+
 public sealed class InvertedConsideration : Consideration
 {
     private readonly Consideration _inner;

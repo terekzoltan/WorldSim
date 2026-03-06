@@ -38,6 +38,17 @@ public sealed class RelationManager
         }
     }
 
+    public void RegisterRaidImpact(Faction attacker, Faction defender, double pressureBoost = 60d)
+    {
+        if (attacker == defender)
+            return;
+
+        var key = NormalizePair(attacker, defender);
+        var currentScore = _pressureScores.GetValueOrDefault(key, 0d);
+        _pressureScores[key] = Math.Clamp(Math.Max(currentScore, 55d) + pressureBoost, 0d, 220d);
+        _stanceCooldownTicks[key] = Math.Max(_stanceCooldownTicks.GetValueOrDefault(key, 0), 90);
+    }
+
     private static Stance ResolveTargetStance(double score)
     {
         if (score >= 120d)

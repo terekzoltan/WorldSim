@@ -64,6 +64,10 @@ public sealed class RuntimeNpcBrain
             NpcCommand.Rest => Job.Rest,
             NpcCommand.BuildHouse => Job.BuildHouse,
             NpcCommand.CraftTools => Job.CraftTools,
+            NpcCommand.BuildWall => Job.BuildWall,
+            NpcCommand.BuildWatchtower => Job.BuildWatchtower,
+            NpcCommand.RaidBorder => Job.RaidBorder,
+            NpcCommand.AttackStructure => Job.AttackStructure,
             NpcCommand.Fight => Job.Fight,
             NpcCommand.Flee => Job.Flee,
             _ => Job.Idle

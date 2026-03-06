@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using WorldSim.AI;
 using WorldSim.Simulation.Effects;
+using WorldSim.Simulation.Navigation;
 
 namespace WorldSim.Simulation;
 
@@ -18,6 +19,10 @@ public enum Job
     Rest,
     BuildHouse,
     CraftTools,
+    BuildWall,
+    BuildWatchtower,
+    RaidBorder,
+    AttackStructure,
     Fight,
     Flee
 }
@@ -64,6 +69,12 @@ public class Person
     const int RestWorkTime = 4;
     const int BuildHouseTime = 20;
     const int CraftToolsTime = 14;
+    const int BuildWallTime = 8;
+    const int BuildWatchtowerTime = 16;
+    const int WallWoodCost = 8;
+    const int WatchtowerWoodCost = 16;
+    const int WatchtowerStoneCost = 6;
+    const float StructureRaidDamage = 26f;
     const float AgingTickDivisor = 90f;
 
     int _doingJob = 0; // csinalni hogy ideig dolgozzon ne instant
@@ -73,6 +84,12 @@ public class Person
     float _loiterThresholdSeconds; // randomized per person
     (int x, int y) _lastPos;
     float _combatMarkerSeconds;
+    readonly NavigationPathCache _pathCache = new();
+    int _unstickStepsRemaining;
+
+    const int PathCacheHorizon = 12;
+    const int PathMaxExpansions = 4096;
+    const int UnstickSteps = 3;
 
     private Person(Colony home, (int, int) pos, bool newborn, RuntimeNpcBrain brain, Random rng)
     {
@@ -367,6 +384,22 @@ public class Person
                         }
                         break;
 
+                    case Job.BuildWall:
+                        ExecuteBuildWallAction(w);
+                        break;
+
+                    case Job.BuildWatchtower:
+                        ExecuteBuildWatchtowerAction(w);
+                        break;
+
+                    case Job.RaidBorder:
+                        ExecuteRaidBorderAction(w);
+                        break;
+
+                    case Job.AttackStructure:
+                        ExecuteAttackStructureAction(w);
+                        break;
+
                     case Job.GatherFood:
                         if (w.TryHarvest(Pos, Resource.Food, 1))
                             _home.Stock[Resource.Food] += GetGatherAmount(w, Resource.Food, w.FoodYield);
@@ -400,7 +433,8 @@ public class Person
                         break;
                 }
 
-                Current = Job.Idle;
+                if (_doingJob <= 0)
+                    Current = Job.Idle;
             }
         }
         else if (Current == Job.Idle)
@@ -549,6 +583,10 @@ public class Person
                     Job.Rest        => ComputeTicks(RestWorkTime, w, isHeavyWork: false),
                     Job.BuildHouse  => Math.Max(1, (int)MathF.Ceiling(BuildHouseTime / w.WorkEfficiencyMultiplier)),
                     Job.CraftTools  => ComputeTicks(CraftToolsTime, w, isHeavyWork: true),
+                    Job.BuildWall => ComputeTicks(BuildWallTime, w, isHeavyWork: true),
+                    Job.BuildWatchtower => ComputeTicks(BuildWatchtowerTime, w, isHeavyWork: true),
+                    Job.RaidBorder => 1,
+                    Job.AttackStructure => 1,
                     Job.Fight       => 1,
                     Job.Flee        => 1,
                     _ => 0
@@ -632,6 +670,9 @@ public class Person
         switch (Profession)
         {
             case Profession.Builder:
+                if (TryStartDefenseConstruction(w))
+                    return true;
+
                 if (_home.ToolCharges <= 2 && _home.Stock[Resource.Iron] >= 2 && _home.Stock[Resource.Wood] >= 2)
                 {
                     Current = Job.CraftTools;
@@ -677,6 +718,34 @@ public class Person
         return false;
     }
 
+    bool TryStartDefenseConstruction(World w)
+    {
+        var warState = w.GetColonyWarState(_home.Id);
+        bool hasHostileStance = w._colonies.Any(colony =>
+            colony != _home
+            && w.GetFactionStance(_home.Faction, colony.Faction) >= WorldSim.Simulation.Diplomacy.Stance.Hostile);
+        if (warState == ColonyWarState.Peace && !hasHostileStance)
+            return false;
+
+        if (_home.Stock[Resource.Wood] >= WatchtowerWoodCost
+            && _home.Stock[Resource.Stone] >= WatchtowerStoneCost
+            && CountOwnWatchtowers(w) < Math.Max(1, _home.HouseCount / 2))
+        {
+            Current = Job.BuildWatchtower;
+            _doingJob = ComputeTicks(BuildWatchtowerTime, w, isHeavyWork: true);
+            return true;
+        }
+
+        if (_home.Stock[Resource.Wood] >= WallWoodCost)
+        {
+            Current = Job.BuildWall;
+            _doingJob = ComputeTicks(BuildWallTime, w, isHeavyWork: true);
+            return true;
+        }
+
+        return false;
+    }
+
     bool TryHandleThreatResponse(World w, float dt)
     {
         var context = BuildThreatContext(w);
@@ -686,12 +755,14 @@ public class Person
         if (!hasImmediateThreats && !shouldDefend)
             return false;
 
-        int nearbyPredators = CountNearbyPredators(w, radius: 4);
-        int nearbyHostiles = CountNearbyHostilePeople(w, radius: 4);
-
         var next = _brain.Think(this, w, dt);
-        if (next != Job.Fight && next != Job.Flee)
-            next = ThreatDecisionPolicy.ShouldFight(context) ? Job.Fight : Job.Flee;
+        if (next != Job.Fight && next != Job.Flee && next != Job.RaidBorder)
+        {
+            if (context.IsWarriorRole && context.IsWarStance && (context.IsContestedTile || context.HasContestedTilesNearby))
+                next = Job.RaidBorder;
+            else
+                next = ThreatDecisionPolicy.ShouldFight(context) ? Job.Fight : Job.Flee;
+        }
 
         bool hasFactionThreat =
             context.NearbyEnemyCount > 0 ||
@@ -867,6 +938,85 @@ public class Person
         Wander(w);
     }
 
+    void ExecuteBuildWallAction(World w)
+    {
+        if (_home.Stock[Resource.Wood] < WallWoodCost)
+            return;
+
+        var spot = FindDefensePlacement(w, preferContested: true);
+        if (spot == null)
+            return;
+
+        if (!w.TryAddWoodWall(_home, spot.Value))
+            return;
+
+        _home.Stock[Resource.Wood] -= WallWoodCost;
+        w.AddExternalEvent($"{_home.Name} raised a border wall");
+    }
+
+    void ExecuteBuildWatchtowerAction(World w)
+    {
+        if (_home.Stock[Resource.Wood] < WatchtowerWoodCost || _home.Stock[Resource.Stone] < WatchtowerStoneCost)
+            return;
+
+        var spot = FindDefensePlacement(w, preferContested: true);
+        if (spot == null)
+            return;
+
+        if (!w.TryAddWatchtower(_home, spot.Value))
+            return;
+
+        _home.Stock[Resource.Wood] -= WatchtowerWoodCost;
+        _home.Stock[Resource.Stone] -= WatchtowerStoneCost;
+        w.AddExternalEvent($"{_home.Name} completed a watchtower");
+    }
+
+    void ExecuteRaidBorderAction(World w)
+    {
+        var adjacentEnemyStructure = FindNearestEnemyStructure(w, radius: 1);
+        if (adjacentEnemyStructure != null)
+        {
+            Current = Job.AttackStructure;
+            _doingJob = 1;
+            return;
+        }
+
+        var target = FindRaidTarget(w);
+        if (target == null)
+            return;
+
+        var previous = Pos;
+        MoveTowards(w, target.Value, 1);
+        if (Pos != previous)
+            return;
+
+        var nearbyEnemyStructure = FindNearestEnemyStructure(w, radius: 2);
+        if (nearbyEnemyStructure != null)
+        {
+            Current = Job.AttackStructure;
+            _doingJob = 1;
+        }
+    }
+
+    void ExecuteAttackStructureAction(World w)
+    {
+        var target = FindNearestEnemyStructure(w, radius: 1);
+        if (target == null)
+            return;
+
+        w.ReportCombatEngagement();
+        var beforeDestroyed = target.Value.structure.IsDestroyed;
+        var damaged = w.TryDamageDefensiveStructure(target.Value.structure.Pos, StructureRaidDamage);
+        if (!damaged)
+            return;
+
+        if (!beforeDestroyed && target.Value.structure.IsDestroyed)
+        {
+            ApplyRaidSuccess(w, target.Value.structure.Owner);
+            w.AddExternalEvent($"{_home.Name} raiders destroyed {target.Value.structure.Owner.Name} defense");
+        }
+    }
+
     private NpcAiContext BuildThreatContext(World w)
     {
         var nearbyPredators = CountNearbyPredators(w, radius: 4);
@@ -957,6 +1107,117 @@ public class Person
         }
 
         return false;
+    }
+
+    private int CountOwnWatchtowers(World w)
+        => w.DefensiveStructures.Count(structure =>
+            structure.Owner == _home
+            && structure is WorldSim.Simulation.Defense.Watchtower
+            && !structure.IsDestroyed);
+
+    private (int x, int y)? FindDefensePlacement(World w, bool preferContested)
+    {
+        var origin = _home.Origin;
+        var candidates = new List<(int x, int y)>();
+        for (int dy = -6; dy <= 6; dy++)
+        {
+            for (int dx = -6; dx <= 6; dx++)
+            {
+                int dist = Math.Abs(dx) + Math.Abs(dy);
+                if (dist < 2 || dist > 6)
+                    continue;
+
+                int x = origin.x + dx;
+                int y = origin.y + dy;
+                if (x < 0 || y < 0 || x >= w.Width || y >= w.Height)
+                    continue;
+                if (w.GetTile(x, y).Ground == Ground.Water)
+                    continue;
+                if (w.IsMovementBlocked(x, y, _home.Id))
+                    continue;
+
+                candidates.Add((x, y));
+            }
+        }
+
+        if (candidates.Count == 0)
+            return null;
+
+        if (preferContested)
+        {
+            var contested = candidates
+                .OrderByDescending(pos => w.IsTileContested(pos.x, pos.y) ? 1 : 0)
+                .ThenBy(pos => Math.Abs(pos.x - Pos.x) + Math.Abs(pos.y - Pos.y))
+                .FirstOrDefault();
+            if (contested != default)
+                return contested;
+        }
+
+        return candidates[_rng.Next(candidates.Count)];
+    }
+
+    private (int x, int y)? FindRaidTarget(World w)
+    {
+        var nearestContested = FindNearestContestedTile(w, radius: 12);
+        if (nearestContested != null)
+        {
+            int owner = w.GetTileOwnerColonyId(nearestContested.Value.x, nearestContested.Value.y);
+            if (owner >= 0 && owner != _home.Id)
+                return nearestContested;
+        }
+
+        var structure = FindNearestEnemyStructure(w, radius: 10);
+        if (structure != null)
+            return structure.Value.structure.Pos;
+
+        var enemy = FindNearestHostilePerson(w, radius: 10);
+        return enemy?.person.Pos;
+    }
+
+    private (WorldSim.Simulation.Defense.DefensiveStructure structure, int dist)? FindNearestEnemyStructure(World w, int radius)
+    {
+        WorldSim.Simulation.Defense.DefensiveStructure? nearest = null;
+        int best = int.MaxValue;
+        foreach (var structure in w.DefensiveStructures)
+        {
+            if (structure.IsDestroyed || structure.Owner == _home || structure.Owner.Faction == _home.Faction)
+                continue;
+
+            int dist = Math.Abs(structure.Pos.x - Pos.x) + Math.Abs(structure.Pos.y - Pos.y);
+            if (dist <= radius && dist < best)
+            {
+                best = dist;
+                nearest = structure;
+            }
+        }
+
+        if (nearest == null)
+            return null;
+        return (nearest, best);
+    }
+
+    private void ApplyRaidSuccess(World w, Colony enemyColony)
+    {
+        if (enemyColony == _home)
+            return;
+
+        int foodLoot = Math.Min(3, enemyColony.Stock[Resource.Food]);
+        int woodLoot = Math.Min(2, enemyColony.Stock[Resource.Wood]);
+
+        enemyColony.Stock[Resource.Food] -= foodLoot;
+        enemyColony.Stock[Resource.Wood] -= woodLoot;
+        _home.Stock[Resource.Food] += foodLoot;
+        _home.Stock[Resource.Wood] += woodLoot;
+
+        var stance = w.GetFactionStance(_home.Faction, enemyColony.Faction);
+        if (stance < WorldSim.Simulation.Diplomacy.Stance.Hostile)
+            w.SetFactionStance(_home.Faction, enemyColony.Faction, WorldSim.Simulation.Diplomacy.Stance.Hostile);
+        else if (stance == WorldSim.Simulation.Diplomacy.Stance.Hostile)
+            w.SetFactionStance(_home.Faction, enemyColony.Faction, WorldSim.Simulation.Diplomacy.Stance.War);
+
+        w.RegisterRaidImpact(_home.Faction, enemyColony.Faction, pressureBoost: 65d);
+
+        w.AddExternalEvent($"{_home.Name} raid looted {foodLoot} food and {woodLoot} wood");
     }
 
     private (Person person, int dist)? FindNearestHostilePerson(World w, int radius)
@@ -1213,9 +1474,42 @@ public class Person
     {
         int remaining = Math.Max(1, maxStep);
         int cx = Pos.x, cy = Pos.y;
+        var grid = new NavigationGrid(w);
 
         while (remaining-- > 0 && (cx != target.x || cy != target.y))
         {
+            if (_unstickStepsRemaining > 0)
+            {
+                if (TryUnstickStep(w, ref cx, ref cy))
+                    _unstickStepsRemaining--;
+                else
+                    _unstickStepsRemaining = 0;
+                continue;
+            }
+
+            var topologyVersion = grid.TopologyVersion;
+            if (!_pathCache.IsValid(target, topologyVersion))
+                BuildPathCache(grid, (cx, cy), target, topologyVersion);
+
+            var next = _pathCache.PeekNext();
+            if (next.HasValue)
+            {
+                if (w.IsMovementBlocked(next.Value.x, next.Value.y, _home.Id))
+                {
+                    _pathCache.Invalidate();
+                    BuildPathCache(grid, (cx, cy), target, topologyVersion);
+                    next = _pathCache.PeekNext();
+                }
+
+                if (next.HasValue && !w.IsMovementBlocked(next.Value.x, next.Value.y, _home.Id))
+                {
+                    cx = next.Value.x;
+                    cy = next.Value.y;
+                    _pathCache.Advance();
+                    continue;
+                }
+            }
+
             int dx = target.x - cx;
             int dy = target.y - cy;
 
@@ -1228,18 +1522,82 @@ public class Person
             nx = Math.Clamp(nx, 0, w.Width - 1);
             ny = Math.Clamp(ny, 0, w.Height - 1);
 
-            if (w.GetTile(nx, ny).Ground != Ground.Water)
+            if (!w.IsMovementBlocked(nx, ny, _home.Id))
             {
                 cx = nx;
                 cy = ny;
+                _pathCache.Invalidate();
             }
             else
             {
-                break;
+                BuildPathCache(grid, (cx, cy), target, topologyVersion);
+                next = _pathCache.PeekNext();
+                if (next.HasValue && !w.IsMovementBlocked(next.Value.x, next.Value.y, _home.Id))
+                {
+                    cx = next.Value.x;
+                    cy = next.Value.y;
+                    _pathCache.Advance();
+                }
+                else
+                {
+                    break;
+                }
             }
         }
 
         Pos = (cx, cy);
+    }
+
+    void BuildPathCache(NavigationGrid grid, (int x, int y) start, (int x, int y) target, int topologyVersion)
+    {
+        var path = NavigationPathfinder.FindPath(
+            grid,
+            start,
+            target,
+            moverColonyId: _home.Id,
+            maxExpansions: PathMaxExpansions,
+            out var budgetExceeded);
+
+        if (budgetExceeded)
+        {
+            _pathCache.Invalidate();
+            _unstickStepsRemaining = UnstickSteps;
+            return;
+        }
+
+        if (path.Count <= 1)
+        {
+            _pathCache.Invalidate();
+            return;
+        }
+
+        var horizon = Math.Min(path.Count, PathCacheHorizon + 1);
+        _pathCache.Set(target, topologyVersion, path.Take(horizon).ToList());
+    }
+
+    bool TryUnstickStep(World w, ref int cx, ref int cy)
+    {
+        var candidates = new List<(int x, int y)>
+        {
+            (cx + 1, cy),
+            (cx - 1, cy),
+            (cx, cy + 1),
+            (cx, cy - 1)
+        };
+
+        foreach (var candidate in candidates.OrderBy(_ => _rng.Next()))
+        {
+            int nx = Math.Clamp(candidate.x, 0, w.Width - 1);
+            int ny = Math.Clamp(candidate.y, 0, w.Height - 1);
+            if (w.IsMovementBlocked(nx, ny, _home.Id))
+                continue;
+
+            cx = nx;
+            cy = ny;
+            return true;
+        }
+
+        return false;
     }
 
     void Wander(World w)
@@ -1250,7 +1608,7 @@ public class Person
         {
             int nx = Math.Clamp(Pos.x + _rng.Next(-moveDistance, moveDistance + 1), 0, w.Width - 1);
             int ny = Math.Clamp(Pos.y + _rng.Next(-moveDistance, moveDistance + 1), 0, w.Height - 1);
-            if (w.GetTile(nx, ny).Ground != Ground.Water)
+            if (!w.IsMovementBlocked(nx, ny, _home.Id))
             {
                 Pos = (nx, ny);
                 return;

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using WorldSim.Graphics.Assets;
@@ -57,6 +58,177 @@ public sealed class StructureRenderPass : IRenderPass
                     break;
             }
         }
+
+        DrawDefensiveStructures(spriteBatch, snapshot, textures, settings);
+        DrawTowerProjectiles(spriteBatch, snapshot, textures, settings);
+    }
+
+    private static void DrawDefensiveStructures(
+        SpriteBatch spriteBatch,
+        WorldRenderSnapshot snapshot,
+        TextureCatalog textures,
+        WorldRenderSettings settings)
+    {
+        foreach (var structure in snapshot.DefensiveStructures)
+        {
+            int tileX = structure.X * settings.TileSize;
+            int tileY = structure.Y * settings.TileSize;
+            var tileRect = new Rectangle(tileX, tileY, settings.TileSize, settings.TileSize);
+
+            if (structure.Kind == DefensiveStructureKindView.WoodWall)
+            {
+                DrawWoodWall(spriteBatch, textures.Pixel, tileRect);
+            }
+            else
+            {
+                DrawWatchtower(spriteBatch, textures.Pixel, tileRect);
+            }
+
+            DrawStructureHpBar(spriteBatch, textures.Pixel, settings, tileRect, structure.Hp, structure.MaxHp);
+        }
+    }
+
+    private static void DrawWoodWall(SpriteBatch spriteBatch, Texture2D pixel, Rectangle tileRect)
+    {
+        var fill = new Color(125, 91, 61);
+        var edge = new Color(79, 55, 36);
+        int height = Math.Max(2, tileRect.Height / 2);
+        int y = tileRect.Y + (tileRect.Height - height) / 2;
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, y, tileRect.Width, height), fill);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, y, tileRect.Width, 1), edge);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, y + height - 1, tileRect.Width, 1), edge);
+        for (int i = 1; i < tileRect.Width - 1; i += 2)
+            spriteBatch.Draw(pixel, new Rectangle(tileRect.X + i, y + 1, 1, Math.Max(1, height - 2)), edge * 0.7f);
+    }
+
+    private static void DrawWatchtower(SpriteBatch spriteBatch, Texture2D pixel, Rectangle tileRect)
+    {
+        var body = new Color(85, 94, 112);
+        var top = new Color(136, 149, 176);
+        int inset = Math.Max(1, tileRect.Width / 5);
+        var bodyRect = new Rectangle(tileRect.X + inset, tileRect.Y + inset, tileRect.Width - (2 * inset), tileRect.Height - inset);
+        spriteBatch.Draw(pixel, bodyRect, body);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, tileRect.Y, tileRect.Width, Math.Max(1, tileRect.Height / 3)), top);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, tileRect.Y, tileRect.Width, 1), Color.White * 0.35f);
+    }
+
+    private static void DrawStructureHpBar(
+        SpriteBatch spriteBatch,
+        Texture2D pixel,
+        WorldRenderSettings settings,
+        Rectangle tileRect,
+        float hp,
+        float maxHp)
+    {
+        if (maxHp <= 0f)
+            return;
+
+        float normalized = Math.Clamp(hp / maxHp, 0f, 1f);
+        if (normalized >= 0.995f)
+            return;
+
+        int width = Math.Max(settings.TileSize + 2, tileRect.Width);
+        int height = Math.Max(2, settings.TileSize / 3);
+        int x = tileRect.X + (tileRect.Width - width) / 2;
+        int y = tileRect.Y - height - 1;
+
+        spriteBatch.Draw(pixel, new Rectangle(x, y, width, height), new Color(16, 20, 26, 210));
+        int innerWidth = Math.Max(1, width - 2);
+        int fillWidth = Math.Clamp((int)MathF.Round(innerWidth * normalized), 1, innerWidth);
+        var fillColor = normalized switch
+        {
+            < 0.35f => new Color(214, 101, 88),
+            < 0.7f => new Color(235, 196, 109),
+            _ => new Color(136, 214, 147)
+        };
+        spriteBatch.Draw(pixel, new Rectangle(x + 1, y + 1, fillWidth, Math.Max(1, height - 2)), fillColor);
+    }
+
+    private static void DrawTowerProjectiles(
+        SpriteBatch spriteBatch,
+        WorldRenderSnapshot snapshot,
+        TextureCatalog textures,
+        WorldRenderSettings settings)
+    {
+        var towerEvents = snapshot.RecentEvents
+            .Where(evt => evt.Contains("watchtower fired", StringComparison.OrdinalIgnoreCase)
+                       || evt.Contains("tower hit predator", StringComparison.OrdinalIgnoreCase))
+            .TakeLast(3)
+            .ToList();
+
+        if (towerEvents.Count == 0)
+            return;
+
+        foreach (var evt in towerEvents)
+        {
+            bool predatorShot = evt.Contains("tower hit predator", StringComparison.OrdinalIgnoreCase);
+            string suffix = predatorShot ? " tower hit predator" : " watchtower fired";
+            int suffixIdx = evt.IndexOf(suffix, StringComparison.OrdinalIgnoreCase);
+            if (suffixIdx <= 0)
+                continue;
+
+            string colonyName = evt[..suffixIdx].Trim();
+            var colony = snapshot.Colonies.FirstOrDefault(c => string.Equals(c.Name, colonyName, StringComparison.OrdinalIgnoreCase));
+            if (colony == null)
+                continue;
+
+            var sourceTower = snapshot.DefensiveStructures
+                .Where(s => s.ColonyId == colony.Id && s.Kind == DefensiveStructureKindView.Watchtower)
+                .FirstOrDefault();
+            if (sourceTower == null)
+                continue;
+
+            var source = TileCenter(sourceTower.X, sourceTower.Y, settings.TileSize);
+            var target = predatorShot
+                ? FindNearestPredator(snapshot, sourceTower.X, sourceTower.Y, settings.TileSize)
+                : FindNearestHostile(snapshot, colony.FactionId, sourceTower.X, sourceTower.Y, settings.TileSize);
+
+            if (target == null)
+                continue;
+
+            var beamColor = predatorShot ? new Color(248, 217, 114) : new Color(236, 142, 121);
+            DrawBeam(spriteBatch, textures.Pixel, source, target.Value, beamColor, Math.Max(1, settings.TileSize / 3));
+        }
+    }
+
+    private static Vector2? FindNearestPredator(WorldRenderSnapshot snapshot, int towerX, int towerY, int tileSize)
+    {
+        var predator = snapshot.Animals
+            .Where(a => a.Kind == AnimalKindView.Predator)
+            .Select(a => new { Animal = a, Dist = Math.Abs(a.X - towerX) + Math.Abs(a.Y - towerY) })
+            .OrderBy(e => e.Dist)
+            .FirstOrDefault();
+        return predator == null ? null : TileCenter(predator.Animal.X, predator.Animal.Y, tileSize);
+    }
+
+    private static Vector2? FindNearestHostile(WorldRenderSnapshot snapshot, int factionId, int towerX, int towerY, int tileSize)
+    {
+        var hostileColonyIds = snapshot.Colonies
+            .Where(c => c.FactionId != factionId)
+            .Select(c => c.Id)
+            .ToHashSet();
+
+        var target = snapshot.People
+            .Where(p => hostileColonyIds.Contains(p.ColonyId))
+            .Select(p => new { Person = p, Dist = Math.Abs(p.X - towerX) + Math.Abs(p.Y - towerY) })
+            .OrderBy(e => e.Dist)
+            .FirstOrDefault();
+        return target == null ? null : TileCenter(target.Person.X, target.Person.Y, tileSize);
+    }
+
+    private static Vector2 TileCenter(int tileX, int tileY, int tileSize)
+        => new((tileX * tileSize) + (tileSize * 0.5f), (tileY * tileSize) + (tileSize * 0.5f));
+
+    private static void DrawBeam(SpriteBatch spriteBatch, Texture2D pixel, Vector2 source, Vector2 target, Color color, int thickness)
+    {
+        var delta = target - source;
+        float length = delta.Length();
+        if (length < 1f)
+            return;
+
+        float angle = MathF.Atan2(delta.Y, delta.X);
+        var rect = new Rectangle((int)source.X, (int)source.Y, (int)length, thickness);
+        spriteBatch.Draw(pixel, rect, null, color, angle, new Vector2(0f, thickness * 0.5f), SpriteEffects.None, 0f);
     }
 
     private static void DrawFarmMarker(SpriteBatch spriteBatch, Texture2D pixel, int x, int y, int size)

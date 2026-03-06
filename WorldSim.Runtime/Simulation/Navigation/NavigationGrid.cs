@@ -32,21 +32,7 @@ public sealed class NavigationGrid
         => x >= 0 && y >= 0 && x < _world.Width && y < _world.Height;
 
     public bool IsBlocked(int x, int y, int moverColonyId)
-    {
-        if (!InBounds(x, y))
-            return true;
-
-        if (_world.GetTile(x, y).Ground == Ground.Water)
-            return true;
-
-        if (_world.Houses.Any(h => h.Pos.x == x && h.Pos.y == y))
-            return true;
-
-        if (_world.SpecializedBuildings.Any(b => b.Pos.x == x && b.Pos.y == y))
-            return true;
-
-        return false;
-    }
+        => _world.IsMovementBlocked(x, y, moverColonyId);
 
     private int ComputeTopologySignature()
     {
@@ -69,6 +55,16 @@ public sealed class NavigationGrid
                 hash = (hash * 31) + building.Pos.y;
                 hash = (hash * 31) + building.Owner.Id;
                 hash = (hash * 31) + (int)building.Kind;
+            }
+
+            foreach (var defense in _world.DefensiveStructures)
+            {
+                if (defense.IsDestroyed)
+                    continue;
+                hash = (hash * 31) + defense.Pos.x;
+                hash = (hash * 31) + defense.Pos.y;
+                hash = (hash * 31) + defense.Owner.Id;
+                hash = (hash * 31) + (int)defense.Kind;
             }
 
             return hash;

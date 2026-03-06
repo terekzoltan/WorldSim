@@ -117,6 +117,32 @@ public sealed class HtnPlanner : IPlanner
                     new[] { NpcCommand.Flee }));
                 break;
 
+            case "BuildDefenses":
+                candidates.Add(new MethodCandidate(
+                    "BuildWatchtower",
+                    context.HomeWood >= 16 && context.HomeStone >= 6 ? 0.96f : 0.28f,
+                    new[] { NpcCommand.BuildWatchtower }));
+                candidates.Add(new MethodCandidate(
+                    "BuildWall",
+                    context.HomeWood >= 8 ? 0.9f : 0.36f,
+                    new[] { NpcCommand.BuildWall }));
+                candidates.Add(new MethodCandidate(
+                    "GatherWoodForDefense",
+                    context.HomeWood < 8 ? 0.75f : 0.15f,
+                    new[] { NpcCommand.GatherWood }));
+                break;
+
+            case "RaidBorder":
+                candidates.Add(new MethodCandidate(
+                    "BorderRaid",
+                    context.IsWarriorRole ? 0.92f : 0.2f,
+                    new[] { NpcCommand.RaidBorder }));
+                candidates.Add(new MethodCandidate(
+                    "FallbackRetreat",
+                    context.IsWarriorRole ? 0.45f : 0.95f,
+                    new[] { NpcCommand.Flee }));
+                break;
+
             default:
                 candidates.Add(new MethodCandidate("FallbackIdle", 0.01f, new[] { NpcCommand.Idle }));
                 break;

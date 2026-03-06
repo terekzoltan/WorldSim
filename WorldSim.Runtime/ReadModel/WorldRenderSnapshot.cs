@@ -39,12 +39,19 @@ public enum SpecializedBuildingKindView
     Storehouse
 }
 
+public enum DefensiveStructureKindView
+{
+    WoodWall,
+    Watchtower
+}
+
 public sealed record WorldRenderSnapshot(
     int Width,
     int Height,
     IReadOnlyList<TileRenderData> Tiles,
     IReadOnlyList<HouseRenderData> Houses,
     IReadOnlyList<SpecializedBuildingRenderData> SpecializedBuildings,
+    IReadOnlyList<DefensiveStructureRenderData> DefensiveStructures,
     IReadOnlyList<PersonRenderData> People,
     IReadOnlyList<AnimalRenderData> Animals,
     IReadOnlyList<ColonyHudData> Colonies,
@@ -52,8 +59,39 @@ public sealed record WorldRenderSnapshot(
     EcoHudData Ecology,
     SeasonView CurrentSeason,
     bool IsDroughtActive,
-    IReadOnlyList<string> RecentEvents
+    IReadOnlyList<string> RecentEvents,
+    DirectorRenderState Director
 );
+
+public sealed record DirectorRenderState(
+    string StageMarker,
+    string OutputMode,
+    int BeatCooldownRemainingTicks,
+    int MajorBeatCooldownRemainingTicks,
+    int EpicBeatCooldownRemainingTicks,
+    IReadOnlyList<DirectorActiveBeatRenderData> ActiveBeats,
+    IReadOnlyList<DirectorActiveDirectiveRenderData> ActiveDirectives,
+    IReadOnlyList<DirectorDomainModifierRenderData> ActiveDomainModifiers,
+    IReadOnlyList<DirectorGoalBiasRenderData> ActiveGoalBiases,
+    string LastActionStatus)
+{
+    public static DirectorRenderState Empty { get; } = new(
+        StageMarker: "idle",
+        OutputMode: "both",
+        BeatCooldownRemainingTicks: 0,
+        MajorBeatCooldownRemainingTicks: 0,
+        EpicBeatCooldownRemainingTicks: 0,
+        ActiveBeats: Array.Empty<DirectorActiveBeatRenderData>(),
+        ActiveDirectives: Array.Empty<DirectorActiveDirectiveRenderData>(),
+        ActiveDomainModifiers: Array.Empty<DirectorDomainModifierRenderData>(),
+        ActiveGoalBiases: Array.Empty<DirectorGoalBiasRenderData>(),
+        LastActionStatus: "No director action");
+}
+
+public sealed record DirectorActiveBeatRenderData(string BeatId, string Text, string Severity, int RemainingTicks, int TotalTicks);
+public sealed record DirectorActiveDirectiveRenderData(int ColonyId, string Directive, int RemainingTicks, int TotalTicks);
+public sealed record DirectorDomainModifierRenderData(string SourceId, string Domain, double BaseModifier, double EffectiveModifier, int RemainingTicks, int TotalDurationTicks);
+public sealed record DirectorGoalBiasRenderData(int ColonyId, string SourceId, string GoalCategory, double BaseWeight, double EffectiveWeight, int RemainingTicks, int TotalDurationTicks, bool IsBlendActive);
 
 public sealed record TileRenderData(
     int X,
@@ -67,6 +105,14 @@ public sealed record TileRenderData(
 public sealed record HouseRenderData(int X, int Y, int ColonyId);
 
 public sealed record SpecializedBuildingRenderData(int X, int Y, int ColonyId, SpecializedBuildingKindView Kind);
+
+public sealed record DefensiveStructureRenderData(
+    int X,
+    int Y,
+    int ColonyId,
+    DefensiveStructureKindView Kind,
+    float Hp,
+    float MaxHp);
 
 public sealed record PersonRenderData(
     int X,

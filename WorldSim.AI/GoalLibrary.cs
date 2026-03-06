@@ -15,6 +15,23 @@ public static class GoalLibrary
         defendSelf.Considerations.Add(new ThreatNearbyConsideration(threatCap: 3));
         goals.Add(defendSelf);
 
+        var buildDefenses = new Goal("BuildDefenses")
+        {
+            CooldownSeconds = 2.2f
+        };
+        buildDefenses.Considerations.Add(new HostileStanceConsideration());
+        buildDefenses.Considerations.Add(new InvertedConsideration(new HungerConsideration()));
+        goals.Add(buildDefenses);
+
+        var raidBorder = new Goal("RaidBorder")
+        {
+            CooldownSeconds = 1.2f
+        };
+        raidBorder.Considerations.Add(new WarriorRoleConsideration());
+        raidBorder.Considerations.Add(new HostileStanceConsideration());
+        raidBorder.Considerations.Add(new ContestedZoneConsideration());
+        goals.Add(raidBorder);
+
         var gatherWood = new Goal("GatherWood")
         {
             CooldownSeconds = 2f

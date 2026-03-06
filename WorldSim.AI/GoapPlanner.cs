@@ -35,6 +35,28 @@ public sealed class GoapPlanner : IPlanner
             return new PlannerDecision(threatCommand, 1, new[] { threatCommand }, 1, threatReason, "GoapThreatRule");
         }
 
+        if (_goal.Name == "BuildDefenses")
+        {
+            var defenseCommand = context.HomeWood >= 16 && context.HomeStone >= 6
+                ? NpcCommand.BuildWatchtower
+                : (context.HomeWood >= 8 ? NpcCommand.BuildWall : NpcCommand.GatherWood);
+            var defenseReason = _goalChanged ? "GoalChanged" : "DefensePrep";
+            _goalChanged = false;
+            return new PlannerDecision(defenseCommand, 1, new[] { defenseCommand }, 1, defenseReason, "GoapDefenseRule");
+        }
+
+        if (_goal.Name == "RaidBorder")
+        {
+            var raidCommand = context.IsWarriorRole
+                ? (context.NearbyEnemyCount > 0 && ThreatDecisionPolicy.ShouldFight(context)
+                    ? NpcCommand.Fight
+                    : NpcCommand.RaidBorder)
+                : NpcCommand.Flee;
+            var raidReason = _goalChanged ? "GoalChanged" : "RaidPressure";
+            _goalChanged = false;
+            return new PlannerDecision(raidCommand, 1, new[] { raidCommand }, 1, raidReason, "GoapRaidRule");
+        }
+
         var reason = _goalChanged ? "GoalChanged" : "PlanContinue";
 
         if (_currentPlan.Count > 0 && !CanExecuteCurrentAction(context, _currentPlan.Peek()))

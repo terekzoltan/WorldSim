@@ -1,5 +1,6 @@
 using System.Linq;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
 
 namespace WorldSim.Runtime.ReadModel;
@@ -55,6 +56,17 @@ public static class WorldSnapshotBuilder
                 b.Pos.y,
                 b.Owner.Id,
                 MapSpecializedBuildingKind(b.Kind)))
+            .ToList();
+
+        var defensiveStructures = world.DefensiveStructures
+            .Where(structure => !structure.IsDestroyed)
+            .Select(structure => new DefensiveStructureRenderData(
+                structure.Pos.x,
+                structure.Pos.y,
+                structure.Owner.Id,
+                MapDefensiveStructureKind(structure.Kind),
+                structure.Hp,
+                structure.MaxHp))
             .ToList();
 
         var people = world._people
@@ -152,6 +164,7 @@ public static class WorldSnapshotBuilder
             tiles,
             houses,
             specializedBuildings,
+            defensiveStructures,
             people,
             animals,
             colonies,
@@ -159,7 +172,8 @@ public static class WorldSnapshotBuilder
             ecology,
             MapSeason(world.CurrentSeason),
             world.IsDroughtActive,
-            world.RecentEvents.ToList()
+            world.RecentEvents.ToList(),
+            DirectorRenderState.Empty
         );
     }
 
@@ -200,6 +214,12 @@ public static class WorldSnapshotBuilder
         SpecializedBuildingKind.Workshop => SpecializedBuildingKindView.Workshop,
         SpecializedBuildingKind.Storehouse => SpecializedBuildingKindView.Storehouse,
         _ => SpecializedBuildingKindView.FarmPlot
+    };
+
+    private static DefensiveStructureKindView MapDefensiveStructureKind(DefensiveStructureKind kind) => kind switch
+    {
+        DefensiveStructureKind.Watchtower => DefensiveStructureKindView.Watchtower,
+        _ => DefensiveStructureKindView.WoodWall
     };
 
     private static float ComputeAverageFoodPerPerson(World world)
