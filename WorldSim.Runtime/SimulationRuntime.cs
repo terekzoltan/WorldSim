@@ -1,9 +1,11 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Text.Json.Nodes;
 using WorldSim.AI;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Effects;
 
 namespace WorldSim.Runtime;
 
@@ -17,6 +19,7 @@ public sealed class SimulationRuntime
     };
 
     private readonly World _world;
+    private readonly double _directorDampeningFactor;
     private readonly Queue<string> _recentAiDecisions = new();
     private readonly DirectorState _directorState = new();
     private long _lastObservedDecisionSequence;
@@ -49,10 +52,46 @@ public sealed class SimulationRuntime
         _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode.ToString(), PolicyMode.ToString());
         TechTree.Load(technologyFilePath);
 
+        _world.EnableDiplomacy = ReadBoolEnv("WORLDSIM_ENABLE_DIPLOMACY", fallback: false);
+        _world.EnableCombatPrimitives = ReadBoolEnv("WORLDSIM_ENABLE_COMBAT_PRIMITIVES", fallback: false);
+        _world.EnablePredatorHumanAttacks = ReadBoolEnv("WORLDSIM_ENABLE_PREDATOR_ATTACKS", fallback: false);
+
+        _directorDampeningFactor = ReadClampedDoubleEnv("REFINERY_DIRECTOR_DAMPENING", fallback: 1.0);
+
         if (LoadedTechCount == 0)
         {
             throw new InvalidOperationException("SimulationRuntime started with zero loaded technologies.");
         }
+    }
+
+    private static double ReadClampedDoubleEnv(string key, double fallback)
+    {
+        var raw = Environment.GetEnvironmentVariable(key);
+        if (string.IsNullOrWhiteSpace(raw))
+            return Math.Clamp(fallback, 0d, 1d);
+
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+            return Math.Clamp(fallback, 0d, 1d);
+
+        return Math.Clamp(parsed, 0d, 1d);
+    }
+
+    private static bool ReadBoolEnv(string key, bool fallback)
+    {
+        var raw = Environment.GetEnvironmentVariable(key);
+        if (string.IsNullOrWhiteSpace(raw))
+            return fallback;
+
+        if (bool.TryParse(raw, out var parsed))
+            return parsed;
+
+        raw = raw.Trim();
+        if (string.Equals(raw, "1", StringComparison.Ordinal))
+            return true;
+        if (string.Equals(raw, "0", StringComparison.Ordinal))
+            return false;
+
+        return fallback;
     }
 
     public void AdvanceTick(float dt)
@@ -193,7 +232,11 @@ public sealed class SimulationRuntime
             throw new InvalidOperationException($"Cannot unlock tech '{techId}': {result.Reason}");
     }
 
-    public void ApplyStoryBeat(string beatId, string text, long durationTicks)
+    public void ApplyStoryBeat(
+        string beatId,
+        string text,
+        long durationTicks,
+        IReadOnlyList<DirectorDomainModifierSpec>? effects = null)
     {
         if (string.IsNullOrWhiteSpace(beatId))
             throw new InvalidOperationException("Cannot apply story beat: beatId is required.");
@@ -204,14 +247,61 @@ public sealed class SimulationRuntime
         if (durationTicks <= 0)
             throw new InvalidOperationException($"Cannot apply story beat '{beatId}': durationTicks must be > 0.");
 
+        // Idempotence: do not register effects twice.
+        if (_directorState.ActiveBeats.Any(beat => string.Equals(beat.BeatId, beatId, StringComparison.Ordinal)))
+        {
+            LastDirectorActionStatus = $"Story beat '{beatId}' already active (idempotent)";
+            return;
+        }
+
+        var validatedEffects = new List<(RuntimeDomain domain, double modifier)>();
+        if (effects != null)
+        {
+            foreach (var effect in effects)
+            {
+                if (effect.DurationTicks != (int)durationTicks)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot apply story beat '{beatId}': effect durationTicks {effect.DurationTicks} must match beat durationTicks {(int)durationTicks}."
+                    );
+                }
+
+                var domain = ParseRuntimeDomain(effect.Domain);
+                if (effect.Modifier < -0.30d || effect.Modifier > 0.30d)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot apply story beat '{beatId}': modifier {effect.Modifier} out of bounds [-0.30, +0.30] for domain '{effect.Domain}'."
+                    );
+                }
+
+                validatedEffects.Add((domain, effect.Modifier));
+            }
+        }
+
         var result = _directorState.ApplyStoryBeat(beatId, text, (int)durationTicks, DirectorBeatSeverity.Major);
         if (!result.Success)
             throw new InvalidOperationException($"Cannot apply story beat '{beatId}': {result.Message}");
 
+        foreach (var (domain, modifier) in validatedEffects)
+        {
+            _world.RegisterDomainModifier(
+                sourceId: "beat:" + beatId,
+                domain: domain,
+                modifier: modifier,
+                durationTicks: (int)durationTicks,
+                dampeningFactor: _directorDampeningFactor);
+        }
+
+        _world.AddExternalEvent("[Director] " + text);
+
         LastDirectorActionStatus = result.Message;
     }
 
-    public void ApplyColonyDirective(int colonyId, string directive, long durationTicks)
+    public void ApplyColonyDirective(
+        int colonyId,
+        string directive,
+        long durationTicks,
+        IReadOnlyList<DirectorGoalBiasSpec>? biases = null)
     {
         if (colonyId < 0 || colonyId >= ColonyCount)
         {
@@ -223,9 +313,6 @@ public sealed class SimulationRuntime
         if (string.IsNullOrWhiteSpace(directive))
             throw new InvalidOperationException("Cannot apply colony directive: directive is required.");
 
-        if (!IsKnownDirectorDirective(directive))
-            throw new InvalidOperationException($"Cannot apply colony directive: unknown directive '{directive}'.");
-
         if (durationTicks <= 0)
         {
             throw new InvalidOperationException(
@@ -233,8 +320,95 @@ public sealed class SimulationRuntime
             );
         }
 
+        var effectiveBiases = (biases != null && biases.Count > 0)
+            ? biases
+            : BuildDefaultDirectiveBiases(directive);
+
+        var biasSpecs = effectiveBiases
+            .Select(bias =>
+            {
+                if (string.IsNullOrWhiteSpace(bias.GoalCategory))
+                    throw new InvalidOperationException("Cannot apply colony directive: goalCategory is required in biases.");
+                if (!IsKnownGoalBiasCategory(bias.GoalCategory))
+                    throw new InvalidOperationException($"Cannot apply colony directive: unknown goalCategory '{bias.GoalCategory}'.");
+                if (bias.Weight < 0d || bias.Weight > 0.50d)
+                    throw new InvalidOperationException($"Cannot apply colony directive: bias weight {bias.Weight} out of bounds [0.0, 0.50].");
+                if (bias.DurationTicks.HasValue && bias.DurationTicks.Value != (int)durationTicks)
+                {
+                    throw new InvalidOperationException(
+                        $"Cannot apply colony directive '{directive}': bias durationTicks {bias.DurationTicks.Value} must match directive durationTicks {(int)durationTicks}."
+                    );
+                }
+                return new GoalBiasSpec(bias.GoalCategory, bias.Weight);
+            })
+            .ToList();
+
+        _world.ReplaceGoalBiases(
+            sourceId: $"directive:{colonyId}:{directive}",
+            colonyId: colonyId,
+            biases: biasSpecs,
+            durationTicks: (int)durationTicks,
+            dampeningFactor: _directorDampeningFactor);
+
         var result = _directorState.ApplyDirective(colonyId, directive, (int)durationTicks);
+        _world.AddExternalEvent($"[Director] Directive: {directive} (C{colonyId}, {durationTicks} ticks)");
         LastDirectorActionStatus = result.Message;
+    }
+
+    private static RuntimeDomain ParseRuntimeDomain(string domainRaw)
+    {
+        if (string.IsNullOrWhiteSpace(domainRaw))
+            throw new InvalidOperationException("Domain is required.");
+
+        return domainRaw.Trim().ToLowerInvariant() switch
+        {
+            "food" => RuntimeDomain.Food,
+            "morale" => RuntimeDomain.Morale,
+            "economy" => RuntimeDomain.Economy,
+            "military" => RuntimeDomain.Military,
+            "research" => RuntimeDomain.Research,
+            _ => throw new InvalidOperationException($"Unknown domain '{domainRaw}'.")
+        };
+    }
+
+    private static bool IsKnownGoalBiasCategory(string category)
+    {
+        var trimmed = category.Trim();
+        return string.Equals(trimmed, GoalBiasCategories.Farming, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, GoalBiasCategories.Gathering, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, GoalBiasCategories.Building, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, GoalBiasCategories.Crafting, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, GoalBiasCategories.Rest, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, GoalBiasCategories.Social, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(trimmed, GoalBiasCategories.Military, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IReadOnlyList<DirectorGoalBiasSpec> BuildDefaultDirectiveBiases(string directive)
+    {
+        if (!IsKnownDirectorDirective(directive))
+            throw new InvalidOperationException($"Cannot apply colony directive: unknown directive '{directive}'.");
+
+        // Transitional mapping: known directive IDs map to bias compositions.
+        return directive switch
+        {
+            "PrioritizeFood" => new[]
+            {
+                new DirectorGoalBiasSpec(GoalBiasCategories.Farming, 0.25, null),
+                new DirectorGoalBiasSpec(GoalBiasCategories.Gathering, 0.15, null)
+            },
+            "StabilizeMorale" => new[]
+            {
+                new DirectorGoalBiasSpec(GoalBiasCategories.Building, 0.20, null),
+                new DirectorGoalBiasSpec(GoalBiasCategories.Farming, 0.15, null)
+            },
+            "BoostIndustry" => new[]
+            {
+                new DirectorGoalBiasSpec(GoalBiasCategories.Crafting, 0.20, null),
+                new DirectorGoalBiasSpec(GoalBiasCategories.Building, 0.12, null),
+                new DirectorGoalBiasSpec(GoalBiasCategories.Gathering, 0.08, null)
+            },
+            _ => Array.Empty<DirectorGoalBiasSpec>()
+        };
     }
 
     private JsonObject BuildDirectorSnapshotJson()
@@ -273,6 +447,39 @@ public sealed class SimulationRuntime
             });
         }
 
+        var activeDomainModifiers = new JsonArray();
+        foreach (var modifier in _world.GetActiveDomainModifiers())
+        {
+            activeDomainModifiers.Add(new JsonObject
+            {
+                ["sourceId"] = modifier.SourceId,
+                ["domain"] = modifier.Domain.ToString().ToLowerInvariant(),
+                ["baseModifier"] = modifier.BaseModifier,
+                ["effectiveModifier"] = modifier.EffectiveModifier,
+                ["remainingTicks"] = modifier.RemainingTicks,
+                ["totalDurationTicks"] = modifier.TotalDurationTicks
+            });
+        }
+
+        var activeGoalBiases = new JsonArray();
+        foreach (var colony in _world._colonies)
+        {
+            foreach (var bias in _world.GetActiveGoalBiases(colony.Id))
+            {
+                activeGoalBiases.Add(new JsonObject
+                {
+                    ["colonyId"] = bias.ColonyId,
+                    ["sourceId"] = bias.SourceId,
+                    ["goalCategory"] = bias.GoalCategory,
+                    ["baseWeight"] = bias.BaseWeight,
+                    ["effectiveWeight"] = bias.EffectiveWeight,
+                    ["remainingTicks"] = bias.RemainingTicks,
+                    ["totalDurationTicks"] = bias.TotalDurationTicks,
+                    ["isBlendActive"] = bias.IsBlendActive
+                });
+            }
+        }
+
         return new JsonObject
         {
             ["currentTick"] = Tick,
@@ -284,7 +491,10 @@ public sealed class SimulationRuntime
             ["activeBeats"] = activeBeats,
             ["activeDirectives"] = activeDirectives,
             ["beatCooldownRemainingTicks"] = _directorState.BeatCooldownRemainingTicks,
-            ["remainingInfluenceBudget"] = 1.0
+            ["remainingInfluenceBudget"] = 1.0,
+            ["dampeningFactor"] = _directorDampeningFactor,
+            ["activeDomainModifiers"] = activeDomainModifiers,
+            ["activeGoalBiases"] = activeGoalBiases
         };
     }
 

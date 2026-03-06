@@ -21,6 +21,18 @@ public abstract record RuntimePatchCommand;
 
 public sealed record UnlockTechRuntimeCommand(string TechId) : RuntimePatchCommand;
 
-public sealed record ApplyStoryBeatRuntimeCommand(string BeatId, string Text, long DurationTicks) : RuntimePatchCommand;
+public readonly record struct DirectorDomainModifierSpec(string Domain, double Modifier, int DurationTicks);
 
-public sealed record ApplyColonyDirectiveRuntimeCommand(int ColonyId, string Directive, long DurationTicks) : RuntimePatchCommand;
+public readonly record struct DirectorGoalBiasSpec(string GoalCategory, double Weight, int? DurationTicks);
+
+public sealed record ApplyStoryBeatRuntimeCommand(
+    string BeatId,
+    string Text,
+    long DurationTicks,
+    IReadOnlyList<DirectorDomainModifierSpec> Effects) : RuntimePatchCommand;
+
+public sealed record ApplyColonyDirectiveRuntimeCommand(
+    int ColonyId,
+    string Directive,
+    long DurationTicks,
+    IReadOnlyList<DirectorGoalBiasSpec> Biases) : RuntimePatchCommand;

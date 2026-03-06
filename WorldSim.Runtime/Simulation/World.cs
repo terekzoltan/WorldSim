@@ -62,6 +62,8 @@ namespace WorldSim.Simulation
         public Season CurrentSeason { get; private set; } = Season.Spring;
         public bool IsDroughtActive { get; private set; }
         public IReadOnlyList<string> RecentEvents => _recentEvents;
+
+        public void AddExternalEvent(string text) => AddEvent(text);
         public int TotalAnimalStuckRecoveries { get; private set; }
         public int TotalPredatorDeaths { get; private set; }
         public int TotalPredatorKillsByHumans { get; private set; }

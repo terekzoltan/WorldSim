@@ -53,14 +53,34 @@ public class PatchCommandTranslationTests
                     OpId = "op_story_1",
                     BeatId = "BEAT_SAMPLE_1",
                     Text = "Storm clouds gather at the colony edge.",
-                    DurationTicks = 20
+                    DurationTicks = 20,
+                    Effects = new[]
+                    {
+                        new EffectEntry
+                        {
+                            Type = "domain_modifier",
+                            Domain = "economy",
+                            Modifier = 0.10,
+                            DurationTicks = 20
+                        }
+                    }
                 },
                 new SetColonyDirectiveOp
                 {
                     OpId = "op_nudge_1",
                     ColonyId = 0,
                     Directive = "PrioritizeFood",
-                    DurationTicks = 18
+                    DurationTicks = 18,
+                    Biases = new[]
+                    {
+                        new GoalBiasEntry
+                        {
+                            Type = "goal_bias",
+                            GoalCategory = "farming",
+                            Weight = 0.30,
+                            DurationTicks = 18
+                        }
+                    }
                 }
             },
             Array.Empty<string>(),
@@ -76,12 +96,16 @@ public class PatchCommandTranslationTests
             {
                 var story = Assert.IsType<ApplyStoryBeatRuntimeCommand>(item);
                 Assert.Equal("BEAT_SAMPLE_1", story.BeatId);
+                var effect = Assert.Single(story.Effects);
+                Assert.Equal("economy", effect.Domain);
             },
             item =>
             {
                 var nudge = Assert.IsType<ApplyColonyDirectiveRuntimeCommand>(item);
                 Assert.Equal(0, nudge.ColonyId);
                 Assert.Equal("PrioritizeFood", nudge.Directive);
+                var bias = Assert.Single(nudge.Biases);
+                Assert.Equal("farming", bias.GoalCategory);
             }
         );
     }
@@ -137,7 +161,7 @@ public class PatchCommandTranslationTests
 
         var commands = new List<RuntimePatchCommand>
         {
-            new ApplyColonyDirectiveRuntimeCommand(0, "UnknownDirective", 10)
+            new ApplyColonyDirectiveRuntimeCommand(0, "UnknownDirective", 10, Array.Empty<DirectorGoalBiasSpec>())
         };
 
         var ex = Assert.Throws<InvalidOperationException>(() => executor.Execute(runtime, commands));
@@ -152,7 +176,7 @@ public class PatchCommandTranslationTests
 
         var commands = new List<RuntimePatchCommand>
         {
-            new ApplyColonyDirectiveRuntimeCommand(999, "PrioritizeFood", 10)
+            new ApplyColonyDirectiveRuntimeCommand(999, "PrioritizeFood", 10, Array.Empty<DirectorGoalBiasSpec>())
         };
 
         var ex = Assert.Throws<InvalidOperationException>(() => executor.Execute(runtime, commands));

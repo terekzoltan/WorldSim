@@ -1,4 +1,5 @@
 using System.IO;
+using System;
 using System.Text.Json.Nodes;
 using WorldSim.Runtime;
 using Xunit;
@@ -72,6 +73,96 @@ public class SimulationRuntimeDirectorStateTests
         Assert.NotNull(director["activeDirectives"]);
         Assert.NotNull(director["beatCooldownRemainingTicks"]);
         Assert.NotNull(director["remainingInfluenceBudget"]);
+        Assert.NotNull(director["dampeningFactor"]);
+        Assert.NotNull(director["activeDomainModifiers"]);
+        Assert.NotNull(director["activeGoalBiases"]);
+    }
+
+    [Fact]
+    public void ApplyStoryBeat_WithEffects_RegistersDomainModifiers_AndDecays()
+    {
+        var runtime = CreateRuntime();
+
+        runtime.ApplyStoryBeat(
+            "BEAT_EFFECT",
+            "A harsh wind slows work.",
+            durationTicks: 10,
+            effects: new[]
+            {
+                new DirectorDomainModifierSpec("economy", 0.20, DurationTicks: 10)
+            });
+
+        var first = runtime.BuildRefinerySnapshot();
+        var mods = first["director"]?["activeDomainModifiers"]?.AsArray();
+        Assert.NotNull(mods);
+        Assert.True(mods!.Count >= 1);
+
+        var economy = mods
+            .Select(item => item?.AsObject())
+            .FirstOrDefault(obj => (obj?["domain"]?.GetValue<string>() ?? string.Empty) == "economy");
+        Assert.NotNull(economy);
+
+        var eff0 = economy!["effectiveModifier"]?.GetValue<double>() ?? -999;
+        Assert.InRange(eff0, 0.19, 0.200001);
+
+        runtime.AdvanceTick(0.25f);
+        var second = runtime.BuildRefinerySnapshot();
+        var mods2 = second["director"]?["activeDomainModifiers"]?.AsArray();
+        var economy2 = mods2
+            ?.Select(item => item?.AsObject())
+            .FirstOrDefault(obj => (obj?["domain"]?.GetValue<string>() ?? string.Empty) == "economy");
+        Assert.NotNull(economy2);
+
+        var eff1 = economy2!["effectiveModifier"]?.GetValue<double>() ?? -999;
+        Assert.InRange(eff1, 0.17, 0.19);
+    }
+
+    [Fact]
+    public void ApplyColonyDirective_WithBiases_RegistersGoalBiases()
+    {
+        var runtime = CreateRuntime();
+
+        runtime.ApplyColonyDirective(
+            colonyId: 0,
+            directive: "CustomDirective",
+            durationTicks: 10,
+            biases: new[]
+            {
+                new DirectorGoalBiasSpec("gathering", 0.40, DurationTicks: 10)
+            });
+
+        var snapshot = runtime.BuildRefinerySnapshot();
+        var biases = snapshot["director"]?["activeGoalBiases"]?.AsArray();
+        Assert.NotNull(biases);
+        Assert.Contains(biases!, item =>
+            (item?["colonyId"]?.GetValue<int>() ?? -1) == 0
+            && (item?["goalCategory"]?.GetValue<string>() ?? string.Empty).Equals("gathering", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void DirectorDampeningFactor_Zero_ProducesNoActiveDomainModifiers()
+    {
+        const string key = "REFINERY_DIRECTOR_DAMPENING";
+        var prev = Environment.GetEnvironmentVariable(key);
+        try
+        {
+            Environment.SetEnvironmentVariable(key, "0");
+            var runtime = CreateRuntime();
+            runtime.ApplyStoryBeat(
+                "BEAT_NO_EFFECT",
+                "Narrative only",
+                durationTicks: 10,
+                effects: new[] { new DirectorDomainModifierSpec("economy", 0.20, DurationTicks: 10) });
+
+            var snapshot = runtime.BuildRefinerySnapshot();
+            var mods = snapshot["director"]?["activeDomainModifiers"]?.AsArray();
+            Assert.NotNull(mods);
+            Assert.Empty(mods!);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(key, prev);
+        }
     }
 
     private static SimulationRuntime CreateRuntime()
