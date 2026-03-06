@@ -2,10 +2,14 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-03-02
+Last updated: 2026-03-06
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
+
+**Execution Steps** are provided per wave starting from Wave 3. They define the concrete session
+launch order, prerequisites, and parallelism for each step. Waves 1–2.5 are fully complete and
+their execution steps are not retroactively documented — see their proof links for verification.
 
 ---
 
@@ -169,22 +173,66 @@ Classification:
 
 > Director Plan > Phase 1 Sprint 3
 
-- ⬜ **S3-A** Beat severity tier implementation (Track D + B)
-- ⬜ **S3-B** HUD and event feed integration (Track A)
-- ⬜ **S3-C** Output mode matrix end-to-end (Track D)
-- ⬜ **S3-D** Fixture parity and smoke test (Track D)
+- ✅ **S3-A** Beat severity tier implementation (Track D: contract/adapter | Track B: runtime)
+- ✅ **S3-B** HUD and event feed integration (Track A)
+- ✅ **S3-C** Output mode matrix end-to-end (Track D)
+- ✅ **S3-D** Fixture parity and smoke test (Track D)
 
 ### Sprint C3: Basic Fortifications + Pathfinding (Track B -> C -> A)
 
 > Combat Plan > Phase 1 Sprint 3
 
-- ⬜ **P1-F** Defense domain scaffold — walls + watchtower (Track B)
-- ⬜ **P1-G** Navigation/pathfinding v1 — BFS when blocked (Track B)
-- ⬜ **P1-H** AI defense building + raid skeleton (Track C)
-- ⬜ **P1-I** Graphics for walls/towers/projectiles (Track A)
+- ✅ **P1-F** Defense domain scaffold — walls + watchtower (Track B)
+- ✅ **P1-G** Navigation/pathfinding v1 — BFS when blocked (Track B)
+- ✅ **P1-H** AI defense building + raid skeleton (Track C)
+- ✅ **P1-I** Graphics for walls/towers/projectiles (Track A)
 
-**Parallelism:** D3 and C3 are **fully parallel**.
-Track A has tasks from both sprints (S3-B + P1-I) — schedule sequentially within Track A.
+### Wave 3 — Execution Steps
+
+**Step 1 — immediately launchable, fully parallel**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P1-F, P1-G, S3-A (runtime part) | — | Do P1-F first, then P1-G, then S3-A runtime |
+| Track D agent | S3-A (contract/adapter part), S3-C, S3-D | — | Do S3-A contract first, then S3-C, then S3-D |
+
+**Step 2 — opens when P1-F ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | P1-I (wall/tower graphics) | P1-F ✅ | Does NOT need P1-G; domain model is enough for rendering |
+
+**Step 2b — opens when P1-F ✅ AND P1-G ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P1-H (AI defense + raid skeleton) | P1-F ✅ + P1-G ✅ | Raid pathfinding needs BFS from P1-G |
+
+**Step 3 — opens when S3-A (both parts) ✅ AND Track A finished P1-I**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | S3-B (Director HUD + event feed) | S3-A ✅ (B+D) + P1-I ✅ | Track A bottleneck — last to complete in this wave |
+
+**S3-A cross-track split note:** S3-A is one epic with two session rows. It is `✅` only when
+BOTH the Track D part (contract/adapter severity mapping) AND the Track B part (runtime severity
+multiplier + cooldown rules) are done. Either track can flag their half as ready in this file;
+the epic itself goes `✅` when both halves are confirmed.
+
+**Wave 3 critical path:**
+
+```
+Track B: ─ P1-F ──── P1-G ──── S3-A(rt) ─
+Track D: ─ S3-A(ct) ──── S3-C ──── S3-D ─   (parallel with Track B)
+Track A: ─ (wait) ── P1-I ──── (wait?) ── S3-B ─   (bottleneck)
+Track C: ─ (wait) ──────── P1-H ─────────   (after P1-F+G, independent of Track A)
+                     ↑           ↑
+                P1-F READY   P1-F+G READY
+```
+
+**Parallelism:** D3 and C3 are **fully parallel** (zero merge risk).
+Track A is the sequential bottleneck: P1-I first (needs P1-F), S3-B second (needs S3-A).
+Track C is independent of Track A — can run P1-H while Track A works on P1-I.
 
 ---
 
@@ -207,7 +255,23 @@ Track A has tasks from both sprints (S3-B + P1-I) — schedule sequentially with
 - ⬜ **P2-D** AI becomes tech-aware — avoid unwinnable fights (Track C)
 - ⬜ **P2-E** Graphics and HUD updates (Track A)
 
-**Parallelism:** D4 and C4 are **fully parallel** (D4 is Java-only, C4 is C# runtime/AI/graphics).
+### Wave 4 — Execution Steps
+
+**Step 1 — immediately launchable, fully parallel (zero file overlap)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | S4-A, S4-B | Wave 3 D3 ✅ | Java-only; no C# changes |
+| Track B agent | P2-A, P2-B, P2-C | Wave 3 C3 ✅ | Sequential: P2-A → P2-B → P2-C |
+
+**Step 2 — opens when P2-A + P2-B + P2-C ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P2-D | P2-A ✅ + P2-B ✅ | AI needs equipment/tech domain to evaluate fights |
+| Track A agent | P2-E | P2-C ✅ | Graphics for advanced structures |
+
+**Critical path:** Track B (3 epics) → Track C + A (parallel). Track D fully independent.
 
 ---
 
@@ -229,7 +293,23 @@ Track A has tasks from both sprints (S3-B + P1-I) — schedule sequentially with
 - ⬜ **P3-C** Commander bonus — Intelligence-based (Track B + C)
 - ⬜ **P3-D** Graphics for battles (Track A)
 
-**Parallelism:** D5 and C5 are **fully parallel** (D5 is Java-only).
+### Wave 5 — Execution Steps
+
+**Step 1 — immediately launchable, fully parallel (zero file overlap)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | S5-A, S5-B | Wave 4 D4 ✅ | Java-only; S5-A → S5-B sequential |
+| Track B agent | P3-A, P3-B, P3-C (B part) | Wave 4 C4 ✅ | P3-A → P3-B → P3-C sequential |
+
+**Step 2 — opens when P3-A + P3-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P3-C (C part — AI commander logic) | P3-A ✅ + P3-B ✅ | Needs formation + morale model |
+| Track A agent | P3-D | P3-A ✅ | Formation rendering needs group model |
+
+**Critical path:** Track B (3 epics) → Track C + A (parallel). Track D fully independent.
 
 ---
 
@@ -252,9 +332,32 @@ Track A has tasks from both sprints (S3-B + P1-I) — schedule sequentially with
 - ⬜ **P3-G** AI siege tactics — attack vs retreat vs sortie (Track C)
 - ⬜ **P3-H** Siege UI/overlays (Track A)
 
-**Parallelism:** D6 and C6 are **parallel with caution** (MR-2).
-S6-C touches `DirectorState` budget tracking; C6 adds siege state to tick loop.
-Both are additive to runtime tick — low risk if same Track B agent coordinates.
+### Wave 6 — Execution Steps
+
+**Step 1 — immediately launchable, parallel with caution (MR-2)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | S6-A, S6-B | Wave 5 D5 ✅ | Java-only; S6-A → S6-B sequential |
+| Track B agent | P3-E, P3-F, S6-C (B part) | Wave 5 C5 ✅ | P3-E → P3-F first, then S6-C runtime |
+
+**MR-2 caution:** S6-C adds budget tracking to `DirectorState`; P3-E/F add siege state to tick loop.
+Both are additive — low risk if Track B agent handles both C6 combat epics AND S6-C runtime part.
+
+**Step 2 — opens when P3-E + P3-F ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P3-G | P3-E ✅ + P3-F ✅ | AI siege needs breach + damage models |
+| Track A agent | P3-H | P3-E ✅ | Siege overlay needs siege state model |
+
+**Step 3 — opens when S6-A + S6-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D + Track B | S6-C (both parts) | S6-A ✅ + S6-B ✅ | Budget system wiring after LLM pipeline is stable |
+
+**Critical path:** Track D S6-A/B (LLM pipeline) → S6-C. Combat side: Track B → Track C + A parallel.
 
 ---
 
@@ -276,10 +379,32 @@ Both are additive to runtime tick — low risk if same Track B agent coordinates
 - ⬜ **P4-C** Runtime command endpoints — DeclareWar, ProposeTreaty, ApplyMilitaryEvent (Track B)
 - ⬜ **P4-D** Java service beats — mock + gated director for war/diplomacy (Track D)
 
-**Parallelism:** MR-3 — **Sequential recommended.**
-Both sprints expand v2 contracts and runtime command endpoints.
-Run D7 first, then C7 (C7 builds on the v2 namespace established in earlier Director sprints).
+### Wave 7 — Execution Steps
 
+**MR-3 — Sequential recommended.** D7 first, then C7.
+Both sprints expand v2 contracts and runtime command endpoints in overlapping namespaces.
+
+**Step 1 — D7 first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | S7-A (D part: contracts + monitoring) | Wave 6 D6 ✅ | Java + C# contract changes |
+| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6 C6 ✅ | Parallel with Track D on different files |
+
+**Step 2 — opens when S7-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D + Track A | S7-B | S7-A ✅ | UX/debug toggles build on causal chain monitoring |
+
+**Step 3 — opens when D7 fully ✅ (S7-A + S7-B). C7 is sequential after D7.**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | P4-A, P4-B, P4-D | S7-A ✅ + S7-B ✅ | v2 contract expansion for combat ops |
+| Track B agent | P4-C | P4-A ✅ + P4-B ✅ | Runtime endpoints need contract + adapter first |
+
+**Critical path:** D7 (S7-A → S7-B) → C7 (P4-A/B/D → P4-C). Strictly sequential.
 **Director pipeline is COMPLETE after this wave.**
 
 ---
