@@ -80,6 +80,7 @@ public sealed record AnimalRenderData(int X, int Y, AnimalKindView Kind);
 
 public sealed record ColonyHudData(
     int Id,
+    int FactionId,
     string Name,
     float Morale,
     int Food,

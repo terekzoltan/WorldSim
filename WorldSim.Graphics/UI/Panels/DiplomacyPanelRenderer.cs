@@ -34,7 +34,7 @@ public sealed class DiplomacyPanelRenderer
         ty += 22;
 
         var factionIds = snapshot.Colonies
-            .Select(colony => colony.Id)
+            .Select(colony => colony.FactionId)
             .Distinct()
             .OrderBy(id => id)
             .ToList();
@@ -83,7 +83,7 @@ public sealed class DiplomacyPanelRenderer
         }
 
         int legendY = gridY + (matrixSize * cellSize) + 8;
-        spriteBatch.DrawString(font, "Legend: N=Neutral  T=Tense  H=Hostile  W=War", new Vector2(x + pad, legendY), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Legend: N=Neutral  H=Hostile  W=War", new Vector2(x + pad, legendY), theme.SecondaryText);
         spriteBatch.DrawString(font, "Territory: Ctrl+F7 overlay (yellow border = contested)", new Vector2(x + pad, legendY + 20), theme.SecondaryText);
     }
 
@@ -105,7 +105,6 @@ public sealed class DiplomacyPanelRenderer
         return stance.ToLowerInvariant() switch
         {
             "neutral" => theme.SuccessText * 0.45f,
-            "tense" => theme.AccentText * 0.45f,
             "hostile" => theme.WarningText * 0.5f,
             "war" => new Color(196, 90, 84) * 0.55f,
             _ => theme.PanelBackground * 0.75f
@@ -117,7 +116,6 @@ public sealed class DiplomacyPanelRenderer
         return stance.ToLowerInvariant() switch
         {
             "neutral" => "N",
-            "tense" => "T",
             "hostile" => "H",
             "war" => "W",
             _ => "?"

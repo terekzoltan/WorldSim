@@ -92,6 +92,7 @@ public static class WorldSnapshotBuilder
 
                 return new ColonyHudData(
                     colony.Id,
+                    (int)colony.Faction,
                     colony.Name,
                     colony.Morale,
                     colony.Stock[Resource.Food],
