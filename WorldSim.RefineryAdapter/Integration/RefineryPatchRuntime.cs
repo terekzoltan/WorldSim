@@ -9,6 +9,7 @@ using WorldSim.Runtime;
 using WorldSim.RefineryAdapter.Translation;
 using WorldSimRefineryClient.Apply;
 using WorldSim.Contracts.V1;
+using WorldSim.Contracts.V2;
 using WorldSimRefineryClient.Serialization;
 using WorldSimRefineryClient.Service;
 
@@ -111,12 +112,15 @@ public sealed class RefineryPatchRuntime
     {
         var beforeHash = CanonicalStateSerializer.Sha256(_patchState);
 
-        PatchResponse response = _options.Mode switch
+        PatchResponse rawResponse = _options.Mode switch
         {
             RefineryIntegrationMode.Fixture => LoadFixtureResponse(),
             RefineryIntegrationMode.Live => await LoadLiveResponseAsync(runtime, tick),
             _ => throw new InvalidOperationException("Integration mode is OFF")
         };
+
+        var selectedOutputMode = SelectOutputMode(rawResponse);
+        var response = ApplyOutputMode(rawResponse, selectedOutputMode);
 
         var result = _applier.Apply(_patchState, response, new PatchApplyOptions(_options.StrictMode));
 
@@ -138,8 +142,90 @@ public sealed class RefineryPatchRuntime
         LastStatus =
             $"Refinery applied: applied={result.AppliedCount}, deduped={result.DedupedCount}, noop={result.NoOpCount}, " +
             $"techs={_patchState.TechIds.Count}, events={_patchState.EventIds.Count}, " +
-            $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={stageMarker}" +
+            $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={stageMarker}, mode={selectedOutputMode.Mode}" +
             (warningHead is null ? string.Empty : $", warn={warningHead}");
+    }
+
+    private DirectorOutputModeSelection SelectOutputMode(PatchResponse response)
+    {
+        if (!string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal))
+        {
+            return new DirectorOutputModeSelection("both", "non_director_goal");
+        }
+
+        if (!string.Equals(_options.DirectorOutputMode, "auto", StringComparison.Ordinal))
+        {
+            return new DirectorOutputModeSelection(_options.DirectorOutputMode, "env");
+        }
+
+        var responseMode = TryReadResponseOutputMode(response);
+        if (responseMode != null)
+        {
+            return new DirectorOutputModeSelection(responseMode, "response");
+        }
+
+        return new DirectorOutputModeSelection("both", "fallback");
+    }
+
+    private static PatchResponse ApplyOutputMode(PatchResponse response, DirectorOutputModeSelection selection)
+    {
+        if (string.Equals(selection.Mode, "both", StringComparison.Ordinal)
+            && string.Equals(selection.Source, "response", StringComparison.Ordinal))
+        {
+            return response;
+        }
+
+        var filteredPatch = response.Patch
+            .Where(op => KeepOpForOutputMode(op, selection.Mode))
+            .ToList();
+
+        var explain = new List<string>(response.Explain)
+        {
+            "adapterOutputMode:" + selection.Mode,
+            "adapterOutputModeSource:" + selection.Source
+        };
+
+        var warnings = new List<string>(response.Warnings);
+        if (!string.Equals(selection.Source, "response", StringComparison.Ordinal))
+        {
+            warnings.Add("Director output mode selected by adapter " + selection.Source + ".");
+        }
+
+        return new PatchResponse(
+            response.SchemaVersion,
+            response.RequestId,
+            response.Seed,
+            filteredPatch,
+            explain,
+            warnings
+        );
+    }
+
+    private static bool KeepOpForOutputMode(PatchOp op, string mode)
+    {
+        if (mode == "story_only")
+            return op is not SetColonyDirectiveOp;
+        if (mode == "nudge_only")
+            return op is not AddStoryBeatOp;
+        if (mode == "off")
+            return op is not AddStoryBeatOp && op is not SetColonyDirectiveOp;
+        return true;
+    }
+
+    private static string? TryReadResponseOutputMode(PatchResponse response)
+    {
+        foreach (var explain in response.Explain)
+        {
+            const string prefix = "directorOutputMode:";
+            if (!explain.StartsWith(prefix, StringComparison.Ordinal))
+                continue;
+
+            var mode = explain[prefix.Length..].Trim().ToLowerInvariant();
+            if (mode is "both" or "story_only" or "nudge_only" or "off")
+                return mode;
+        }
+
+        return null;
     }
 
     private PatchResponse LoadFixtureResponse()
@@ -220,5 +306,7 @@ public sealed class RefineryPatchRuntime
 
         return false;
     }
+
+    private sealed record DirectorOutputModeSelection(string Mode, string Source);
 
 }

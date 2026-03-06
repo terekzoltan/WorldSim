@@ -51,6 +51,7 @@ public class PatchCommandTranslationTests
                 new AddStoryBeatOp
                 {
                     OpId = "op_story_1",
+                    Severity = "major",
                     BeatId = "BEAT_SAMPLE_1",
                     Text = "Storm clouds gather at the colony edge.",
                     DurationTicks = 20,
@@ -108,6 +109,107 @@ public class PatchCommandTranslationTests
                 Assert.Equal("farming", bias.GoalCategory);
             }
         );
+    }
+
+    [Fact]
+    public void Translator_AllowsMinorBeatWithZeroEffects()
+    {
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-s3a-minor",
+            777,
+            new List<PatchOp>
+            {
+                new AddStoryBeatOp
+                {
+                    OpId = "op_story_minor_1",
+                    Severity = "minor",
+                    BeatId = "BEAT_MINOR_1",
+                    Text = "Scouts report calm borders.",
+                    DurationTicks = 12,
+                    Effects = Array.Empty<EffectEntry>()
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var translator = new PatchCommandTranslator();
+        var commands = translator.Translate(response);
+
+        var story = Assert.IsType<ApplyStoryBeatRuntimeCommand>(Assert.Single(commands));
+        Assert.Empty(story.Effects);
+    }
+
+    [Fact]
+    public void Translator_RejectsSeverityMismatchDeterministically()
+    {
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-s3a-mismatch",
+            778,
+            new List<PatchOp>
+            {
+                new AddStoryBeatOp
+                {
+                    OpId = "op_story_bad_1",
+                    Severity = "minor",
+                    BeatId = "BEAT_BAD_1",
+                    Text = "Unexpected pressure on supply chains.",
+                    DurationTicks = 16,
+                    Effects = new[]
+                    {
+                        new EffectEntry
+                        {
+                            Type = "domain_modifier",
+                            Domain = "food",
+                            Modifier = -0.10,
+                            DurationTicks = 16
+                        }
+                    }
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var translator = new PatchCommandTranslator();
+        var ex = Assert.Throws<InvalidOperationException>(() => translator.Translate(response));
+        Assert.Contains("Story beat severity mismatch", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Translator_RejectsEffectCountAboveEpicLimit()
+    {
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-s3a-overflow",
+            779,
+            new List<PatchOp>
+            {
+                new AddStoryBeatOp
+                {
+                    OpId = "op_story_bad_2",
+                    Severity = "epic",
+                    BeatId = "BEAT_BAD_2",
+                    Text = "Overloaded scenario candidate.",
+                    DurationTicks = 20,
+                    Effects = new[]
+                    {
+                        BuildEffect("food", 0.05, 20),
+                        BuildEffect("economy", 0.05, 20),
+                        BuildEffect("morale", 0.05, 20),
+                        BuildEffect("research", 0.05, 20)
+                    }
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var translator = new PatchCommandTranslator();
+        var ex = Assert.Throws<InvalidOperationException>(() => translator.Translate(response));
+        Assert.Contains("max 3 effects", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -197,6 +299,17 @@ public class PatchCommandTranslationTests
         var repoRoot = FindRepoRoot();
         var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
         return new SimulationRuntime(32, 32, 10, techPath);
+    }
+
+    private static EffectEntry BuildEffect(string domain, double modifier, int durationTicks)
+    {
+        return new EffectEntry
+        {
+            Type = "domain_modifier",
+            Domain = domain,
+            Modifier = modifier,
+            DurationTicks = durationTicks
+        };
     }
 
     private static string FindRepoRoot()

@@ -32,6 +32,8 @@ public sealed class PatchCommandTranslator
                         }
                     }
 
+                    ValidateSeverityTier(addStoryBeat.Severity, effects.Count);
+
                     commands.Add(new ApplyStoryBeatRuntimeCommand(
                         addStoryBeat.BeatId,
                         addStoryBeat.Text,
@@ -66,6 +68,41 @@ public sealed class PatchCommandTranslator
         }
 
         return commands;
+    }
+
+    private static void ValidateSeverityTier(string? declaredSeverityRaw, int effectCount)
+    {
+        if (effectCount > 3)
+        {
+            throw new InvalidOperationException(
+                $"Story beat effect count {effectCount} exceeds S3-A limit (max 3 effects)."
+            );
+        }
+
+        var inferredSeverity = effectCount switch
+        {
+            0 => "minor",
+            <= 2 => "major",
+            _ => "epic"
+        };
+
+        if (string.IsNullOrWhiteSpace(declaredSeverityRaw))
+            return;
+
+        var declaredSeverity = declaredSeverityRaw.Trim().ToLowerInvariant();
+        if (declaredSeverity is not ("minor" or "major" or "epic"))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported story beat severity '{declaredSeverityRaw}'. Expected one of: minor, major, epic."
+            );
+        }
+
+        if (!string.Equals(declaredSeverity, inferredSeverity, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Story beat severity mismatch: declared '{declaredSeverity}', inferred '{inferredSeverity}' from effect count {effectCount}."
+            );
+        }
     }
 }
 

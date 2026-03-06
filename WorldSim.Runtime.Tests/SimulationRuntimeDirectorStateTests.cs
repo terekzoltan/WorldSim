@@ -13,7 +13,14 @@ public class SimulationRuntimeDirectorStateTests
     {
         var runtime = CreateRuntime();
 
-        runtime.ApplyStoryBeat("BEAT_COOLDOWN", "Harvest omens spread", durationTicks: 30);
+        runtime.ApplyStoryBeat(
+            "BEAT_COOLDOWN",
+            "Harvest omens spread",
+            durationTicks: 30,
+            effects: new[]
+            {
+                new DirectorDomainModifierSpec("economy", 0.10, DurationTicks: 30)
+            });
         var first = runtime.BuildRefinerySnapshot();
         int cooldownBefore = first["director"]?["beatCooldownRemainingTicks"]?.GetValue<int>() ?? -1;
 
@@ -23,6 +30,71 @@ public class SimulationRuntimeDirectorStateTests
 
         Assert.True(cooldownBefore > 0);
         Assert.Equal(cooldownBefore - 1, cooldownAfter);
+    }
+
+    [Fact]
+    public void ApplyStoryBeat_MinorBeat_HasNoCooldownAndNoModifiers()
+    {
+        var runtime = CreateRuntime();
+
+        runtime.ApplyStoryBeat("BEAT_MINOR", "A quiet day passes", durationTicks: 12);
+        var snapshot = runtime.BuildRefinerySnapshot();
+
+        int cooldown = snapshot["director"]?["beatCooldownRemainingTicks"]?.GetValue<int>() ?? -1;
+        var mods = snapshot["director"]?["activeDomainModifiers"]?.AsArray();
+        var beats = snapshot["director"]?["activeBeats"]?.AsArray();
+
+        Assert.Equal(0, cooldown);
+        Assert.NotNull(mods);
+        Assert.Empty(mods!);
+        Assert.Contains(beats!, beat => (beat?["severity"]?.GetValue<string>() ?? string.Empty) == "Minor");
+    }
+
+    [Fact]
+    public void ApplyStoryBeat_EpicBeat_RegistersEffects_AndSetsEpicCooldown()
+    {
+        var runtime = CreateRuntime();
+
+        runtime.ApplyStoryBeat(
+            "BEAT_EPIC",
+            "A kingdom-wide shock reshapes priorities.",
+            durationTicks: 16,
+            effects: new[]
+            {
+                new DirectorDomainModifierSpec("food", 0.10, DurationTicks: 16),
+                new DirectorDomainModifierSpec("economy", -0.08, DurationTicks: 16),
+                new DirectorDomainModifierSpec("morale", 0.06, DurationTicks: 16)
+            });
+
+        var snapshot = runtime.BuildRefinerySnapshot();
+        int cooldown = snapshot["director"]?["beatCooldownRemainingTicks"]?.GetValue<int>() ?? -1;
+        var mods = snapshot["director"]?["activeDomainModifiers"]?.AsArray();
+        var beats = snapshot["director"]?["activeBeats"]?.AsArray();
+
+        Assert.True(cooldown >= 40);
+        Assert.NotNull(mods);
+        Assert.Equal(3, mods!.Count);
+        Assert.Contains(beats!, beat => (beat?["severity"]?.GetValue<string>() ?? string.Empty) == "Epic");
+    }
+
+    [Fact]
+    public void ApplyStoryBeat_RejectsMoreThanThreeEffects()
+    {
+        var runtime = CreateRuntime();
+
+        var ex = Assert.Throws<InvalidOperationException>(() => runtime.ApplyStoryBeat(
+            "BEAT_TOO_MANY",
+            "Overloaded candidate",
+            durationTicks: 14,
+            effects: new[]
+            {
+                new DirectorDomainModifierSpec("food", 0.05, DurationTicks: 14),
+                new DirectorDomainModifierSpec("economy", 0.05, DurationTicks: 14),
+                new DirectorDomainModifierSpec("morale", 0.05, DurationTicks: 14),
+                new DirectorDomainModifierSpec("research", 0.05, DurationTicks: 14)
+            }));
+
+        Assert.Contains("max 3", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

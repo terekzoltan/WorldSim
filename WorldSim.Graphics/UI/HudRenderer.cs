@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -58,7 +59,26 @@ public sealed class HudRenderer
         var contentWidth = Math.Max(220, panelWidth - 26);
 
         var visibleEventCount = Math.Min(snapshot.RecentEvents.Count, 8);
+        var director = snapshot.Director;
+        var hasDirectorData = director.ActiveDirectives.Count > 0
+                              || director.ActiveDomainModifiers.Count > 0
+                              || director.ActiveGoalBiases.Count > 0
+                              || director.BeatCooldownRemainingTicks > 0
+                              || !string.Equals(director.LastActionStatus, "No director action", StringComparison.OrdinalIgnoreCase);
+
+        var directorExtraLines = 0;
+        if (hasDirectorData)
+        {
+            directorExtraLines += 2;
+            if (showAiDebug)
+            {
+                directorExtraLines += Math.Min(2, director.ActiveDomainModifiers.Count > 0 ? 1 : 0);
+                directorExtraLines += Math.Min(2, director.ActiveGoalBiases.Count > 0 ? 1 : 0);
+            }
+        }
+
         var baseHeight = 120 + (snapshot.Colonies.Count * 44) + 84 + (visibleEventCount * 26);
+        baseHeight += directorExtraLines * 20;
         if (renderStats != null)
             baseHeight += 24;
         var panelHeight = Math.Clamp(baseHeight, 220, Math.Max(220, viewportHeight - 40));
@@ -68,6 +88,7 @@ public sealed class HudRenderer
         var y = 18;
         y = _colonyPanel.Draw(spriteBatch, font, snapshot.Colonies, leftX, y, contentWidth, Theme);
         y = _ecologyPanel.Draw(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, Theme);
+        y = DrawDirectorStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, showAiDebug);
         y = _eventFeed.Draw(spriteBatch, font, snapshot.RecentEvents.Take(visibleEventCount).ToList(), leftX, y + 4, contentWidth, Theme);
         y = TextWrap.DrawWrapped(spriteBatch, font, refineryStatus, new Vector2(leftX, y + 10), Theme.StatusText, contentWidth, 20);
         y = TextWrap.DrawWrapped(spriteBatch, font, plannerStatus, new Vector2(leftX, y), Theme.StatusText, contentWidth, 20);
@@ -80,6 +101,61 @@ public sealed class HudRenderer
 
         if (showAiDebug)
             _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
+    }
+
+    private int DrawDirectorStatus(
+        SpriteBatch spriteBatch,
+        SpriteFont font,
+        WorldRenderSnapshot snapshot,
+        int startX,
+        int startY,
+        int maxWidth,
+        bool showDebug)
+    {
+        var state = snapshot.Director;
+        var directive = state.ActiveDirectives.FirstOrDefault();
+        var directiveLabel = directive == null
+            ? "none"
+            : $"{directive.Directive} C{directive.ColonyId} ({directive.RemainingTicks}/{directive.TotalTicks}t)";
+
+        int y = TextWrap.DrawWrapped(
+            spriteBatch,
+            font,
+            $"Director: stage={state.StageMarker} mode={state.OutputMode} cd={state.BeatCooldownRemainingTicks}t",
+            new Vector2(startX, startY),
+            Theme.DirectorEventText,
+            maxWidth,
+            18);
+
+        y = TextWrap.DrawWrapped(
+            spriteBatch,
+            font,
+            $"Directive: {directiveLabel}",
+            new Vector2(startX, y),
+            Theme.SecondaryText,
+            maxWidth,
+            18);
+
+        if (!showDebug)
+            return y;
+
+        if (state.ActiveDomainModifiers.Count > 0)
+        {
+            var mods = string.Join(", ", state.ActiveDomainModifiers
+                .Take(3)
+                .Select(mod => $"{mod.Domain}:{mod.EffectiveModifier:+0.00;-0.00}({mod.RemainingTicks}t)"));
+            y = TextWrap.DrawWrapped(spriteBatch, font, $"Dir mods: {mods}", new Vector2(startX, y), Theme.SecondaryText, maxWidth, 18);
+        }
+
+        if (state.ActiveGoalBiases.Count > 0)
+        {
+            var biases = string.Join(", ", state.ActiveGoalBiases
+                .Take(3)
+                .Select(bias => $"C{bias.ColonyId}.{bias.GoalCategory}:{bias.EffectiveWeight:0.00}"));
+            y = TextWrap.DrawWrapped(spriteBatch, font, $"Dir bias: {biases}", new Vector2(startX, y), Theme.SecondaryText, maxWidth, 18);
+        }
+
+        return y;
     }
 
     private void DrawPanel(SpriteBatch spriteBatch, Texture2D pixel, Rectangle rect)

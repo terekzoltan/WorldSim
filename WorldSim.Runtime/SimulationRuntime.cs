@@ -102,7 +102,81 @@ public sealed class SimulationRuntime
         Tick++;
     }
 
-    public WorldRenderSnapshot GetSnapshot() => WorldSnapshotBuilder.Build(_world);
+    public WorldRenderSnapshot GetSnapshot()
+    {
+        var snapshot = WorldSnapshotBuilder.Build(_world);
+        return snapshot with
+        {
+            Director = BuildDirectorRenderState()
+        };
+    }
+
+    private DirectorRenderState BuildDirectorRenderState()
+    {
+        var activeBeats = _directorState.ActiveBeats
+            .Select(beat => new DirectorActiveBeatRenderData(
+                beat.BeatId,
+                beat.Text,
+                beat.Severity.ToString(),
+                beat.RemainingTicks,
+                beat.TotalTicks))
+            .ToList();
+
+        var activeDirectives = _directorState.ActiveDirectives
+            .Select(directive => new DirectorActiveDirectiveRenderData(
+                directive.ColonyId,
+                directive.Directive,
+                directive.RemainingTicks,
+                directive.TotalTicks))
+            .ToList();
+
+        var activeModifiers = _world.GetActiveDomainModifiers()
+            .Select(modifier => new DirectorDomainModifierRenderData(
+                modifier.SourceId,
+                modifier.Domain.ToString(),
+                modifier.BaseModifier,
+                modifier.EffectiveModifier,
+                modifier.RemainingTicks,
+                modifier.TotalDurationTicks))
+            .ToList();
+
+        var activeBiases = _world._colonies
+            .SelectMany(colony => _world.GetActiveGoalBiases(colony.Id)
+                .Select(bias => new DirectorGoalBiasRenderData(
+                    bias.ColonyId,
+                    bias.SourceId,
+                    bias.GoalCategory,
+                    bias.BaseWeight,
+                    bias.EffectiveWeight,
+                    bias.RemainingTicks,
+                    bias.TotalDurationTicks,
+                    bias.IsBlendActive)))
+            .OrderBy(bias => bias.ColonyId)
+            .ThenBy(bias => bias.GoalCategory)
+            .ToList();
+
+        var stageMarker = activeBeats.Count > 0 || activeDirectives.Count > 0
+            ? "active"
+            : _directorState.BeatCooldownRemainingTicks > 0
+                ? "cooldown"
+                : "idle";
+
+        var outputMode = (Environment.GetEnvironmentVariable("REFINERY_DIRECTOR_OUTPUT_MODE") ?? "both").Trim().ToLowerInvariant();
+        if (outputMode is not ("both" or "story_only" or "nudge_only" or "off"))
+            outputMode = "both";
+
+        return new DirectorRenderState(
+            StageMarker: stageMarker,
+            OutputMode: outputMode,
+            BeatCooldownRemainingTicks: _directorState.BeatCooldownRemainingTicks,
+            MajorBeatCooldownRemainingTicks: _directorState.MajorBeatCooldownRemainingTicks,
+            EpicBeatCooldownRemainingTicks: _directorState.EpicBeatCooldownRemainingTicks,
+            ActiveBeats: activeBeats,
+            ActiveDirectives: activeDirectives,
+            ActiveDomainModifiers: activeModifiers,
+            ActiveGoalBiases: activeBiases,
+            LastActionStatus: LastDirectorActionStatus);
+    }
 
     public AiDebugSnapshot GetAiDebugSnapshot() => _latestAiDebugSnapshot;
 
@@ -278,23 +352,43 @@ public sealed class SimulationRuntime
             }
         }
 
-        var result = _directorState.ApplyStoryBeat(beatId, text, (int)durationTicks, DirectorBeatSeverity.Major);
+        var severity = InferBeatSeverity(validatedEffects.Count);
+
+        var result = _directorState.ApplyStoryBeat(beatId, text, (int)durationTicks, severity);
         if (!result.Success)
             throw new InvalidOperationException($"Cannot apply story beat '{beatId}': {result.Message}");
 
-        foreach (var (domain, modifier) in validatedEffects)
+        if (severity != DirectorBeatSeverity.Minor)
         {
-            _world.RegisterDomainModifier(
-                sourceId: "beat:" + beatId,
-                domain: domain,
-                modifier: modifier,
-                durationTicks: (int)durationTicks,
-                dampeningFactor: _directorDampeningFactor);
+            foreach (var (domain, modifier) in validatedEffects)
+            {
+                _world.RegisterDomainModifier(
+                    sourceId: "beat:" + beatId,
+                    domain: domain,
+                    modifier: modifier,
+                    durationTicks: (int)durationTicks,
+                    dampeningFactor: _directorDampeningFactor);
+            }
         }
 
-        _world.AddExternalEvent("[Director] " + text);
+        _world.AddExternalEvent($"[Director:{severity.ToString().ToUpperInvariant()}] {text}");
 
         LastDirectorActionStatus = result.Message;
+    }
+
+    private static DirectorBeatSeverity InferBeatSeverity(int effectCount)
+    {
+        if (effectCount < 0)
+            throw new InvalidOperationException($"Cannot infer beat severity: invalid effect count {effectCount}.");
+        if (effectCount > 3)
+            throw new InvalidOperationException($"Cannot apply story beat: effect count {effectCount} exceeds S3-A cap (max 3).");
+
+        return effectCount switch
+        {
+            0 => DirectorBeatSeverity.Minor,
+            <= 2 => DirectorBeatSeverity.Major,
+            _ => DirectorBeatSeverity.Epic
+        };
     }
 
     public void ApplyColonyDirective(

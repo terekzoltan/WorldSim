@@ -5,6 +5,9 @@ namespace WorldSim.Contracts.V2;
 
 public sealed record AddStoryBeatOp : PatchOp
 {
+    [JsonPropertyName("severity")]
+    public string? Severity { get; init; }
+
     [JsonPropertyName("beatId")]
     public required string BeatId { get; init; }
 

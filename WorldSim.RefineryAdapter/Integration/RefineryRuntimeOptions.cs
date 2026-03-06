@@ -5,6 +5,7 @@ namespace WorldSim.RefineryAdapter.Integration;
 public sealed record RefineryRuntimeOptions(
     RefineryIntegrationMode Mode,
     string Goal,
+    string DirectorOutputMode,
     string FixtureResponsePath,
     string ServiceBaseUrl,
     bool StrictMode,
@@ -27,6 +28,9 @@ public sealed record RefineryRuntimeOptions(
         };
 
         var goal = System.Environment.GetEnvironmentVariable("REFINERY_GOAL") ?? "TECH_TREE_PATCH";
+        var directorOutputMode = NormalizeDirectorOutputMode(
+            System.Environment.GetEnvironmentVariable("REFINERY_DIRECTOR_OUTPUT_MODE")
+        );
         var strictMode = !string.Equals(System.Environment.GetEnvironmentVariable("REFINERY_LENIENT"), "true", System.StringComparison.OrdinalIgnoreCase);
         var serviceBaseUrl = System.Environment.GetEnvironmentVariable("REFINERY_BASE_URL") ?? "http://localhost:8091";
         var requestSeed = ParseLongEnv("REFINERY_REQUEST_SEED", 123L);
@@ -52,6 +56,7 @@ public sealed record RefineryRuntimeOptions(
         return new RefineryRuntimeOptions(
             mode,
             goal,
+            directorOutputMode,
             fixtureResponsePath,
             serviceBaseUrl,
             strictMode,
@@ -90,5 +95,15 @@ public sealed record RefineryRuntimeOptions(
         }
 
         return baseDirectory;
+    }
+
+    private static string NormalizeDirectorOutputMode(string? raw)
+    {
+        var normalized = string.IsNullOrWhiteSpace(raw) ? "auto" : raw.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "auto" or "both" or "story_only" or "nudge_only" or "off" => normalized,
+            _ => "auto"
+        };
     }
 }
