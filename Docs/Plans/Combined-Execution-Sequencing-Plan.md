@@ -289,6 +289,80 @@ Proof targets:
 
 ---
 
+## Wave 3.2 — NPC Clustering + Observability Closeout
+
+Purpose:
+- Close the remaining NPC clustering / idle-looking stack issues discovered during manual simulation review.
+- Treat diplomacy/war as an amplifier, not the single root cause.
+- Prioritize broad runtime correctness: actor overlap, no-progress loops, retreat collapse, and missing observability.
+
+### Sprint X3.2: Occupancy + No-Progress + Retreat Fixes (Track B + A + C)
+
+- ✅ **W3.2-B1** Actor occupancy lite / end-position deconfliction (Track B)
+- ✅ **W3.2-B2** Soft reservation for shared targets (resource/build/retreat slots) (Track B)
+- ✅ **W3.2-B3** No-progress detection + backoff for pseudo-success movement/action loops (Track B)
+- ✅ **W3.2-B4** Replace single-tile flee-to-origin with safe-area / refuge ring behavior (Track B)
+- ✅ **W3.2-B5** Export runtime observability for clustering diagnosis (war state, warrior quota, optional NPC cause/target debug) (Track B)
+- ✅ **W3.2-C1** Audit planner/AI fallback so peaceful zero-signal states do not collapse into bad defensive loops (Track C)
+- ✅ **W3.2-C2** Add crowd-aware fallback preferences where AI already chooses between equivalent actions (Track C)
+- ✅ **W3.2-A1** Add stack visibility/debug rendering for overlapping people (Track A)
+- ✅ **W3.2-A2** Rename diplomacy panel labels from `F0/F1/F2/F3` to faction names/abbreviations and improve panel title (Track A)
+- ✅ **W3.2-A3** Replace placeholder combat overlay with useful debug content (Track A)
+
+### Wave 3.2 — Execution Steps
+
+**Step 1 — Runtime broad fixes first (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W3.2-B1 | Wave 3.1 ✅ | Prevent arbitrary same-tile stacking as a baseline runtime rule |
+| Track B agent | W3.2-B3 | W3.2-B1 ✅ | Detect loops where actions/movement report success without real position change |
+| Track B agent | W3.2-B4 | W3.2-B1 ✅ | Retreat/home behavior must stop collapsing civilians onto a single colony origin tile |
+
+**Step 2 — Shared-target deconfliction + observability (Track B, then Track A/C can consume it)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W3.2-B2 | W3.2-B1 ✅ | Soft reservation only; avoid heavy fully-simultaneous path ownership in this wave |
+| Track B agent | W3.2-B5 | W3.2-B3 ✅ | Export `ColonyWarState`, `ColonyWarriorCount`, and optional per-NPC reason/target/no-progress debug |
+
+**Step 3 — AI + UI closeout (Track C + A, partially parallel)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | W3.2-C1 | W3.2-B5 ✅ | Verify peaceful states do not enter defensive/flee-biased fallback spuriously |
+| Track C agent | W3.2-C2 | W3.2-B2 ✅ | Prefer alternate equivalent targets when tiles/slots are crowded |
+| Track A agent | W3.2-A1 | W3.2-B5 ✅ | Surface stack count / overlap debug so manual QA can see whether overlap still exists |
+| Track A agent | W3.2-A2 | Wave 3.1 ✅ | Pure naming/UX cleanup: use faction names/abbreviations instead of `F*` ids |
+| Track A agent | W3.2-A3 | W3.2-B5 ✅ | Combat overlay should show meaningful combat/mobilization/contested diagnostics, not placeholder boxes |
+
+### Wave 3.2 — Design Notes
+
+- Diplomacy/war is considered an amplifier for clustering, not the sole root cause.
+- The first fixes must target broad/systemic behavior: people overlap, shared target convergence, and no-progress loops.
+- `TryMoveTowardsNearestResource(...)` is not treated as the sole driver for this wave; fixes should stay broad and occupancy-focused.
+- Retreat/home collapse remains in scope because it worsens clusters even when it is not the original trigger.
+- Naming cleanup: the diplomacy panel should move away from `F0/F1/F2/F3` and toward recognizable faction labels (for example `Syl`, `Obs`, `Aet`, `Chi`).
+
+Acceptance notes:
+- In peaceful runs, multiple civilians should no longer remain visually collapsed onto one tile for long periods.
+- In hostile/war runs, civilian retreat should spread into a local safe area rather than a single origin pixel.
+- Manual QA must be able to distinguish: peaceful crowding, diplomacy-driven retreat, contested-tile convergence, and no-progress loops.
+- Combat overlay must provide real debugging value.
+
+Proof targets:
+- `W3.2-B1/B2/B3`: runtime tests proving overlap prevention, soft reservation, and no-progress backoff in peaceful scenarios.
+- `W3.2-B4`: runtime test proving flee/home uses a safe-area distribution rather than a single origin tile.
+- `W3.2-B5/A1/A3`: snapshot/HUD/overlay verification that stack counts, war state, contested status, and combat diagnostics are visible.
+- `W3.2-C1/C2`: AI tests proving peaceful states avoid bad defensive fallback and crowded equivalent targets can be de-prioritized.
+
+**Parallelism:**
+- Step 1 is mostly sequential Track B work.
+- After `W3.2-B5`, Track A and Track C can proceed in parallel.
+- No Track D work is required for this closeout wave.
+
+---
+
 ## Wave 4 — Refinery Gate + Military Tech (Director Phase 2a + Combat Phase 2)
 
 ### Sprint D4: Formal Model + Validation Loop (Track D only — Java)
