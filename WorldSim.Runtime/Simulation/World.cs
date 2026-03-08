@@ -95,6 +95,7 @@ namespace WorldSim.Simulation
         readonly Dictionary<(Faction left, Faction right), int> _contestedTilesByFactionPair = new();
         readonly RelationManager _relationManager = new();
         readonly DefenseManager _defenseManager = new();
+        readonly Dictionary<string, int> _softReservations = new(StringComparer.Ordinal);
         int _navigationTopologyVersion;
         int _nextDefenseStructureId = 1;
 
@@ -218,6 +219,7 @@ namespace WorldSim.Simulation
         public void Update(float dt)
         {
             _tickCounter++;
+            _softReservations.Clear();
             _simulationTimeSeconds += Math.Max(0f, dt);
             _domainModifierEngine.Tick();
             _goalBiasEngine.Tick();
@@ -236,6 +238,8 @@ namespace WorldSim.Simulation
             _people.AddRange(births);
             if (births.Count > 0)
                 MarkTerritoryDirty();
+
+            DeconflictPeopleEndPositions();
 
             _professionRebalanceTimer += dt;
             if (_professionRebalanceTimer >= ProfessionRebalancePeriod)
@@ -450,6 +454,21 @@ namespace WorldSim.Simulation
 
         public int CurrentTick => _tickCounter;
         public int TerritoryRecomputeCount => _territoryRecomputeCount;
+        public int ActiveSoftReservationCount => _softReservations.Count;
+
+        public int GetSoftReservationCount(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return 0;
+            return _softReservations.GetValueOrDefault(key, 0);
+        }
+
+        public void ReserveSoftTarget(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return;
+            _softReservations[key] = _softReservations.GetValueOrDefault(key, 0) + 1;
+        }
 
         public void RegisterDomainModifier(string sourceId, RuntimeDomain domain, double modifier, int durationTicks, double dampeningFactor)
             => _domainModifierEngine.RegisterModifier(sourceId, domain, modifier, durationTicks, dampeningFactor);
@@ -557,6 +576,55 @@ namespace WorldSim.Simulation
             const float rollingWindowSeconds = 60f;
             while (_recentStarvationDeaths.Count > 0 && (_simulationTimeSeconds - _recentStarvationDeaths.Peek()) > rollingWindowSeconds)
                 _recentStarvationDeaths.Dequeue();
+        }
+
+        private void DeconflictPeopleEndPositions()
+        {
+            var occupied = new HashSet<(int x, int y)>();
+            foreach (var person in _people)
+            {
+                if (person.Health <= 0f)
+                    continue;
+
+                if (occupied.Add(person.Pos))
+                    continue;
+
+                if (TryFindNearbyFreePersonTile(person, person.Pos, out var fallback))
+                {
+                    person.Pos = fallback;
+                    occupied.Add(fallback);
+                }
+            }
+        }
+
+        private bool TryFindNearbyFreePersonTile(Person person, (int x, int y) center, out (int x, int y) tile)
+        {
+            for (int radius = 1; radius <= 12; radius++)
+            {
+                int minX = Math.Max(0, center.x - radius);
+                int maxX = Math.Min(Width - 1, center.x + radius);
+                int minY = Math.Max(0, center.y - radius);
+                int maxY = Math.Min(Height - 1, center.y + radius);
+
+                for (int y = minY; y <= maxY; y++)
+                {
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        if (_map[x, y].Ground == Ground.Water)
+                            continue;
+                        if (IsMovementBlocked(x, y, person.Home.Id))
+                            continue;
+                        if (_people.Any(other => other != person && other.Health > 0f && other.Pos == (x, y)))
+                            continue;
+
+                        tile = (x, y);
+                        return true;
+                    }
+                }
+            }
+
+            tile = center;
+            return false;
         }
 
         private void MarkTerritoryDirty()

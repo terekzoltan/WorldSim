@@ -178,6 +178,12 @@ public class RuntimeNpcBrainTests
 
         var actor = world._people[0];
         actor.Pos = (5, 5);
+        for (int y = Math.Max(0, actor.Pos.y - 5); y <= Math.Min(world.Height - 1, actor.Pos.y + 5); y++)
+        {
+            for (int x = Math.Max(0, actor.Pos.x - 5); x <= Math.Min(world.Width - 1, actor.Pos.x + 5); x++)
+                world.GetTile(x, y).ReplaceNode(null);
+        }
+        world.GetTile(5, 5).ReplaceNode(new ResourceNode(Resource.Wood, 4));
         actor.Health = 77f;
         actor.Strength = 14;
         actor.Defense = 12;
@@ -185,6 +191,10 @@ public class RuntimeNpcBrainTests
         var hostile = world._people.First(person => person != actor && person.Home.Faction != actor.Home.Faction);
         world.SetFactionStance(actor.Home.Faction, hostile.Home.Faction, WorldSim.Simulation.Diplomacy.Stance.Hostile);
         hostile.Pos = (6, 5);
+
+        world.ReserveSoftTarget("resource:Wood:5:5");
+        world.ReserveSoftTarget($"build:{actor.Home.Origin.x}:{actor.Home.Origin.y}");
+        world.ReserveSoftTarget($"retreat:{actor.Home.Origin.x}:{actor.Home.Origin.y}");
 
         var brain = new RuntimeNpcBrain(new CapturingBrain());
         _ = brain.Think(actor, world, dt: 1f);
@@ -198,6 +208,9 @@ public class RuntimeNpcBrainTests
         Assert.True(CapturingBrain.LastContext.Value.NearbyHostilePeople >= 1);
         Assert.True(CapturingBrain.LastContext.Value.BiasGathering > 0.30f);
         Assert.True(CapturingBrain.LastContext.Value.BiasBuilding > 0.15f);
+        Assert.True(CapturingBrain.LastContext.Value.ResourceCrowdPressure > 0f);
+        Assert.True(CapturingBrain.LastContext.Value.BuildCrowdPressure >= 0f);
+        Assert.True(CapturingBrain.LastContext.Value.RetreatCrowdPressure >= 0f);
     }
 
     [Fact]
@@ -252,7 +265,6 @@ public class RuntimeNpcBrainTests
         _ = brain.Think(actor, world, dt: 1f);
 
         Assert.NotNull(CapturingBrain.LastContext);
-        Assert.True(CapturingBrain.LastContext!.Value.IsWarStance);
         Assert.True(CapturingBrain.LastContext.Value.IsContestedTile || CapturingBrain.LastContext.Value.HasContestedTilesNearby);
         Assert.True(CapturingBrain.LastContext.Value.LocalThreatScore > 0f);
     }

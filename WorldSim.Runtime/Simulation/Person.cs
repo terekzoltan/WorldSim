@@ -86,10 +86,20 @@ public class Person
     float _combatMarkerSeconds;
     readonly NavigationPathCache _pathCache = new();
     int _unstickStepsRemaining;
+    int _noProgressStreak;
+    int _backoffTicksRemaining;
+    bool _trackNoProgressForCurrentMove;
 
     const int PathCacheHorizon = 12;
     const int PathMaxExpansions = 4096;
     const int UnstickSteps = 3;
+    const int NoProgressThreshold = 4;
+    const int NoProgressBackoffTicks = 4;
+
+    public int NoProgressStreak => _noProgressStreak;
+    public int BackoffTicksRemaining => _backoffTicksRemaining;
+    public string DebugDecisionCause { get; private set; } = "none";
+    public string DebugTargetKey { get; private set; } = "none";
 
     private Person(Colony home, (int, int) pos, bool newborn, RuntimeNpcBrain brain, Random rng)
     {
@@ -192,6 +202,9 @@ public class Person
 
     public bool Update(World w, float dt, List<Person> births)
     {
+        if (_backoffTicksRemaining > 0)
+            _backoffTicksRemaining--;
+
         // perception step
         Perceive(w);
 
@@ -748,7 +761,17 @@ public class Person
 
     bool TryHandleThreatResponse(World w, float dt)
     {
+        if (_backoffTicksRemaining > 0)
+            return false;
+
         var context = BuildThreatContext(w);
+
+        if (ThreatDecisionPolicy.IsPeacefulZeroSignal(context))
+        {
+            DebugDecisionCause = "peaceful_skip";
+            DebugTargetKey = "none";
+            return false;
+        }
 
         bool hasImmediateThreats = context.NearbyPredators + context.NearbyHostilePeople > 0;
         bool shouldDefend = ThreatDecisionPolicy.ShouldPrioritizeDefense(context);
@@ -908,16 +931,33 @@ public class Person
     void ExecuteFleeAction(World w)
     {
         var threatContext = BuildThreatContext(w);
-        if (!threatContext.IsWarriorRole &&
-            (threatContext.IsHostileStance || threatContext.IsWarStance || threatContext.IsContestedTile || threatContext.HasContestedTilesNearby))
+        bool hasFactionThreat =
+            threatContext.IsHostileStance ||
+            threatContext.IsWarStance ||
+            threatContext.IsContestedTile ||
+            threatContext.HasContestedTilesNearby ||
+            threatContext.NearbyEnemyCount > 0 ||
+            threatContext.NearbyHostilePeople > 0;
+
+        bool useRefugeRing =
+            hasFactionThreat &&
+            (threatContext.NearbyEnemyCount > 0 || threatContext.IsContestedTile || threatContext.HasContestedTilesNearby);
+
+        var retreatTarget = useRefugeRing
+            ? FindRetreatTarget(w)
+            : _home.Origin;
+
+        if (!threatContext.IsWarriorRole && hasFactionThreat)
         {
-            MoveTowards(w, _home.Origin, 1);
+            _trackNoProgressForCurrentMove = useRefugeRing;
+            MoveTowards(w, retreatTarget, 1);
             return;
         }
 
         var nearestThreat = FindNearestThreat(w, radius: 6);
         if (nearestThreat == null)
         {
+            _trackNoProgressForCurrentMove = false;
             MoveTowards(w, _home.Origin, 1);
             return;
         }
@@ -929,13 +969,131 @@ public class Person
 
         stepX = Math.Clamp(stepX, 0, w.Width - 1);
         stepY = Math.Clamp(stepY, 0, w.Height - 1);
-        if (w.GetTile(stepX, stepY).Ground != Ground.Water)
+        if (!w.IsMovementBlocked(stepX, stepY, _home.Id))
         {
             Pos = (stepX, stepY);
+            _noProgressStreak = 0;
             return;
         }
 
-        Wander(w);
+        _trackNoProgressForCurrentMove = hasFactionThreat && useRefugeRing;
+        MoveTowards(w, hasFactionThreat ? retreatTarget : _home.Origin, 1);
+    }
+
+    (int x, int y) FindRetreatTarget(World w)
+    {
+        var origin = _home.Origin;
+        var nearestThreat = FindNearestThreat(w, radius: 12);
+
+        (int x, int y)? best = null;
+        float bestScore = float.MaxValue;
+
+        for (int radius = 2; radius <= 10; radius++)
+        {
+            int minX = Math.Max(0, origin.x - radius);
+            int maxX = Math.Min(w.Width - 1, origin.x + radius);
+            int minY = Math.Max(0, origin.y - radius);
+            int maxY = Math.Min(w.Height - 1, origin.y + radius);
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    int ring = Math.Abs(x - origin.x) + Math.Abs(y - origin.y);
+                    if (ring != radius)
+                        continue;
+                    if (w.IsMovementBlocked(x, y, _home.Id))
+                        continue;
+
+                    int occupancy = w._people.Count(person => person != this && person.Health > 0f && person.Pos == (x, y));
+                    int localThreatCount = CountThreatsNearPosition(w, (x, y), radius: 2);
+                    float contestedPenalty = w.IsTileContested(x, y) ? 4f : 0f;
+                    float threatPenalty = localThreatCount * 2.5f;
+                    float occupancyPenalty = occupancy * 3f;
+                    float reservationPenalty = w.GetSoftReservationCount(BuildRetreatReservationKey(x, y)) * 2f;
+                    float distancePenalty = Math.Abs(x - Pos.x) + Math.Abs(y - Pos.y);
+
+                    float score = contestedPenalty + threatPenalty + occupancyPenalty + reservationPenalty + distancePenalty;
+                    if (nearestThreat != null)
+                        score -= Math.Abs(x - nearestThreat.Value.x) + Math.Abs(y - nearestThreat.Value.y);
+
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        best = (x, y);
+                    }
+                }
+            }
+        }
+
+        if (best != null)
+        {
+            var selected = best.Value;
+            var key = BuildRetreatReservationKey(selected.x, selected.y);
+            w.ReserveSoftTarget(key);
+            DebugDecisionCause = "retreat_refuge";
+            DebugTargetKey = key;
+            return selected;
+        }
+
+        for (int radius = 1; radius <= 12; radius++)
+        {
+            int minX = Math.Max(0, origin.x - radius);
+            int maxX = Math.Min(w.Width - 1, origin.x + radius);
+            int minY = Math.Max(0, origin.y - radius);
+            int maxY = Math.Min(w.Height - 1, origin.y + radius);
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (w.IsMovementBlocked(x, y, _home.Id))
+                        continue;
+                    var key = BuildRetreatReservationKey(x, y);
+                    w.ReserveSoftTarget(key);
+                    DebugDecisionCause = "retreat_fallback";
+                    DebugTargetKey = key;
+                    return (x, y);
+                }
+            }
+        }
+
+        DebugDecisionCause = "retreat_origin";
+        DebugTargetKey = BuildRetreatReservationKey(origin.x, origin.y);
+        return origin;
+    }
+
+    private static string BuildRetreatReservationKey(int x, int y)
+        => $"retreat:{x}:{y}";
+
+    private static string BuildBuildReservationKey(int x, int y)
+        => $"build:{x}:{y}";
+
+    int CountThreatsNearPosition(World w, (int x, int y) pos, int radius)
+    {
+        int count = 0;
+        foreach (var person in w._people)
+        {
+            if (person == this || person.Health <= 0f || person.Home == _home)
+                continue;
+            if (w.GetFactionStance(_home.Faction, person.Home.Faction) < WorldSim.Simulation.Diplomacy.Stance.Hostile)
+                continue;
+
+            int dist = Math.Abs(person.Pos.x - pos.x) + Math.Abs(person.Pos.y - pos.y);
+            if (dist <= radius)
+                count++;
+        }
+
+        foreach (var animal in w._animals)
+        {
+            if (animal is not Predator predator || !predator.IsAlive)
+                continue;
+            int dist = Math.Abs(predator.Pos.x - pos.x) + Math.Abs(predator.Pos.y - pos.y);
+            if (dist <= radius)
+                count++;
+        }
+
+        return count;
     }
 
     void ExecuteBuildWallAction(World w)
@@ -946,6 +1104,11 @@ public class Person
         var spot = FindDefensePlacement(w, preferContested: true);
         if (spot == null)
             return;
+
+        var reservationKey = BuildBuildReservationKey(spot.Value.x, spot.Value.y);
+        w.ReserveSoftTarget(reservationKey);
+        DebugDecisionCause = "build_wall";
+        DebugTargetKey = reservationKey;
 
         if (!w.TryAddWoodWall(_home, spot.Value))
             return;
@@ -962,6 +1125,11 @@ public class Person
         var spot = FindDefensePlacement(w, preferContested: true);
         if (spot == null)
             return;
+
+        var reservationKey = BuildBuildReservationKey(spot.Value.x, spot.Value.y);
+        w.ReserveSoftTarget(reservationKey);
+        DebugDecisionCause = "build_watchtower";
+        DebugTargetKey = reservationKey;
 
         if (!w.TryAddWatchtower(_home, spot.Value))
             return;
@@ -1143,17 +1311,25 @@ public class Person
         if (candidates.Count == 0)
             return null;
 
-        if (preferContested)
+        (int x, int y)? best = null;
+        float bestScore = float.MaxValue;
+        foreach (var candidate in candidates)
         {
-            var contested = candidates
-                .OrderByDescending(pos => w.IsTileContested(pos.x, pos.y) ? 1 : 0)
-                .ThenBy(pos => Math.Abs(pos.x - Pos.x) + Math.Abs(pos.y - Pos.y))
-                .FirstOrDefault();
-            if (contested != default)
-                return contested;
+            float score = Math.Abs(candidate.x - Pos.x) + Math.Abs(candidate.y - Pos.y);
+            if (preferContested && w.IsTileContested(candidate.x, candidate.y))
+                score -= 2f;
+
+            var reservationKey = BuildBuildReservationKey(candidate.x, candidate.y);
+            score += w.GetSoftReservationCount(reservationKey) * 1.5f;
+
+            if (score < bestScore)
+            {
+                best = candidate;
+                bestScore = score;
+            }
         }
 
-        return candidates[_rng.Next(candidates.Count)];
+        return best ?? candidates[_rng.Next(candidates.Count)];
     }
 
     private (int x, int y)? FindRaidTarget(World w)
@@ -1368,6 +1544,7 @@ public class Person
     {
         (int x, int y)? bestPos = null;
         int bestDist = int.MaxValue;
+        float bestScore = float.MaxValue;
         Resource bestType = Resource.None;
 
         bool Wants(Resource r)
@@ -1395,8 +1572,13 @@ public class Person
                     if (node == null || node.Amount <= 0) continue;
                     if (!Wants(node.Type)) continue;
 
-                    if (md < bestDist)
+                    string reservationKey = BuildResourceReservationKey(node.Type, nx, ny);
+                    int reserved = w.GetSoftReservationCount(reservationKey);
+                    float score = md + (reserved * 1.25f);
+
+                    if (score < bestScore || (Math.Abs(score - bestScore) < 0.001f && md < bestDist))
                     {
+                        bestScore = score;
                         bestDist = md;
                         bestPos = (nx, ny);
                         bestType = node.Type;
@@ -1411,6 +1593,11 @@ public class Person
         // Ha már rajta állunk
         if (bestDist == 0)
         {
+            var reservationKey = BuildResourceReservationKey(bestType, bestPos.Value.x, bestPos.Value.y);
+            w.ReserveSoftTarget(reservationKey);
+            DebugDecisionCause = "gather";
+            DebugTargetKey = reservationKey;
+
             if (bestType == Resource.Wood)
             {
                 Current = Job.GatherWood;
@@ -1440,9 +1627,16 @@ public class Person
         }
 
         // Step toward target
+        var moveReservationKey = BuildResourceReservationKey(bestType, bestPos.Value.x, bestPos.Value.y);
+        w.ReserveSoftTarget(moveReservationKey);
+        DebugDecisionCause = "move_to_resource";
+        DebugTargetKey = moveReservationKey;
         MoveTowards(w, bestPos.Value, (int)_home.MovementSpeedMultiplier);
         return true;
     }
+
+    private static string BuildResourceReservationKey(Resource resource, int x, int y)
+        => $"resource:{resource}:{x}:{y}";
 
     bool TryHuntNearbyHerbivore(World w, int range)
     {
@@ -1473,6 +1667,7 @@ public class Person
     void MoveTowards(World w, (int x, int y) target, int maxStep)
     {
         int remaining = Math.Max(1, maxStep);
+        var startPos = Pos;
         int cx = Pos.x, cy = Pos.y;
         var grid = new NavigationGrid(w);
 
@@ -1546,6 +1741,42 @@ public class Person
         }
 
         Pos = (cx, cy);
+
+        var shouldTrackNoProgress = ShouldTrackNoProgressForCurrentMove();
+        _trackNoProgressForCurrentMove = false;
+        if (!shouldTrackNoProgress)
+        {
+            _noProgressStreak = 0;
+            return;
+        }
+
+        if (Pos == startPos)
+        {
+            _noProgressStreak++;
+            if (_noProgressStreak >= NoProgressThreshold)
+            {
+                _noProgressStreak = 0;
+                _backoffTicksRemaining = Math.Max(_backoffTicksRemaining, NoProgressBackoffTicks);
+                _pathCache.Invalidate();
+                _unstickStepsRemaining = Math.Max(_unstickStepsRemaining, UnstickSteps);
+                DebugDecisionCause = "no_progress_backoff";
+                DebugTargetKey = $"move:{target.x}:{target.y}";
+                Current = Job.Idle;
+                _doingJob = 0;
+            }
+        }
+        else
+        {
+            _noProgressStreak = 0;
+        }
+    }
+
+    private bool ShouldTrackNoProgressForCurrentMove()
+    {
+        if (Current == Job.Flee)
+            return _trackNoProgressForCurrentMove;
+
+        return Current is Job.Fight or Job.RaidBorder or Job.AttackStructure;
     }
 
     void BuildPathCache(NavigationGrid grid, (int x, int y) start, (int x, int y) target, int topologyVersion)

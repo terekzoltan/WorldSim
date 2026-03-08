@@ -20,7 +20,8 @@ public sealed class GoalSelector
             if (!onCooldown)
             {
                 var bias = GoalBiasCategories.GetBiasForGoal(goal.Name, context);
-                score = Math.Clamp(score + bias, 0f, 1f);
+                var crowdPenalty = GoalBiasCategories.GetCrowdPenaltyForGoal(goal.Name, context) * 0.2f;
+                score = Math.Clamp(score + bias - crowdPenalty, 0f, 1f);
             }
             scores.Add(new GoalScoreEntry(goal.Name, score, onCooldown));
 

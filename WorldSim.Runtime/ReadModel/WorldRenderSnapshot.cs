@@ -122,7 +122,11 @@ public sealed record PersonRenderData(
     int ColonyId,
     float Health,
     bool IsInCombat,
-    int LastCombatTick);
+    int LastCombatTick,
+    int NoProgressStreak,
+    int BackoffTicksRemaining,
+    string DebugDecisionCause,
+    string DebugTargetKey);
 
 public sealed record AnimalRenderData(int X, int Y, AnimalKindView Kind);
 
@@ -149,7 +153,9 @@ public sealed record ColonyHudData(
     int DeathsOther,
     float AverageHunger,
     float AverageStamina,
-    string ProfessionSummary
+    string ProfessionSummary,
+    string WarState,
+    int WarriorCount
 );
 
 public sealed record FactionStanceRenderData(int LeftFactionId, int RightFactionId, string Stance);
@@ -172,5 +178,6 @@ public sealed record EcoHudData(
     bool PredatorHumanAttacksEnabled,
     float AverageFoodPerPerson,
     int ColoniesInFoodEmergency,
-    float FoodPerPersonSpread
+    float FoodPerPersonSpread,
+    int SoftReservationCount
 );

@@ -362,6 +362,35 @@ public class DecisionTests
     }
 
     [Fact]
+    public void ThreatDecisionPolicy_PeacefulZeroSignal_DoesNotPrioritizeDefense()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 2f,
+            Hunger: 24f,
+            Stamina: 70f,
+            HomeWood: 4,
+            HomeStone: 3,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 4,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 80f,
+            Strength: 10,
+            Defense: 8,
+            LocalThreatScore: 0.05f);
+
+        Assert.True(ThreatDecisionPolicy.IsPeacefulZeroSignal(context));
+        Assert.False(ThreatDecisionPolicy.ShouldPrioritizeDefense(context));
+        Assert.False(ThreatDecisionPolicy.ShouldFight(context));
+    }
+
+    [Fact]
     public void SimplePlanner_BuildDefenses_UsesFortificationCommands_WhenHostile()
     {
         var planner = new SimplePlanner();
@@ -424,6 +453,42 @@ public class DecisionTests
         var decision = planner.GetNextCommand(context);
 
         Assert.Equal(NpcCommand.RaidBorder, decision.Command);
+    }
+
+    [Fact]
+    public void UtilityGoapBrain_CrowdPenalty_PrefersLessCrowdedEquivalentGoal()
+    {
+        var gatherWood = new Goal("GatherWood") { CooldownSeconds = 0f };
+        gatherWood.Considerations.Add(new FixedConsideration(0.6f));
+
+        var buildHouse = new Goal("BuildHouse") { CooldownSeconds = 0f };
+        buildHouse.Considerations.Add(new FixedConsideration(0.6f));
+
+        var goals = new List<Goal> { gatherWood, buildHouse };
+        var brain = new UtilityGoapBrain(new SimplePlanner(), goals);
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 22f,
+            Hunger: 18f,
+            Stamina: 80f,
+            HomeWood: 80,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 8,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            ResourceCrowdPressure: 1f,
+            BuildCrowdPressure: 0f);
+
+        var result = brain.Think(context);
+
+        Assert.Equal("BuildHouse", result.Trace.SelectedGoal);
     }
 
     private sealed class FixedConsideration : Consideration

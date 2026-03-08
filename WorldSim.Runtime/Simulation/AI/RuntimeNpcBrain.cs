@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using WorldSim.AI;
 
@@ -107,6 +108,9 @@ public sealed class RuntimeNpcBrain
             && Manhattan(actor.Pos, other.Pos) <= ThreatSenseRadius);
         var nearbyEnemies = nearbyHostiles;
         var hostileProximityScore = Math.Clamp(nearbyEnemies / 4f, 0f, 1f);
+        var resourceCrowdPressure = ComputeResourceCrowdPressure(world, actor.Pos, radius: 5);
+        var buildCrowdPressure = ComputeBuildCrowdPressure(world, actor.Home.Origin, actor.Home.Id);
+        var retreatCrowdPressure = ComputeRetreatCrowdPressure(world, actor.Home.Origin, actor.Home.Id);
         var localThreatScore = ComputeThreatScore(
             nearbyPredators,
             nearbyHostiles,
@@ -152,7 +156,10 @@ public sealed class RuntimeNpcBrain
             IsWarriorRole: isWarriorRole,
             NearbyEnemyCount: nearbyEnemies,
             HostileProximityScore: hostileProximityScore,
-            LocalThreatScore: localThreatScore);
+            LocalThreatScore: localThreatScore,
+            ResourceCrowdPressure: resourceCrowdPressure,
+            BuildCrowdPressure: buildCrowdPressure,
+            RetreatCrowdPressure: retreatCrowdPressure);
     }
 
     private static int Manhattan((int x, int y) a, (int x, int y) b)
@@ -208,6 +215,115 @@ public sealed class RuntimeNpcBrain
         if (isWarStance)
             score += 0.15f;
         return Math.Clamp(score, 0f, 1f);
+    }
+
+    private static float ComputeResourceCrowdPressure(World world, (int x, int y) pos, int radius)
+    {
+        var reservations = new List<int>(16);
+        for (int dy = -radius; dy <= radius; dy++)
+        {
+            for (int dx = -radius; dx <= radius; dx++)
+            {
+                var x = pos.x + dx;
+                var y = pos.y + dy;
+                if (x < 0 || y < 0 || x >= world.Width || y >= world.Height)
+                    continue;
+
+                var node = world.GetTile(x, y).Node;
+                if (node == null || node.Amount <= 0)
+                    continue;
+
+                var key = $"resource:{node.Type}:{x}:{y}";
+                reservations.Add(world.GetSoftReservationCount(key));
+            }
+        }
+
+        if (reservations.Count == 0)
+            return 0f;
+
+        reservations.Sort();
+        int sample = Math.Min(4, reservations.Count);
+        float avg = 0f;
+        for (int i = 0; i < sample; i++)
+            avg += reservations[i];
+        avg /= sample;
+        return Math.Clamp(avg / 4f, 0f, 1f);
+    }
+
+    private static float ComputeBuildCrowdPressure(World world, (int x, int y) origin, int colonyId)
+    {
+        var reservations = new List<int>(24);
+        for (int radius = 2; radius <= 6; radius++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) != radius)
+                        continue;
+
+                    var x = origin.x + dx;
+                    var y = origin.y + dy;
+                    if (x < 0 || y < 0 || x >= world.Width || y >= world.Height)
+                        continue;
+                    if (world.GetTile(x, y).Ground == Ground.Water)
+                        continue;
+                    if (world.IsMovementBlocked(x, y, colonyId))
+                        continue;
+
+                    reservations.Add(world.GetSoftReservationCount($"build:{x}:{y}"));
+                }
+            }
+        }
+
+        if (reservations.Count == 0)
+            return 0f;
+
+        reservations.Sort();
+        int sample = Math.Min(6, reservations.Count);
+        float avg = 0f;
+        for (int i = 0; i < sample; i++)
+            avg += reservations[i];
+        avg /= sample;
+        return Math.Clamp(avg / 4f, 0f, 1f);
+    }
+
+    private static float ComputeRetreatCrowdPressure(World world, (int x, int y) origin, int colonyId)
+    {
+        var reservations = new List<int>(24);
+        for (int radius = 2; radius <= 8; radius++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) != radius)
+                        continue;
+
+                    var x = origin.x + dx;
+                    var y = origin.y + dy;
+                    if (x < 0 || y < 0 || x >= world.Width || y >= world.Height)
+                        continue;
+                    if (world.GetTile(x, y).Ground == Ground.Water)
+                        continue;
+                    if (world.IsMovementBlocked(x, y, colonyId))
+                        continue;
+
+                    reservations.Add(world.GetSoftReservationCount($"retreat:{x}:{y}"));
+                }
+            }
+        }
+
+        if (reservations.Count == 0)
+            return 0f;
+
+        reservations.Sort();
+        int sample = Math.Min(8, reservations.Count);
+        float avg = 0f;
+        for (int i = 0; i < sample; i++)
+            avg += reservations[i];
+        avg /= sample;
+        return Math.Clamp(avg / 4f, 0f, 1f);
     }
 
     private static bool IsWarriorRole(World world, Person actor, int colonyId, bool isHostileStance)

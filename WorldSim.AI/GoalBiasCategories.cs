@@ -32,4 +32,24 @@ public static class GoalBiasCategories
             _ => 0f
         };
     }
+
+    public static float GetCrowdPenaltyForGoal(string goalName, in NpcAiContext context)
+    {
+        if (string.IsNullOrWhiteSpace(goalName))
+            return 0f;
+
+        return goalName switch
+        {
+            "GatherWood" => context.ResourceCrowdPressure,
+            "GatherStone" => context.ResourceCrowdPressure,
+            "SecureFood" => context.ResourceCrowdPressure,
+            "StabilizeResources" => context.ResourceCrowdPressure,
+            "BuildHouse" => context.BuildCrowdPressure,
+            "ExpandHousing" => context.BuildCrowdPressure,
+            "BuildDefenses" => context.BuildCrowdPressure,
+            "DefendSelf" => context.RetreatCrowdPressure * 0.35f,
+            "RaidBorder" => context.RetreatCrowdPressure * 0.2f,
+            _ => 0f
+        };
+    }
 }

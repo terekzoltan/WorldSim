@@ -55,7 +55,10 @@ public readonly record struct NpcAiContext(
     bool IsWarriorRole = false,
     int NearbyEnemyCount = 0,
     float HostileProximityScore = 0f,
-    float LocalThreatScore = 0f);
+    float LocalThreatScore = 0f,
+    float ResourceCrowdPressure = 0f,
+    float BuildCrowdPressure = 0f,
+    float RetreatCrowdPressure = 0f);
 
 public interface IPlanner
 {

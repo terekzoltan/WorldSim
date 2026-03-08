@@ -4,8 +4,29 @@ namespace WorldSim.AI;
 
 public static class ThreatDecisionPolicy
 {
+    public static bool IsPeacefulZeroSignal(in NpcAiContext context)
+    {
+        if (Math.Max(0, context.NearbyPredators) > 0)
+            return false;
+        if (Math.Max(0, context.NearbyHostilePeople) > 0)
+            return false;
+        if (Math.Max(0, context.NearbyEnemyCount) > 0)
+            return false;
+        if (context.IsWarStance || context.IsHostileStance)
+            return false;
+        if (context.IsContestedTile || context.HasContestedTilesNearby)
+            return false;
+        if (context.HostileProximityScore > 0.08f)
+            return false;
+
+        return context.LocalThreatScore <= 0.1f;
+    }
+
     public static bool ShouldPrioritizeDefense(in NpcAiContext context)
     {
+        if (IsPeacefulZeroSignal(context))
+            return false;
+
         if (Math.Max(0, context.NearbyPredators) > 0)
             return true;
 

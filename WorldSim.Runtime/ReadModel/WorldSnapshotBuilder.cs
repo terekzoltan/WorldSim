@@ -76,7 +76,11 @@ public static class WorldSnapshotBuilder
                 p.Home.Id,
                 p.Health,
                 p.IsInCombat,
-                p.LastCombatTick))
+                p.LastCombatTick,
+                p.NoProgressStreak,
+                p.BackoffTicksRemaining,
+                p.DebugDecisionCause,
+                p.DebugTargetKey))
             .ToList();
 
         var animals = world._animals
@@ -125,7 +129,9 @@ public static class WorldSnapshotBuilder
                     deathStats.Other,
                     avgHunger,
                     avgStamina,
-                    profSummary
+                    profSummary,
+                    world.GetColonyWarState(colony.Id).ToString(),
+                    world.GetColonyWarriorCount(colony.Id)
                 );
             })
             .ToList();
@@ -155,7 +161,8 @@ public static class WorldSnapshotBuilder
             world.EnablePredatorHumanAttacks,
             ComputeAverageFoodPerPerson(world),
             world._colonies.Count(c => c.Stock[Resource.Food] <= Math.Max(3, world._people.Count(p => p.Home == c && p.Health > 0f) / 2)),
-            ComputeFoodPerPersonSpread(world)
+            ComputeFoodPerPersonSpread(world),
+            world.ActiveSoftReservationCount
         );
 
         return new WorldRenderSnapshot(
