@@ -66,6 +66,7 @@ public sealed record WorldRenderSnapshot(
 public sealed record DirectorRenderState(
     string StageMarker,
     string OutputMode,
+    string OutputModeSource,
     int BeatCooldownRemainingTicks,
     int MajorBeatCooldownRemainingTicks,
     int EpicBeatCooldownRemainingTicks,
@@ -78,6 +79,7 @@ public sealed record DirectorRenderState(
     public static DirectorRenderState Empty { get; } = new(
         StageMarker: "idle",
         OutputMode: "both",
+        OutputModeSource: "unknown",
         BeatCooldownRemainingTicks: 0,
         MajorBeatCooldownRemainingTicks: 0,
         EpicBeatCooldownRemainingTicks: 0,

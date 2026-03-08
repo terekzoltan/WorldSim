@@ -137,6 +137,9 @@ public class SimulationRuntimeDirectorStateTests
         Assert.NotNull(director);
         Assert.NotNull(director!["currentTick"]);
         Assert.NotNull(director["currentSeason"]);
+        Assert.NotNull(director["effectiveOutputMode"]);
+        Assert.NotNull(director["effectiveOutputModeSource"]);
+        Assert.NotNull(director["stage"]);
         Assert.NotNull(director["colonyPopulation"]);
         Assert.NotNull(director["foodReservesPct"]);
         Assert.NotNull(director["moraleAvg"]);

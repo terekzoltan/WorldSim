@@ -22,6 +22,7 @@ public sealed class SimulationRuntime
     private readonly double _directorDampeningFactor;
     private readonly Queue<string> _recentAiDecisions = new();
     private readonly DirectorState _directorState = new();
+    private DirectorExecutionState _directorExecutionState = DirectorExecutionState.NotTriggered;
     private long _lastObservedDecisionSequence;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
@@ -155,19 +156,14 @@ public sealed class SimulationRuntime
             .ThenBy(bias => bias.GoalCategory)
             .ToList();
 
-        var stageMarker = activeBeats.Count > 0 || activeDirectives.Count > 0
-            ? "active"
-            : _directorState.BeatCooldownRemainingTicks > 0
-                ? "cooldown"
-                : "idle";
-
-        var outputMode = (Environment.GetEnvironmentVariable("REFINERY_DIRECTOR_OUTPUT_MODE") ?? "both").Trim().ToLowerInvariant();
-        if (outputMode is not ("both" or "story_only" or "nudge_only" or "off"))
-            outputMode = "both";
+        var stageMarker = _directorExecutionState.Stage;
+        var outputMode = _directorExecutionState.EffectiveOutputMode;
+        var outputModeSource = _directorExecutionState.EffectiveOutputModeSource;
 
         return new DirectorRenderState(
             StageMarker: stageMarker,
             OutputMode: outputMode,
+            OutputModeSource: outputModeSource,
             BeatCooldownRemainingTicks: _directorState.BeatCooldownRemainingTicks,
             MajorBeatCooldownRemainingTicks: _directorState.MajorBeatCooldownRemainingTicks,
             EpicBeatCooldownRemainingTicks: _directorState.EpicBeatCooldownRemainingTicks,
@@ -176,6 +172,29 @@ public sealed class SimulationRuntime
             ActiveDomainModifiers: activeModifiers,
             ActiveGoalBiases: activeBiases,
             LastActionStatus: LastDirectorActionStatus);
+    }
+
+    public void SetDirectorExecutionState(
+        string effectiveOutputMode,
+        string effectiveOutputModeSource,
+        string stage,
+        long tick,
+        bool isDirectorGoal)
+    {
+        _directorExecutionState = new DirectorExecutionState(
+            EffectiveOutputMode: NormalizeOutputMode(effectiveOutputMode),
+            EffectiveOutputModeSource: string.IsNullOrWhiteSpace(effectiveOutputModeSource) ? "unknown" : effectiveOutputModeSource.Trim().ToLowerInvariant(),
+            Stage: string.IsNullOrWhiteSpace(stage) ? "idle" : stage.Trim(),
+            Tick: tick,
+            IsDirectorGoal: isDirectorGoal);
+    }
+
+    private static string NormalizeOutputMode(string? outputMode)
+    {
+        var normalized = string.IsNullOrWhiteSpace(outputMode) ? "both" : outputMode.Trim().ToLowerInvariant();
+        return normalized is "both" or "story_only" or "nudge_only" or "off"
+            ? normalized
+            : "both";
     }
 
     public AiDebugSnapshot GetAiDebugSnapshot() => _latestAiDebugSnapshot;
@@ -578,6 +597,9 @@ public sealed class SimulationRuntime
         {
             ["currentTick"] = Tick,
             ["currentSeason"] = _world.CurrentSeason.ToString(),
+            ["effectiveOutputMode"] = _directorExecutionState.EffectiveOutputMode,
+            ["effectiveOutputModeSource"] = _directorExecutionState.EffectiveOutputModeSource,
+            ["stage"] = _directorExecutionState.Stage,
             ["colonyPopulation"] = livingPopulation,
             ["foodReservesPct"] = foodReservesPct,
             ["moraleAvg"] = moraleAvg,

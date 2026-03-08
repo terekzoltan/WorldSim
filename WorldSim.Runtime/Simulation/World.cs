@@ -111,6 +111,11 @@ namespace WorldSim.Simulation
         const float ProfessionRebalancePeriod = 12f;
         const float SpecializedBuildPeriod = 14f;
         const float FoodParityPeriod = 6f;
+        const int TerritoryRecomputeIntervalTicks = 5;
+
+        int _lastTerritoryRecomputeTick;
+        bool _territoryDirty = true;
+        int _territoryRecomputeCount;
 
         public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null, int? randomSeed = null)
         {
@@ -207,7 +212,7 @@ namespace WorldSim.Simulation
 
             InitializeFactionStances();
 
-            RecomputeTerritoryOwnership();
+            RefreshTerritoryStateIfNeeded(force: true);
         }
 
         public void Update(float dt)
@@ -229,6 +234,8 @@ namespace WorldSim.Simulation
                 }
             }
             _people.AddRange(births);
+            if (births.Count > 0)
+                MarkTerritoryDirty();
 
             _professionRebalanceTimer += dt;
             if (_professionRebalanceTimer >= ProfessionRebalancePeriod)
@@ -279,7 +286,7 @@ namespace WorldSim.Simulation
                 }
             }
 
-            RecomputeTerritoryOwnership();
+            RefreshTerritoryStateIfNeeded();
             if (EnableDiplomacy)
                 _relationManager.Tick(this);
             RecomputeMobilizationState();
@@ -307,12 +314,14 @@ namespace WorldSim.Simulation
         {
             Houses.Add(new House(colony, pos, HouseCapacity));
             _navigationTopologyVersion++;
+            MarkTerritoryDirty();
         }
 
         public void AddSpecializedBuilding(Colony colony, (int x, int y) pos, SpecializedBuildingKind kind)
         {
             SpecializedBuildings.Add(new SpecializedBuilding(colony, pos, kind));
             _navigationTopologyVersion++;
+            MarkTerritoryDirty();
         }
 
         public bool TryAddWoodWall(Colony colony, (int x, int y) pos)
@@ -322,6 +331,7 @@ namespace WorldSim.Simulation
 
             DefensiveStructures.Add(new WoodWallSegment(_nextDefenseStructureId++, colony, pos));
             _navigationTopologyVersion++;
+            MarkTerritoryDirty();
             return true;
         }
 
@@ -332,6 +342,7 @@ namespace WorldSim.Simulation
 
             DefensiveStructures.Add(new Watchtower(_nextDefenseStructureId++, colony, pos));
             _navigationTopologyVersion++;
+            MarkTerritoryDirty();
             return true;
         }
 
@@ -343,7 +354,10 @@ namespace WorldSim.Simulation
 
             structure.ApplyDamage(damage);
             if (structure.IsDestroyed)
+            {
                 _navigationTopologyVersion++;
+                MarkTerritoryDirty();
+            }
             return true;
         }
 
@@ -352,7 +366,10 @@ namespace WorldSim.Simulation
             int before = DefensiveStructures.Count;
             DefensiveStructures.RemoveAll(s => s.IsDestroyed);
             if (DefensiveStructures.Count != before)
+            {
                 _navigationTopologyVersion++;
+                MarkTerritoryDirty();
+            }
         }
 
         public bool IsMovementBlocked(int x, int y, int moverColonyId)
@@ -432,6 +449,7 @@ namespace WorldSim.Simulation
             => _colonyWarriorCounts.TryGetValue(colonyId, out var count) ? count : 0;
 
         public int CurrentTick => _tickCounter;
+        public int TerritoryRecomputeCount => _territoryRecomputeCount;
 
         public void RegisterDomainModifier(string sourceId, RuntimeDomain domain, double modifier, int durationTicks, double dampeningFactor)
             => _domainModifierEngine.RegisterModifier(sourceId, domain, modifier, durationTicks, dampeningFactor);
@@ -530,6 +548,7 @@ namespace WorldSim.Simulation
                     break;
             }
 
+            MarkTerritoryDirty();
             TrimRecentDeathWindows();
         }
 
@@ -538,6 +557,26 @@ namespace WorldSim.Simulation
             const float rollingWindowSeconds = 60f;
             while (_recentStarvationDeaths.Count > 0 && (_simulationTimeSeconds - _recentStarvationDeaths.Peek()) > rollingWindowSeconds)
                 _recentStarvationDeaths.Dequeue();
+        }
+
+        private void MarkTerritoryDirty()
+        {
+            _territoryDirty = true;
+        }
+
+        private void RefreshTerritoryStateIfNeeded(bool force = false)
+        {
+            if (!force)
+            {
+                bool intervalElapsed = (_tickCounter - _lastTerritoryRecomputeTick) >= TerritoryRecomputeIntervalTicks;
+                if (!_territoryDirty && !intervalElapsed)
+                    return;
+            }
+
+            RecomputeTerritoryOwnership();
+            _lastTerritoryRecomputeTick = _tickCounter;
+            _territoryDirty = false;
+            _territoryRecomputeCount++;
         }
 
         private void InitializeFactionStances()

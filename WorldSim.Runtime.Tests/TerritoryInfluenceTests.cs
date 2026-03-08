@@ -8,6 +8,35 @@ namespace WorldSim.Runtime.Tests;
 public class TerritoryInfluenceTests
 {
     [Fact]
+    public void TerritoryOwnership_Recompute_IsPeriodic_WhenWorldUnchanged()
+    {
+        var world = new World(width: 32, height: 20, initialPop: 0, randomSeed: 310);
+
+        Assert.Equal(1, world.TerritoryRecomputeCount);
+
+        for (int i = 0; i < 20; i++)
+            world.Update(0.25f);
+
+        Assert.Equal(5, world.TerritoryRecomputeCount);
+    }
+
+    [Fact]
+    public void TerritoryOwnership_Recompute_TriggersOnDirtyStructureChange()
+    {
+        var world = new World(width: 32, height: 20, initialPop: 0, randomSeed: 311);
+        var colony = world._colonies[0];
+
+        world.Update(0.25f);
+        Assert.Equal(1, world.TerritoryRecomputeCount);
+
+        var tile = FindBuildableTile(world);
+        world.AddHouse(colony, tile);
+
+        world.Update(0.25f);
+        Assert.Equal(2, world.TerritoryRecomputeCount);
+    }
+
+    [Fact]
     public void TerritoryOwnership_IsDeterministic_ForSameSeed()
     {
         var first = new World(width: 36, height: 24, initialPop: 20, randomSeed: 301);
@@ -58,5 +87,26 @@ public class TerritoryInfluenceTests
         }
 
         Assert.True(sum >= 0);
+    }
+
+    private static (int x, int y) FindBuildableTile(World world)
+    {
+        for (int y = 1; y < world.Height - 1; y++)
+        {
+            for (int x = 1; x < world.Width - 1; x++)
+            {
+                if (world.GetTile(x, y).Ground == Ground.Water)
+                    continue;
+                if (world.Houses.Any(house => house.Pos == (x, y)))
+                    continue;
+                if (world.SpecializedBuildings.Any(building => building.Pos == (x, y)))
+                    continue;
+                if (world.DefensiveStructures.Any(structure => structure.Pos == (x, y) && !structure.IsDestroyed))
+                    continue;
+                return (x, y);
+            }
+        }
+
+        throw new InvalidOperationException("No buildable tile found.");
     }
 }
