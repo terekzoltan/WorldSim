@@ -17,7 +17,7 @@ public sealed class DiplomacyPanelRenderer
         WorldRenderSnapshot snapshot)
     {
         int width = Math.Min(560, viewportWidth - 28);
-        int height = 250;
+        int height = 272;
         int x = 14;
         int y = viewportHeight - height - 14;
         var rect = new Rectangle(x, y, width, height);
@@ -30,7 +30,7 @@ public sealed class DiplomacyPanelRenderer
 
         int pad = 10;
         int ty = y + pad;
-        spriteBatch.DrawString(font, "Diplomacy Matrix", new Vector2(x + pad, ty), theme.AccentText);
+        spriteBatch.DrawString(font, "Faction Relations", new Vector2(x + pad, ty), theme.AccentText);
         ty += 22;
 
         var factionIds = snapshot.Colonies
@@ -56,8 +56,9 @@ public sealed class DiplomacyPanelRenderer
             int faction = factionIds[i];
             var headerPos = new Vector2(gridX + (i * cellSize) + 8, ty);
             var rowPos = new Vector2(x + pad, gridY + (i * cellSize) + 7);
-            spriteBatch.DrawString(font, $"F{faction}", headerPos, theme.PrimaryText);
-            spriteBatch.DrawString(font, $"F{faction}", rowPos, theme.PrimaryText);
+            string factionLabel = GetFactionAbbreviation(faction);
+            spriteBatch.DrawString(font, factionLabel, headerPos, theme.PrimaryText);
+            spriteBatch.DrawString(font, factionLabel, rowPos, theme.PrimaryText);
         }
 
         foreach (var rowFaction in factionIds)
@@ -84,7 +85,8 @@ public sealed class DiplomacyPanelRenderer
 
         int legendY = gridY + (matrixSize * cellSize) + 8;
         spriteBatch.DrawString(font, "Legend: N=Neutral  H=Hostile  W=War", new Vector2(x + pad, legendY), theme.SecondaryText);
-        spriteBatch.DrawString(font, "Territory: Ctrl+F7 overlay (yellow border = contested)", new Vector2(x + pad, legendY + 20), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Factions: Syl=Sylvars  Obs=Obsidari  Aet=Aetheri  Chi=Chirita", new Vector2(x + pad, legendY + 20), theme.SecondaryText);
+        spriteBatch.DrawString(font, "Territory: Ctrl+F7 overlay (yellow border = contested)", new Vector2(x + pad, legendY + 40), theme.SecondaryText);
     }
 
     private static string ResolveStance(WorldRenderSnapshot snapshot, int leftFaction, int rightFaction)
@@ -119,6 +121,18 @@ public sealed class DiplomacyPanelRenderer
             "hostile" => "H",
             "war" => "W",
             _ => "?"
+        };
+    }
+
+    private static string GetFactionAbbreviation(int factionId)
+    {
+        return factionId switch
+        {
+            0 => "Syl",
+            1 => "Obs",
+            2 => "Aet",
+            3 => "Chi",
+            _ => $"F{factionId}"
         };
     }
 }

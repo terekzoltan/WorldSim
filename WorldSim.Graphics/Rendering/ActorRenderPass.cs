@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using WorldSim.Graphics.Assets;
@@ -47,6 +48,63 @@ public sealed class ActorRenderPass : IRenderPass
 
             DrawHealthBar(spriteBatch, textures, person, bounds, settings, theme);
             DrawCombatMarker(spriteBatch, textures, person, bounds, settings, theme);
+        }
+
+        DrawStackDebugMarkers(spriteBatch, textures, snapshot, settings);
+    }
+
+    private static void DrawStackDebugMarkers(
+        SpriteBatch spriteBatch,
+        TextureCatalog textures,
+        WorldRenderSnapshot snapshot,
+        WorldRenderSettings settings)
+    {
+        var stacks = snapshot.People
+            .GroupBy(person => (person.X, person.Y))
+            .Where(group => group.Count() > 1)
+            .OrderBy(group => group.Key.Y)
+            .ThenBy(group => group.Key.X);
+
+        int tile = settings.TileSize;
+        int border = Math.Max(1, tile / 5);
+
+        foreach (var stack in stacks)
+        {
+            int count = stack.Count();
+            bool hasNoProgress = stack.Any(person => person.NoProgressStreak > 0 || person.BackoffTicksRemaining > 0);
+
+            var baseColor = count switch
+            {
+                >= 5 => new Color(221, 79, 79),
+                >= 3 => new Color(233, 160, 95),
+                _ => new Color(231, 210, 112)
+            };
+
+            if (hasNoProgress)
+                baseColor = new Color(232, 118, 224);
+
+            var accent = baseColor * (hasNoProgress ? 0.88f : 0.72f);
+            int x = stack.Key.X * tile;
+            int y = stack.Key.Y * tile;
+            var rect = new Rectangle(x, y, tile, tile);
+
+            spriteBatch.Draw(textures.Pixel, new Rectangle(rect.X, rect.Y, rect.Width, border), accent);
+            spriteBatch.Draw(textures.Pixel, new Rectangle(rect.X, rect.Bottom - border, rect.Width, border), accent);
+            spriteBatch.Draw(textures.Pixel, new Rectangle(rect.X, rect.Y, border, rect.Height), accent);
+            spriteBatch.Draw(textures.Pixel, new Rectangle(rect.Right - border, rect.Y, border, rect.Height), accent);
+
+            int pips = Math.Clamp(count, 2, 6);
+            int pipWidth = Math.Max(1, tile / 6);
+            int pipHeight = Math.Max(2, tile / 3);
+            int startX = rect.X + 1;
+            int topY = Math.Max(0, rect.Y - pipHeight - 1);
+            for (int i = 0; i < pips; i++)
+            {
+                int px = startX + (i * (pipWidth + 1));
+                if (px >= rect.Right)
+                    break;
+                spriteBatch.Draw(textures.Pixel, new Rectangle(px, topY, pipWidth, pipHeight), accent);
+            }
         }
     }
 

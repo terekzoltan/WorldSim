@@ -41,7 +41,11 @@ public static class WorldSnapshotInterpolator
                 cur.ColonyId,
                 cur.Health,
                 cur.IsInCombat,
-                cur.LastCombatTick));
+                cur.LastCombatTick,
+                cur.NoProgressStreak,
+                cur.BackoffTicksRemaining,
+                cur.DebugDecisionCause,
+                cur.DebugTargetKey));
         }
 
         for (int i = shared; i < current.Count; i++)
