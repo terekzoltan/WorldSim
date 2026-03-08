@@ -218,6 +218,8 @@ Szabaly:
 Cel:
 - Olyan rovid, gyakorlati megjegyzesek gyujtohelye, amik tobb tracket is erintenek.
 
+- Mindig próbálj aljára írni.
+
 Formatum:
 - `[YYYY-MM-DD][Track] rovid cim - hatas - kovetkezo lepes`.
 
@@ -257,6 +259,11 @@ Entries:
 - `[2026-03-03][Track B] P1-F status zarva (✅) - defense scaffold bekotve (WoodWall/Watchtower/DefenseManager), hostiles szamara fal-blokkolas es watchtower auto-fire aktiv, defensive snapshot mezok (DefensiveStructures + HP) exportalva, build+runtime/full test gate zold - kovetkezo lepes: P1-G BFS cache+topology invalidation`.
 - `[2026-03-06][Track B] S3-A runtime fel kesz (🔄) - beat severity effect-count alapjan inferalt (minor=0, major<=2, epic<=3), minor beat gameplay-modifier nelkul fut, major/epic cooldown policy DirectorState-re kotve, severity-tagelt director event feed bekotve, runtime+full gate zold - kovetkezo lepes: S3-A teljes statuszaras Track D contract/adapter visszajelzessel`.
 - `[2026-03-06][Track B] S3-A status zarva (✅) - Track D contract/adapter oldali severity enforce + S3-C/S3-D kesz allapotaval egyutt cross-track lezaras megtortent, Step3 (Track A S3-B) feloldva - kovetkezo lepes: Track A S3-B HUD/event feed integracio`.
+- `[2026-03-08][Track B] Wave3.1 W3.1-B1 status zarva (✅) - runtime director render state mar adapter altal szamitott effective output mode/source/stage alapjan frissul (nem env default), refinery snapshot director blokk effective mode/source mezokkel bovult, adapter+runtime+full gate zold - kovetkezo lepes: W3.1-A1 Track A HUD consume + W3.1-B2 territory periodic cache`.
+- `[2026-03-08][Track B] Wave3.1 W3.1-B2 status zarva (✅) - territory ownership/contested recompute periodikus cache modellre valtott (5 tick interval + dirty trigger), per-tick full scan megszunt, territory determinisztikus/perf tesztek zold - kovetkezo lepes: Wave3.1 cross-track smoke + Wave4 kickoff readiness`.
 - `[2026-03-06][Track A] P1-I status zarva (✅) - wall/watchtower render + damaged structure HP bar + watchtower beam visualization (recent event trigger) bekotve, build+arch test zold - kovetkezo lepes: S3-B varakozas S3-A teljes (B+D) statuszarasig`.
 - `[2026-03-06][Track D] Wave3 S3-D status zarva (✅) - director fixture replay+live parity hash teszt (opt-in), Java/C# teszt gate zold, manual smoke checklist dokumentalva (Docs/Wave3-Director-Smoke-Checklist.md) - kovetkezo lepes: S3-A cross-track statuszaras Track B runtime fel kesz jelzes utan`.
 - `[2026-03-06][Track A] S3-B status zarva (✅) - director render state snapshotba emelve, event feed severity color (minor/major/epic), HUD directive+timer/stage/cooldown es debug sorok (modifiers+biases) bekotve, build+arch test zold - kovetkezo lepes: Wave3 teljes cross-track smoke`.
+- `[2026-03-08][Track D] Wave3.1 W3.1-D1 status zarva (✅) - adapter oldalon effective director mode/source truth status bevezetve (env/response/fallback), trigger adapteren keresztul kiolvashato handoff, mode-source determinisztikus tesztek (auto->response, auto->fallback, env override) zold - kovetkezo lepes: W3.1-B1 runtime snapshot handoff Track B oldalon`.
+- `[2026-03-08][Track A] Wave3.1 W3.1-A1 status zarva (✅) - HUD/planner status a snapshot director effective mode+source+stage mezoket mutatja (nem env default), B1 handoff truth vizualisan kovetheto - kovetkezo lepes: W3.1-A2 beam stance-alapu celpontszures`.
+- `[2026-03-08][Track A] Wave3.1 W3.1-A2 status zarva (✅) - watchtower beam target valasztas FactionStances alapjan Hostile/War kapcsolatra szukitve, Neutral/Tense es same-faction celpontok kizartak - kovetkezo lepes: W3.1-B2 Track B territory cache utan cross-track smoke`.

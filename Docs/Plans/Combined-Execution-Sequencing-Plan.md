@@ -236,6 +236,59 @@ Track C is independent of Track A — can run P1-H while Track A works on P1-I.
 
 ---
 
+## Wave 3.1 — Wave 3 Closeout Fixes
+
+Purpose:
+- Close the remaining correctness/perf drift discovered after Wave 3 review.
+- Keep scope narrow: no new feature family, only state-sync, render correctness, and territory recompute hardening.
+
+### Sprint X3.1: Director/HUD Sync + Beam Correctness + Territory Perf (Track D + B + A)
+
+- ✅ **W3.1-D1** Director effective output mode handoff (Track D)
+- ✅ **W3.1-B1** Runtime stores effective director execution status and snapshots it (Track B)
+- ✅ **W3.1-A1** HUD consumes effective director mode/source from snapshot (Track A)
+- ✅ **W3.1-A2** Watchtower beam target filtering uses faction stance, not "different faction" heuristic (Track A)
+- ✅ **W3.1-B2** Territory ownership recompute moves from per-tick full scan to periodic cached recompute (Track B)
+
+### Wave 3.1 — Execution Steps
+
+**Step 1 — Director mode truth sync (Track D -> B -> A)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | W3.1-D1 | Wave 3 ✅ | Adapter computes final effective mode (`both/story_only/nudge_only/off`) and source (`env/response/fallback`) |
+| Track B agent | W3.1-B1 | W3.1-D1 ✅ | Runtime stores last effective mode/source/stage and exports it via director render state |
+| Track A agent | W3.1-A1 | W3.1-B1 ✅ | HUD must display applied mode, not env default |
+
+**Step 2 — Beam correctness (Track A)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | W3.1-A2 | Wave 3 ✅ | Beam target search must use `FactionStances` + `FactionId`; neutral factions are not valid hostile targets |
+
+**Step 3 — Territory perf hardening (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W3.1-B2 | Wave 3 ✅ | First step only: periodic recompute + cached ownership/contested state; dirty-region remains future scope |
+
+Acceptance notes:
+- HUD `DirectorMode` matches the actual applied output mode, including `auto` cases.
+- Watchtower beam only points at runtime-valid hostile/predator targets.
+- Territory ownership no longer recomputes as a full-map scan every tick.
+
+Proof targets:
+- `W3.1-D1/B1/A1`: adapter/runtime tests for `auto -> story_only`, env override to `off`, and snapshot/HUD mode visibility.
+- `W3.1-A2`: stance-based render verification (`Neutral` faction should not get a beam target).
+- `W3.1-B2`: runtime test that ownership recompute is periodic/cached while diplomacy behavior remains stable.
+
+**Parallelism:**
+- W3.1-D1/B1/A1 is sequential by design.
+- W3.1-A2 can run in parallel with W3.1-B2.
+- No Track C work is required for this closeout wave.
+
+---
+
 ## Wave 4 — Refinery Gate + Military Tech (Director Phase 2a + Combat Phase 2)
 
 ### Sprint D4: Formal Model + Validation Loop (Track D only — Java)
