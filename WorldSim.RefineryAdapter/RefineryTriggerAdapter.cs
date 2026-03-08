@@ -15,6 +15,8 @@ public sealed class RefineryTriggerAdapter
 
     public string LastStatus => _runtime.LastStatus;
 
+    public DirectorExecutionStatus LastDirectorExecutionStatus => _runtime.LastDirectorExecutionStatus;
+
     public void Trigger(SimulationRuntime runtime, long tick) => _runtime.Trigger(runtime, tick);
 
     public void Pump() => _runtime.Pump();

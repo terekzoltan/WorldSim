@@ -32,6 +32,7 @@ public sealed class RefineryPatchRuntime
     private DateTime _lastTriggerUtc = DateTime.MinValue;
 
     public string LastStatus { get; private set; } = "Refinery integration: not triggered";
+    public DirectorExecutionStatus LastDirectorExecutionStatus { get; private set; } = DirectorExecutionStatus.NotTriggered;
 
     public RefineryPatchRuntime(RefineryRuntimeOptions options)
     {
@@ -138,11 +139,27 @@ public sealed class RefineryPatchRuntime
                                item.StartsWith("refineryStage:", StringComparison.Ordinal)
                                || item.StartsWith("directorStage:", StringComparison.Ordinal))
                           ?? "refineryStage:unknown";
+
+        LastDirectorExecutionStatus = new DirectorExecutionStatus(
+            EffectiveOutputMode: selectedOutputMode.Mode,
+            EffectiveOutputModeSource: selectedOutputMode.Source,
+            Stage: stageMarker,
+            Tick: tick,
+            IsDirectorGoal: string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal)
+        );
+
+        runtime.SetDirectorExecutionState(
+            effectiveOutputMode: LastDirectorExecutionStatus.EffectiveOutputMode,
+            effectiveOutputModeSource: LastDirectorExecutionStatus.EffectiveOutputModeSource,
+            stage: LastDirectorExecutionStatus.Stage,
+            tick: LastDirectorExecutionStatus.Tick,
+            isDirectorGoal: LastDirectorExecutionStatus.IsDirectorGoal);
+
         var warningHead = response.Warnings.FirstOrDefault();
         LastStatus =
             $"Refinery applied: applied={result.AppliedCount}, deduped={result.DedupedCount}, noop={result.NoOpCount}, " +
             $"techs={_patchState.TechIds.Count}, events={_patchState.EventIds.Count}, " +
-            $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={stageMarker}, mode={selectedOutputMode.Mode}" +
+            $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={stageMarker}, mode={selectedOutputMode.Mode}, source={selectedOutputMode.Source}" +
             (warningHead is null ? string.Empty : $", warn={warningHead}");
     }
 
