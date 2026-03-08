@@ -203,17 +203,35 @@ public sealed class StructureRenderPass : IRenderPass
 
     private static Vector2? FindNearestHostile(WorldRenderSnapshot snapshot, int factionId, int towerX, int towerY, int tileSize)
     {
-        var hostileColonyIds = snapshot.Colonies
-            .Where(c => c.FactionId != factionId)
-            .Select(c => c.Id)
-            .ToHashSet();
+        var factionByColonyId = snapshot.Colonies
+            .ToDictionary(colony => colony.Id, colony => colony.FactionId);
 
         var target = snapshot.People
-            .Where(p => hostileColonyIds.Contains(p.ColonyId))
+            .Where(person => factionByColonyId.TryGetValue(person.ColonyId, out var targetFactionId)
+                             && IsHostileStance(snapshot, factionId, targetFactionId))
             .Select(p => new { Person = p, Dist = Math.Abs(p.X - towerX) + Math.Abs(p.Y - towerY) })
             .OrderBy(e => e.Dist)
             .FirstOrDefault();
         return target == null ? null : TileCenter(target.Person.X, target.Person.Y, tileSize);
+    }
+
+    private static bool IsHostileStance(WorldRenderSnapshot snapshot, int sourceFactionId, int targetFactionId)
+    {
+        if (sourceFactionId == targetFactionId)
+            return false;
+
+        var direct = snapshot.FactionStances
+            .FirstOrDefault(s => s.LeftFactionId == sourceFactionId && s.RightFactionId == targetFactionId);
+        var stance = direct?.Stance;
+        if (string.IsNullOrWhiteSpace(stance))
+        {
+            var reverse = snapshot.FactionStances
+                .FirstOrDefault(s => s.LeftFactionId == targetFactionId && s.RightFactionId == sourceFactionId);
+            stance = reverse?.Stance;
+        }
+
+        return string.Equals(stance, "Hostile", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(stance, "War", StringComparison.OrdinalIgnoreCase);
     }
 
     private static Vector2 TileCenter(int tileX, int tileY, int tileSize)

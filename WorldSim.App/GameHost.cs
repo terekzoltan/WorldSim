@@ -739,7 +739,7 @@ public class GameHost : Game
         bool panelExclusive = _showDiplomacyPanel || _showCampaignPanel;
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: Matrix.CreateScale(hudScale, hudScale, 1f));
-        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | DirectorMode:{snapshot.Director.OutputMode}";
+        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | Director:{snapshot.Director.OutputMode}({snapshot.Director.OutputModeSource})@{snapshot.Director.StageMarker}";
 #if DEBUG
         plannerStatus += " (F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F6 HUD scale | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
 #endif
