@@ -235,7 +235,7 @@ public sealed class StructureRenderPass : IRenderPass
         var towerEvents = snapshot.RecentEvents
             .Where(evt => evt.Contains("watchtower fired", StringComparison.OrdinalIgnoreCase)
                        || evt.Contains("arrow tower fired", StringComparison.OrdinalIgnoreCase)
-                       || evt.Contains("catapult fired", StringComparison.OrdinalIgnoreCase)
+                       || evt.Contains("catapult tower fired", StringComparison.OrdinalIgnoreCase)
                        || evt.Contains("tower fired", StringComparison.OrdinalIgnoreCase)
                        || evt.Contains("tower hit predator", StringComparison.OrdinalIgnoreCase))
             .TakeLast(3)
