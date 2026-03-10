@@ -59,6 +59,10 @@ namespace WorldSim.Simulation
         public bool EnableCombatPrimitives { get; set; }
         public bool EnableDiplomacy { get; set; }
         public float PredatorHumanDamage { get; set; } = 10f;
+        public float CombatDamageBonusMultiplier { get; set; } = 1f;
+        public float CombatDefenseBonusMultiplier { get; set; } = 1f;
+        public float SiegeDamageMultiplier { get; set; } = 1f;
+        public bool RequireFortificationTechUnlock { get; set; }
         public int NavigationTopologyVersion => _navigationTopologyVersion;
 
         public Season CurrentSeason { get; private set; } = Season.Spring;
@@ -88,6 +92,14 @@ namespace WorldSim.Simulation
         public int TotalNoProgressBackoffCombat { get; private set; }
         public int DenseNeighborhoodTicks { get; private set; }
         public int LastTickDenseActors { get; private set; }
+
+        public bool CanBuildFortifications(Colony colony)
+        {
+            if (!RequireFortificationTechUnlock)
+                return true;
+
+            return colony.FortificationsUnlocked || colony.UnlockedTechs.Contains("fortification");
+        }
 
         readonly Random _rng;
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
@@ -453,10 +465,105 @@ namespace WorldSim.Simulation
             if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
                 return false;
 
-            DefensiveStructures.Add(new Watchtower(_nextDefenseStructureId++, colony, pos));
+            DefensiveStructures.Add(new Watchtower(
+                _nextDefenseStructureId++,
+                colony,
+                pos,
+                maxHp: ScaleFortificationHp(colony, Watchtower.DefaultHp)));
             _navigationTopologyVersion++;
             MarkTerritoryDirty();
             return true;
+        }
+
+        public bool TryAddStoneWall(Colony colony, (int x, int y) pos)
+        {
+            if (!colony.UnlockedTechs.Contains("fortification"))
+                return false;
+            if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
+                return false;
+
+            DefensiveStructures.Add(new StoneWallSegment(
+                _nextDefenseStructureId++,
+                colony,
+                pos,
+                maxHp: ScaleFortificationHp(colony, StoneWallSegment.DefaultHp)));
+            _navigationTopologyVersion++;
+            MarkTerritoryDirty();
+            return true;
+        }
+
+        public bool TryAddReinforcedWall(Colony colony, (int x, int y) pos)
+        {
+            if (!colony.UnlockedTechs.Contains("advanced_fortification"))
+                return false;
+            if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
+                return false;
+
+            DefensiveStructures.Add(new ReinforcedWallSegment(
+                _nextDefenseStructureId++,
+                colony,
+                pos,
+                maxHp: ScaleFortificationHp(colony, ReinforcedWallSegment.DefaultHp)));
+            _navigationTopologyVersion++;
+            MarkTerritoryDirty();
+            return true;
+        }
+
+        public bool TryAddGate(Colony colony, (int x, int y) pos)
+        {
+            if (!colony.UnlockedTechs.Contains("fortification"))
+                return false;
+            if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
+                return false;
+
+            DefensiveStructures.Add(new GateStructure(
+                _nextDefenseStructureId++,
+                colony,
+                pos,
+                maxHp: ScaleFortificationHp(colony, GateStructure.DefaultHp)));
+            _navigationTopologyVersion++;
+            MarkTerritoryDirty();
+            return true;
+        }
+
+        public bool TryAddArrowTower(Colony colony, (int x, int y) pos)
+        {
+            if (!colony.UnlockedTechs.Contains("fortification"))
+                return false;
+            if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
+                return false;
+
+            DefensiveStructures.Add(new ArrowTower(
+                _nextDefenseStructureId++,
+                colony,
+                pos,
+                maxHp: ScaleFortificationHp(colony, ArrowTower.DefaultHp)));
+            _navigationTopologyVersion++;
+            MarkTerritoryDirty();
+            return true;
+        }
+
+        public bool TryAddCatapultTower(Colony colony, (int x, int y) pos)
+        {
+            if (!colony.UnlockedTechs.Contains("siege_craft"))
+                return false;
+            if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
+                return false;
+
+            DefensiveStructures.Add(new CatapultTower(
+                _nextDefenseStructureId++,
+                colony,
+                pos,
+                maxHp: ScaleFortificationHp(colony, CatapultTower.DefaultHp)));
+            _navigationTopologyVersion++;
+            MarkTerritoryDirty();
+            return true;
+        }
+
+        private static float ScaleFortificationHp(Colony colony, float baseHp)
+        {
+            var multiplier = Math.Max(1f, colony.FortificationHpMultiplier);
+            return baseHp * multiplier;
         }
 
         public bool TryDamageDefensiveStructure((int x, int y) pos, float damage)
@@ -512,6 +619,13 @@ namespace WorldSim.Simulation
             var moverColony = _colonies.FirstOrDefault(c => c.Id == moverColonyId);
             if (moverColony == null)
                 return true;
+
+            if (defense is GateStructure gate)
+            {
+                if (gate.IsOpen)
+                    return false;
+                return moverColony.Faction != defense.Owner.Faction;
+            }
 
             return moverColony.Faction != defense.Owner.Faction;
         }

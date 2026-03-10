@@ -197,6 +197,35 @@ namespace WorldSim.Simulation
                 case "stone_buildings":
                     colony.CanBuildWithStone = true;
                     break;
+                case "damage_bonus":
+                    world.CombatDamageBonusMultiplier = Math.Max(world.CombatDamageBonusMultiplier, 1.15f);
+                    colony.SetWeaponLevelClamped(Math.Max(colony.WeaponLevel, 1));
+                    break;
+                case "defense_bonus":
+                    world.CombatDefenseBonusMultiplier = Math.Max(world.CombatDefenseBonusMultiplier, 1.15f);
+                    colony.SetArmorLevelClamped(Math.Max(colony.ArmorLevel, 1));
+                    break;
+                case "unlock_warrior_role":
+                    colony.WarriorRoleUnlocked = true;
+                    break;
+                case "combat_morale_bonus":
+                    colony.CombatMoraleBonus = Math.Max(colony.CombatMoraleBonus, 8f);
+                    break;
+                case "scout_radius":
+                    colony.ScoutRadiusBonus = Math.Max(colony.ScoutRadiusBonus, 2);
+                    break;
+                case "unlock_formations":
+                    colony.FormationsUnlocked = true;
+                    break;
+                case "unlock_fortifications":
+                    colony.FortificationsUnlocked = true;
+                    break;
+                case "fortification_hp_bonus":
+                    colony.FortificationHpMultiplier = Math.Max(colony.FortificationHpMultiplier, 1.2f);
+                    break;
+                case "siege_damage":
+                    world.SiegeDamageMultiplier = Math.Max(world.SiegeDamageMultiplier, 1.15f);
+                    break;
             }
         }
     }

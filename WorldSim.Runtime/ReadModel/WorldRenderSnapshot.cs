@@ -42,7 +42,12 @@ public enum SpecializedBuildingKindView
 public enum DefensiveStructureKindView
 {
     WoodWall,
-    Watchtower
+    StoneWall,
+    ReinforcedWall,
+    Gate,
+    Watchtower,
+    ArrowTower,
+    CatapultTower
 }
 
 public sealed record WorldRenderSnapshot(
@@ -114,7 +119,8 @@ public sealed record DefensiveStructureRenderData(
     int ColonyId,
     DefensiveStructureKindView Kind,
     float Hp,
-    float MaxHp);
+    float MaxHp,
+    bool IsActive);
 
 public sealed record PersonRenderData(
     int X,
@@ -156,7 +162,9 @@ public sealed record ColonyHudData(
     float AverageStamina,
     string ProfessionSummary,
     string WarState,
-    int WarriorCount
+    int WarriorCount,
+    int WeaponLevel,
+    int ArmorLevel
 );
 
 public sealed record FactionStanceRenderData(int LeftFactionId, int RightFactionId, string Stance);

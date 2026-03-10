@@ -66,7 +66,8 @@ public static class WorldSnapshotBuilder
                 structure.Owner.Id,
                 MapDefensiveStructureKind(structure.Kind),
                 structure.Hp,
-                structure.MaxHp))
+                structure.MaxHp,
+                structure.IsActive))
             .ToList();
 
         var people = world._people
@@ -132,7 +133,9 @@ public static class WorldSnapshotBuilder
                     avgStamina,
                     profSummary,
                     world.GetColonyWarState(colony.Id).ToString(),
-                    world.GetColonyWarriorCount(colony.Id)
+                    world.GetColonyWarriorCount(colony.Id),
+                    colony.WeaponLevel,
+                    colony.ArmorLevel
                 );
             })
             .ToList();
@@ -237,7 +240,12 @@ public static class WorldSnapshotBuilder
 
     private static DefensiveStructureKindView MapDefensiveStructureKind(DefensiveStructureKind kind) => kind switch
     {
+        DefensiveStructureKind.StoneWall => DefensiveStructureKindView.StoneWall,
+        DefensiveStructureKind.ReinforcedWall => DefensiveStructureKindView.ReinforcedWall,
+        DefensiveStructureKind.Gate => DefensiveStructureKindView.Gate,
         DefensiveStructureKind.Watchtower => DefensiveStructureKindView.Watchtower,
+        DefensiveStructureKind.ArrowTower => DefensiveStructureKindView.ArrowTower,
+        DefensiveStructureKind.CatapultTower => DefensiveStructureKindView.CatapultTower,
         _ => DefensiveStructureKindView.WoodWall
     };
 

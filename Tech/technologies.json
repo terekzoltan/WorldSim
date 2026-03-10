@@ -111,6 +111,78 @@
       "effect": "golden_trade",
       "prerequisites": ["logistics", "tools"],
       "cost": { "gold": 12, "wood": 8 }
+    },
+    {
+      "id": "weaponry",
+      "name": "Weapon Smithing",
+      "description": "Improves weapon quality for stronger attacks.",
+      "effect": "damage_bonus",
+      "prerequisites": ["mining"],
+      "cost": { "iron": 18, "wood": 12 }
+    },
+    {
+      "id": "armor_smithing",
+      "name": "Armor Smithing",
+      "description": "Improves defensive gear and battlefield survivability.",
+      "effect": "defense_bonus",
+      "prerequisites": ["weaponry"],
+      "cost": { "iron": 16, "stone": 14 }
+    },
+    {
+      "id": "military_training",
+      "name": "Military Training",
+      "description": "Formal drills unlock dedicated warrior discipline.",
+      "effect": "unlock_warrior_role",
+      "prerequisites": ["construction"],
+      "cost": { "food": 20, "wood": 16 }
+    },
+    {
+      "id": "war_drums",
+      "name": "War Drums",
+      "description": "Coordinated battle signals improve combat morale.",
+      "effect": "combat_morale_bonus",
+      "prerequisites": ["military_training"],
+      "cost": { "wood": 12, "gold": 8 }
+    },
+    {
+      "id": "scouts",
+      "name": "Recon Scouts",
+      "description": "Forward scouting expands battlefield awareness.",
+      "effect": "scout_radius",
+      "prerequisites": ["military_training", "exploration"],
+      "cost": { "food": 12, "wood": 10, "gold": 6 }
+    },
+    {
+      "id": "advanced_tactics",
+      "name": "Advanced Tactics",
+      "description": "Codified maneuvers unlock formation-level command.",
+      "effect": "unlock_formations",
+      "prerequisites": ["education", "military_training"],
+      "cost": { "food": 14, "wood": 12, "gold": 10 }
+    },
+    {
+      "id": "fortification",
+      "name": "Fortification Doctrine",
+      "description": "Unlocks colony fortification construction plans.",
+      "effect": "unlock_fortifications",
+      "prerequisites": ["construction", "mining"],
+      "cost": { "wood": 18, "stone": 20 }
+    },
+    {
+      "id": "advanced_fortification",
+      "name": "Advanced Fortification",
+      "description": "Reinforcement methods increase fortification durability.",
+      "effect": "fortification_hp_bonus",
+      "prerequisites": ["fortification", "masonry"],
+      "cost": { "stone": 24, "iron": 10 }
+    },
+    {
+      "id": "siege_craft",
+      "name": "Siege Craft",
+      "description": "Specialized siege knowledge improves structure assault power.",
+      "effect": "siege_damage",
+      "prerequisites": ["fortification", "tools"],
+      "cost": { "wood": 16, "iron": 14, "stone": 12 }
     }
   ]
 }

@@ -46,6 +46,14 @@ namespace WorldSim.Simulation
         public int FarmPlotCount { get; private set; }
         public int WorkshopCount { get; private set; }
         public int StorehouseCount { get; private set; }
+        public bool WarriorRoleUnlocked { get; set; }
+        public bool FortificationsUnlocked { get; set; }
+        public bool FormationsUnlocked { get; set; }
+        public int ScoutRadiusBonus { get; set; }
+        public float CombatMoraleBonus { get; set; }
+        public float FortificationHpMultiplier { get; set; } = 1f;
+        public int WeaponLevel { get; private set; }
+        public int ArmorLevel { get; private set; }
 
         float _age;
         readonly float _baseWoodGatherMultiplier = 1f;
@@ -105,6 +113,16 @@ namespace WorldSim.Simulation
             FoodReserveBonus = StorehouseCount * 6;
         }
 
+        public void SetWeaponLevelClamped(int level)
+        {
+            WeaponLevel = Math.Clamp(level, 0, 3);
+        }
+
+        public void SetArmorLevelClamped(int level)
+        {
+            ArmorLevel = Math.Clamp(level, 0, 3);
+        }
+
         public void Update(World world, float dt)
         {
             _age += dt;
@@ -133,6 +151,10 @@ namespace WorldSim.Simulation
             target += Math.Clamp((foodPerCapita - 2f) * 7f, -20f, 20f);
             target -= Math.Max(0f, housingPressure - 1f) * 28f;
             target -= criticalRatio * 35f;
+
+            var warState = world.GetColonyWarState(Id);
+            if (warState is ColonyWarState.Tense or ColonyWarState.War)
+                target += CombatMoraleBonus;
 
             var moraleDomainBoost = (float)world.GetDomainModifier(RuntimeDomain.Morale);
             target += moraleDomainBoost * 25f;
