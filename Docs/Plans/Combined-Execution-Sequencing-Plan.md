@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-03-06
+Last updated: 2026-03-10
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -359,6 +359,174 @@ Proof targets:
 **Parallelism:**
 - Step 1 is mostly sequential Track B work.
 - After `W3.2-B5`, Track A and Track C can proceed in parallel.
+- No Track D work is required for this closeout wave.
+
+---
+
+## Wave 3.5 — Local Worksite + Crowd Persistence Closeout
+
+Purpose:
+- Close the remaining post-W3.2 clustering issues where NPCs no longer overlap on one pixel, but still persist in dense local groups.
+- Address local pseudo-work loops and local crowd reseeding instead of treating diplomacy/war as the primary cause.
+- Focus on broad runtime fixes first: build-site correctness, local dispersal, spawn distribution, and peaceful no-progress coverage.
+
+### Sprint X3.5: Worksite Correctness + Local Crowd Dissipation (Track B + C + A)
+
+- ✅ **W3.5-B1** Align `BuildHouse` start conditions with actual completion cost (Track B)
+- ✅ **W3.5-B2** Introduce explicit build-site targeting/state for house/defense construction (Track B)
+- ✅ **W3.5-B3** Spawn births onto nearby free land tiles instead of the parent tile (Track B)
+- ✅ **W3.5-B4** Upgrade deconfliction from exact-overlap removal to local crowd dissipation / spacing (Track B)
+- ✅ **W3.5-B5** Extend no-progress detection/backoff to peaceful gather/build movement loops (Track B)
+- ✅ **W3.5-C1** Audit planner warm-up / double-think and other peaceful pseudo-idle execution mismatches (Track C)
+- ✅ **W3.5-A1** Improve tracked/debug UI so local cluster cause is visible (`decision cause`, `target key`, build-site intent) (Track A)
+
+### Wave 3.5 — Execution Steps
+
+**Step 1 — Runtime loop correctness first (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W3.5-B1 | Wave 3.2 ✅ | Remove builder pseudo-work loop caused by half-cost start vs full-cost finish mismatch |
+| Track B agent | W3.5-B2 | W3.5-B1 ✅ | Jobs must target a concrete build site before work begins; stop building "wherever the actor stands" |
+| Track B agent | W3.5-B3 | Wave 3.2 ✅ | Reduce local crowd reseeding from births/spawn concentration |
+
+**Step 2 — Local cluster dissipation (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W3.5-B4 | W3.5-B2 ✅ | Do more than same-tile separation; spread persistent local groups over nearby free space |
+| Track B agent | W3.5-B5 | W3.5-B2 ✅ | Peaceful gather/build travel also needs no-progress/backoff coverage |
+
+**Step 3 — AI/Debug closeout (Track C + A, parallel after runtime base is ready)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | W3.5-C1 | W3.5-B5 ✅ | Verify peaceful execution does not burn a planner step or enter pseudo-idle loops spuriously |
+| Track A agent | W3.5-A1 | W3.5-B5 ✅ | Surface cluster cause/debug intent clearly for manual QA and tracked NPC inspection |
+
+### Wave 3.5 — Design Notes
+
+- Diplomacy/war remains an amplifier, but is not treated as the primary root cause in this wave.
+- The current main hypotheses are:
+  - in-place/local work loops,
+  - build jobs starting without a concrete site,
+  - births/spawn re-densifying already crowded local areas,
+  - overlap-only deconfliction not truly dispersing groups.
+- `TryMoveTowardsNearestResource(...)` is not the focal bug for this wave.
+- This wave should improve behavior in peaceful simulations first; war/retreat cases should benefit secondarily.
+
+Acceptance notes:
+- In peaceful runs, dense local NPC groups should decay over time instead of reforming around the same few tiles.
+- Builders should not repeatedly "work" in place when construction is not actually affordable or no build site was selected.
+- New births should not keep reseeding the same crowded tile.
+- Manual QA should be able to tell whether a local cluster is caused by build intent, resource intent, retreat intent, or planner/no-progress fallback.
+
+Proof targets:
+- `W3.5-B1/B2`: runtime tests for build start/finish consistency and explicit build-site flow.
+- `W3.5-B3/B4`: runtime tests showing births and crowd dissipation reduce persistent local clustering.
+- `W3.5-B5/C1`: tests proving peaceful gather/build loops back off when no real movement/work progress occurs.
+- `W3.5-A1`: tracked/debug UI exposes decision cause + target clearly enough for manual clustering diagnosis.
+
+**Parallelism:**
+- Step 1 and Step 2 are primarily sequential Track B work.
+- After `W3.5-B5`, Track C and Track A can proceed in parallel.
+- No Track D work is required for this closeout wave.
+
+---
+
+## Wave 3.6 — Clustering Evidence + Manual QA Control Closeout
+
+Purpose:
+- Close the remaining W3.5 review gaps before the project treats local grouping as "good enough" or naturally emergent.
+- Distinguish natural short-lived grouping from pathological stuck clustering using repeatable evidence instead of one-off manual impressions.
+- Add multi-run headless telemetry and lightweight in-app sim-speed control so future sessions can investigate clustering with less guesswork.
+
+### Sprint X3.6: Clustering Validation + Telemetry Matrix (Track B + C + A)
+
+- ✅ **W3.6-B1** Make birth spawn and build-site selection truly actor-free, not only structure-free (Track B)
+- ✅ **W3.6-B2** Protect active peaceful work intents from crowd dissipation / false site invalidation (Track B)
+- ✅ **W3.6-B3** Export clustering telemetry and stuckness counters from runtime/headless paths (Track B)
+- ✅ **W3.6-B4** Extend `WorldSim.ScenarioRunner` into a structured multi-config + multi-planner clustering matrix runner (Track B)
+- ✅ **W3.6-C1** Reconcile the W3.2 crowd-aware tie-break behavior with current code/tests/docs (Track C)
+- ✅ **W3.6-A1** Add stable tracked-actor identity to AI debug snapshot/render plumbing (Track A)
+- ✅ **W3.6-A2** Add simulation speed controls + HUD indicator for manual QA (`pause`, slower, faster, optional single-step) (Track A)
+
+### Wave 3.6 — Execution Steps
+
+**Step 1 — Runtime correctness gaps first (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W3.6-B1 | Wave 3.5 ✅ | "Free tile" must mean actor-free for births and build placement unless an explicit hard fallback is taken |
+| Track B agent | W3.6-B2 | W3.6-B1 ✅ | Crowd dissipation must not relocate active gather/build workers in a way that cancels or corrupts their current intent |
+
+**Step 2 — Instrumentation for evidence, not anecdotes (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W3.6-B3 | W3.6-B2 ✅ | Add counters/metrics for overlap resolves, local crowd moves, birth fallback, build-site resets, no-progress by cause, and dense-neighborhood persistence |
+| Track B agent | W3.6-B4 | W3.6-B3 ✅ | ScenarioRunner should run many seeds/configs/planner modes and emit structured output (`json`/`jsonl` or equivalent) for later comparison |
+
+**Step 3 — AI/UI/manual QA closeout (Track C + A, parallel after runtime telemetry is stable)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | W3.6-C1 | W3.6-B3 ✅ | Either restore crowd-aware equivalent-action preference with tests, or explicitly retire/update the W3.2 claim so code/tests/docs agree |
+| Track A agent | W3.6-A1 | W3.6-B3 ✅ | Tracked NPC debug must resolve a stable actor identity, not whichever actor currently shares the tile |
+| Track A agent | W3.6-A2 | Wave 3.5 ✅ | Manual QA needs direct runtime speed control without rebuilding or editing constants |
+
+**Step 4 — Cross-mode evidence gate (Track B + A/C consumption)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Coordinator / QA session | W3.6 evidence pass | W3.6-B4 ✅ + W3.6-C1 ✅ + W3.6-A1/A2 ✅ | Run repeated `Simple/GOAP/HTN` matrices on the same seed sets; compare clustering metrics before drawing planner-quality conclusions |
+
+### Wave 3.6 — Design Notes
+
+- This wave does **not** assume that visible grouping is inherently wrong; the goal is to separate natural congregation from true stuckness.
+- Manual testing remains useful, but one-off runs are treated as directional hints only. Wave 3.6 adds infrastructure so repeated runs can answer the question with evidence.
+- `W3.6-B1` should tighten the semantics of "free tile":
+  - actor-free for birth spawn,
+  - actor-free for explicit build-site targeting,
+  - explicit fallback only when no actor-free option exists.
+- `W3.6-B2` should treat active peaceful work as protected state for dissipation purposes. Idle or loosely moving actors may still be spread, but workers should not be silently displaced off a valid work target mid-flow.
+- `W3.6-B3/B4` should prefer lightweight structured telemetry over screenshots/log scraping. The goal is reproducible comparison across seeds, planners, and configs.
+- The telemetry runner should support at least:
+  - multiple seeds,
+  - multiple planner modes (`Simple`, `Goap`, `Htn`),
+  - optional config matrix (map size / pop / feature flags / ticks),
+  - machine-readable output for later sessions.
+- Suggested clustering metrics:
+  - exact overlap resolve count,
+  - local crowd dissipation move count,
+  - average / max local neighbor density,
+  - repeated dense-neighborhood dwell windows,
+  - no-progress backoffs by cause (`resource`, `build`, `flee`, `combat`),
+  - build-site reset count,
+  - birth fallback-to-parent count.
+- `W3.6-C1` exists because current code drifted from the previously documented W3.2 crowd-aware tie-break claim; this wave must resolve the mismatch explicitly.
+- `W3.6-A2` is intentionally small but high-value: sim-speed control should make clustering/manual QA faster to inspect without changing game logic. Showing current speed in HUD/debug is part of the feature, not optional polish.
+
+Acceptance notes:
+- Births and build-site targeting no longer choose a person-occupied tile unless a clearly defined hard fallback path is active.
+- Crowd dissipation reduces idle/local blobs without causing active workers to "teleport off" their job and enter new pseudo-failure loops.
+- The project can run repeated headless clustering matrices and keep structured results for later analysis instead of relying only on memory or screenshots.
+- Manual QA can pause, slow down, and speed up the sim while always seeing the current speed state.
+- AI debug tracking stays pinned to the same actor even when multiple people temporarily share or cross the same tile.
+- After W3.6, planner-mode comparison (`Simple` vs `Goap` vs `Htn`) should be evidence-backed, not inferred from one manual run.
+
+Proof targets:
+- `W3.6-B1/B2`: runtime tests for actor-free birth/build selection and for active build/gather flows surviving deconfliction/dissipation correctly.
+- `W3.6-B3`: runtime/headless tests proving the new counters are exported deterministically.
+- `W3.6-B4`: ScenarioRunner output sample + test coverage for multi-seed / multi-planner structured reporting.
+- `W3.6-C1`: AI tests and doc alignment proving either restored crowd-aware preference or explicit retirement of that behavior.
+- `W3.6-A1`: snapshot/UI verification that tracked NPC debug uses stable identity rather than tile-only lookup.
+- `W3.6-A2`: manual smoke checklist item(s) proving pause/speed changes work and HUD reflects the active rate.
+
+**Parallelism:**
+- `W3.6-B1 -> W3.6-B2 -> W3.6-B3 -> W3.6-B4` is the main Track B critical path.
+- After `W3.6-B3`, Track C (`W3.6-C1`) and Track A (`W3.6-A1`) can proceed in parallel.
+- `W3.6-A2` can run in parallel with the later Track B work because it is primarily host/HUD level.
 - No Track D work is required for this closeout wave.
 
 ---
