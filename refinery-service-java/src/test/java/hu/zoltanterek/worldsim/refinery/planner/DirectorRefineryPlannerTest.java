@@ -1,0 +1,76 @@
+package hu.zoltanterek.worldsim.refinery.planner;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.List;
+
+import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import hu.zoltanterek.worldsim.refinery.model.Goal;
+import hu.zoltanterek.worldsim.refinery.model.PatchOp;
+import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
+
+class DirectorRefineryPlannerTest {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void validateAndRepair_UsesDeterministicFallbackAfterRetries() {
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 0);
+        PatchRequest request = directorRequest(128L, 2, 0);
+
+        List<PatchOp> invalidCandidate = List.of(
+                new PatchOp.SetColonyDirective("op_bad", 99, "UnknownDirective", 5)
+        );
+
+        DirectorRefineryPlanner.DirectorValidationResult result = planner.validateAndRepair(request, invalidCandidate);
+
+        assertFalse(result.validated());
+        assertTrue(result.fallbackUsed());
+        assertEquals(0, result.retriesUsed());
+        assertTrue(result.warnings().stream().anyMatch(msg -> msg.contains("directorFallback")));
+        assertTrue(result.patch().stream().allMatch(op ->
+                op instanceof PatchOp.AddStoryBeat || op instanceof PatchOp.SetColonyDirective
+        ));
+    }
+
+    @Test
+    void validateAndRepair_ReturnsValidatedResultForValidCandidate() {
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 2);
+        PatchRequest request = directorRequest(64L, 1, 0);
+
+        List<PatchOp> validCandidate = List.of(
+                new PatchOp.SetColonyDirective("op_dir_1", 0, "PrioritizeFood", 16),
+                new PatchOp.AddStoryBeat("op_story_1", "BEAT_OK", "Season remains stable.", 20)
+        );
+
+        DirectorRefineryPlanner.DirectorValidationResult result = planner.validateAndRepair(request, validCandidate);
+
+        assertTrue(result.validated());
+        assertFalse(result.fallbackUsed());
+        assertEquals(0, result.retriesUsed());
+        assertEquals(2, result.patch().size());
+        assertTrue(result.patch().get(0) instanceof PatchOp.AddStoryBeat);
+    }
+
+    private PatchRequest directorRequest(long tick, int colonyCount, long cooldownTicks) {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.putObject("world")
+                .put("colonyCount", colonyCount)
+                .put("storyBeatCooldownTicks", cooldownTicks);
+
+        return new PatchRequest(
+                "v1",
+                "req-director",
+                321L,
+                tick,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                snapshot,
+                null
+        );
+    }
+}

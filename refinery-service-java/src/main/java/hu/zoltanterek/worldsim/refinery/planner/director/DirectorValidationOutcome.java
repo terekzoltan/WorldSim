@@ -6,6 +6,8 @@ import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 
 public record DirectorValidationOutcome(
         List<PatchOp> patch,
-        List<String> warnings
+        List<String> warnings,
+        List<String> feedback,
+        boolean repaired
 ) {
 }

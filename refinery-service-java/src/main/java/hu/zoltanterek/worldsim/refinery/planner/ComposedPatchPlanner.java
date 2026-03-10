@@ -106,40 +106,30 @@ public class ComposedPatchPlanner implements PatchPlanner {
                 directorOutputMode
         );
 
-        List<PatchOp> validatedPatch = candidatePatch;
-        boolean validationFailed = false;
-        DirectorRefineryPlanner.DirectorValidationResult validationResult;
-        try {
-            validationResult = directorRefineryPlanner.validateAndRepair(request, candidatePatch);
-            validatedPatch = applyDirectorOutputMode(validationResult.patch(), directorOutputMode);
-        } catch (IllegalArgumentException ex) {
-            validationResult = new DirectorRefineryPlanner.DirectorValidationResult(
-                    applyDirectorOutputMode(mockResponse.patch(), directorOutputMode),
-                    false,
-                    List.of(),
-                    List.of(ex.getMessage())
-            );
-            validatedPatch = validationResult.patch();
-            validationFailed = true;
-        }
+        DirectorRefineryPlanner.DirectorValidationResult validationResult =
+                directorRefineryPlanner.validateAndRepair(request, candidatePatch);
+        List<PatchOp> validatedPatch = applyDirectorOutputMode(validationResult.patch(), directorOutputMode);
 
-        String stage = validationResult.validated()
+        String stage = validationResult.fallbackUsed()
+                ? "directorStage:fallback-deterministic"
+                : validationResult.validated()
                 ? "directorStage:refinery-validated"
-                : validationFailed ? "directorStage:fallback-mock" : "directorStage:mock";
+                : "directorStage:mock";
 
         List<String> explain = new ArrayList<>();
         explain.add(stage);
         explain.add("directorOutputMode:" + directorOutputMode);
         explain.add(llmProposal.isPresent() ? "llmStage:candidate" : "llmStage:disabled");
+        explain.add("llmRetries:" + validationResult.retriesUsed());
         if (llmProposal.isPresent()) {
             explain.add("LLM planner proposed director candidate patch.");
         } else {
             explain.add("LLM planner unavailable for director; deterministic mock candidate used.");
         }
-        if (validationResult.validated()) {
+        if (validationResult.fallbackUsed()) {
+            explain.add("Director validation exhausted retries; deterministic fallback candidate applied.");
+        } else if (validationResult.validated()) {
             explain.add("Director candidate passed formal validation.");
-        } else if (validationFailed) {
-            explain.add("Director validation failed; deterministic mock fallback applied.");
         } else {
             explain.add("Director formal validation gate disabled; pass-through mode.");
         }
