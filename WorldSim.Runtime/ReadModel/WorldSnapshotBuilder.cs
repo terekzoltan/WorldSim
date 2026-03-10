@@ -73,6 +73,7 @@ public static class WorldSnapshotBuilder
             .Select(p => new PersonRenderData(
                 p.Pos.x,
                 p.Pos.y,
+                p.Id,
                 p.Home.Id,
                 p.Health,
                 p.IsInCombat,
@@ -162,7 +163,18 @@ public static class WorldSnapshotBuilder
             ComputeAverageFoodPerPerson(world),
             world._colonies.Count(c => c.Stock[Resource.Food] <= Math.Max(3, world._people.Count(p => p.Home == c && p.Health > 0f) / 2)),
             ComputeFoodPerPersonSpread(world),
-            world.ActiveSoftReservationCount
+            world.ActiveSoftReservationCount,
+            world.TotalOverlapResolveMoves,
+            world.TotalCrowdDissipationMoves,
+            world.TotalBirthFallbackToOccupiedCount,
+            world.TotalBirthFallbackToParentCount,
+            world.TotalBuildSiteResetCount,
+            world.TotalNoProgressBackoffResource,
+            world.TotalNoProgressBackoffBuild,
+            world.TotalNoProgressBackoffFlee,
+            world.TotalNoProgressBackoffCombat,
+            world.DenseNeighborhoodTicks,
+            world.LastTickDenseActors
         );
 
         return new WorldRenderSnapshot(

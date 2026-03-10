@@ -49,7 +49,7 @@ public sealed class HudRenderer
         {
             _techMenuPanel.Draw(spriteBatch, font, techMenu.Value, Theme);
             if (showAiDebug)
-                _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
+                _aiDebugPanel.Draw(spriteBatch, font, aiDebug, snapshot, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
             return;
         }
 
@@ -100,7 +100,7 @@ public sealed class HudRenderer
         }
 
         if (showAiDebug)
-            _aiDebugPanel.Draw(spriteBatch, font, aiDebug, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
+            _aiDebugPanel.Draw(spriteBatch, font, aiDebug, snapshot, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
     }
 
     private int DrawDirectorStatus(

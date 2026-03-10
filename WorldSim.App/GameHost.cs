@@ -28,6 +28,7 @@ public class GameHost : Game
     }
 
     private static readonly float[] HudScales = { 1.0f, 1.15f, 1.3f };
+    private static readonly float[] SimSpeedPresets = { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 10.0f };
 
     private static readonly (string Name, WorldRenderTheme Theme)[] ThemePresets =
     {
@@ -58,6 +59,8 @@ public class GameHost : Game
 
     private float _accumulator;
     private float _timeScale = 10.0f;
+    private bool _simPaused;
+    private int _simSpeedIndex = SimSpeedPresets.Length - 1;
     private bool _showTechMenu;
     private int _selectedColony;
     private int _previousWheel;
@@ -105,6 +108,7 @@ public class GameHost : Game
 
         _refineryRuntime = new RefineryTriggerAdapter(AppDomain.CurrentDomain.BaseDirectory);
         _hudRenderer.SetTheme(HudTheme.FromWorldTheme(_worldRenderer.Theme));
+        _timeScale = SimSpeedPresets[_simSpeedIndex];
         ApplyQualityProfile(_qualityProfile);
     }
 
@@ -205,6 +209,27 @@ public class GameHost : Game
         else
         {
             _fullscreenKeyDown = false;
+        }
+
+        if (IsChordPressed(keys, Keys.P, requireCtrl: true))
+        {
+            _simPaused = !_simPaused;
+            if (_simPaused)
+                _accumulator = 0f;
+            SetToast(_simPaused ? "Simulation paused" : $"Simulation resumed x{_timeScale:0.##}");
+        }
+
+        if (IsChordPressed(keys, Keys.OemMinus, requireCtrl: true) || IsChordPressed(keys, Keys.Subtract, requireCtrl: true))
+            AdjustSimulationSpeed(-1);
+
+        if (IsChordPressed(keys, Keys.OemPlus, requireCtrl: true) || IsChordPressed(keys, Keys.Add, requireCtrl: true))
+            AdjustSimulationSpeed(1);
+
+        if (IsChordPressed(keys, Keys.OemPeriod, requireCtrl: true) || IsChordPressed(keys, Keys.Decimal, requireCtrl: true))
+        {
+            _simPaused = true;
+            _accumulator = SimulationTickDuration;
+            SetToast("Simulation step: +1 tick");
         }
 
         if (IsChordPressed(keys, Keys.F1, requireCtrl: true))
@@ -324,11 +349,15 @@ public class GameHost : Game
         _previousKeys = keys;
         _refineryRuntime.Pump();
 
-        _accumulator += (float)gameTime.ElapsedGameTime.TotalSeconds * _timeScale;
+        if (!_simPaused)
+            _accumulator += (float)gameTime.ElapsedGameTime.TotalSeconds * _timeScale;
+
         while (_accumulator >= SimulationTickDuration)
         {
             _runtime.AdvanceTick(SimulationTickDuration);
             _accumulator -= SimulationTickDuration;
+            if (_simPaused)
+                break;
         }
 
         base.Update(gameTime);
@@ -500,7 +529,17 @@ public class GameHost : Game
             return;
         }
 
-        SetToast($"{prefix} #{ai.TrackedNpcIndex + 1}/{Math.Max(1, ai.TrackedNpcCount)} C{ai.TrackedColonyId} @({ai.TrackedX},{ai.TrackedY})");
+        SetToast($"{prefix} #{ai.TrackedNpcIndex}/{Math.Max(1, ai.TrackedNpcCount)} A{ai.TrackedActorId} C{ai.TrackedColonyId} @({ai.TrackedX},{ai.TrackedY})");
+    }
+
+    private void AdjustSimulationSpeed(int delta)
+    {
+        if (delta == 0)
+            return;
+
+        _simSpeedIndex = Math.Clamp(_simSpeedIndex + Math.Sign(delta), 0, SimSpeedPresets.Length - 1);
+        _timeScale = SimSpeedPresets[_simSpeedIndex];
+        SetToast($"Simulation speed: x{_timeScale:0.##}");
     }
 
     private static SimulationRuntime CreateRuntime()
@@ -739,9 +778,10 @@ public class GameHost : Game
         bool panelExclusive = _showDiplomacyPanel || _showCampaignPanel;
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: Matrix.CreateScale(hudScale, hudScale, 1f));
-        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | Director:{snapshot.Director.OutputMode}({snapshot.Director.OutputModeSource})@{snapshot.Director.StageMarker}";
+        var simStatus = _simPaused ? $"PAUSED@x{_timeScale:0.##}" : $"x{_timeScale:0.##}";
+        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | Director:{snapshot.Director.OutputMode}({snapshot.Director.OutputModeSource})@{snapshot.Director.StageMarker} | Sim:{simStatus}";
 #if DEBUG
-        plannerStatus += " (F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F6 HUD scale | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
+        plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F6 HUD scale | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
 #endif
         if (_showTelemetryHud && !_cleanShotMode && !panelExclusive)
         {

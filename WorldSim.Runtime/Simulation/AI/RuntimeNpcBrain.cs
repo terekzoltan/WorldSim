@@ -49,10 +49,10 @@ public sealed class RuntimeNpcBrain
         _simulationTimeSeconds += Math.Max(0f, dt);
         var context = BuildContext(actor, world);
         var decision = _brain.Think(context);
-        return RecordDecision(actor, decision.Command, decision.Trace);
+        return RecordDecision(actor, world, decision.Command, decision.Trace);
     }
 
-    private Job RecordDecision(Person actor, NpcCommand command, AiDecisionTrace trace)
+    private Job RecordDecision(Person actor, World world, NpcCommand command, AiDecisionTrace trace)
     {
         var job = command switch
         {
@@ -76,7 +76,9 @@ public sealed class RuntimeNpcBrain
 
         _decisionSequence++;
         LastDecision = new RuntimeAiDecision(
+            WorldTick: world.CurrentTick,
             Sequence: _decisionSequence,
+            ActorId: actor.Id,
             ColonyId: actor.Home.Id,
             X: actor.Pos.x,
             Y: actor.Pos.y,
@@ -219,7 +221,7 @@ public sealed class RuntimeNpcBrain
 
     private static float ComputeResourceCrowdPressure(World world, (int x, int y) pos, int radius)
     {
-        var reservations = new List<int>(16);
+        var maxReserved = 0;
         for (int dy = -radius; dy <= radius; dy++)
         {
             for (int dx = -radius; dx <= radius; dx++)
@@ -234,25 +236,16 @@ public sealed class RuntimeNpcBrain
                     continue;
 
                 var key = $"resource:{node.Type}:{x}:{y}";
-                reservations.Add(world.GetSoftReservationCount(key));
+                maxReserved = Math.Max(maxReserved, world.GetSoftReservationCount(key));
             }
         }
 
-        if (reservations.Count == 0)
-            return 0f;
-
-        reservations.Sort();
-        int sample = Math.Min(4, reservations.Count);
-        float avg = 0f;
-        for (int i = 0; i < sample; i++)
-            avg += reservations[i];
-        avg /= sample;
-        return Math.Clamp(avg / 4f, 0f, 1f);
+        return Math.Clamp(maxReserved / 4f, 0f, 1f);
     }
 
     private static float ComputeBuildCrowdPressure(World world, (int x, int y) origin, int colonyId)
     {
-        var reservations = new List<int>(24);
+        var maxReserved = 0;
         for (int radius = 2; radius <= 6; radius++)
         {
             for (int dy = -radius; dy <= radius; dy++)
@@ -271,26 +264,17 @@ public sealed class RuntimeNpcBrain
                     if (world.IsMovementBlocked(x, y, colonyId))
                         continue;
 
-                    reservations.Add(world.GetSoftReservationCount($"build:{x}:{y}"));
+                    maxReserved = Math.Max(maxReserved, world.GetSoftReservationCount($"build:{x}:{y}"));
                 }
             }
         }
 
-        if (reservations.Count == 0)
-            return 0f;
-
-        reservations.Sort();
-        int sample = Math.Min(6, reservations.Count);
-        float avg = 0f;
-        for (int i = 0; i < sample; i++)
-            avg += reservations[i];
-        avg /= sample;
-        return Math.Clamp(avg / 4f, 0f, 1f);
+        return Math.Clamp(maxReserved / 4f, 0f, 1f);
     }
 
     private static float ComputeRetreatCrowdPressure(World world, (int x, int y) origin, int colonyId)
     {
-        var reservations = new List<int>(24);
+        var maxReserved = 0;
         for (int radius = 2; radius <= 8; radius++)
         {
             for (int dy = -radius; dy <= radius; dy++)
@@ -309,21 +293,12 @@ public sealed class RuntimeNpcBrain
                     if (world.IsMovementBlocked(x, y, colonyId))
                         continue;
 
-                    reservations.Add(world.GetSoftReservationCount($"retreat:{x}:{y}"));
+                    maxReserved = Math.Max(maxReserved, world.GetSoftReservationCount($"retreat:{x}:{y}"));
                 }
             }
         }
 
-        if (reservations.Count == 0)
-            return 0f;
-
-        reservations.Sort();
-        int sample = Math.Min(8, reservations.Count);
-        float avg = 0f;
-        for (int i = 0; i < sample; i++)
-            avg += reservations[i];
-        avg /= sample;
-        return Math.Clamp(avg / 4f, 0f, 1f);
+        return Math.Clamp(maxReserved / 4f, 0f, 1f);
     }
 
     private static bool IsWarriorRole(World world, Person actor, int colonyId, bool isHostileStance)

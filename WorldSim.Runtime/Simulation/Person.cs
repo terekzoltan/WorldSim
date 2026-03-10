@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using WorldSim.AI;
 using WorldSim.Simulation.Effects;
 using WorldSim.Simulation.Navigation;
@@ -31,6 +32,9 @@ public enum PersonDeathReason { None, OldAge, Starvation, Predator, Combat, Othe
 
 public class Person
 {
+    private static int _nextFallbackPersonId = 1;
+
+    public int Id { get; }
     public (int x, int y) Pos;
     public Job Current = Job.Idle;
     public float Health = 100;  
@@ -89,6 +93,13 @@ public class Person
     int _noProgressStreak;
     int _backoffTicksRemaining;
     bool _trackNoProgressForCurrentMove;
+    string _noProgressTrackContext = "move";
+    bool _suppressPeacefulActionsDuringBackoff;
+    bool _protectFromDissipationThisTick;
+    int _lastAiThinkTick = -1;
+    float _lastAiThinkDt = -1f;
+    Job _lastAiThinkResult = Job.Idle;
+    bool _hasCachedAiThink;
 
     const int PathCacheHorizon = 12;
     const int PathMaxExpansions = 4096;
@@ -100,9 +111,14 @@ public class Person
     public int BackoffTicksRemaining => _backoffTicksRemaining;
     public string DebugDecisionCause { get; private set; } = "none";
     public string DebugTargetKey { get; private set; } = "none";
+    public bool IsActivePeacefulIntentProtected => _protectFromDissipationThisTick;
 
-    private Person(Colony home, (int, int) pos, bool newborn, RuntimeNpcBrain brain, Random rng)
+    private Job _activeBuildSiteJob = Job.Idle;
+    private (int x, int y)? _activeBuildSite;
+
+    private Person(int id, Colony home, (int, int) pos, bool newborn, RuntimeNpcBrain brain, Random rng)
     {
+        Id = id;
         _home = home;
         _brain = brain;
         _rng = rng;
@@ -122,11 +138,14 @@ public class Person
     }
 
     public static Person Spawn(Colony home, (int, int) pos, RuntimeNpcBrain brain, Random rng)
-        => new Person(home, pos, newborn: false, brain, rng);
+        => Spawn(home, pos, brain, rng, Interlocked.Increment(ref _nextFallbackPersonId));
+
+    public static Person Spawn(Colony home, (int, int) pos, RuntimeNpcBrain brain, Random rng, int actorId)
+        => new Person(actorId, home, pos, newborn: false, brain, rng);
 
     public static Person SpawnWithBonus(Colony home, (int, int) pos, World world, RuntimeNpcBrain brain, Random rng)
     {
-        var person = new Person(home, pos, newborn: true, brain, rng);
+        var person = new Person(world.AllocatePersonId(), home, pos, newborn: true, brain, rng);
         person.Strength = Math.Min(20, person.Strength + world.StrengthBonus);
         person.Intelligence = Math.Min(20, person.Intelligence + world.IntelligenceBonus);
         person.Health += world.HealthBonus;
@@ -202,8 +221,11 @@ public class Person
 
     public bool Update(World w, float dt, List<Person> births)
     {
+        _protectFromDissipationThisTick = false;
         if (_backoffTicksRemaining > 0)
             _backoffTicksRemaining--;
+        if (_backoffTicksRemaining <= 0)
+            _suppressPeacefulActionsDuringBackoff = false;
 
         // perception step
         Perceive(w);
@@ -231,7 +253,7 @@ public class Person
         float hunger = Needs.GetValueOrDefault("Hunger", 0f);
 
         if (LastAiDecision == null)
-            _ = _brain.Think(this, w, dt);
+            _ = ThinkAiOncePerTick(w, dt);
 
         // Critical hunger preemption happens before starvation damage to avoid dying with available food.
         if (hunger >= 78f && _home.Stock[Resource.Food] > 0)
@@ -316,7 +338,8 @@ public class Person
 
         if (Age >= 18 && Age <= 60 && hasHousingRoom && socialGate && _rng.NextDouble() < birthChance)
         {
-            births.Add(Person.SpawnWithBonus(_home, Pos, w, w.CreateNpcBrain(_home), w.CreateEntityRng()));
+            var birthPos = w.GetBirthSpawnPosition(_home, Pos);
+            births.Add(Person.SpawnWithBonus(_home, birthPos, w, w.CreateNpcBrain(_home), w.CreateEntityRng()));
         }
 
         int reserveBonus = _home.FoodReserveBonus;
@@ -327,6 +350,12 @@ public class Person
 
         if (_doingJob > 0 && Current != Job.Idle)
         {
+            if (Current is Job.GatherWood or Job.GatherStone or Job.GatherIron or Job.GatherGold or Job.GatherFood
+                or Job.BuildHouse or Job.BuildWall or Job.BuildWatchtower)
+            {
+                _protectFromDissipationThisTick = true;
+            }
+
             // working → not idle
             _idleTimeSeconds = 0f;
 
@@ -368,23 +397,7 @@ public class Person
                         break;
 
                     case Job.BuildHouse:
-                        // Szükséges házak száma, de legalább annyi, mint a már meglévő házak
-                        int maxHouses = Math.Max(_home.HouseCount, (int)Math.Ceiling((colonyPop + 3) / (double)w.HouseCapacity));
-                        if (_home.HouseCount < maxHouses)
-                        {
-                            if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
-                            {
-                                _home.Stock[Resource.Stone] -= _home.HouseStoneCost;
-                                _home.HouseCount++;
-                                w.AddHouse(_home, Pos);
-                            }
-                            else if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
-                            {
-                                _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
-                                _home.HouseCount++;
-                                w.AddHouse(_home, Pos);
-                            }
-                        }
+                        TryCompleteHouseBuild(w);
                         TryConsumeToolCharge();
                         break;
 
@@ -527,6 +540,15 @@ public class Person
                 return true;
             }
 
+            if (_suppressPeacefulActionsDuringBackoff && _backoffTicksRemaining > 0)
+            {
+                DebugDecisionCause = "peaceful_backoff_wait";
+                DebugTargetKey = "none";
+                _idleTimeSeconds = 0f;
+                _lastPos = Pos;
+                return true;
+            }
+
             if (TryProfessionDirectedAction(w, veryLowFood))
             {
                 _idleTimeSeconds = 0f;
@@ -581,9 +603,27 @@ public class Person
             }
 
             // 3) Utility-goal fallback → pick a job (e.g., BuildHouse if feasible)
-            var next = _brain.Think(this, w, dt);
+            var next = ThinkAiOncePerTick(w, dt);
+            if (next == Job.BuildHouse && !CanStartHouseBuild(w))
+                next = ResolveHouseBuildFallback(w);
+
+            if (IsBuildJob(next))
+            {
+                if (TryExecuteBuildIntent(w, next))
+                {
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
+
+                next = ResolveBuildFallback(w, next);
+            }
+
             if (next != Job.Idle)
             {
+                if (!IsBuildJob(next))
+                    ResetBuildSiteState(w);
+
                 Current = next;
                 _doingJob = next switch
                 {
@@ -678,6 +718,18 @@ public class Person
         return Math.Max(1, (int)MathF.Round(baseYield * colonyMultiplier * professionMultiplier * economyMultiplier * foodDomainMultiplier));
     }
 
+    private Job ThinkAiOncePerTick(World w, float dt)
+    {
+        if (_hasCachedAiThink && _lastAiThinkTick == w.CurrentTick && Math.Abs(_lastAiThinkDt - dt) < 0.0001f)
+            return _lastAiThinkResult;
+
+        _lastAiThinkResult = _brain.Think(this, w, dt);
+        _lastAiThinkTick = w.CurrentTick;
+        _lastAiThinkDt = dt;
+        _hasCachedAiThink = true;
+        return _lastAiThinkResult;
+    }
+
     bool TryProfessionDirectedAction(World w, bool veryLowFood)
     {
         switch (Profession)
@@ -693,11 +745,9 @@ public class Person
                     return true;
                 }
 
-                if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost / 2)
+                if (CanStartHouseBuild(w))
                 {
-                    Current = Job.BuildHouse;
-                    _doingJob = ComputeTicks(BuildHouseTime, w, isHeavyWork: true);
-                    return true;
+                    return TryExecuteBuildIntent(w, Job.BuildHouse);
                 }
                 break;
             case Profession.Lumberjack:
@@ -744,19 +794,212 @@ public class Person
             && _home.Stock[Resource.Stone] >= WatchtowerStoneCost
             && CountOwnWatchtowers(w) < Math.Max(1, _home.HouseCount / 2))
         {
-            Current = Job.BuildWatchtower;
-            _doingJob = ComputeTicks(BuildWatchtowerTime, w, isHeavyWork: true);
-            return true;
+            return TryExecuteBuildIntent(w, Job.BuildWatchtower);
         }
 
         if (_home.Stock[Resource.Wood] >= WallWoodCost)
         {
-            Current = Job.BuildWall;
-            _doingJob = ComputeTicks(BuildWallTime, w, isHeavyWork: true);
-            return true;
+            return TryExecuteBuildIntent(w, Job.BuildWall);
         }
 
         return false;
+    }
+
+    private bool NeedsHousing(World w)
+    {
+        int colonyPop = w._people.Count(person => person.Home == _home && person.Health > 0f);
+        int targetHouseCount = Math.Max(_home.HouseCount, (int)Math.Ceiling((colonyPop + 3) / (double)w.HouseCapacity));
+        return _home.HouseCount < targetHouseCount;
+    }
+
+    private bool CanAffordHouseBuild(World w)
+    {
+        if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
+            return true;
+
+        return _home.Stock[Resource.Wood] >= _home.HouseWoodCost;
+    }
+
+    private bool CanStartHouseBuild(World w)
+        => NeedsHousing(w) && CanAffordHouseBuild(w);
+
+    private Job ResolveHouseBuildFallback(World w)
+    {
+        if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] < _home.HouseStoneCost)
+            return Job.GatherStone;
+
+        return Job.GatherWood;
+    }
+
+    private static bool IsBuildJob(Job job)
+        => job is Job.BuildHouse or Job.BuildWall or Job.BuildWatchtower;
+
+    private Job ResolveBuildFallback(World w, Job buildJob)
+    {
+        return buildJob switch
+        {
+            Job.BuildHouse => ResolveHouseBuildFallback(w),
+            Job.BuildWatchtower when _home.Stock[Resource.Stone] < WatchtowerStoneCost => Job.GatherStone,
+            _ => Job.GatherWood
+        };
+    }
+
+    private void ClearBuildSiteState()
+    {
+        _activeBuildSite = null;
+        _activeBuildSiteJob = Job.Idle;
+    }
+
+    private void ResetBuildSiteState(World w)
+    {
+        if (_activeBuildSite != null && _activeBuildSiteJob != Job.Idle)
+            w.ReportBuildSiteReset();
+
+        ClearBuildSiteState();
+    }
+
+    private bool HasValidActiveBuildSite(World w, Job buildJob)
+    {
+        if (_activeBuildSiteJob != buildJob || _activeBuildSite == null)
+            return false;
+
+        return IsBuildSiteValid(w, _activeBuildSite.Value, buildJob);
+    }
+
+    private bool IsBuildSiteValid(World w, (int x, int y) site, Job buildJob)
+    {
+        if (!w.CanPlaceStructureAt(site.x, site.y))
+            return false;
+
+        if (buildJob is Job.BuildWall or Job.BuildWatchtower)
+        {
+            int distFromOrigin = Math.Abs(site.x - _home.Origin.x) + Math.Abs(site.y - _home.Origin.y);
+            if (distFromOrigin is < 2 or > 6)
+                return false;
+        }
+
+        return true;
+    }
+
+    private bool TryAcquireBuildSite(World w, Job buildJob)
+    {
+        if (HasValidActiveBuildSite(w, buildJob))
+            return true;
+
+        (int x, int y)? site = buildJob switch
+        {
+            Job.BuildHouse => FindHouseBuildPlacement(w),
+            Job.BuildWall => FindDefensePlacement(w, preferContested: true),
+            Job.BuildWatchtower => FindDefensePlacement(w, preferContested: true),
+            _ => null
+        };
+
+        if (site == null)
+        {
+            ResetBuildSiteState(w);
+            return false;
+        }
+
+        _activeBuildSite = site;
+        _activeBuildSiteJob = buildJob;
+        return true;
+    }
+
+    private bool TryExecuteBuildIntent(World w, Job buildJob)
+    {
+        if (buildJob == Job.BuildHouse && !CanStartHouseBuild(w))
+        {
+            ResetBuildSiteState(w);
+            return false;
+        }
+
+        if (buildJob == Job.BuildWall && _home.Stock[Resource.Wood] < WallWoodCost)
+        {
+            ResetBuildSiteState(w);
+            return false;
+        }
+
+        if (buildJob == Job.BuildWatchtower
+            && (_home.Stock[Resource.Wood] < WatchtowerWoodCost || _home.Stock[Resource.Stone] < WatchtowerStoneCost))
+        {
+            ResetBuildSiteState(w);
+            return false;
+        }
+
+        if (!TryAcquireBuildSite(w, buildJob))
+            return false;
+
+        var site = _activeBuildSite!.Value;
+        var reservationKey = BuildBuildReservationKey(site.x, site.y);
+        w.ReserveSoftTarget(reservationKey);
+
+        if (Pos != site)
+        {
+            DebugDecisionCause = "build_site_move";
+            DebugTargetKey = reservationKey;
+            _protectFromDissipationThisTick = true;
+            _trackNoProgressForCurrentMove = true;
+            _noProgressTrackContext = "build";
+            MoveTowards(w, site, (int)_home.MovementSpeedMultiplier);
+            return true;
+        }
+
+        DebugDecisionCause = buildJob switch
+        {
+            Job.BuildHouse => "build_house_work",
+            Job.BuildWall => "build_wall_work",
+            Job.BuildWatchtower => "build_watchtower_work",
+            _ => "build_work"
+        };
+        DebugTargetKey = reservationKey;
+        _protectFromDissipationThisTick = true;
+
+        Current = buildJob;
+        _doingJob = buildJob switch
+        {
+            Job.BuildHouse => ComputeTicks(BuildHouseTime, w, isHeavyWork: true),
+            Job.BuildWall => ComputeTicks(BuildWallTime, w, isHeavyWork: true),
+            Job.BuildWatchtower => ComputeTicks(BuildWatchtowerTime, w, isHeavyWork: true),
+            _ => 0
+        };
+        return _doingJob > 0;
+    }
+
+    private void TryCompleteHouseBuild(World w)
+    {
+        if (!HasValidActiveBuildSite(w, Job.BuildHouse) || _activeBuildSite == null)
+        {
+            ResetBuildSiteState(w);
+            return;
+        }
+
+        if (Pos != _activeBuildSite.Value)
+            return;
+
+        if (!NeedsHousing(w))
+        {
+            ResetBuildSiteState(w);
+            return;
+        }
+
+        var site = _activeBuildSite.Value;
+
+        if (w.StoneBuildingsEnabled && _home.CanBuildWithStone && _home.Stock[Resource.Stone] >= _home.HouseStoneCost)
+        {
+            _home.Stock[Resource.Stone] -= _home.HouseStoneCost;
+            _home.HouseCount++;
+            w.AddHouse(_home, site);
+            ClearBuildSiteState();
+            return;
+        }
+
+        if (_home.Stock[Resource.Wood] >= _home.HouseWoodCost)
+        {
+            _home.Stock[Resource.Wood] -= _home.HouseWoodCost;
+            _home.HouseCount++;
+            w.AddHouse(_home, site);
+            ClearBuildSiteState();
+        }
     }
 
     bool TryHandleThreatResponse(World w, float dt)
@@ -778,7 +1021,7 @@ public class Person
         if (!hasImmediateThreats && !shouldDefend)
             return false;
 
-        var next = _brain.Think(this, w, dt);
+        var next = ThinkAiOncePerTick(w, dt);
         if (next != Job.Fight && next != Job.Flee && next != Job.RaidBorder)
         {
             if (context.IsWarriorRole && context.IsWarStance && (context.IsContestedTile || context.HasContestedTilesNearby))
@@ -950,6 +1193,7 @@ public class Person
         if (!threatContext.IsWarriorRole && hasFactionThreat)
         {
             _trackNoProgressForCurrentMove = useRefugeRing;
+            _noProgressTrackContext = useRefugeRing ? "flee" : "move";
             MoveTowards(w, retreatTarget, 1);
             return;
         }
@@ -958,6 +1202,7 @@ public class Person
         if (nearestThreat == null)
         {
             _trackNoProgressForCurrentMove = false;
+            _noProgressTrackContext = "move";
             MoveTowards(w, _home.Origin, 1);
             return;
         }
@@ -977,6 +1222,7 @@ public class Person
         }
 
         _trackNoProgressForCurrentMove = hasFactionThreat && useRefugeRing;
+        _noProgressTrackContext = hasFactionThreat && useRefugeRing ? "flee" : "move";
         MoveTowards(w, hasFactionThreat ? retreatTarget : _home.Origin, 1);
     }
 
@@ -1101,19 +1347,29 @@ public class Person
         if (_home.Stock[Resource.Wood] < WallWoodCost)
             return;
 
-        var spot = FindDefensePlacement(w, preferContested: true);
-        if (spot == null)
+        if (!HasValidActiveBuildSite(w, Job.BuildWall) || _activeBuildSite == null)
+        {
+            ResetBuildSiteState(w);
+            return;
+        }
+
+        var spot = _activeBuildSite.Value;
+        if (Pos != spot)
             return;
 
-        var reservationKey = BuildBuildReservationKey(spot.Value.x, spot.Value.y);
+        var reservationKey = BuildBuildReservationKey(spot.x, spot.y);
         w.ReserveSoftTarget(reservationKey);
         DebugDecisionCause = "build_wall";
         DebugTargetKey = reservationKey;
 
-        if (!w.TryAddWoodWall(_home, spot.Value))
+        if (!w.TryAddWoodWall(_home, spot))
+        {
+            ResetBuildSiteState(w);
             return;
+        }
 
         _home.Stock[Resource.Wood] -= WallWoodCost;
+        ClearBuildSiteState();
         w.AddExternalEvent($"{_home.Name} raised a border wall");
     }
 
@@ -1122,20 +1378,30 @@ public class Person
         if (_home.Stock[Resource.Wood] < WatchtowerWoodCost || _home.Stock[Resource.Stone] < WatchtowerStoneCost)
             return;
 
-        var spot = FindDefensePlacement(w, preferContested: true);
-        if (spot == null)
+        if (!HasValidActiveBuildSite(w, Job.BuildWatchtower) || _activeBuildSite == null)
+        {
+            ResetBuildSiteState(w);
+            return;
+        }
+
+        var spot = _activeBuildSite.Value;
+        if (Pos != spot)
             return;
 
-        var reservationKey = BuildBuildReservationKey(spot.Value.x, spot.Value.y);
+        var reservationKey = BuildBuildReservationKey(spot.x, spot.y);
         w.ReserveSoftTarget(reservationKey);
         DebugDecisionCause = "build_watchtower";
         DebugTargetKey = reservationKey;
 
-        if (!w.TryAddWatchtower(_home, spot.Value))
+        if (!w.TryAddWatchtower(_home, spot))
+        {
+            ResetBuildSiteState(w);
             return;
+        }
 
         _home.Stock[Resource.Wood] -= WatchtowerWoodCost;
         _home.Stock[Resource.Stone] -= WatchtowerStoneCost;
+        ClearBuildSiteState();
         w.AddExternalEvent($"{_home.Name} completed a watchtower");
     }
 
@@ -1283,10 +1549,11 @@ public class Person
             && structure is WorldSim.Simulation.Defense.Watchtower
             && !structure.IsDestroyed);
 
-    private (int x, int y)? FindDefensePlacement(World w, bool preferContested)
+    private (int x, int y)? FindHouseBuildPlacement(World w)
     {
         var origin = _home.Origin;
-        var candidates = new List<(int x, int y)>();
+        var actorFreeCandidates = new List<(int x, int y)>();
+        var fallbackCandidates = new List<(int x, int y)>();
         for (int dy = -6; dy <= 6; dy++)
         {
             for (int dx = -6; dx <= 6; dx++)
@@ -1299,15 +1566,69 @@ public class Person
                 int y = origin.y + dy;
                 if (x < 0 || y < 0 || x >= w.Width || y >= w.Height)
                     continue;
-                if (w.GetTile(x, y).Ground == Ground.Water)
-                    continue;
-                if (w.IsMovementBlocked(x, y, _home.Id))
+                if (!w.CanPlaceStructureAt(x, y))
                     continue;
 
-                candidates.Add((x, y));
+                var candidate = (x, y);
+                fallbackCandidates.Add(candidate);
+                if (!w.IsActorOccupied(x, y, exclude: this))
+                    actorFreeCandidates.Add(candidate);
             }
         }
 
+        var candidates = actorFreeCandidates.Count > 0 ? actorFreeCandidates : fallbackCandidates;
+        if (candidates.Count == 0)
+            return null;
+
+        (int x, int y)? best = null;
+        float bestScore = float.MaxValue;
+        foreach (var candidate in candidates)
+        {
+            float score = Math.Abs(candidate.x - Pos.x) + Math.Abs(candidate.y - Pos.y);
+            var reservationKey = BuildBuildReservationKey(candidate.x, candidate.y);
+            score += w.GetSoftReservationCount(reservationKey) * 1.5f;
+
+            int localOccupancy = w._people.Count(person => person != this && person.Health > 0f && person.Pos == candidate);
+            score += localOccupancy * 1.2f;
+
+            if (score < bestScore)
+            {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+
+        return best ?? candidates[_rng.Next(candidates.Count)];
+    }
+
+    private (int x, int y)? FindDefensePlacement(World w, bool preferContested)
+    {
+        var origin = _home.Origin;
+        var actorFreeCandidates = new List<(int x, int y)>();
+        var fallbackCandidates = new List<(int x, int y)>();
+        for (int dy = -6; dy <= 6; dy++)
+        {
+            for (int dx = -6; dx <= 6; dx++)
+            {
+                int dist = Math.Abs(dx) + Math.Abs(dy);
+                if (dist < 2 || dist > 6)
+                    continue;
+
+                int x = origin.x + dx;
+                int y = origin.y + dy;
+                if (x < 0 || y < 0 || x >= w.Width || y >= w.Height)
+                    continue;
+                if (!w.CanPlaceStructureAt(x, y))
+                    continue;
+
+                var candidate = (x, y);
+                fallbackCandidates.Add(candidate);
+                if (!w.IsActorOccupied(x, y, exclude: this))
+                    actorFreeCandidates.Add(candidate);
+            }
+        }
+
+        var candidates = actorFreeCandidates.Count > 0 ? actorFreeCandidates : fallbackCandidates;
         if (candidates.Count == 0)
             return null;
 
@@ -1597,6 +1918,7 @@ public class Person
             w.ReserveSoftTarget(reservationKey);
             DebugDecisionCause = "gather";
             DebugTargetKey = reservationKey;
+            _protectFromDissipationThisTick = true;
 
             if (bestType == Resource.Wood)
             {
@@ -1631,6 +1953,8 @@ public class Person
         w.ReserveSoftTarget(moveReservationKey);
         DebugDecisionCause = "move_to_resource";
         DebugTargetKey = moveReservationKey;
+        _trackNoProgressForCurrentMove = true;
+        _noProgressTrackContext = "resource";
         MoveTowards(w, bestPos.Value, (int)_home.MovementSpeedMultiplier);
         return true;
     }
@@ -1742,8 +2066,13 @@ public class Person
 
         Pos = (cx, cy);
 
+        var noProgressContext = _noProgressTrackContext;
+        if (noProgressContext == "move" && Current is Job.Fight or Job.RaidBorder or Job.AttackStructure)
+            noProgressContext = "combat";
+
         var shouldTrackNoProgress = ShouldTrackNoProgressForCurrentMove();
         _trackNoProgressForCurrentMove = false;
+        _noProgressTrackContext = "move";
         if (!shouldTrackNoProgress)
         {
             _noProgressStreak = 0;
@@ -1759,10 +2088,16 @@ public class Person
                 _backoffTicksRemaining = Math.Max(_backoffTicksRemaining, NoProgressBackoffTicks);
                 _pathCache.Invalidate();
                 _unstickStepsRemaining = Math.Max(_unstickStepsRemaining, UnstickSteps);
-                DebugDecisionCause = "no_progress_backoff";
+                DebugDecisionCause = $"no_progress_backoff:{noProgressContext}";
                 DebugTargetKey = $"move:{target.x}:{target.y}";
                 Current = Job.Idle;
                 _doingJob = 0;
+                w.ReportNoProgressBackoff(noProgressContext);
+
+                if (noProgressContext is "resource" or "build")
+                    _suppressPeacefulActionsDuringBackoff = true;
+                if (noProgressContext == "build")
+                    ResetBuildSiteState(w);
             }
         }
         else
@@ -1773,8 +2108,8 @@ public class Person
 
     private bool ShouldTrackNoProgressForCurrentMove()
     {
-        if (Current == Job.Flee)
-            return _trackNoProgressForCurrentMove;
+        if (_trackNoProgressForCurrentMove)
+            return true;
 
         return Current is Job.Fight or Job.RaidBorder or Job.AttackStructure;
     }

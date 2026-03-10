@@ -38,6 +38,7 @@ public static class WorldSnapshotInterpolator
             result.Add(new PersonRenderData(
                 (int)MathF.Round(MathHelper.Lerp(prev.X, cur.X, alpha)),
                 (int)MathF.Round(MathHelper.Lerp(prev.Y, cur.Y, alpha)),
+                cur.ActorId,
                 cur.ColonyId,
                 cur.Health,
                 cur.IsInCombat,

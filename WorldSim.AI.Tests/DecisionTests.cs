@@ -295,6 +295,48 @@ public class DecisionTests
     }
 
     [Fact]
+    public void UtilityGoapBrain_CrowdPenalty_PrefersLessCrowdedEquivalentGoal()
+    {
+        var gatherWood = new Goal("GatherWood")
+        {
+            CooldownSeconds = 0f
+        };
+        gatherWood.Considerations.Add(new FixedConsideration(0.6f));
+
+        var buildHouse = new Goal("BuildHouse")
+        {
+            CooldownSeconds = 0f
+        };
+        buildHouse.Considerations.Add(new FixedConsideration(0.6f));
+
+        var goals = new List<Goal> { gatherWood, buildHouse };
+        var brain = new UtilityGoapBrain(new SimplePlanner(), goals);
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 21f,
+            Hunger: 20f,
+            Stamina: 80f,
+            HomeWood: 80,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 8,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            ResourceCrowdPressure: 1f,
+            BuildCrowdPressure: 0f);
+
+        var result = brain.Think(context);
+
+        Assert.Equal("BuildHouse", result.Trace.SelectedGoal);
+    }
+
+    [Fact]
     public void ThreatDecisionPolicy_WarriorInContestedWar_PrefersFight()
     {
         var context = new NpcAiContext(
@@ -453,42 +495,6 @@ public class DecisionTests
         var decision = planner.GetNextCommand(context);
 
         Assert.Equal(NpcCommand.RaidBorder, decision.Command);
-    }
-
-    [Fact]
-    public void UtilityGoapBrain_CrowdPenalty_PrefersLessCrowdedEquivalentGoal()
-    {
-        var gatherWood = new Goal("GatherWood") { CooldownSeconds = 0f };
-        gatherWood.Considerations.Add(new FixedConsideration(0.6f));
-
-        var buildHouse = new Goal("BuildHouse") { CooldownSeconds = 0f };
-        buildHouse.Considerations.Add(new FixedConsideration(0.6f));
-
-        var goals = new List<Goal> { gatherWood, buildHouse };
-        var brain = new UtilityGoapBrain(new SimplePlanner(), goals);
-
-        var context = new NpcAiContext(
-            SimulationTimeSeconds: 22f,
-            Hunger: 18f,
-            Stamina: 80f,
-            HomeWood: 80,
-            HomeStone: 0,
-            HomeIron: 0,
-            HomeGold: 0,
-            HomeFood: 8,
-            HomeHouseCount: 1,
-            HouseWoodCost: 50,
-            ColonyPopulation: 6,
-            HouseCapacity: 5,
-            StoneBuildingsEnabled: false,
-            CanBuildWithStone: false,
-            HouseStoneCost: 100,
-            ResourceCrowdPressure: 1f,
-            BuildCrowdPressure: 0f);
-
-        var result = brain.Think(context);
-
-        Assert.Equal("BuildHouse", result.Trace.SelectedGoal);
     }
 
     private sealed class FixedConsideration : Consideration

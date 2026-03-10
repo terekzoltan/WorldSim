@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using WorldSim.AI;
 using WorldSim.Simulation;
 using Xunit;
@@ -135,6 +136,27 @@ public class RuntimeNpcBrainTests
     }
 
     [Fact]
+    public void SimulationRuntime_ManualTracking_StaysPinnedToSameActorAcrossWorldReordering()
+    {
+        var repoRoot = FindRepoRoot();
+        var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
+        var runtime = new SimulationRuntime(16, 16, 10, techPath);
+
+        runtime.AdvanceTick(0.25f);
+        runtime.CycleTrackedNpc(1);
+        var before = runtime.GetAiDebugSnapshot();
+
+        var world = GetWorld(runtime);
+        world._people.Reverse();
+
+        runtime.AdvanceTick(0.25f);
+        var after = runtime.GetAiDebugSnapshot();
+
+        Assert.Equal("Manual", after.TrackingMode);
+        Assert.Equal(before.TrackedActorId, after.TrackedActorId);
+    }
+
+    [Fact]
     public void RuntimeAiOptions_FromEnvironment_AppliesFactionPolicyTable()
     {
         const string key = "WORLDSIM_AI_POLICY_TABLE";
@@ -178,12 +200,6 @@ public class RuntimeNpcBrainTests
 
         var actor = world._people[0];
         actor.Pos = (5, 5);
-        for (int y = Math.Max(0, actor.Pos.y - 5); y <= Math.Min(world.Height - 1, actor.Pos.y + 5); y++)
-        {
-            for (int x = Math.Max(0, actor.Pos.x - 5); x <= Math.Min(world.Width - 1, actor.Pos.x + 5); x++)
-                world.GetTile(x, y).ReplaceNode(null);
-        }
-        world.GetTile(5, 5).ReplaceNode(new ResourceNode(Resource.Wood, 4));
         actor.Health = 77f;
         actor.Strength = 14;
         actor.Defense = 12;
@@ -192,9 +208,10 @@ public class RuntimeNpcBrainTests
         world.SetFactionStance(actor.Home.Faction, hostile.Home.Faction, WorldSim.Simulation.Diplomacy.Stance.Hostile);
         hostile.Pos = (6, 5);
 
+        world.GetTile(5, 5).ReplaceNode(new ResourceNode(Resource.Wood, 4));
         world.ReserveSoftTarget("resource:Wood:5:5");
-        world.ReserveSoftTarget($"build:{actor.Home.Origin.x}:{actor.Home.Origin.y}");
-        world.ReserveSoftTarget($"retreat:{actor.Home.Origin.x}:{actor.Home.Origin.y}");
+        world.ReserveSoftTarget($"build:{actor.Home.Origin.x}:{actor.Home.Origin.y + 2}");
+        world.ReserveSoftTarget($"retreat:{actor.Home.Origin.x + 2}:{actor.Home.Origin.y}");
 
         var brain = new RuntimeNpcBrain(new CapturingBrain());
         _ = brain.Think(actor, world, dt: 1f);
@@ -329,5 +346,14 @@ public class RuntimeNpcBrainTests
         }
 
         throw new DirectoryNotFoundException("Could not locate repository root containing Tech/technologies.json");
+    }
+
+    private static World GetWorld(SimulationRuntime runtime)
+    {
+        var field = typeof(SimulationRuntime).GetField("_world", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var value = field!.GetValue(runtime);
+        Assert.IsType<World>(value);
+        return (World)value!;
     }
 }

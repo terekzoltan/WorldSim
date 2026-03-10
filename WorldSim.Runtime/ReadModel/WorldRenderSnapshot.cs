@@ -119,6 +119,7 @@ public sealed record DefensiveStructureRenderData(
 public sealed record PersonRenderData(
     int X,
     int Y,
+    int ActorId,
     int ColonyId,
     float Health,
     bool IsInCombat,
@@ -179,5 +180,16 @@ public sealed record EcoHudData(
     float AverageFoodPerPerson,
     int ColoniesInFoodEmergency,
     float FoodPerPersonSpread,
-    int SoftReservationCount
+    int SoftReservationCount,
+    int OverlapResolveMoves,
+    int CrowdDissipationMoves,
+    int BirthFallbackToOccupied,
+    int BirthFallbackToParent,
+    int BuildSiteResetCount,
+    int NoProgressBackoffResource,
+    int NoProgressBackoffBuild,
+    int NoProgressBackoffFlee,
+    int NoProgressBackoffCombat,
+    int DenseNeighborhoodTicks,
+    int LastTickDenseActors
 );

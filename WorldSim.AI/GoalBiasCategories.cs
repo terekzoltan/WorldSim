@@ -47,7 +47,7 @@ public static class GoalBiasCategories
             "BuildHouse" => context.BuildCrowdPressure,
             "ExpandHousing" => context.BuildCrowdPressure,
             "BuildDefenses" => context.BuildCrowdPressure,
-            "DefendSelf" => context.RetreatCrowdPressure * 0.35f,
+            "DefendSelf" => context.RetreatCrowdPressure * 0.3f,
             "RaidBorder" => context.RetreatCrowdPressure * 0.2f,
             _ => 0f
         };

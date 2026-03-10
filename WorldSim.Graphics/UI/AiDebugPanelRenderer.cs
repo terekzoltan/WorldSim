@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -11,6 +12,7 @@ public sealed class AiDebugPanelRenderer
         SpriteBatch spriteBatch,
         SpriteFont font,
         AiDebugSnapshot debug,
+        WorldRenderSnapshot snapshot,
         int viewportWidth,
         HudTheme theme,
         bool compact,
@@ -32,8 +34,20 @@ public sealed class AiDebugPanelRenderer
         y += 20;
         spriteBatch.DrawString(font, $"PlanLen {debug.PlanLength} | Cost {debug.PlanCost} | Replan {debug.ReplanReason} | Method {debug.MethodName}", new Vector2(x, y), theme.StatusText);
         y += 20;
-        spriteBatch.DrawString(font, $"Tracked NPC colony {debug.TrackedColonyId} @ ({debug.TrackedX},{debug.TrackedY}) seq {debug.DecisionSequence}", new Vector2(x, y), theme.StatusText);
+        spriteBatch.DrawString(font, $"Tracked NPC A{debug.TrackedActorId} C{debug.TrackedColonyId} @ ({debug.TrackedX},{debug.TrackedY}) seq {debug.DecisionSequence}", new Vector2(x, y), theme.StatusText);
         y += 24;
+
+        var trackedPerson = ResolveTrackedPerson(snapshot, debug);
+        var debugCause = trackedPerson?.DebugDecisionCause ?? "none";
+        var debugTarget = trackedPerson?.DebugTargetKey ?? "none";
+        var buildIntent = ResolveBuildIntent(debugCause, debugTarget);
+        var noProgress = trackedPerson?.NoProgressStreak ?? 0;
+        var backoff = trackedPerson?.BackoffTicksRemaining ?? 0;
+
+        spriteBatch.DrawString(font, $"Cause {debugCause} | Target {debugTarget}", new Vector2(x, y), theme.StatusText);
+        y += 18;
+        spriteBatch.DrawString(font, $"Intent {buildIntent} | NoProg {noProgress} | Backoff {backoff}", new Vector2(x, y), theme.StatusText);
+        y += 22;
 
         if (compact)
         {
@@ -66,5 +80,39 @@ public sealed class AiDebugPanelRenderer
 
         y += 4;
         spriteBatch.DrawString(font, "History page: Up/Down | F4 compact", new Vector2(x + 8, y), theme.SecondaryText);
+    }
+
+    private static PersonRenderData? ResolveTrackedPerson(WorldRenderSnapshot snapshot, AiDebugSnapshot debug)
+    {
+        var byActor = snapshot.People.FirstOrDefault(person => person.ActorId == debug.TrackedActorId);
+        if (byActor != null)
+            return byActor;
+
+        var exact = snapshot.People.FirstOrDefault(person =>
+            person.ColonyId == debug.TrackedColonyId
+            && person.X == debug.TrackedX
+            && person.Y == debug.TrackedY);
+        if (exact != null)
+            return exact;
+
+        var sameTile = snapshot.People.FirstOrDefault(person =>
+            person.X == debug.TrackedX
+            && person.Y == debug.TrackedY);
+        return sameTile;
+    }
+
+    private static string ResolveBuildIntent(string decisionCause, string targetKey)
+    {
+        if (targetKey.StartsWith("build:", StringComparison.OrdinalIgnoreCase)
+            || decisionCause.Contains("build_site", StringComparison.OrdinalIgnoreCase)
+            || decisionCause.Contains("build_house", StringComparison.OrdinalIgnoreCase)
+            || decisionCause.Contains("build_wall", StringComparison.OrdinalIgnoreCase)
+            || decisionCause.Contains("build_watchtower", StringComparison.OrdinalIgnoreCase))
+            return "active_build_site";
+
+        if (decisionCause.Contains("no_progress_backoff:build", StringComparison.OrdinalIgnoreCase))
+            return "build_site_backoff";
+
+        return "none";
     }
 }

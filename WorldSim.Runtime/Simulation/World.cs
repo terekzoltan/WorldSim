@@ -77,6 +77,17 @@ namespace WorldSim.Simulation
         public int TotalDeathsOther { get; private set; }
         public int RecentDeathsStarvation60s => _recentStarvationDeaths.Count;
         public int TotalStarvationDeathsWithFood { get; private set; }
+        public int TotalOverlapResolveMoves { get; private set; }
+        public int TotalCrowdDissipationMoves { get; private set; }
+        public int TotalBirthFallbackToOccupiedCount { get; private set; }
+        public int TotalBirthFallbackToParentCount { get; private set; }
+        public int TotalBuildSiteResetCount { get; private set; }
+        public int TotalNoProgressBackoffResource { get; private set; }
+        public int TotalNoProgressBackoffBuild { get; private set; }
+        public int TotalNoProgressBackoffFlee { get; private set; }
+        public int TotalNoProgressBackoffCombat { get; private set; }
+        public int DenseNeighborhoodTicks { get; private set; }
+        public int LastTickDenseActors { get; private set; }
 
         readonly Random _rng;
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
@@ -98,6 +109,7 @@ namespace WorldSim.Simulation
         readonly Dictionary<string, int> _softReservations = new(StringComparer.Ordinal);
         int _navigationTopologyVersion;
         int _nextDefenseStructureId = 1;
+        int _nextPersonId = 1;
 
         float _simulationTimeSeconds;
         int _tickCounter;
@@ -113,6 +125,9 @@ namespace WorldSim.Simulation
         const float SpecializedBuildPeriod = 14f;
         const float FoodParityPeriod = 6f;
         const int TerritoryRecomputeIntervalTicks = 5;
+        const int CrowdDissipationNeighborRadius = 2;
+        const int CrowdDissipationSearchRadius = 4;
+        const int CrowdDissipationThreshold = 4;
 
         int _lastTerritoryRecomputeTick;
         bool _territoryDirty = true;
@@ -202,7 +217,7 @@ namespace WorldSim.Simulation
                         py = Math.Clamp(col.Origin.y + _rng.Next(-spawnRadius, spawnRadius + 1), 0, Height - 1);
                     } while (_map[px, py].Ground == Ground.Water && ++attempts < 64);
 
-                    _people.Add(Person.Spawn(col, (px, py), CreateNpcBrain(col), CreateEntityRng()));
+                    _people.Add(Person.Spawn(col, (px, py), CreateNpcBrain(col), CreateEntityRng(), AllocatePersonId()));
                 }
             }
 
@@ -313,7 +328,101 @@ namespace WorldSim.Simulation
 
         (int, int) RandomFreePos() => (_rng.Next(Width), _rng.Next(Height));
         internal Random CreateEntityRng() => new Random(_rng.Next());
+        public int AllocatePersonId() => _nextPersonId++;
         public Tile GetTile(int x, int y) => _map[x, y];
+        public bool CanPlaceStructureAt(int x, int y)
+            => InBounds(x, y)
+               && GetTile(x, y).Ground != Ground.Water
+               && !IsOccupiedByStructure(x, y);
+
+        public bool IsActorOccupied(int x, int y, Person? exclude = null)
+            => _people.Any(person => person != exclude && person.Health > 0f && person.Pos == (x, y));
+
+        public bool CanPlaceStructureAtActorFree(int x, int y, Person? exclude = null)
+            => CanPlaceStructureAt(x, y) && !IsActorOccupied(x, y, exclude);
+
+        public (int x, int y) GetBirthSpawnPosition(Colony colony, (int x, int y) parentPos)
+        {
+            const int MaxRadius = 4;
+            (int x, int y)? best = null;
+            float bestScore = float.MaxValue;
+
+            for (int radius = 1; radius <= MaxRadius; radius++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        int md = Math.Abs(dx) + Math.Abs(dy);
+                        if (md == 0 || md > radius)
+                            continue;
+
+                        int x = parentPos.x + dx;
+                        int y = parentPos.y + dy;
+                        if (!CanPlaceStructureAtActorFree(x, y))
+                            continue;
+
+                        float colonyDist = Math.Abs(x - colony.Origin.x) + Math.Abs(y - colony.Origin.y);
+                        float score = md + (colonyDist * 0.2f);
+                        if (score < bestScore)
+                        {
+                            best = (x, y);
+                            bestScore = score;
+                        }
+                    }
+                }
+
+                if (best != null)
+                    return best.Value;
+            }
+
+            best = null;
+            bestScore = float.MaxValue;
+            for (int radius = 1; radius <= MaxRadius; radius++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        int md = Math.Abs(dx) + Math.Abs(dy);
+                        if (md == 0 || md > radius)
+                            continue;
+
+                        int x = parentPos.x + dx;
+                        int y = parentPos.y + dy;
+                        if (!CanPlaceStructureAt(x, y))
+                            continue;
+
+                        int occupancy = _people.Count(person => person.Health > 0f && person.Pos == (x, y));
+                        float colonyDist = Math.Abs(x - colony.Origin.x) + Math.Abs(y - colony.Origin.y);
+                        float score = occupancy * 6f + md + (colonyDist * 0.2f);
+                        if (score < bestScore)
+                        {
+                            best = (x, y);
+                            bestScore = score;
+                        }
+                    }
+                }
+
+                if (best != null)
+                {
+                    TotalBirthFallbackToOccupiedCount++;
+                    return best.Value;
+                }
+            }
+
+            if (CanPlaceStructureAt(parentPos.x, parentPos.y))
+            {
+                TotalBirthFallbackToParentCount++;
+                return parentPos;
+            }
+
+            var fallback = FindAnyFreeLandNear(colony.Origin);
+            if (fallback == null)
+                TotalBirthFallbackToParentCount++;
+            return fallback ?? parentPos;
+        }
+
         public void AddHouse(Colony colony, (int x, int y) pos)
         {
             Houses.Add(new House(colony, pos, HouseCapacity));
@@ -409,6 +518,30 @@ namespace WorldSim.Simulation
 
         private bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
+        private (int x, int y)? FindAnyFreeLandNear((int x, int y) origin)
+        {
+            int maxRadius = Math.Max(Width, Height);
+            for (int radius = 0; radius <= maxRadius; radius++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        int md = Math.Abs(dx) + Math.Abs(dy);
+                        if (md > radius)
+                            continue;
+
+                        int x = origin.x + dx;
+                        int y = origin.y + dy;
+                        if (CanPlaceStructureAt(x, y))
+                            return (x, y);
+                    }
+                }
+            }
+
+            return null;
+        }
+
         private bool IsOccupiedByStructure(int x, int y)
             => Houses.Any(h => h.Pos.x == x && h.Pos.y == y)
                || SpecializedBuildings.Any(b => b.Pos.x == x && b.Pos.y == y)
@@ -421,6 +554,25 @@ namespace WorldSim.Simulation
         public void ReportPredatorKilledByHumans() => TotalPredatorKillsByHumans++;
         public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
         public void ReportCombatEngagement() => TotalCombatEngagements++;
+        public void ReportBuildSiteReset() => TotalBuildSiteResetCount++;
+        public void ReportNoProgressBackoff(string context)
+        {
+            switch (context)
+            {
+                case "resource":
+                    TotalNoProgressBackoffResource++;
+                    break;
+                case "build":
+                    TotalNoProgressBackoffBuild++;
+                    break;
+                case "flee":
+                    TotalNoProgressBackoffFlee++;
+                    break;
+                case "combat":
+                    TotalNoProgressBackoffCombat++;
+                    break;
+            }
+        }
         public ColonyDeathStats GetColonyDeathStats(int colonyId)
             => _colonyDeathStats.TryGetValue(colonyId, out var stats)
                 ? stats
@@ -581,23 +733,41 @@ namespace WorldSim.Simulation
         private void DeconflictPeopleEndPositions()
         {
             var occupied = new HashSet<(int x, int y)>();
+            var keeperByTile = new Dictionary<(int x, int y), Person>();
             foreach (var person in _people)
             {
                 if (person.Health <= 0f)
                     continue;
 
-                if (occupied.Add(person.Pos))
-                    continue;
-
-                if (TryFindNearbyFreePersonTile(person, person.Pos, out var fallback))
+                var tile = person.Pos;
+                if (!keeperByTile.TryGetValue(tile, out var keeper))
                 {
-                    person.Pos = fallback;
+                    occupied.Add(tile);
+                    keeperByTile[tile] = person;
+                    continue;
+                }
+
+                var mover = person;
+                if (person.IsActivePeacefulIntentProtected && !keeper.IsActivePeacefulIntentProtected)
+                {
+                    mover = keeper;
+                    keeperByTile[tile] = person;
+                }
+
+                if (TryFindNearbyFreePersonTile(mover, mover.Pos, occupied, out var fallback))
+                {
+                    mover.Pos = fallback;
                     occupied.Add(fallback);
+                    keeperByTile[fallback] = mover;
+                    TotalOverlapResolveMoves++;
                 }
             }
+
+            DissipateLocalCrowds(occupied);
+            UpdateDenseNeighborhoodTelemetry(occupied);
         }
 
-        private bool TryFindNearbyFreePersonTile(Person person, (int x, int y) center, out (int x, int y) tile)
+        private bool TryFindNearbyFreePersonTile(Person person, (int x, int y) center, HashSet<(int x, int y)> occupied, out (int x, int y) tile)
         {
             for (int radius = 1; radius <= 12; radius++)
             {
@@ -614,7 +784,7 @@ namespace WorldSim.Simulation
                             continue;
                         if (IsMovementBlocked(x, y, person.Home.Id))
                             continue;
-                        if (_people.Any(other => other != person && other.Health > 0f && other.Pos == (x, y)))
+                        if (occupied.Contains((x, y)))
                             continue;
 
                         tile = (x, y);
@@ -625,6 +795,127 @@ namespace WorldSim.Simulation
 
             tile = center;
             return false;
+        }
+
+        private void DissipateLocalCrowds(HashSet<(int x, int y)> occupied)
+        {
+            var alive = _people
+                .Where(person => person.Health > 0f)
+                .OrderByDescending(person => CountNeighbors(occupied, person.Pos, CrowdDissipationNeighborRadius))
+                .ThenBy(person => person.Home.Id)
+                .ThenBy(person => person.Pos.x)
+                .ThenBy(person => person.Pos.y)
+                .ToList();
+
+            int maxMoves = Math.Max(1, alive.Count / 3);
+            int moves = 0;
+            foreach (var person in alive)
+            {
+                if (moves >= maxMoves)
+                    break;
+                if (!ShouldDissipate(person))
+                    continue;
+
+                int currentCrowd = CountNeighbors(occupied, person.Pos, CrowdDissipationNeighborRadius);
+                if (currentCrowd < CrowdDissipationThreshold)
+                    continue;
+
+                if (!TryFindCrowdDissipationTile(person, occupied, currentCrowd, out var target))
+                    continue;
+
+                occupied.Remove(person.Pos);
+                person.Pos = target;
+                occupied.Add(target);
+                moves++;
+                TotalCrowdDissipationMoves++;
+            }
+        }
+
+        private void UpdateDenseNeighborhoodTelemetry(HashSet<(int x, int y)> occupied)
+        {
+            int denseActors = 0;
+            foreach (var pos in occupied)
+            {
+                if (CountNeighbors(occupied, pos, CrowdDissipationNeighborRadius) >= CrowdDissipationThreshold)
+                    denseActors++;
+            }
+
+            LastTickDenseActors = denseActors;
+            if (denseActors > 0)
+                DenseNeighborhoodTicks++;
+        }
+
+        private bool ShouldDissipate(Person person)
+        {
+            if (person.IsInCombat)
+                return false;
+            if (person.BackoffTicksRemaining > 0)
+                return false;
+            if (person.IsActivePeacefulIntentProtected)
+                return false;
+
+            return person.Current is not (Job.Fight or Job.AttackStructure or Job.RaidBorder);
+        }
+
+        private bool TryFindCrowdDissipationTile(
+            Person person,
+            HashSet<(int x, int y)> occupied,
+            int currentCrowd,
+            out (int x, int y) tile)
+        {
+            float bestScore = float.MaxValue;
+            (int x, int y)? best = null;
+
+            for (int radius = 1; radius <= CrowdDissipationSearchRadius; radius++)
+            {
+                int minX = Math.Max(0, person.Pos.x - radius);
+                int maxX = Math.Min(Width - 1, person.Pos.x + radius);
+                int minY = Math.Max(0, person.Pos.y - radius);
+                int maxY = Math.Min(Height - 1, person.Pos.y + radius);
+
+                for (int y = minY; y <= maxY; y++)
+                {
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        int dist = Math.Abs(x - person.Pos.x) + Math.Abs(y - person.Pos.y);
+                        if (dist == 0 || dist > radius)
+                            continue;
+                        if (_map[x, y].Ground == Ground.Water)
+                            continue;
+                        if (IsMovementBlocked(x, y, person.Home.Id))
+                            continue;
+                        if (occupied.Contains((x, y)))
+                            continue;
+
+                        int neighborCrowd = CountNeighbors(occupied, (x, y), CrowdDissipationNeighborRadius);
+                        if (neighborCrowd + 1 >= currentCrowd)
+                            continue;
+
+                        float score = neighborCrowd * 5f + dist;
+                        if (score < bestScore)
+                        {
+                            bestScore = score;
+                            best = (x, y);
+                        }
+                    }
+                }
+            }
+
+            tile = best ?? person.Pos;
+            return best != null;
+        }
+
+        private static int CountNeighbors(HashSet<(int x, int y)> occupied, (int x, int y) center, int radius)
+        {
+            int count = 0;
+            foreach (var pos in occupied)
+            {
+                int dist = Math.Abs(pos.x - center.x) + Math.Abs(pos.y - center.y);
+                if (dist <= radius)
+                    count++;
+            }
+
+            return count;
         }
 
         private void MarkTerritoryDirty()

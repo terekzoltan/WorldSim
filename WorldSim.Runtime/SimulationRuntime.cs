@@ -23,9 +23,10 @@ public sealed class SimulationRuntime
     private readonly Queue<string> _recentAiDecisions = new();
     private readonly DirectorState _directorState = new();
     private DirectorExecutionState _directorExecutionState = DirectorExecutionState.NotTriggered;
-    private long _lastObservedDecisionSequence;
+    private int _lastObservedDecisionTick = -1;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
+    private int _trackedActorId = -1;
     private bool _manualTracking;
     public NpcPlannerMode PlannerMode { get; }
     public NpcPolicyMode PolicyMode { get; }
@@ -205,8 +206,16 @@ public sealed class SimulationRuntime
         if (tracked.Count == 0)
             return;
 
+        var current = ResolveSelectedDecision(tracked);
+        var currentIndex = current == null
+            ? 0
+            : tracked.FindIndex(decision => decision.ActorId == current.ActorId);
+        if (currentIndex < 0)
+            currentIndex = 0;
+
         _manualTracking = true;
-        _trackedNpcCursor = NormalizeTrackedIndex(_trackedNpcCursor + Math.Sign(delta), tracked.Count);
+        _trackedNpcCursor = NormalizeTrackedIndex(currentIndex + Math.Sign(delta), tracked.Count);
+        _trackedActorId = tracked[_trackedNpcCursor].ActorId;
         RefreshAiDebugSnapshot();
     }
 
@@ -214,6 +223,7 @@ public sealed class SimulationRuntime
     {
         _manualTracking = false;
         _trackedNpcCursor = 0;
+        _trackedActorId = -1;
         RefreshAiDebugSnapshot();
     }
 
@@ -633,7 +643,7 @@ public sealed class SimulationRuntime
     private void RefreshAiDebugSnapshot()
     {
         var tracked = GetTrackedDecisions();
-        var latest = tracked.FirstOrDefault();
+        var latest = ResolveLatestDecision(tracked);
 
         if (latest == null)
         {
@@ -641,17 +651,20 @@ public sealed class SimulationRuntime
             return;
         }
 
-        if (_manualTracking)
-            _trackedNpcCursor = NormalizeTrackedIndex(_trackedNpcCursor, tracked.Count);
-        else
-            _trackedNpcCursor = 0;
+        var selectedDecision = ResolveSelectedDecision(tracked) ?? latest;
+        var selectedIndex = tracked.FindIndex(decision => decision.ActorId == selectedDecision.ActorId);
+        if (selectedIndex < 0)
+            selectedIndex = 0;
 
-        var selectedIndex = _manualTracking ? _trackedNpcCursor : 0;
+        _trackedNpcCursor = selectedIndex;
+        if (_manualTracking)
+            _trackedActorId = tracked[selectedIndex].ActorId;
+
         var selected = tracked[selectedIndex];
 
-        if (latest.Sequence > _lastObservedDecisionSequence)
+        if (latest.WorldTick > _lastObservedDecisionTick)
         {
-            _lastObservedDecisionSequence = latest.Sequence;
+            _lastObservedDecisionTick = latest.WorldTick;
             var summary = $"{latest.Trace.PolicyName} | Goal {latest.Trace.SelectedGoal} -> {latest.Job}";
             _recentAiDecisions.Enqueue(summary);
             while (_recentAiDecisions.Count > 24)
@@ -666,6 +679,7 @@ public sealed class SimulationRuntime
             TrackedNpcIndex: selectedIndex + 1,
             TrackedNpcCount: tracked.Count,
             DecisionSequence: selected.Sequence,
+            TrackedActorId: selected.ActorId,
             TrackedColonyId: selected.ColonyId,
             TrackedX: selected.X,
             TrackedY: selected.Y,
@@ -688,8 +702,35 @@ public sealed class SimulationRuntime
             .Select(person => person.LastAiDecision)
             .Where(decision => decision != null)
             .Select(decision => decision!)
-            .OrderByDescending(decision => decision.Sequence)
+            .OrderBy(decision => decision.ActorId)
             .ToList();
+    }
+
+    private RuntimeAiDecision? ResolveSelectedDecision(IReadOnlyList<RuntimeAiDecision> tracked)
+    {
+        var latest = ResolveLatestDecision(tracked);
+        if (!_manualTracking)
+            return latest;
+
+        if (_trackedActorId >= 0)
+        {
+            var byActor = tracked.FirstOrDefault(decision => decision.ActorId == _trackedActorId);
+            if (byActor != null)
+                return byActor;
+        }
+
+        _manualTracking = false;
+        _trackedActorId = -1;
+        return latest;
+    }
+
+    private static RuntimeAiDecision? ResolveLatestDecision(IReadOnlyList<RuntimeAiDecision> tracked)
+    {
+        return tracked
+            .OrderByDescending(decision => decision.WorldTick)
+            .ThenByDescending(decision => decision.Sequence)
+            .ThenBy(decision => decision.ActorId)
+            .FirstOrDefault();
     }
 
     private static int NormalizeTrackedIndex(int index, int count)
