@@ -17,8 +17,8 @@ their execution steps are not retroactively documented — see their proof links
 
 | Alias | Full Path |
 |-------|-----------|
-| **Director Plan** | `Docs/Plans/Director-Integration-Master-Plan.md` |
-| **Combat Plan** | `Docs/Plans/Combat-Defense-Campaign-Master-Plan.md` |
+| **Director Plan** | `Docs/Plans/Master/Director-Integration-Master-Plan.md` |
+| **Combat Plan** | `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md` |
 
 Epic codes (e.g., `S1-A`, `P0-B`) are unique and greppable in the respective master plan.
 
@@ -537,18 +537,109 @@ Proof targets:
 
 > Director Plan > Phase 2 Sprint 4
 
-- ⬜ **S4-A** Formal model layers in Java — all Phase 0-2 invariants (INV-01 through INV-14, INV-20)
-- ⬜ **S4-B** Validation/repair loop + fallback planner
+- ✅ **S4-A** Formal model layers in Java — all Phase 0-2 invariants (INV-01 through INV-14, INV-20)
+- ✅ **S4-B** Validation/repair loop + fallback planner
 
 ### Sprint C4: Military Tech + Advanced Defenses (Track B -> C -> A)
 
 > Combat Plan > Phase 2 Sprint 4
 
-- ⬜ **P2-A** Military + fortification techs in `technologies.json` (Track B)
-- ⬜ **P2-B** Colony equipment levels — weapon/armor (Track B)
-- ⬜ **P2-C** Advanced defenses — stone walls, gates, arrow/catapult towers (Track B)
-- ⬜ **P2-D** AI becomes tech-aware — avoid unwinnable fights (Track C)
-- ⬜ **P2-E** Graphics and HUD updates (Track A)
+- ✅ **P2-A** Military + fortification techs in `technologies.json` (Track B)
+- ✅ **P2-B** Colony equipment levels — weapon/armor (Track B)
+- ✅ **P2-C** Advanced defenses — stone walls, gates, arrow/catapult towers (Track B)
+- ✅ **P2-D** AI becomes tech-aware — avoid unwinnable fights (Track C)
+- ✅ **P2-E** Graphics and HUD updates (Track A)
+
+#### P2-D expanded spec (Track C agent input)
+
+**Prereq:** P2-A ✅ + P2-B ✅ (equipment/tech domain must exist before AI can reason about it)
+
+**Context fields to add to `NpcAiContext` (`WorldSim.AI/Abstractions.cs`):**
+
+| Field | Type | Source |
+|-------|------|--------|
+| `HomeWeaponLevel` | `int` | `_home.WeaponLevel` |
+| `HomeArmorLevel` | `int` | `_home.ArmorLevel` |
+| `HomeMilitaryTechCount` | `int` | count of military techs unlocked (`weaponry`, `armor_smithing`, `military_training`, `war_drums`, `scouts`, `advanced_tactics`) |
+| `HomeFortificationTechCount` | `int` | count of fortification techs unlocked (`fortification`, `advanced_fortification`, `siege_craft`) |
+
+Enemy equipment is **not** observable at the individual AI level (no espionage mechanic yet). The AI uses its own equipment as a relative proxy.
+
+**`BuildThreatContext` wiring (`Person.cs`):** Populate the four new fields from `_home` and `_home.UnlockedTechIds` (or equivalent colony accessor). Do not add enemy-tech sniffing.
+
+**`ThreatDecisionPolicy.ShouldFight` changes (`WorldSim.AI/ThreatDecisionPolicy.cs`):**
+
+- Add an equipment disadvantage check: if `HomeWeaponLevel == 0 && HomeArmorLevel == 0` and `LocalThreatScore >= 0.55f`, reduce effective fight willingness (return false earlier, or apply a penalty multiplier to `power`).
+- The intent: un-upgraded colonies retreat rather than suicidally fighting into a high-threat scenario.
+- Keep the existing warrior-role gate and health gate intact.
+- Threshold values: tunable constants, not magic numbers inline.
+
+**New AI goal: `UnlockMilitaryTech` (all planners):**
+
+- Condition: `IsWarStance == true || (IsHostileStance && LocalThreatScore >= 0.4f)` AND `HomeMilitaryTechCount < 3`.
+- Command maps to a new `NpcCommand.ResearchTech` (or reuse existing `CraftTools` goal if no new command slot is available — coordinate with Track B).
+- Priority: higher than `BuildWall` when under active war pressure, lower than `Fight`/`Flee` direct threat response.
+- Wire into `SimplePlanner`, `GoapPlanner`, and `HtnPlanner` consistently.
+
+**Acceptance criteria:**
+- AI test: a colony with `WeaponLevel=0, ArmorLevel=0` under high threat score (≥ 0.55) does NOT call `ShouldFight` = true (retreat bias confirmed).
+- AI test: `UnlockMilitaryTech` goal fires when war stance + low military tech count.
+- AI test: `UnlockMilitaryTech` does NOT fire when already at or above the threshold tech count.
+- Full solution builds + all existing tests pass + new tests pass.
+- No changes to `WorldSim.Runtime`, `WorldSim.Graphics`, or Java.
+
+#### P2-E expanded spec (Track A agent input)
+
+**Prereq:** P2-C ✅ (all 7 structure types + snapshot mapping must exist)
+
+**StructureRenderPass changes (`WorldSim.Graphics/Rendering/StructureRenderPass.cs`):**
+
+The current `DrawDefensiveStructures` method has a two-branch switch (`WoodWall` → `DrawWoodWall`, everything else → `DrawWatchtower`). Replace with a full switch covering all 7 `DefensiveStructureKindView` values:
+
+| Kind | Render approach | Color palette suggestion |
+|------|----------------|--------------------------|
+| `WoodWall` | existing `DrawWoodWall` | brown (125, 91, 61) — keep as-is |
+| `StoneWall` | thicker/taller rectangle with stone texture lines | grey (140, 140, 150) |
+| `ReinforcedWall` | stone wall + iron edge highlight | grey + steel accent (170, 180, 195) |
+| `Gate` | gap/archway shape; draw as two half-wall pillars with a gap center | same grey as StoneWall, with a dark center gap |
+| `Watchtower` | existing `DrawWatchtower` | blue-grey (85, 94, 112) — keep as-is |
+| `ArrowTower` | taller watchtower body + notched top | blue-grey + lighter parapet (150, 165, 185) |
+| `CatapultTower` | widest footprint + distinct dark cap | dark slate (60, 65, 80) with orange accent dot |
+
+Add an **inactive structure indicator**: when `structure.IsActive == false`, overlay the structure with a semi-transparent red tint or a small `!` marker (pixel-art style). This makes upkeep failures visible.
+
+**Tower projectile events — extend event matching (`DrawTowerProjectiles`):**
+
+Current code only matches `"watchtower fired"` and `"tower hit predator"` event strings. Extend to also match:
+- `"arrow tower fired"` (ArrowTower shot)
+- `"catapult fired"` (CatapultTower shot)
+
+For catapult: draw a larger/thicker beam or a filled circle at the AoE center to suggest splash; color suggestion: orange-red (230, 130, 60).
+
+**Tech menu additions (`TechMenuPanelRenderer.cs` + `HudRenderer.cs`):**
+
+The current tech menu lists all locked techs as a flat numbered list. Add a **section header** for the military/fortification branch:
+
+- When the list contains any of the military tech IDs (`weaponry`, `armor_smithing`, `military_training`, `war_drums`, `scouts`, `advanced_tactics`, `fortification`, `advanced_fortification`, `siege_craft`), render a "-- Military & Fortification --" section header before those entries.
+- The existing civilan/economy branch entries keep their existing display.
+- `TechMenuView` may need a small extension to carry branch grouping data, or the renderer can classify by name string — coordinate with Track B if a model change is needed.
+
+**Colony HUD — equipment level indicator:**
+
+`ColonyHudData` already has `WeaponLevel` and `ArmorLevel`. Add a short line to the colony HUD section (near the resource row) showing:
+```
+Wpn: 1  Arm: 0
+```
+Only show when at least one level > 0, or always show for clarity (designer preference).
+
+**Acceptance criteria:**
+- All 7 structure kinds render with visually distinct colors/shapes.
+- Inactive structures show a visible inactive indicator.
+- Arrow tower and catapult projectile events produce beams/splash markers.
+- Tech menu shows military branch header when those techs are present.
+- Colony HUD shows weapon/armor level.
+- F1 tech menu open/close and Ctrl+F1–F4 flows do not regress.
+- Build + arch tests green.
 
 ### Wave 4 — Execution Steps
 
@@ -567,6 +658,112 @@ Proof targets:
 | Track A agent | P2-E | P2-C ✅ | Graphics for advanced structures |
 
 **Critical path:** Track B (3 epics) → Track C + A (parallel). Track D fully independent.
+
+---
+
+## Wave 4.5 — SMR Headless Validation Infrastructure
+
+Purpose:
+- Promote the `W3.6-B4` Scenario Matrix Runner into an agent-grade headless validation system that later waves can use for regression, balance, and performance evidence.
+- Replace anecdotal clustering/manual QA conclusions with reproducible artifact bundles, anomaly detection, and baseline comparison.
+- Keep the visual `SMR Lab` explicitly out of the critical path until the late campaign/UI waves; this wave is headless-first by design.
+
+### Sprint X4.5: Scenario Matrix Runner Hardening (Track B + C + Meta)
+
+- ⬜ **SMR-B1** Artifact bundle contract + output directory layout (`manifest`, runs, summaries, anomalies, logs) (Track B)
+- ⬜ **SMR-B2** Assertion + anomaly engine with explicit exit codes for agent/CI use (Track B)
+- ⬜ **SMR-B3** Baseline comparison + delta threshold policy (Track B)
+- ⬜ **SMR-B4** Unified CLI surface for clustering, balance, and perf evidence modes (Track B)
+- ⬜ **SMR-B5** Lightweight evidence export hooks (event/sample timeline, worst-run drilldown, replay-oriented data without a viewer yet) (Track B)
+- ⬜ **SMR-C1** AI/planner anomaly signals exposed to SMR only where runtime counters are insufficient (Track C)
+- ⬜ **SMR-M1** Absorb `Session-Balance-QA-Plan.md` + `Session-Perf-Profiling-Plan.md` expectations into one Combined-plan sequencing/evidence workflow (Meta)
+- ⬜ **SMR-M2** Baseline update policy, artifact retention policy, and evidence-review protocol (Meta)
+
+### Wave 4.5 — Execution Steps
+
+**Step 1 — define the contract before adding more modes**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | SMR-B1 | Wave 3.6 ✅ | Stabilize output bundle first so later assertions/perf/reporting write into one schema |
+| Meta coordinator | SMR-M1 | Wave 3.6 ✅ | Merge the existing balance/perf session expectations into one operational storyline |
+
+**Step 2 — make SMR agent-usable, not just human-readable**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | SMR-B2 | SMR-B1 ✅ | Exit codes, invariant/anomaly catalog, and machine-readable failure reporting |
+| Track C agent | SMR-C1 | SMR-B2 🔄 or ✅ | Only additive AI/planner signals; keep scope narrow and evidence-driven |
+
+**Step 3 — turn one-off runs into comparable evidence**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | SMR-B3 | SMR-B2 ✅ | Baseline deltas and regression thresholds build directly on assertion/anomaly output |
+| Meta coordinator | SMR-M2 | SMR-B3 🔄 or ✅ | Define when baselines are updated, how artifacts are kept, and how evidence is reviewed |
+
+**Step 4 — unify the tool surface and export drilldown evidence**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | SMR-B4 | SMR-B3 ✅ | One CLI/tool surface for `assert`, `compare`, `perf`, and standard matrix runs |
+| Track B agent | SMR-B5 | SMR-B4 ✅ | Add worst-run drilldown bundles and replay-oriented evidence data; still no graphical lab |
+
+**Step 5 — adoption gate before Wave 5+ complexity**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Coordinator / QA session | SMR evidence gate | SMR-B4 ✅ + SMR-B5 ✅ + SMR-C1 ✅ + SMR-M1/M2 ✅ | Before Wave 5 formations/group combat starts, prove SMR can run repeatable evidence sweeps and identify suspicious runs without manual guesswork |
+
+### Wave 4.5 — Design Notes
+
+- `W3.6-B4` is treated as **SMR Phase 0**, not unfinished work. Wave 4.5 hardens that base into a project-level tool.
+- This wave intentionally lands **before** Wave 5 group combat and Wave 6 siege/LLM complexity so that those later systems inherit a stronger debugging and regression workflow.
+- The existing session plans remain relevant source docs, but their key deliverables are consolidated here:
+  - `Docs/Plans/Session-Balance-QA-Plan.md`
+  - `Docs/Plans/Session-Perf-Profiling-Plan.md`
+- `SMR-B1` should standardize a durable artifact layout so OpenCode/LLM sessions can run SMR in isolation and later sessions can re-open the artifacts without ambiguity.
+- `SMR-B2` should separate:
+  - hard assertion failures,
+  - anomaly warnings,
+  - infra/config errors,
+  - and stable exit codes for automation.
+- `SMR-B3` should make "compare against yesterday / compare against known-good" a first-class workflow, not a manual spreadsheet task.
+- `SMR-B4` should unify the currently separate headless directions into one tool contract:
+  - standard matrix run,
+  - assertion mode,
+  - comparison mode,
+  - perf mode,
+  - machine-readable summary/report mode.
+- `SMR-B5` is deliberately **not** the visual lab. Its purpose is to export richer evidence bundles (sampled snapshots, event trails, anomaly context, worst-run drilldown) that a later UI can consume.
+- `SMR-C1` exists to avoid overloading Track B with planner-specific interpretation logic when a small additive AI signal would make anomaly classification far more useful.
+- There is **no Track A epic in Wave 4.5**. This is intentional: Track A bandwidth remains focused on battle/siege/campaign UI in later waves, and the visual SMR Lab is deferred.
+- Visual `SMR Lab` target:
+  - not before Wave 10 closeout,
+  - should consume the artifact bundles defined here,
+  - should start as replay/drilldown UI before any 16-window live mosaic experiment.
+
+Acceptance notes:
+- SMR can be launched by a coding agent with a stable CLI contract and deterministic artifact output directory.
+- A run can fail with a machine-meaningful reason (`assert fail`, `anomaly gate fail`, `bad config`, etc.) instead of only printing human text.
+- Baseline comparison and regression deltas are stored as artifacts, not reconstructed manually from terminal logs.
+- Perf, balance, and clustering evidence share one compatible schema/tool surface rather than separate ad hoc outputs.
+- The project has a documented evidence-review workflow before the heavier Wave 5+ runtime/AI complexity lands.
+
+Proof targets:
+- `SMR-B1`: sample artifact bundle checked into docs/example or captured in test fixtures.
+- `SMR-B2`: tests for assertion/anomaly classification and exit-code policy.
+- `SMR-B3`: tests and/or fixtures for baseline delta reporting.
+- `SMR-B4`: smoke commands proving standard/assert/compare/perf modes all emit compatible outputs.
+- `SMR-B5`: at least one worst-run drilldown artifact example with enough data for later replay UI.
+- `SMR-C1`: AI/runtime tests proving planner/anomaly signals are exported deterministically.
+- `SMR-M1/M2`: documented operator workflow for baseline refresh, artifact retention, and evidence review.
+
+**Parallelism:**
+- Main critical path: `SMR-B1 -> SMR-B2 -> SMR-B3 -> SMR-B4 -> SMR-B5`.
+- Meta work (`SMR-M1`, `SMR-M2`) can overlap with the corresponding Track B phases but should not outrun the real tool contract.
+- `SMR-C1` should start only after `SMR-B2` reveals which AI/planner signals are truly missing.
+- No Track A work is planned in this wave.
 
 ---
 
