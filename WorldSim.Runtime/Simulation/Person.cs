@@ -1609,6 +1609,17 @@ public class Person
         var hasContestedTilesNearby = HasContestedTileNearby(w, radius: 2);
         var nearbyEnemyCount = nearbyHostiles;
         var hostileProximity = Math.Clamp(nearbyEnemyCount / 4f, 0f, 1f);
+        var homeMilitaryTechCount =
+            (_home.UnlockedTechs.Contains("weaponry") ? 1 : 0)
+            + (_home.UnlockedTechs.Contains("armor_smithing") ? 1 : 0)
+            + (_home.UnlockedTechs.Contains("military_training") ? 1 : 0)
+            + (_home.UnlockedTechs.Contains("war_drums") ? 1 : 0)
+            + (_home.UnlockedTechs.Contains("scouts") ? 1 : 0)
+            + (_home.UnlockedTechs.Contains("advanced_tactics") ? 1 : 0);
+        var homeFortificationTechCount =
+            (_home.UnlockedTechs.Contains("fortification") ? 1 : 0)
+            + (_home.UnlockedTechs.Contains("advanced_fortification") ? 1 : 0)
+            + (_home.UnlockedTechs.Contains("siege_craft") ? 1 : 0);
         var localThreat = Math.Clamp(
             (nearbyPredators / 3f) * 0.45f +
             (nearbyHostiles / 4f) * 0.55f +
@@ -1647,7 +1658,11 @@ public class Person
             IsWarriorRole: IsWarriorRole(w),
             NearbyEnemyCount: nearbyEnemyCount,
             HostileProximityScore: hostileProximity,
-            LocalThreatScore: localThreat);
+            LocalThreatScore: localThreat,
+            HomeWeaponLevel: _home.WeaponLevel,
+            HomeArmorLevel: _home.ArmorLevel,
+            HomeMilitaryTechCount: homeMilitaryTechCount,
+            HomeFortificationTechCount: homeFortificationTechCount);
     }
 
     private bool IsWarriorRole(World w)
