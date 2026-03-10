@@ -75,14 +75,33 @@ public sealed class StructureRenderPass : IRenderPass
             int tileY = structure.Y * settings.TileSize;
             var tileRect = new Rectangle(tileX, tileY, settings.TileSize, settings.TileSize);
 
-            if (structure.Kind == DefensiveStructureKindView.WoodWall)
+            switch (structure.Kind)
             {
-                DrawWoodWall(spriteBatch, textures.Pixel, tileRect);
+                case DefensiveStructureKindView.WoodWall:
+                    DrawWoodWall(spriteBatch, textures.Pixel, tileRect);
+                    break;
+                case DefensiveStructureKindView.StoneWall:
+                    DrawStoneWall(spriteBatch, textures.Pixel, tileRect);
+                    break;
+                case DefensiveStructureKindView.ReinforcedWall:
+                    DrawReinforcedWall(spriteBatch, textures.Pixel, tileRect);
+                    break;
+                case DefensiveStructureKindView.Gate:
+                    DrawGate(spriteBatch, textures.Pixel, tileRect);
+                    break;
+                case DefensiveStructureKindView.Watchtower:
+                    DrawWatchtower(spriteBatch, textures.Pixel, tileRect);
+                    break;
+                case DefensiveStructureKindView.ArrowTower:
+                    DrawArrowTower(spriteBatch, textures.Pixel, tileRect);
+                    break;
+                case DefensiveStructureKindView.CatapultTower:
+                    DrawCatapultTower(spriteBatch, textures.Pixel, tileRect);
+                    break;
             }
-            else
-            {
-                DrawWatchtower(spriteBatch, textures.Pixel, tileRect);
-            }
+
+            if (!structure.IsActive)
+                DrawInactiveMarker(spriteBatch, textures.Pixel, tileRect);
 
             DrawStructureHpBar(spriteBatch, textures.Pixel, settings, tileRect, structure.Hp, structure.MaxHp);
         }
@@ -110,6 +129,69 @@ public sealed class StructureRenderPass : IRenderPass
         spriteBatch.Draw(pixel, bodyRect, body);
         spriteBatch.Draw(pixel, new Rectangle(tileRect.X, tileRect.Y, tileRect.Width, Math.Max(1, tileRect.Height / 3)), top);
         spriteBatch.Draw(pixel, new Rectangle(tileRect.X, tileRect.Y, tileRect.Width, 1), Color.White * 0.35f);
+    }
+
+    private static void DrawStoneWall(SpriteBatch spriteBatch, Texture2D pixel, Rectangle tileRect)
+    {
+        var fill = new Color(140, 140, 150);
+        var edge = new Color(102, 102, 112);
+        int height = Math.Max(2, (tileRect.Height * 2) / 3);
+        int y = tileRect.Y + (tileRect.Height - height) / 2;
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, y, tileRect.Width, height), fill);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, y, tileRect.Width, 1), edge);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, y + height - 1, tileRect.Width, 1), edge);
+        for (int i = 1; i < tileRect.Width - 1; i += 3)
+            spriteBatch.Draw(pixel, new Rectangle(tileRect.X + i, y + 1, 1, Math.Max(1, height - 2)), edge * 0.7f);
+    }
+
+    private static void DrawReinforcedWall(SpriteBatch spriteBatch, Texture2D pixel, Rectangle tileRect)
+    {
+        DrawStoneWall(spriteBatch, pixel, tileRect);
+        var steel = new Color(170, 180, 195);
+        int height = Math.Max(2, (tileRect.Height * 2) / 3);
+        int y = tileRect.Y + (tileRect.Height - height) / 2;
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, y + 1, tileRect.Width, 1), steel * 0.9f);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, y + height - 2, tileRect.Width, 1), steel * 0.9f);
+    }
+
+    private static void DrawGate(SpriteBatch spriteBatch, Texture2D pixel, Rectangle tileRect)
+    {
+        var stone = new Color(138, 138, 148);
+        var darkGap = new Color(40, 44, 52);
+        int pillarWidth = Math.Max(1, tileRect.Width / 3);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, tileRect.Y, pillarWidth, tileRect.Height), stone);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.Right - pillarWidth, tileRect.Y, pillarWidth, tileRect.Height), stone);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X + pillarWidth, tileRect.Y + 1, tileRect.Width - (pillarWidth * 2), tileRect.Height - 2), darkGap);
+    }
+
+    private static void DrawArrowTower(SpriteBatch spriteBatch, Texture2D pixel, Rectangle tileRect)
+    {
+        var body = new Color(92, 105, 126);
+        var parapet = new Color(150, 165, 185);
+        int inset = Math.Max(1, tileRect.Width / 6);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X + inset, tileRect.Y + inset, tileRect.Width - (2 * inset), tileRect.Height - inset), body);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, tileRect.Y, tileRect.Width, Math.Max(2, tileRect.Height / 3)), parapet);
+        for (int x = tileRect.X + 1; x < tileRect.Right - 1; x += 2)
+            spriteBatch.Draw(pixel, new Rectangle(x, tileRect.Y + 1, 1, 1), new Color(60, 70, 84));
+    }
+
+    private static void DrawCatapultTower(SpriteBatch spriteBatch, Texture2D pixel, Rectangle tileRect)
+    {
+        var body = new Color(60, 65, 80);
+        var cap = new Color(44, 48, 60);
+        var accent = new Color(230, 130, 60);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, tileRect.Y + 1, tileRect.Width, tileRect.Height - 1), body);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X, tileRect.Y, tileRect.Width, Math.Max(2, tileRect.Height / 2)), cap);
+        int dot = Math.Max(1, tileRect.Width / 4);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.Center.X - (dot / 2), tileRect.Center.Y - (dot / 2), dot, dot), accent);
+    }
+
+    private static void DrawInactiveMarker(SpriteBatch spriteBatch, Texture2D pixel, Rectangle tileRect)
+    {
+        var tint = new Color(180, 62, 62) * 0.32f;
+        spriteBatch.Draw(pixel, tileRect, tint);
+        int marker = Math.Max(1, tileRect.Width / 4);
+        spriteBatch.Draw(pixel, new Rectangle(tileRect.X + 1, tileRect.Y + 1, marker, marker), new Color(236, 118, 118) * 0.85f);
     }
 
     private static void DrawStructureHpBar(
@@ -152,6 +234,9 @@ public sealed class StructureRenderPass : IRenderPass
     {
         var towerEvents = snapshot.RecentEvents
             .Where(evt => evt.Contains("watchtower fired", StringComparison.OrdinalIgnoreCase)
+                       || evt.Contains("arrow tower fired", StringComparison.OrdinalIgnoreCase)
+                       || evt.Contains("catapult fired", StringComparison.OrdinalIgnoreCase)
+                       || evt.Contains("tower fired", StringComparison.OrdinalIgnoreCase)
                        || evt.Contains("tower hit predator", StringComparison.OrdinalIgnoreCase))
             .TakeLast(3)
             .ToList();
@@ -162,7 +247,9 @@ public sealed class StructureRenderPass : IRenderPass
         foreach (var evt in towerEvents)
         {
             bool predatorShot = evt.Contains("tower hit predator", StringComparison.OrdinalIgnoreCase);
-            string suffix = predatorShot ? " tower hit predator" : " watchtower fired";
+            bool catapultShot = evt.Contains("catapult fired", StringComparison.OrdinalIgnoreCase);
+            bool arrowTowerShot = evt.Contains("arrow tower fired", StringComparison.OrdinalIgnoreCase);
+            string suffix = ResolveTowerEventSuffix(evt, predatorShot, catapultShot, arrowTowerShot);
             int suffixIdx = evt.IndexOf(suffix, StringComparison.OrdinalIgnoreCase);
             if (suffixIdx <= 0)
                 continue;
@@ -173,7 +260,7 @@ public sealed class StructureRenderPass : IRenderPass
                 continue;
 
             var sourceTower = snapshot.DefensiveStructures
-                .Where(s => s.ColonyId == colony.Id && s.Kind == DefensiveStructureKindView.Watchtower)
+                .Where(s => s.ColonyId == colony.Id && IsMatchingTowerKind(s.Kind, catapultShot, arrowTowerShot))
                 .FirstOrDefault();
             if (sourceTower == null)
                 continue;
@@ -186,9 +273,42 @@ public sealed class StructureRenderPass : IRenderPass
             if (target == null)
                 continue;
 
-            var beamColor = predatorShot ? new Color(248, 217, 114) : new Color(236, 142, 121);
-            DrawBeam(spriteBatch, textures.Pixel, source, target.Value, beamColor, Math.Max(1, settings.TileSize / 3));
+            var beamColor = predatorShot
+                ? new Color(248, 217, 114)
+                : catapultShot
+                    ? new Color(230, 130, 60)
+                    : new Color(236, 142, 121);
+            int thickness = Math.Max(1, settings.TileSize / (catapultShot ? 2 : 3));
+            DrawBeam(spriteBatch, textures.Pixel, source, target.Value, beamColor, thickness);
+
+            if (catapultShot)
+            {
+                int splash = Math.Max(2, settings.TileSize / 2);
+                spriteBatch.Draw(textures.Pixel, new Rectangle((int)target.Value.X - splash, (int)target.Value.Y - splash, splash * 2, splash * 2), beamColor * 0.45f);
+            }
         }
+    }
+
+    private static string ResolveTowerEventSuffix(string evt, bool predatorShot, bool catapultShot, bool arrowTowerShot)
+    {
+        if (predatorShot)
+            return " tower hit predator";
+        if (catapultShot)
+            return " catapult fired";
+        if (arrowTowerShot)
+            return " arrow tower fired";
+        if (evt.Contains("watchtower fired", StringComparison.OrdinalIgnoreCase))
+            return " watchtower fired";
+        return " tower fired";
+    }
+
+    private static bool IsMatchingTowerKind(DefensiveStructureKindView kind, bool catapultShot, bool arrowTowerShot)
+    {
+        if (catapultShot)
+            return kind == DefensiveStructureKindView.CatapultTower;
+        if (arrowTowerShot)
+            return kind == DefensiveStructureKindView.ArrowTower;
+        return kind == DefensiveStructureKindView.Watchtower || kind == DefensiveStructureKindView.ArrowTower;
     }
 
     private static Vector2? FindNearestPredator(WorldRenderSnapshot snapshot, int towerX, int towerY, int tileSize)
