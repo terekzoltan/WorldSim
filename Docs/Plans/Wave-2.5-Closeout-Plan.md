@@ -4,13 +4,13 @@ Status: Active
 Owner: Meta Coordinator
 Last updated: 2026-03-04
 
-This wave exists to close gaps discovered after Wave 2 was marked ✅ in `Docs/Plans/Combined-Execution-Sequencing-Plan.md`.
+This wave exists to close gaps discovered after Wave 2 was marked ✅ in `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md`.
 It is intentionally scoped to **integration correctness + determinism + observability**, not new feature expansion.
 
 References:
-- `Docs/Plans/Combined-Execution-Sequencing-Plan.md`
-- `Docs/Plans/Director-Integration-Master-Plan.md` (Phase 1 / Sprint 2 acceptance + DoD)
-- `Docs/Plans/Combat-Defense-Campaign-Master-Plan.md` (Phase 1 / Sprint 2 DoD)
+- `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md`
+- `Docs/Plans/Master/Director-Integration-Master-Plan.md` (Phase 1 / Sprint 2 acceptance + DoD)
+- `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md` (Phase 1 / Sprint 2 DoD)
 
 ---
 
@@ -84,9 +84,9 @@ Acceptance (Block 3):
 
 ### Block 4 (Meta docs, sequential)
 
-- `Docs/Plans/Combined-Execution-Sequencing-Plan.md`: add Wave 2.5 section referencing this doc.
-- `Docs/Plans/Director-Integration-Master-Plan.md`: resolve contract schema drift (either align to current v2 types or mark future fields explicitly).
-- `Docs/Plans/Combat-Defense-Campaign-Master-Plan.md`: note that keybinds are suggested and may be overridden by implementation.
+- `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md`: add Wave 2.5 section referencing this doc.
+- `Docs/Plans/Master/Director-Integration-Master-Plan.md`: resolve contract schema drift (either align to current v2 types or mark future fields explicitly).
+- `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md`: note that keybinds are suggested and may be overridden by implementation.
 
 Acceptance (Block 4):
 - Plans are self-consistent: Combined plan references the closeout wave; master plan examples match the actual contract shape.

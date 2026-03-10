@@ -137,11 +137,11 @@ Ha VIOLATION talalhato, uzenofal bejegyzes is kotelezo.
 - `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md` -- Track A Phase 1, 3 sprint
 - `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Sprint3-Execution-Plan.md` -- Track A Sprint 3 reszletek
 - `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md` -- Track D Season Director (tactical, superseded by master plan)
-- `Docs/Plans/Director-Integration-Master-Plan.md` -- Track D Director Integration strategiai master plan (2300+ sor)
+- `Docs/Plans/Master/Director-Integration-Master-Plan.md` -- Track D Director Integration strategiai master plan (2300+ sor)
 - `Docs/Plans/Track-C-Prep-CrossTrack-Handshake.md` -- Track C cross-track contract
 - `Docs/Plans/Track-C-AI-Context-Contract-v1.md` -- Track B->C AI context contract
 - `Docs/Plans/Track-B-Prep-Roadmap.md` -- Track B prep roadmap
-- `Docs/Plans/Combat-Defense-Campaign-Master-Plan.md` -- Jovobeni combat/campaign master plan
+- `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md` -- Jovobeni combat/campaign master plan
 - `WorldSim.Runtime/Docs/Plans/TODO.md` -- Runtime korai TODO (legacy)
 - `Docs/Plans/Session-Combat-Coordinator-Plan.md` -- Combat Coordinator session playbook
 - `Docs/Plans/Session-Perf-Profiling-Plan.md` -- Performance Profiling session plan
@@ -275,7 +275,7 @@ Ha VIOLATION talalhato, uzenofal bejegyzes is kotelezo.
 **Lepesek:**
 
 1. Olvasd be a teljes AGENTS.md-t (track-ek, uzenofal, kockazatok).
-2. Olvasd be a `Combat-Defense-Campaign-Master-Plan.md`-t (legnagyobb jovobeli scope).
+2. Olvasd be a `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md`-t (legnagyobb jovobeli scope).
 3. Gondolkodj el a kovetkezokon:
    - Melyik Track kozelit a kesz allapothoz? Mi jonhet utana?
    - Van-e olyan teruleti feladat, ami uj Track-et indokolna?

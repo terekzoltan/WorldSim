@@ -4,7 +4,7 @@
 > Master Plan across Tracks A/B/C/D. This session is to combat phases what the Meta Coordinator
 > is to the overall project -- a persistent coordination hub opened at each phase/sprint boundary.
 >
-> **Primary reference:** `Docs/Plans/Combat-Defense-Campaign-Master-Plan.md` (1958 lines, 8 phases, 13 sprints)
+> **Primary reference:** `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md` (1958 lines, 8 phases, 13 sprints)
 
 Status: Ready to launch (trigger: Track A Sprint 3 complete + Phase 0 green-lit)
 Last updated: 2026-02-26
