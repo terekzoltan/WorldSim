@@ -7,6 +7,23 @@ namespace WorldSim.Simulation;
 
 public sealed class RuntimeNpcBrain
 {
+    private static readonly string[] MilitaryTechIds =
+    {
+        "weaponry",
+        "armor_smithing",
+        "military_training",
+        "war_drums",
+        "scouts",
+        "advanced_tactics"
+    };
+
+    private static readonly string[] FortificationTechIds =
+    {
+        "fortification",
+        "advanced_fortification",
+        "siege_craft"
+    };
+
     private const int ThreatSenseRadius = 4;
     private const int ContestedSenseRadius = 2;
     private readonly INpcDecisionBrain _brain;
@@ -65,6 +82,7 @@ public sealed class RuntimeNpcBrain
             NpcCommand.Rest => Job.Rest,
             NpcCommand.BuildHouse => Job.BuildHouse,
             NpcCommand.CraftTools => Job.CraftTools,
+            NpcCommand.ResearchTech => Job.CraftTools,
             NpcCommand.BuildWall => Job.BuildWall,
             NpcCommand.BuildWatchtower => Job.BuildWatchtower,
             NpcCommand.RaidBorder => Job.RaidBorder,
@@ -122,6 +140,8 @@ public sealed class RuntimeNpcBrain
             isHostileStance,
             isWarStance);
         var isWarriorRole = IsWarriorRole(world, actor, colonyId, isHostileStance);
+        var homeMilitaryTechCount = CountUnlockedTechs(actor.Home, MilitaryTechIds);
+        var homeFortificationTechCount = CountUnlockedTechs(actor.Home, FortificationTechIds);
 
         return new NpcAiContext(
             SimulationTimeSeconds: _simulationTimeSeconds,
@@ -159,10 +179,17 @@ public sealed class RuntimeNpcBrain
             NearbyEnemyCount: nearbyEnemies,
             HostileProximityScore: hostileProximityScore,
             LocalThreatScore: localThreatScore,
+            HomeWeaponLevel: actor.Home.WeaponLevel,
+            HomeArmorLevel: actor.Home.ArmorLevel,
+            HomeMilitaryTechCount: homeMilitaryTechCount,
+            HomeFortificationTechCount: homeFortificationTechCount,
             ResourceCrowdPressure: resourceCrowdPressure,
             BuildCrowdPressure: buildCrowdPressure,
             RetreatCrowdPressure: retreatCrowdPressure);
     }
+
+    private static int CountUnlockedTechs(Colony colony, IEnumerable<string> techIds)
+        => techIds.Count(colony.UnlockedTechs.Contains);
 
     private static int Manhattan((int x, int y) a, (int x, int y) b)
         => Math.Abs(a.x - b.x) + Math.Abs(a.y - b.y);

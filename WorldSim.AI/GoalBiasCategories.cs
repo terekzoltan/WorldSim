@@ -22,6 +22,7 @@ public static class GoalBiasCategories
             "DefendSelf" => context.BiasMilitary,
             "BuildDefenses" => Math.Max(context.BiasBuilding, context.BiasMilitary),
             "RaidBorder" => context.BiasMilitary,
+            "UnlockMilitaryTech" => context.BiasMilitary,
             "GatherWood" => context.BiasGathering,
             "GatherStone" => context.BiasGathering,
             "StabilizeResources" => Math.Max(context.BiasGathering, context.BiasCrafting),
@@ -47,6 +48,7 @@ public static class GoalBiasCategories
             "BuildHouse" => context.BuildCrowdPressure,
             "ExpandHousing" => context.BuildCrowdPressure,
             "BuildDefenses" => context.BuildCrowdPressure,
+            "UnlockMilitaryTech" => context.BuildCrowdPressure * 0.5f,
             "DefendSelf" => context.RetreatCrowdPressure * 0.3f,
             "RaidBorder" => context.RetreatCrowdPressure * 0.2f,
             _ => 0f

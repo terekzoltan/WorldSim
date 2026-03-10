@@ -57,6 +57,14 @@ public sealed class GoapPlanner : IPlanner
             return new PlannerDecision(raidCommand, 1, new[] { raidCommand }, 1, raidReason, "GoapRaidRule");
         }
 
+        if (_goal.Name == "UnlockMilitaryTech")
+        {
+            var researchCommand = ShouldUnlockMilitaryTech(context) ? NpcCommand.ResearchTech : NpcCommand.CraftTools;
+            var researchReason = _goalChanged ? "GoalChanged" : "TechPressure";
+            _goalChanged = false;
+            return new PlannerDecision(researchCommand, 1, new[] { researchCommand }, 1, researchReason, "GoapTechRule");
+        }
+
         var reason = _goalChanged ? "GoalChanged" : "PlanContinue";
 
         if (_currentPlan.Count > 0 && !CanExecuteCurrentAction(context, _currentPlan.Peek()))
@@ -218,6 +226,9 @@ public sealed class GoapPlanner : IPlanner
             case "RecoverStamina":
                 state["stamina"] = Math.Max(20, (int)MathF.Round(context.Stamina)) + 30;
                 break;
+            case "UnlockMilitaryTech":
+                state["militaryTech"] = context.HomeMilitaryTechCount + 1;
+                break;
         }
 
         return state;
@@ -244,4 +255,16 @@ public sealed class GoapPlanner : IPlanner
     }
 
     private sealed record Node(GoapState State, Node? Parent, GoapAction? Action, int G);
+
+    private static bool ShouldUnlockMilitaryTech(in NpcAiContext context)
+    {
+        if (context.HomeMilitaryTechCount >= 3)
+            return false;
+
+        var minimumFoodReserve = Math.Max(4, context.ColonyPopulation / 2);
+        if (context.HomeFood < minimumFoodReserve)
+            return false;
+
+        return context.IsWarStance || (context.IsHostileStance && context.LocalThreatScore >= 0.4f);
+    }
 }

@@ -364,7 +364,9 @@ public class DecisionTests
             IsWarriorRole: true,
             NearbyEnemyCount: 1,
             HostileProximityScore: 0.6f,
-            LocalThreatScore: 0.75f);
+            LocalThreatScore: 0.75f,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
 
         Assert.True(ThreatDecisionPolicy.ShouldFight(context));
     }
@@ -433,6 +435,39 @@ public class DecisionTests
     }
 
     [Fact]
+    public void ThreatDecisionPolicy_LowEquipmentHighThreat_AvoidsFight()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 3f,
+            Hunger: 15f,
+            Stamina: 82f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 90f,
+            Strength: 20,
+            Defense: 16,
+            NearbyHostilePeople: 2,
+            IsWarStance: true,
+            IsWarriorRole: true,
+            NearbyEnemyCount: 2,
+            LocalThreatScore: 0.7f,
+            HomeWeaponLevel: 0,
+            HomeArmorLevel: 0);
+
+        Assert.False(ThreatDecisionPolicy.ShouldFight(context));
+    }
+
+    [Fact]
     public void SimplePlanner_BuildDefenses_UsesFortificationCommands_WhenHostile()
     {
         var planner = new SimplePlanner();
@@ -495,6 +530,66 @@ public class DecisionTests
         var decision = planner.GetNextCommand(context);
 
         Assert.Equal(NpcCommand.RaidBorder, decision.Command);
+    }
+
+    [Fact]
+    public void SimplePlanner_UnlockMilitaryTech_FiresUnderWarPressure_WhenTechCountLow()
+    {
+        var planner = new SimplePlanner();
+        planner.SetGoal(new Goal("UnlockMilitaryTech"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 9f,
+            Hunger: 20f,
+            Stamina: 75f,
+            HomeWood: 12,
+            HomeStone: 4,
+            HomeIron: 2,
+            HomeGold: 0,
+            HomeFood: 8,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            IsWarStance: true,
+            HomeMilitaryTechCount: 1);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.ResearchTech, decision.Command);
+    }
+
+    [Fact]
+    public void SimplePlanner_UnlockMilitaryTech_DoesNotFire_WhenThresholdReached()
+    {
+        var planner = new SimplePlanner();
+        planner.SetGoal(new Goal("UnlockMilitaryTech"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 9f,
+            Hunger: 20f,
+            Stamina: 75f,
+            HomeWood: 12,
+            HomeStone: 4,
+            HomeIron: 2,
+            HomeGold: 0,
+            HomeFood: 8,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            IsWarStance: true,
+            HomeMilitaryTechCount: 3);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.NotEqual(NpcCommand.ResearchTech, decision.Command);
     }
 
     private sealed class FixedConsideration : Consideration

@@ -32,6 +32,16 @@ public static class GoalLibrary
         raidBorder.Considerations.Add(new ContestedZoneConsideration());
         goals.Add(raidBorder);
 
+        var unlockMilitaryTech = new Goal("UnlockMilitaryTech")
+        {
+            CooldownSeconds = 2.0f
+        };
+        unlockMilitaryTech.Considerations.Add(new WarPressureConsideration());
+        unlockMilitaryTech.Considerations.Add(new LowMilitaryTechCountConsideration(threshold: 3));
+        unlockMilitaryTech.Considerations.Add(new InvertedConsideration(new LowFoodStockConsideration()));
+        unlockMilitaryTech.Considerations.Add(new InvertedConsideration(new HungerConsideration()));
+        goals.Add(unlockMilitaryTech);
+
         var gatherWood = new Goal("GatherWood")
         {
             CooldownSeconds = 2f

@@ -143,6 +143,17 @@ public sealed class HtnPlanner : IPlanner
                     new[] { NpcCommand.Flee }));
                 break;
 
+            case "UnlockMilitaryTech":
+                candidates.Add(new MethodCandidate(
+                    "ResearchMilitaryTech",
+                    ShouldUnlockMilitaryTech(context) ? 0.95f : 0.2f,
+                    new[] { NpcCommand.ResearchTech }));
+                candidates.Add(new MethodCandidate(
+                    "FallbackCrafting",
+                    ShouldUnlockMilitaryTech(context) ? 0.3f : 0.65f,
+                    new[] { NpcCommand.CraftTools }));
+                break;
+
             default:
                 candidates.Add(new MethodCandidate("FallbackIdle", 0.01f, new[] { NpcCommand.Idle }));
                 break;
@@ -162,4 +173,16 @@ public sealed class HtnPlanner : IPlanner
     }
 
     private sealed record MethodCandidate(string Name, float Score, IReadOnlyList<NpcCommand> Commands);
+
+    private static bool ShouldUnlockMilitaryTech(in NpcAiContext context)
+    {
+        if (context.HomeMilitaryTechCount >= 3)
+            return false;
+
+        var minimumFoodReserve = System.Math.Max(4, context.ColonyPopulation / 2);
+        if (context.HomeFood < minimumFoodReserve)
+            return false;
+
+        return context.IsWarStance || (context.IsHostileStance && context.LocalThreatScore >= 0.4f);
+    }
 }

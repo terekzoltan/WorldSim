@@ -12,6 +12,7 @@ public enum NpcCommand
     Rest,
     BuildHouse,
     CraftTools,
+    ResearchTech,
     BuildWall,
     BuildWatchtower,
     RaidBorder,
@@ -56,6 +57,10 @@ public readonly record struct NpcAiContext(
     int NearbyEnemyCount = 0,
     float HostileProximityScore = 0f,
     float LocalThreatScore = 0f,
+    int HomeWeaponLevel = 0,
+    int HomeArmorLevel = 0,
+    int HomeMilitaryTechCount = 0,
+    int HomeFortificationTechCount = 0,
     float ResourceCrowdPressure = 0f,
     float BuildCrowdPressure = 0f,
     float RetreatCrowdPressure = 0f);

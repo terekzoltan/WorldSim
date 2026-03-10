@@ -76,8 +76,18 @@ public class Person
     const int BuildWallTime = 8;
     const int BuildWatchtowerTime = 16;
     const int WallWoodCost = 8;
+    const int StoneWallStoneCost = 10;
+    const int ReinforcedWallStoneCost = 14;
+    const int ReinforcedWallIronCost = 4;
+    const int GateWoodCost = 8;
+    const int GateStoneCost = 8;
     const int WatchtowerWoodCost = 16;
     const int WatchtowerStoneCost = 6;
+    const int ArrowTowerWoodCost = 18;
+    const int ArrowTowerStoneCost = 10;
+    const int CatapultTowerWoodCost = 20;
+    const int CatapultTowerStoneCost = 12;
+    const int CatapultTowerIronCost = 8;
     const float StructureRaidDamage = 26f;
     const float AgingTickDivisor = 90f;
 
@@ -783,6 +793,9 @@ public class Person
 
     bool TryStartDefenseConstruction(World w)
     {
+        if (!w.CanBuildFortifications(_home))
+            return false;
+
         var warState = w.GetColonyWarState(_home.Id);
         bool hasHostileStance = w._colonies.Any(colony =>
             colony != _home
@@ -790,14 +803,13 @@ public class Person
         if (warState == ColonyWarState.Peace && !hasHostileStance)
             return false;
 
-        if (_home.Stock[Resource.Wood] >= WatchtowerWoodCost
-            && _home.Stock[Resource.Stone] >= WatchtowerStoneCost
+        if (CanAffordTowerBuild(w)
             && CountOwnWatchtowers(w) < Math.Max(1, _home.HouseCount / 2))
         {
             return TryExecuteBuildIntent(w, Job.BuildWatchtower);
         }
 
-        if (_home.Stock[Resource.Wood] >= WallWoodCost)
+        if (CanAffordWallBuild(w))
         {
             return TryExecuteBuildIntent(w, Job.BuildWall);
         }
@@ -839,10 +851,52 @@ public class Person
         return buildJob switch
         {
             Job.BuildHouse => ResolveHouseBuildFallback(w),
-            Job.BuildWatchtower when _home.Stock[Resource.Stone] < WatchtowerStoneCost => Job.GatherStone,
+            Job.BuildWatchtower when NeedsStoneForTowerBuild(w) => Job.GatherStone,
             _ => Job.GatherWood
         };
     }
+
+    private bool CanAffordWallBuild(World w)
+    {
+        if (HasTech("advanced_fortification")
+            && _home.Stock[Resource.Stone] >= ReinforcedWallStoneCost
+            && _home.Stock[Resource.Iron] >= ReinforcedWallIronCost)
+            return true;
+
+        if (HasTech("fortification")
+            && _home.Stock[Resource.Stone] >= StoneWallStoneCost)
+            return true;
+
+        return _home.Stock[Resource.Wood] >= WallWoodCost;
+    }
+
+    private bool CanAffordTowerBuild(World w)
+    {
+        if (HasTech("siege_craft")
+            && _home.Stock[Resource.Wood] >= CatapultTowerWoodCost
+            && _home.Stock[Resource.Stone] >= CatapultTowerStoneCost
+            && _home.Stock[Resource.Iron] >= CatapultTowerIronCost)
+            return true;
+
+        if (HasTech("fortification")
+            && _home.Stock[Resource.Wood] >= ArrowTowerWoodCost
+            && _home.Stock[Resource.Stone] >= ArrowTowerStoneCost)
+            return true;
+
+        return _home.Stock[Resource.Wood] >= WatchtowerWoodCost && _home.Stock[Resource.Stone] >= WatchtowerStoneCost;
+    }
+
+    private bool NeedsStoneForTowerBuild(World w)
+    {
+        if (HasTech("siege_craft") && _home.Stock[Resource.Stone] < CatapultTowerStoneCost)
+            return true;
+        if (HasTech("fortification") && _home.Stock[Resource.Stone] < ArrowTowerStoneCost)
+            return true;
+        return _home.Stock[Resource.Stone] < WatchtowerStoneCost;
+    }
+
+    private bool HasTech(string techId)
+        => _home.UnlockedTechs.Contains(techId);
 
     private void ClearBuildSiteState()
     {
@@ -913,14 +967,14 @@ public class Person
             return false;
         }
 
-        if (buildJob == Job.BuildWall && _home.Stock[Resource.Wood] < WallWoodCost)
+        if (buildJob == Job.BuildWall && !CanAffordWallBuild(w))
         {
             ResetBuildSiteState(w);
             return false;
         }
 
         if (buildJob == Job.BuildWatchtower
-            && (_home.Stock[Resource.Wood] < WatchtowerWoodCost || _home.Stock[Resource.Stone] < WatchtowerStoneCost))
+            && !CanAffordTowerBuild(w))
         {
             ResetBuildSiteState(w);
             return false;
@@ -1116,9 +1170,9 @@ public class Person
             var enemyPower = enemy.Strength + (enemy.Defense / 2f);
             var duelWinChance = Math.Clamp(0.40f + ((myPower - enemyPower) / 50f), 0.15f, 0.9f);
             if (_rng.NextDouble() < duelWinChance)
-                enemy.ApplyCombatDamage(w, Math.Max(2f, Strength * 0.8f), "FactionCombat");
+                enemy.ApplyCombatDamage(w, ScaleOutgoingCombatDamage(w, Math.Max(2f, Strength * 0.8f)), "FactionCombat");
             else
-                ApplyCombatDamage(w, Math.Max(1.5f, enemy.Strength * 0.65f), "FactionCombat");
+                ApplyCombatDamage(w, enemy.ScaleOutgoingCombatDamage(w, Math.Max(1.5f, enemy.Strength * 0.65f)), "FactionCombat");
 
             return;
         }
@@ -1344,7 +1398,7 @@ public class Person
 
     void ExecuteBuildWallAction(World w)
     {
-        if (_home.Stock[Resource.Wood] < WallWoodCost)
+        if (!CanAffordWallBuild(w))
             return;
 
         if (!HasValidActiveBuildSite(w, Job.BuildWall) || _activeBuildSite == null)
@@ -1362,20 +1416,45 @@ public class Person
         DebugDecisionCause = "build_wall";
         DebugTargetKey = reservationKey;
 
-        if (!w.TryAddWoodWall(_home, spot))
+        var built = false;
+        if (HasTech("advanced_fortification")
+            && _home.Stock[Resource.Stone] >= ReinforcedWallStoneCost
+            && _home.Stock[Resource.Iron] >= ReinforcedWallIronCost)
+        {
+            built = w.TryAddReinforcedWall(_home, spot);
+            if (built)
+            {
+                _home.Stock[Resource.Stone] -= ReinforcedWallStoneCost;
+                _home.Stock[Resource.Iron] -= ReinforcedWallIronCost;
+            }
+        }
+        else if (HasTech("fortification") && _home.Stock[Resource.Stone] >= StoneWallStoneCost)
+        {
+            built = w.TryAddStoneWall(_home, spot);
+            if (built)
+                _home.Stock[Resource.Stone] -= StoneWallStoneCost;
+        }
+        else
+        {
+            built = w.TryAddWoodWall(_home, spot);
+            if (built)
+                _home.Stock[Resource.Wood] -= WallWoodCost;
+        }
+
+        if (!built)
         {
             ResetBuildSiteState(w);
             return;
         }
 
-        _home.Stock[Resource.Wood] -= WallWoodCost;
+        TryBuildGateNearby(w, spot);
         ClearBuildSiteState();
         w.AddExternalEvent($"{_home.Name} raised a border wall");
     }
 
     void ExecuteBuildWatchtowerAction(World w)
     {
-        if (_home.Stock[Resource.Wood] < WatchtowerWoodCost || _home.Stock[Resource.Stone] < WatchtowerStoneCost)
+        if (!CanAffordTowerBuild(w))
             return;
 
         if (!HasValidActiveBuildSite(w, Job.BuildWatchtower) || _activeBuildSite == null)
@@ -1393,16 +1472,82 @@ public class Person
         DebugDecisionCause = "build_watchtower";
         DebugTargetKey = reservationKey;
 
-        if (!w.TryAddWatchtower(_home, spot))
+        var built = false;
+        if (HasTech("siege_craft")
+            && _home.Stock[Resource.Wood] >= CatapultTowerWoodCost
+            && _home.Stock[Resource.Stone] >= CatapultTowerStoneCost
+            && _home.Stock[Resource.Iron] >= CatapultTowerIronCost)
+        {
+            built = w.TryAddCatapultTower(_home, spot);
+            if (built)
+            {
+                _home.Stock[Resource.Wood] -= CatapultTowerWoodCost;
+                _home.Stock[Resource.Stone] -= CatapultTowerStoneCost;
+                _home.Stock[Resource.Iron] -= CatapultTowerIronCost;
+            }
+        }
+        else if (HasTech("fortification")
+                 && _home.Stock[Resource.Wood] >= ArrowTowerWoodCost
+                 && _home.Stock[Resource.Stone] >= ArrowTowerStoneCost)
+        {
+            built = w.TryAddArrowTower(_home, spot);
+            if (built)
+            {
+                _home.Stock[Resource.Wood] -= ArrowTowerWoodCost;
+                _home.Stock[Resource.Stone] -= ArrowTowerStoneCost;
+            }
+        }
+        else
+        {
+            built = w.TryAddWatchtower(_home, spot);
+            if (built)
+            {
+                _home.Stock[Resource.Wood] -= WatchtowerWoodCost;
+                _home.Stock[Resource.Stone] -= WatchtowerStoneCost;
+            }
+        }
+
+        if (!built)
         {
             ResetBuildSiteState(w);
             return;
         }
 
-        _home.Stock[Resource.Wood] -= WatchtowerWoodCost;
-        _home.Stock[Resource.Stone] -= WatchtowerStoneCost;
         ClearBuildSiteState();
         w.AddExternalEvent($"{_home.Name} completed a watchtower");
+    }
+
+    private void TryBuildGateNearby(World w, (int x, int y) wallSpot)
+    {
+        if (!HasTech("fortification"))
+            return;
+        if (_home.Stock[Resource.Wood] < GateWoodCost || _home.Stock[Resource.Stone] < GateStoneCost)
+            return;
+        if (w.DefensiveStructures.Count(structure => structure.Owner == _home && structure.Kind == WorldSim.Simulation.Defense.DefensiveStructureKind.Gate) >= 1)
+            return;
+
+        var origin = _home.Origin;
+        var candidates = new[]
+        {
+            (origin.x + 2, origin.y),
+            (origin.x - 2, origin.y),
+            (origin.x, origin.y + 2),
+            (origin.x, origin.y - 2),
+            (wallSpot.x + 1, wallSpot.y),
+            (wallSpot.x - 1, wallSpot.y),
+            (wallSpot.x, wallSpot.y + 1),
+            (wallSpot.x, wallSpot.y - 1)
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (!w.TryAddGate(_home, candidate))
+                continue;
+
+            _home.Stock[Resource.Wood] -= GateWoodCost;
+            _home.Stock[Resource.Stone] -= GateStoneCost;
+            break;
+        }
     }
 
     void ExecuteRaidBorderAction(World w)
@@ -1453,8 +1598,9 @@ public class Person
 
     private NpcAiContext BuildThreatContext(World w)
     {
-        var nearbyPredators = CountNearbyPredators(w, radius: 4);
-        var nearbyHostiles = CountNearbyHostilePeople(w, radius: 4);
+        var sensingRadius = 4 + _home.ScoutRadiusBonus;
+        var nearbyPredators = CountNearbyPredators(w, radius: sensingRadius);
+        var nearbyHostiles = CountNearbyHostilePeople(w, radius: sensingRadius);
         var colonyId = _home.Id;
         var warState = w.GetColonyWarState(colonyId);
         var isWarStance = warState == ColonyWarState.War;
@@ -1524,6 +1670,29 @@ public class Person
             && person.Health > 0f
             && (person.Strength + person.Defense) > myPower);
         return stronger < warriorCount;
+    }
+
+    public float ScaleOutgoingCombatDamage(World world, float baseDamage)
+    {
+        if (baseDamage <= 0f)
+            return 0f;
+
+        if (!IsWarriorRole(world))
+            return baseDamage;
+
+        float weaponMultiplier = 1f + (_home.WeaponLevel * 0.12f);
+        return baseDamage * weaponMultiplier * world.CombatDamageBonusMultiplier;
+    }
+
+    private float GetIncomingCombatDamageMultiplier(World world)
+    {
+        if (!IsWarriorRole(world))
+            return 1f;
+
+        float armorMultiplier = Math.Clamp(1f - (_home.ArmorLevel * 0.10f), 0.55f, 1f);
+        float globalDefense = Math.Clamp(world.CombatDefenseBonusMultiplier, 0.5f, 2f);
+        float globalMultiplier = 1f / globalDefense;
+        return Math.Clamp(armorMultiplier * globalMultiplier, 0.45f, 1f);
     }
 
     private bool HasContestedTileNearby(World w, int radius)
@@ -1832,7 +2001,8 @@ public class Person
         if (amount <= 0f || Health <= 0f)
             return;
 
-        Health -= amount;
+        float adjusted = amount * GetIncomingCombatDamageMultiplier(world);
+        Health -= adjusted;
         EnterCombat(world);
         if (Health <= 0f)
             LastDeathReason = PersonDeathReason.Combat;

@@ -4,6 +4,10 @@ namespace WorldSim.AI;
 
 public static class ThreatDecisionPolicy
 {
+    private const float BaseLowHealthThreshold = 45f;
+    private const float LowEquipmentHighThreatThreshold = 0.55f;
+    private const float LowEquipmentPowerPenaltyMultiplier = 0.7f;
+
     public static bool IsPeacefulZeroSignal(in NpcAiContext context)
     {
         if (Math.Max(0, context.NearbyPredators) > 0)
@@ -54,10 +58,14 @@ public static class ThreatDecisionPolicy
         if (hasFactionThreat && !context.IsWarriorRole)
             return false;
 
-        if (context.Health < 45f)
+        if (context.Health < BaseLowHealthThreshold)
             return false;
 
+        bool lowEquipment = context.HomeWeaponLevel == 0 && context.HomeArmorLevel == 0;
+
         var power = context.Strength + (context.Defense / 2f);
+        if (lowEquipment && context.LocalThreatScore >= LowEquipmentHighThreatThreshold)
+            power *= LowEquipmentPowerPenaltyMultiplier;
         var threatLoad =
             (6f * Math.Max(0, context.NearbyPredators)) +
             (8f * Math.Max(0, context.NearbyHostilePeople)) +

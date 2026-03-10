@@ -150,6 +150,36 @@ public sealed class WarriorRoleConsideration : Consideration
     }
 }
 
+public sealed class WarPressureConsideration : Consideration
+{
+    public override float Evaluate(in NpcAiContext context)
+    {
+        if (context.IsWarStance)
+            return 1f;
+        if (context.IsHostileStance && context.LocalThreatScore >= 0.4f)
+            return 0.8f;
+        return 0f;
+    }
+}
+
+public sealed class LowMilitaryTechCountConsideration : Consideration
+{
+    private readonly int _threshold;
+
+    public LowMilitaryTechCountConsideration(int threshold = 3)
+    {
+        _threshold = Math.Max(1, threshold);
+    }
+
+    public override float Evaluate(in NpcAiContext context)
+    {
+        if (context.HomeMilitaryTechCount >= _threshold)
+            return 0f;
+
+        return Math.Clamp((_threshold - context.HomeMilitaryTechCount) / (float)_threshold, 0f, 1f);
+    }
+}
+
 public sealed class InvertedConsideration : Consideration
 {
     private readonly Consideration _inner;

@@ -30,6 +30,7 @@ public sealed class SimplePlanner : IPlanner
                     ? NpcCommand.Fight
                     : NpcCommand.RaidBorder)
                 : NpcCommand.Flee,
+            "UnlockMilitaryTech" => ShouldUnlockMilitaryTech(context) ? NpcCommand.ResearchTech : NpcCommand.CraftTools,
             "GatherWood" => NpcCommand.GatherWood,
             "GatherStone" => NpcCommand.GatherStone,
             "SecureFood" => context.Hunger >= 68f && context.HomeFood > 0 ? NpcCommand.EatFood : NpcCommand.GatherFood,
@@ -48,6 +49,18 @@ public sealed class SimplePlanner : IPlanner
         var reason = _goalChanged ? "GoalChanged" : "RuleMatch";
         _goalChanged = false;
         return new PlannerDecision(command, 1, new[] { command }, 1, reason, "SimpleRule");
+    }
+
+    private static bool ShouldUnlockMilitaryTech(in NpcAiContext context)
+    {
+        if (context.HomeMilitaryTechCount >= 3)
+            return false;
+
+        var minimumFoodReserve = Math.Max(4, context.ColonyPopulation / 2);
+        if (context.HomeFood < minimumFoodReserve)
+            return false;
+
+        return context.IsWarStance || (context.IsHostileStance && context.LocalThreatScore >= 0.4f);
     }
 
 }

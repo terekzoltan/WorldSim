@@ -20,6 +20,7 @@ public class RuntimeNpcBrainTests
     [InlineData(NpcCommand.Rest, Job.Rest)]
     [InlineData(NpcCommand.BuildHouse, Job.BuildHouse)]
     [InlineData(NpcCommand.CraftTools, Job.CraftTools)]
+    [InlineData(NpcCommand.ResearchTech, Job.CraftTools)]
     [InlineData(NpcCommand.BuildWall, Job.BuildWall)]
     [InlineData(NpcCommand.BuildWatchtower, Job.BuildWatchtower)]
     [InlineData(NpcCommand.RaidBorder, Job.RaidBorder)]
@@ -197,6 +198,12 @@ public class RuntimeNpcBrainTests
             },
             durationTicks: 20,
             dampeningFactor: 1.0);
+        var home = world._people[0].Home;
+        home.SetWeaponLevelClamped(1);
+        home.SetArmorLevelClamped(1);
+        home.UnlockedTechs.Add("weaponry");
+        home.UnlockedTechs.Add("military_training");
+        home.UnlockedTechs.Add("fortification");
 
         var actor = world._people[0];
         actor.Pos = (5, 5);
@@ -225,6 +232,9 @@ public class RuntimeNpcBrainTests
         Assert.True(CapturingBrain.LastContext.Value.NearbyHostilePeople >= 1);
         Assert.True(CapturingBrain.LastContext.Value.BiasGathering > 0.30f);
         Assert.True(CapturingBrain.LastContext.Value.BiasBuilding > 0.15f);
+        Assert.True(CapturingBrain.LastContext.Value.HomeWeaponLevel >= 1);
+        Assert.True(CapturingBrain.LastContext.Value.HomeMilitaryTechCount >= 2);
+        Assert.True(CapturingBrain.LastContext.Value.HomeFortificationTechCount >= 1);
         Assert.True(CapturingBrain.LastContext.Value.ResourceCrowdPressure > 0f);
         Assert.True(CapturingBrain.LastContext.Value.BuildCrowdPressure >= 0f);
         Assert.True(CapturingBrain.LastContext.Value.RetreatCrowdPressure >= 0f);
