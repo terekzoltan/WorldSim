@@ -673,10 +673,11 @@ Purpose:
 - ⬜ **SMR-B1** Artifact bundle contract + output directory layout (`manifest`, runs, summaries, anomalies, logs) (Track B)
 - ⬜ **SMR-B2** Assertion + anomaly engine with explicit exit codes for agent/CI use (Track B)
 - ⬜ **SMR-B3** Baseline comparison + delta threshold policy (Track B)
-- ⬜ **SMR-B4** Unified CLI surface for clustering, balance, and perf evidence modes (Track B)
+- ⬜ **SMR-B4** Unified CLI surface for clustering, balance, and perf evidence modes; SimStats headless infra (Track B)
 - ⬜ **SMR-B5** Lightweight evidence export hooks (event/sample timeline, worst-run drilldown, replay-oriented data without a viewer yet) (Track B)
+- ⬜ **SMR-B6** CI integration — `.github/workflows/balance-smoke.yml` with assert + perf modes, triggered on push/PR to `main` (Track B)
 - ⬜ **SMR-C1** AI/planner anomaly signals exposed to SMR only where runtime counters are insufficient (Track C)
-- ⬜ **SMR-M1** Absorb `Session-Balance-QA-Plan.md` + `Session-Perf-Profiling-Plan.md` expectations into one Combined-plan sequencing/evidence workflow (Meta)
+- ✅ **SMR-M1** Absorb `Session-Balance-QA-Plan.md` + `Session-Perf-Profiling-Plan.md` expectations into one Combined-plan sequencing/evidence workflow (Meta)
 - ⬜ **SMR-M2** Baseline update policy, artifact retention policy, and evidence-review protocol (Meta)
 
 ### Wave 4.5 — Execution Steps
@@ -709,19 +710,100 @@ Purpose:
 | Track B agent | SMR-B4 | SMR-B3 ✅ | One CLI/tool surface for `assert`, `compare`, `perf`, and standard matrix runs |
 | Track B agent | SMR-B5 | SMR-B4 ✅ | Add worst-run drilldown bundles and replay-oriented evidence data; still no graphical lab |
 
-**Step 5 — adoption gate before Wave 5+ complexity**
+**Step 5 — CI hardening + adoption gate before Wave 5+ complexity**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Coordinator / QA session | SMR evidence gate | SMR-B4 ✅ + SMR-B5 ✅ + SMR-C1 ✅ + SMR-M1/M2 ✅ | Before Wave 5 formations/group combat starts, prove SMR can run repeatable evidence sweeps and identify suspicious runs without manual guesswork |
+| Track B agent | SMR-B6 | SMR-B2 ✅ (exit codes must exist first) | CI workflow: `.github/workflows/balance-smoke.yml` — push/PR trigger, assert mode, perf mode optional |
+| Coordinator / QA session | SMR evidence gate | SMR-B4 ✅ + SMR-B5 ✅ + SMR-B6 ✅ + SMR-C1 ✅ + SMR-M1/M2 ✅ | Before Wave 5 formations/group combat starts, prove SMR can run repeatable evidence sweeps and identify suspicious runs without manual guesswork |
 
 ### Wave 4.5 — Design Notes
 
 - `W3.6-B4` is treated as **SMR Phase 0**, not unfinished work. Wave 4.5 hardens that base into a project-level tool.
 - This wave intentionally lands **before** Wave 5 group combat and Wave 6 siege/LLM complexity so that those later systems inherit a stronger debugging and regression workflow.
-- The existing session plans remain relevant source docs, but their key deliverables are consolidated here:
-  - `Docs/Plans/Session-Balance-QA-Plan.md`
-  - `Docs/Plans/Session-Perf-Profiling-Plan.md`
+- The existing session plans are **absorbed/superseded** by Wave 4.5 SMR; their deliverables are fully consolidated here:
+  - `Docs/Plans/Session-Balance-QA-Plan.md` → SMR-B2 (invariant catalog), SMR-B3 (multi-config matrix + baseline comparison), SMR-B6 (CI workflow)
+  - `Docs/Plans/Session-Perf-Profiling-Plan.md` → SMR-B4 (SimStats headless infra + `--perf` mode + perf budget enforcement), SMR-A-infra (RenderStats FPS + SimStats runtime file, out of band for Track A/B)
+
+#### Invariant catalog (from `Session-Balance-QA-Plan.md`) — input to SMR-B2
+
+SMR-B2 must implement and register these invariant IDs in the assertion engine:
+
+| Category | ID | Invariant | Threshold | Phase |
+|----------|----|-----------|-----------|-------|
+| Survival | `SURV-01` | At least 1 colony survives | `livingColonies >= 1` | A |
+| Survival | `SURV-02` | Population does not collapse to zero | `people > 0` | A |
+| Survival | `SURV-03` | No mass starvation (>50% deaths from starvation) | `starvDeaths / totalDeaths < 0.5` | A |
+| Survival | `SURV-04` | Average food per person above subsistence | `avgFpp >= 1.0` | A |
+| Survival | `SURV-05` | Starvation-with-food anomaly is rare | `starvWithFood <= 2` | A |
+| Combat | `COMB-01` | Combat deaths exist (combat is happening) | `combatDeaths > 0` | Phase 0+ |
+| Combat | `COMB-02` | Combat is not annihilating population | `combatDeaths / totalDeaths < 0.7` | Phase 0+ |
+| Combat | `COMB-03` | Combat engagements proportional to population | `engagements > 0` | Phase 0+ |
+| Economy | `ECON-01` | Total food is positive at end of run | `totalFood > 0` | A |
+| Economy | `ECON-02` | No degenerate colony (food=0 && people=0 is expected, not a bug) | informational | A |
+| Scaling | `SCALE-01` | Larger maps produce more colonies | `large.colonies >= small.colonies` | Phase C / SMR-B3 |
+| Scaling | `SCALE-02` | Population scales roughly with initial pop | `people >= initialPop * 0.3` | Phase C / SMR-B3 |
+
+Combat counters required from Track B for `COMB-*` invariants: `TotalCombatDeaths`, `TotalCombatKills`, `TotalCombatEngagements` on `World`. If not yet exposed, assertion engine must gracefully **skip** combat invariants (not fail with a hard error).
+
+#### Perf budget (from `Session-Perf-Profiling-Plan.md`) — input to SMR-B4
+
+| Metric | Green (target) | Yellow (warning) | Red (block) |
+|--------|----------------|------------------|-------------|
+| FPS (384×216, 1080p) | ≥ 60 | 30–59 | < 30 |
+| Sim tick time (avg) | ≤ 4 ms | 4–8 ms | > 8 ms |
+| Snapshot build time | ≤ 2 ms | 2–5 ms | > 5 ms |
+| Render frame time | ≤ 12 ms | 12–16 ms | > 16 ms |
+| Total entity count | ≤ 5 000 | 5 000–10 000 | > 10 000 |
+
+SMR `--perf` mode must report: `avgTickMs`, `maxTickMs`, `p99TickMs`, `peakEntities` per seed (JSON line). Red-zone violations in any mode should produce anomaly warnings, not hard assertion failures (perf regressions are evidence, not blockers by default).
+
+#### SimStats / FPS infra assignment
+
+`Session-Perf-Profiling-Plan.md` Phase A specifies two runtime measurement files not yet implemented:
+
+- **`WorldSim.Runtime/Diagnostics/SimStats.cs`** (new file): `LastTickMs`, `LastSnapshotBuildMs`, `EntityCountSnapshot` — Track B responsibility. Must be exposed via `SimulationRuntime` property, **no** dependency from Runtime → Graphics.
+- **`RenderStats` FPS extension** (`WorldSim.Graphics/Rendering/RenderStats.cs`): rolling 1-second `Fps`, `TotalEntitiesRendered`, 60-frame time history — Track A responsibility, lower priority (deferred until FPS < 60 or explicit perf sprint).
+- **F3 HUD extension** (`WorldSim.Graphics/UI/HudRenderer.cs`): `FPS | Tick Xms | Snap Xms | Render Xms | Entities N` — Track A, same trigger.
+- **ScenarioRunner `--perf` mode** (`WorldSim.ScenarioRunner/Program.cs`): `WORLDSIM_SCENARIO_PERF=true` env var — Track B, part of SMR-B4.
+
+These items are **not** new epics but are callouts within SMR-B4 (Track B) and a pending Track A subtask (low priority, Wave 5+ trigger).
+
+#### CI workflow spec (input to SMR-B6)
+
+File: `.github/workflows/balance-smoke.yml`
+
+```yaml
+name: Balance Smoke
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  balance-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj -c Release
+      - name: Run balance smoke
+        env:
+          WORLDSIM_SCENARIO_SEEDS: "101,202,303,404,505"
+          WORLDSIM_SCENARIO_TICKS: "1200"
+          WORLDSIM_SCENARIO_ASSERT: "true"
+          WORLDSIM_SCENARIO_JSON: "true"
+        run: dotnet run --project WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj -c Release
+```
+
+Prereq: SMR-B2 exit codes must exist before CI is meaningful. SMR-B6 is therefore Step 5, not Step 1.
+
+#### Existing design notes
+
 - `SMR-B1` should standardize a durable artifact layout so OpenCode/LLM sessions can run SMR in isolation and later sessions can re-open the artifacts without ambiguity.
 - `SMR-B2` should separate:
   - hard assertion failures,
