@@ -74,13 +74,13 @@ dotnet run --project WorldSim.ScenarioRunner
 
 # Assert mode — checks survival/economy/combat invariants; exits non-zero on failure
 $env:WORLDSIM_SCENARIO_ASSERT = "true"
-$env:WORLDSIM_SCENARIO_ARTIFACT_DIR = "C:\tmp\smr-run"
+$env:WORLDSIM_SCENARIO_ARTIFACT_DIR = ".\smr-out"
 dotnet run --project WorldSim.ScenarioRunner
 
 # Unified mode surface (standard | assert | compare | perf | all)
 $env:WORLDSIM_SCENARIO_MODE = "all"
 $env:WORLDSIM_SCENARIO_BASELINE_PATH = "Docs\Baselines\balance-baseline.json"
-$env:WORLDSIM_SCENARIO_ARTIFACT_DIR = "C:\tmp\smr-run"
+$env:WORLDSIM_SCENARIO_ARTIFACT_DIR = ".\smr-out"
 dotnet run --project WorldSim.ScenarioRunner
 ```
 
