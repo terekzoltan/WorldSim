@@ -1,0 +1,102 @@
+name: SMR Headless
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smr-headless:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [assert, perf]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build ScenarioRunner
+        run: dotnet build WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj -c Release
+
+      - name: Run SMR headless
+        id: smr
+        shell: bash
+        env:
+          WORLDSIM_SCENARIO_MODE: ${{ matrix.mode }}
+          WORLDSIM_SCENARIO_SEEDS: "101,202,303,404,505"
+          WORLDSIM_SCENARIO_TICKS: "1200"
+          WORLDSIM_SCENARIO_PLANNERS: "simple,goap,htn"
+          WORLDSIM_SCENARIO_OUTPUT: "json"
+          WORLDSIM_SCENARIO_ARTIFACT_DIR: ${{ runner.temp }}/smr-${{ matrix.mode }}-${{ github.run_id }}
+        run: |
+          mkdir -p "$WORLDSIM_SCENARIO_ARTIFACT_DIR"
+          set +e
+          dotnet run --project WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj -c Release
+          EXIT_CODE=$?
+          set -e
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          echo "artifact_dir=$WORLDSIM_SCENARIO_ARTIFACT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Read manifest and compute retention
+        id: manifest
+        if: always()
+        shell: bash
+        run: |
+          MANIFEST_PATH="${{ steps.smr.outputs.artifact_dir }}/manifest.json"
+          if [ -f "$MANIFEST_PATH" ]; then
+            ASSERT_FAILS=$(jq -r '.assertionFailures // 0' "$MANIFEST_PATH")
+            PERF_RED=$(jq -r '.perfRedCount // 0' "$MANIFEST_PATH")
+            EXIT_REASON=$(jq -r '.exitReason // "unknown"' "$MANIFEST_PATH")
+          else
+            ASSERT_FAILS=0
+            PERF_RED=0
+            EXIT_REASON="manifest_missing"
+          fi
+
+          RETENTION=14
+          if [ "${{ steps.smr.outputs.exit_code }}" != "0" ] || [ "$ASSERT_FAILS" != "0" ] || [ "$PERF_RED" != "0" ]; then
+            RETENTION=30
+          fi
+
+          echo "manifest_path=$MANIFEST_PATH" >> "$GITHUB_OUTPUT"
+          echo "assertion_failures=$ASSERT_FAILS" >> "$GITHUB_OUTPUT"
+          echo "perf_red_count=$PERF_RED" >> "$GITHUB_OUTPUT"
+          echo "exit_reason=$EXIT_REASON" >> "$GITHUB_OUTPUT"
+          echo "retention_days=$RETENTION" >> "$GITHUB_OUTPUT"
+
+      - name: Upload SMR artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smr-artifacts-${{ matrix.mode }}-${{ github.run_id }}
+          path: ${{ steps.smr.outputs.artifact_dir }}
+          if-no-files-found: warn
+          retention-days: ${{ steps.manifest.outputs.retention_days }}
+
+      - name: Append step summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## SMR Headless (${{ matrix.mode }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Exit code: \\`${{ steps.smr.outputs.exit_code }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Exit reason: \\`${{ steps.manifest.outputs.exit_reason }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Assertion failures: \\`${{ steps.manifest.outputs.assertion_failures }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Perf red count: \\`${{ steps.manifest.outputs.perf_red_count }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact dir: \\`${{ steps.smr.outputs.artifact_dir }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact retention: \\`${{ steps.manifest.outputs.retention_days }} days\\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail job on SMR gate failure
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.smr.outputs.exit_code }}" != "0" ]; then
+            echo "SMR gate failed for mode=${{ matrix.mode }} with exit=${{ steps.smr.outputs.exit_code }}"
+            exit 1
+          fi

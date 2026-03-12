@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using WorldSim.AI;
 using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
@@ -90,6 +91,9 @@ namespace WorldSim.Simulation
         public int TotalNoProgressBackoffBuild { get; private set; }
         public int TotalNoProgressBackoffFlee { get; private set; }
         public int TotalNoProgressBackoffCombat { get; private set; }
+        public int TotalAiNoPlanDecisions { get; private set; }
+        public int TotalAiReplanBackoffDecisions { get; private set; }
+        public int TotalAiResearchTechDecisions { get; private set; }
         public int DenseNeighborhoodTicks { get; private set; }
         public int LastTickDenseActors { get; private set; }
 
@@ -686,6 +690,17 @@ namespace WorldSim.Simulation
                     TotalNoProgressBackoffCombat++;
                     break;
             }
+        }
+
+        public void ReportAiDecisionSignal(string? replanReason, NpcCommand command)
+        {
+            if (string.Equals(replanReason, "NoPlan", StringComparison.Ordinal))
+                TotalAiNoPlanDecisions++;
+            else if (string.Equals(replanReason, "ReplanBackoff", StringComparison.Ordinal))
+                TotalAiReplanBackoffDecisions++;
+
+            if (command == NpcCommand.ResearchTech)
+                TotalAiResearchTechDecisions++;
         }
         public ColonyDeathStats GetColonyDeathStats(int colonyId)
             => _colonyDeathStats.TryGetValue(colonyId, out var stats)

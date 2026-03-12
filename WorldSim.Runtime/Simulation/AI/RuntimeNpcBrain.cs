@@ -104,6 +104,8 @@ public sealed class RuntimeNpcBrain
             Job: job,
             Trace: trace);
 
+        world.ReportAiDecisionSignal(trace.ReplanReason, command);
+
         return job;
     }
 

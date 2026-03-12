@@ -27,6 +27,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorldSim.RefineryAdapter.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorldSim.Runtime.Tests", "WorldSim.Runtime.Tests\WorldSim.Runtime.Tests.csproj", "{8A43DA72-8D6B-4AE1-959F-E78ED8FCD36D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorldSim.ScenarioRunner", "WorldSim.ScenarioRunner\WorldSim.ScenarioRunner.csproj", "{0D38D918-4749-48FC-9D55-7664457A6B7D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WorldSim.ScenarioRunner.Tests", "WorldSim.ScenarioRunner.Tests\WorldSim.ScenarioRunner.Tests.csproj", "{B9774241-71DC-403F-9417-D419704CBCC7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -181,6 +185,30 @@ Global
 		{8A43DA72-8D6B-4AE1-959F-E78ED8FCD36D}.Release|x64.Build.0 = Release|Any CPU
 		{8A43DA72-8D6B-4AE1-959F-E78ED8FCD36D}.Release|x86.ActiveCfg = Release|Any CPU
 		{8A43DA72-8D6B-4AE1-959F-E78ED8FCD36D}.Release|x86.Build.0 = Release|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Debug|x64.Build.0 = Debug|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Debug|x86.Build.0 = Debug|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Release|x64.ActiveCfg = Release|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Release|x64.Build.0 = Release|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Release|x86.ActiveCfg = Release|Any CPU
+		{0D38D918-4749-48FC-9D55-7664457A6B7D}.Release|x86.Build.0 = Release|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Debug|x64.Build.0 = Debug|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Debug|x86.Build.0 = Debug|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Release|x64.ActiveCfg = Release|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Release|x64.Build.0 = Release|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Release|x86.ActiveCfg = Release|Any CPU
+		{B9774241-71DC-403F-9417-D419704CBCC7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

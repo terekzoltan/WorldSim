@@ -296,6 +296,29 @@ public class RuntimeNpcBrainTests
         Assert.True(CapturingBrain.LastContext.Value.LocalThreatScore > 0f);
     }
 
+    [Fact]
+    public void Think_ReportsPlannerSignals_ToWorldCounters()
+    {
+        var world = new World(16, 16, 10, randomSeed: 123);
+        var actor = world._people[0];
+
+        var noPlanBrain = new SignalBrain(NpcCommand.Idle, "NoPlan");
+        var runtimeBrain = new RuntimeNpcBrain(noPlanBrain);
+        _ = runtimeBrain.Think(actor, world, dt: 1f);
+
+        var replanBackoffBrain = new SignalBrain(NpcCommand.Idle, "ReplanBackoff");
+        runtimeBrain = new RuntimeNpcBrain(replanBackoffBrain);
+        _ = runtimeBrain.Think(actor, world, dt: 1f);
+
+        var researchBrain = new SignalBrain(NpcCommand.ResearchTech, "RuleMatch");
+        runtimeBrain = new RuntimeNpcBrain(researchBrain);
+        _ = runtimeBrain.Think(actor, world, dt: 1f);
+
+        Assert.Equal(1, world.TotalAiNoPlanDecisions);
+        Assert.Equal(1, world.TotalAiReplanBackoffDecisions);
+        Assert.Equal(1, world.TotalAiResearchTechDecisions);
+    }
+
     private sealed class FixedBrain : INpcDecisionBrain
     {
         private readonly NpcCommand _command;
@@ -356,6 +379,33 @@ public class RuntimeNpcBrainTests
         }
 
         throw new DirectoryNotFoundException("Could not locate repository root containing Tech/technologies.json");
+    }
+
+    private sealed class SignalBrain : INpcDecisionBrain
+    {
+        private readonly NpcCommand _command;
+        private readonly string _replanReason;
+
+        public SignalBrain(NpcCommand command, string replanReason)
+        {
+            _command = command;
+            _replanReason = replanReason;
+        }
+
+        public AiDecisionResult Think(in NpcAiContext context)
+        {
+            var trace = new AiDecisionTrace(
+                SelectedGoal: "Signal",
+                PlannerName: "Signal",
+                PolicyName: "Signal",
+                PlanLength: 1,
+                PlanPreview: new[] { _command },
+                PlanCost: 1,
+                ReplanReason: _replanReason,
+                MethodName: "Signal",
+                GoalScores: Array.Empty<GoalScoreEntry>());
+            return new AiDecisionResult(_command, trace);
+        }
     }
 
     private static World GetWorld(SimulationRuntime runtime)
