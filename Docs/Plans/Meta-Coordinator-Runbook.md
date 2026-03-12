@@ -35,6 +35,7 @@
 4. **Elavult hivatkozasok:**
    - Keress `Game1`-re (mar `GameHost`), vagy mas ismert atnevezes.
    - Keress torott plan-fajl hivatkozasokra (glob: `Docs/Plans/*.md`, `WorldSim.*/Docs/Plans/*.md`).
+   - Ellenorizd, hogy a low-cost 2D guiding constraint konzisztensen jelen van-e `AGENTS.md`, a Combined plan, a relevans Track A terv, es a perf/balance session docok kozott.
 5. **Output:** AGENTS.md edit (ha volt valtozas).
 
 ---
@@ -131,6 +132,7 @@ Ha VIOLATION talalhato, uzenofal bejegyzes is kotelezo.
 3. Tartalmi konzisztencia:
    - A plan-ben emlitett fazis/sprint megegyezik az AGENTS.md "Current focus" szekcioval?
    - Vannak-e ellentmondas a plan es az AGENTS.md Track scope kozott?
+   - A showcase-orientalt tervek nem irjak-e felul a low-cost/default baseline project-szintu szabalyat?
 4. **Output:** Konzisztencia report + javitasi javaslatok.
 
 **Ismert plan fajlok (referencia):**
@@ -146,6 +148,7 @@ Ha VIOLATION talalhato, uzenofal bejegyzes is kotelezo.
 - `Docs/Plans/Session-Combat-Coordinator-Plan.md` -- Combat Coordinator session playbook
 - `Docs/Plans/Session-Perf-Profiling-Plan.md` -- Performance Profiling session plan
 - `Docs/Plans/Session-Balance-QA-Plan.md` -- Balance/QA Agent session plan
+- `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` -- Low-cost 2D strategiai referencia + integration prompt pack
 - `Docs/Plans/Track-C-Phase0-Preflight-Checklist.md` -- Track C Phase 0 preflight checklist
 - `Docs/Plans/Track-C-Combat-Masterplan-Readiness-Roadmap.md` -- Track C combat readiness roadmap
 
@@ -307,7 +310,8 @@ a felhasznalo aktivan tudja iranyitani, nem csak kezben tartani.
 6. `sprint-plan` -- closeout + kovetkezo scope (ha relevan)
 7. `risk-update` -- kockazatok
 8. `project-futures` -- strategiai attekintes
-9. `onboarding-snapshot(all)` -- vegleges friss allapot-osszefoglalo
+9. `low-cost-2d-sync` -- low-cost/profile-aware irany konzisztenciaja
+10. `onboarding-snapshot(all)` -- vegleges friss allapot-osszefoglalo
 
 **Output:** Osszesitett riport:
 
@@ -338,7 +342,10 @@ a felhasznalo aktivan tudja iranyitani, nem csak kezben tartani.
 ### 8. Strategic Outlook
 [fo iranyok]
 
-### 9. Current State (Onboarding)
+### 9. Low-Cost 2D Sync
+[guiding constraint / drift / kovetkezo lepes]
+
+### 10. Current State (Onboarding)
 [Track-enkent 2-3 mondat]
 
 ### Osszesitett akcio-lista
@@ -348,7 +355,27 @@ a felhasznalo aktivan tudja iranyitani, nem csak kezben tartani.
 
 ---
 
-## 11. `perf-check`
+## 11. `low-cost-2d-sync`
+
+**Cel:** A low-cost 2D strategia projekt-szintu guiding constraintkent maradjon jelen a docokban es a sequencingben.
+
+**Mikor:** Uj visual/perf terv megjelenesekor, milestone elott, vagy ha a felhasznalo keri.
+
+**Lepesek:**
+
+1. Olvasd be: `AGENTS.md`, `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md`, `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md`.
+2. Ellenorizd, hogy a low-cost/default baseline szabaly megjelenik-e a Track A tervben es a perf/balance session docokban.
+3. Ellenorizd, hogy a Combined planben van-e explicit kesobbi sequencing slot a low-cost baseline munkanak.
+4. Jelold a driftet:
+   - showcase tuldominancia,
+   - profile-nev eltetesek,
+   - perf/balance/session doc elavulas,
+   - boundary-szabalyt serto renderer-logika.
+5. **Output:** rovid sync report + javasolt doc patchlista.
+
+---
+
+## 12. `perf-check`
 
 **Cel:** Performance baseline meres es budget-osszevetes barmelyik sessionbol triggerelhetoen.
 

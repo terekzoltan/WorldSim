@@ -192,6 +192,7 @@ Track D design principles (OnlabRefinery parity):
 - Nagy `Game1` refaktor regressziot okozhat -> kis, lepesenkenti PR-ek.
 - Content path torhet projektmozgasnal -> smoke test minden PR utan.
 - Tulsagosan gyors encapsulation lassithat -> snapshot adapterrel fokozatos atallas.
+- A showcase-orientalt visual polish elnyomhatja az olcso/stabil baseline-t -> profile-aware strategia kell, ahol a default fejlesztoi mod nem a legdragabb latvanyreteg.
 
 ## "Nem kell kulon Track E"
 
@@ -200,6 +201,17 @@ A telemetry/persistence/scenario-runner feladatok nem kulon trackkent kezeltek, 
 - Telemetry: Track A (HUD/debug overlay) + Track B (runtime counters)
 - Persistence: Track B (runtime allapot) + Track D (patch dedupe state)
 - Scenario runner/headless: Track B incremental toolkent, ha CI vagy balansz igenyli
+
+## Low-Cost 2D guiding constraint
+
+Referencia:
+- `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md`
+
+Projekt-szintu alapelv:
+- A WorldSim vizualis es teljesitmeny-strategiaja low-cost, state-driven es profile-aware: a `Runtime` szamolja a visual-driving state-et, a snapshot exportalja, a `Graphics` ezt olcson es determinisztikusan jeleniti meg, a quality/profile layer pedig skalazza.
+- A default fejlesztoi baseline nem a showcase polish, hanem az olcso es stabil futas.
+- A latvanyosabb post-fx / capture / cinematic utak csak raepulhetnek erre az alapra, nem cserelhetik le.
+- A low-cost strategy nem irhatja felul a snapshot boundary-t: a `Graphics` nem szamolhat gameplay/allapot logikat sajat maga.
 
 ## Wave turn-gate protocol (all track agents)
 
@@ -300,3 +312,14 @@ Entries:
 - `[2026-03-10][Track C] Wave4 P2-D status zarva (✅) - AI context equipment/tech mezok, low-equipment threat policy es UnlockMilitaryTech goal/planner wiring bekotve, ResearchTech command runtime fallback CraftTools mappinggal aktiv, AI+runtime+full solution gate zold - kovetkezo lepes: P2-E Track A handoff + Wave4 cross-track smoke`.
 - `[2026-03-10][Track A] Wave4 P2-E status zarva (✅) - advanced defense render 7 kindra bovitve (wood/stone/reinforced/gate/watch/arrow/catapult) + inactive indicator, tower projectile event match bovitve (arrow/catapult) catapult splash markerrel, tech menu military branch header es colony HUD weapon/armor sor bekotve; build+arch test zold - kovetkezo lepes: Wave4 cross-track smoke`.
 - `[2026-03-10][Meta] SMR-M1 status zarva (✅) - Session-Balance-QA-Plan + Session-Perf-Profiling-Plan abszorbalva Combined-plan Wave4.5 szekcioban: invariant katalog (SURV/COMB/ECON/SCALE), perf budget tabla, SimStats/RenderStats infra felelosseg-bontas, CI workflow spec (SMR-B6 uj epic), SMR-B4 perf mode spec beepitve; SMR-B1 Track B agent prompt keszitese kovetkezik`.
+- `[2026-03-10][Track B] Wave4.5 SMR-B1 status zarva (✅) - ScenarioRunner artifact bundle contract bevezetve (`manifest.json`, `runs/*.json`, `summary.json`, `anomalies.json=[]`, `run.log`), `WORLDSIM_SCENARIO_ARTIFACT_DIR` env-guarded additive output es per-run file-safe naming bekotve, uj ScenarioRunner tesztprojekt 5 artifact acceptance teszttel + teljes solution gate zold - kovetkezo lepes: SMR-B2 assertion+anomaly engine es exit-code policy implementalas`.
+- `[2026-03-10][Track B] Wave4.5 SMR-B2 status zarva (✅) - ScenarioRunner assertion+anomaly engine bekotve (SURV/ECON/COMB invariant katalog, combat counter hiany graceful skip), explicit exit-code policy aktiv (`0` ok, `2` assert_fail, `3` config_error, `4` anomaly_gate_fail), artifact bundle bovitve `assertions.json` + valos `anomalies.json` kimenettel es manifest assertion/anomaly summary mezokkel; uj ScenarioRunner tesztek (assert fail, skipped combat invariants, anomaly non-block default, config error exit) + teljes solution gate zold - kovetkezo lepes: SMR-B3 baseline comparison + delta threshold policy implementalas`.
+- `[2026-03-10][Track B] Wave4.5 SMR-B3 status zarva (✅) - baseline compare engine bekotve (`WORLDSIM_SCENARIO_COMPARE` + `WORLDSIM_SCENARIO_BASELINE_PATH`), run-level metric delta + pass->fail regression detektalas + SCALE-01/02 check aktiv, `WORLDSIM_SCENARIO_DELTA_FAIL` policyval threshold breach anomaly-gate failre emelheto; artifact bundle bovitve `compare.json` es manifest compare summary mezokkel, uj ScenarioRunner compare tesztek (baseline missing, delta artifact, regression report, delta-fail exit, scaling checks) + teljes solution gate zold - kovetkezo lepes: SMR-B4 unified CLI surface + perf mode`.
+- `[2026-03-10][Track C] Wave4.5 SMR-C1 implementalas elinditva (AI/planner anomaly signals) - runtime AI decision signal counterek es ScenarioRunner AI anomaly export wiring folyamatban - kovetkezo lepes: runtime+scenario test gate + statuszaras`.
+- `[2026-03-10][Track C] Wave4.5 SMR-C1 status zarva (✅) - SMR-hez AI/planner signal export bekotve (NoPlan, ReplanBackoff, ResearchTech counters), ScenarioRunner run/anomaly artifact mezok bovitve, runtime+scenario+full solution gate zold - kovetkezo lepes: SMR-B3 baseline compare integriacio + evidence gate`.
+- `[2026-03-10][Meta] Low-cost 2D strategy referencia rogzitve - state-driven vizual + profile-aware baseline projekt-szintu guiding constraint lett - kovetkezo lepes: Combined plan Wave 7.5 low-cost baseline sequencing + Track A/B/perf doc alignment`.
+- `[2026-03-10][Meta] SMR-B4 agent prompt elkeszult - Docs/Plans/Master/Wave4.5-SMR-B4-Track-B-Agent-Prompt.md - unified MODE env var (standard/assert/compare/perf/all), perf stopwatch wiring, ANOM-PERF-* anomaliak, perf.json artifact, manifest perf mezok, 7 uj teszt spec - kovetkezo lepes: Track B SMR-B4 implementalas`.
+- `[2026-03-10][Meta] SMR-M2 status zarva (✅) - Docs/Plans/Master/SMR-M2-Evidence-Review-Protocol.md irva: baseline update policy (mikor/hogyan frissiteni, minimum 3 seed + 3 planner), artifact retention policy (local/CI/wave-boundary), evidence-review protocol (7-lepes checklist merge elott, shorthand fast-path graphics PR-ekhez) - Combined-plan SMR-M2 statusz ✅ - kovetkezo lepes: SMR-B4 Track B implementalas, majd SMR evidence gate`.
+- `[2026-03-10][Track B] Wave4.5 SMR-B4 status zarva (✅) - unified MODE surface bekotve (`WORLDSIM_SCENARIO_MODE=standard/assert/compare/perf/all`) OR-semantikaval a legacy env flagok felett, per-tick perf stopwatch metrikak (`PerfAvgTickMs/PerfMaxTickMs/PerfP99TickMs/PerfPeakEntities`) run-level exporttal aktiv, ANOM-PERF-* red-zone anomalia es `WORLDSIM_SCENARIO_PERF_FAIL` gate policy bekotve; artifact bundle bovitve `perf.json` + manifest perf mezokkel (`perfEnabled/perfRunCount/perfRedCount/perfYellowCount`), uj PerfMode tesztek (7 required eset) + teljes solution gate zold - kovetkezo lepes: SMR-B5 lightweight drilldown evidence export`.
+- `[2026-03-10][Track B] Wave4.5 SMR-B5 status zarva (✅) - lightweight drilldown evidence export bekotve (`WORLDSIM_SCENARIO_DRILLDOWN`, `WORLDSIM_SCENARIO_DRILLDOWN_TOP`, `WORLDSIM_SCENARIO_SAMPLE_EVERY`): artifact bundle `drilldown/index.json` + run-szintu `timeline.json`/`events.json`/`replay.json` kimenettel bovult, worst-run deterministic scoring+top-N valasztas es replay-oriented payload aktiv, manifest drilldown mezok (`drilldownEnabled/drilldownSelectedRuns/drilldownTopN/drilldownSampleEvery`) hozzaadva; uj ScenarioRunner drilldown tesztek + teljes solution gate zold - kovetkezo lepes: SMR-B6 CI workflow integracio`.
+- `[2026-03-10][Track B] Wave4.5 SMR-B6 status zarva (✅) - CI workflow bekotve `.github/workflows/smr-headless.yml` alatt: push/PR/workflow_dispatch trigger, assert+perf matrix futas, SMR exit-code gate, artifact upload `smr-artifacts-<mode>-<run_id>` naminggel, retention policy M2 szerint (alap 14 nap, assert/perf red/non-zero eseten 30 nap), manifest summary GitHub step summary-be exportalva - kovetkezo lepes: SMR evidence gate (B4+B5+B6+C1+M1/M2)`.

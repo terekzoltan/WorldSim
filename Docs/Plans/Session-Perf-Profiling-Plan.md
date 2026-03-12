@@ -8,7 +8,14 @@
 > that any session can invoke for perf checks.
 
 Status: Planned (trigger: Combat Phase 3, or earlier if FPS < 60)
-Last updated: 2026-02-26
+Last updated: 2026-03-10
+
+> Wave 4.5 now owns the headless SMR/perf infrastructure track. This session remains relevant, but its focus shifts toward
+> profile-aware in-app validation, render-side telemetry, and low-cost visual regression checks on top of the shared SMR evidence path.
+>
+> **Naming note:** `Showcase` / `DevLite` / `Headless` are the intended project-wide profile labels. The full runtime/profile
+> plumbing is sequenced later (Wave 7.5), so this document uses them as target QA/perf lanes, not as a claim that every toggle
+> already exists in the live app today.
 
 ---
 
@@ -56,7 +63,7 @@ Last updated: 2026-02-26
 | Viewport culling | MISSING | All render passes iterate full snapshot |
 | Snapshot builder optimization | MISSING | Uses LINQ `.Select().ToList()` chains |
 | Performance benchmarks (BenchmarkDotNet etc.) | MISSING | -- |
-| ScenarioRunner perf mode | MISSING | -- |
+| ScenarioRunner perf mode | EXISTS / expanding in Wave 4.5 | `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` -> `SMR-B4` |
 
 ---
 
@@ -148,17 +155,35 @@ When `WORLDSIM_SCENARIO_PERF=true`:
 
 ---
 
-## 4. Performance budget
+## 4. Profile-aware performance budget
+
+### Showcase
 
 | Metric | Target (green) | Warning (yellow) | Red line |
 |---|---|---|---|
-| FPS (384x216, 1080p, fullscreen) | >= 60 | 30-59 | < 30 |
+| FPS (1080p fullscreen) | >= 60 | 30-59 | < 30 |
+| Render frame time | <= 12ms | 12-16ms | > 16ms |
+| Snapshot build time | <= 2ms | 2-5ms | > 5ms |
+
+### DevLite
+
+| Metric | Target (green) | Warning (yellow) | Red line |
+|---|---|---|---|
+| Stable frame rate | >= 30 | 20-29 | < 20 |
 | Sim tick time (avg) | <= 4ms | 4-8ms | > 8ms |
 | Snapshot build time | <= 2ms | 2-5ms | > 5ms |
-| Render frame time | <= 12ms | 12-16ms | > 16ms |
-| Total entity count | <= 5000 | 5000-10000 | > 10000 |
+| Visible entities / draw pressure | within preset budget | elevated but stable | runaway growth / hitching |
 
-These budgets should be revisited at each combat phase boundary.
+### Headless
+
+| Metric | Target (green) | Warning (yellow) | Red line |
+|---|---|---|---|
+| Sim tick time (avg) | <= 4ms | 4-8ms | > 8ms |
+| Sim tick p99 | <= 8ms | 8-12ms | > 12ms |
+| Peak entities | <= 5000 | 5000-10000 | > 10000 |
+| Scenario throughput | stable across same seed matrix | moderate drift | severe regression |
+
+These budgets should be revisited at each combat phase boundary, with the default developer baseline judged against `DevLite`, not `Showcase`.
 
 ---
 
@@ -173,7 +198,8 @@ These budgets should be revisited at each combat phase boundary.
       - 384x216 (large)
    b. Record per preset: FPS, render frame ms, sim tick ms, entity counts
    c. Run ScenarioRunner --perf for headless baseline (1200 ticks, 5 seeds)
-   d. Document in a "Perf Baseline" table (append to this plan or a separate report)
+   d. Compare the same seed/config in `Showcase` vs `DevLite` where visual profile differences matter
+   e. Document in a "Perf Baseline" table (append to this plan or a separate report)
 
 2. IDENTIFY BOTTLENECKS
    a. Which render pass is slowest? (RenderStats per-pass breakdown via F3)
@@ -182,10 +208,11 @@ These budgets should be revisited at each combat phase boundary.
    d. Is the bottleneck CPU-bound (sim/snapshot) or GPU/draw-bound (render passes)?
 
 3. TARGET OPTIMIZATION
-   a. Pick the highest-impact optimization from Phase B list
-   b. Implement
-   c. Re-measure on same presets
-   d. Record delta: "B1 viewport culling: 384x216 FPS 28 -> 55 (+96%)"
+    a. Pick the highest-impact optimization from Phase B list
+    b. Implement
+    c. Re-measure on same presets
+    d. Record delta: "B1 viewport culling: 384x216 FPS 28 -> 55 (+96%)"
+    e. Verify that optional polish does not silently become the default profile cost
 
 4. REPORT
    a. Write uzenofal entry with key findings
@@ -211,10 +238,10 @@ These budgets should be revisited at each combat phase boundary.
 | Session | Relationship |
 |---------|-------------|
 | **Combat Coordinator** | Triggers this session at Phase 3 or on FPS drop. Receives perf reports. |
-| **Balance/QA Agent** | Shares ScenarioRunner `--perf` infrastructure. Can run perf tests as part of balance smoke. |
+| **Balance/QA Agent** | Shares ScenarioRunner `--perf` infrastructure. Can run perf tests as part of balance/profile regression checks. |
 | **Meta Coordinator** | Receives summary at phase boundaries. Updates risk registry if perf budget violated. |
-| **Track A sessions** | Viewport culling and render pass optimization are Track A implementation work. |
-| **Track B sessions** | SimStats, snapshot builder optimization, sim tick profiling are Track B implementation work. |
+| **Track A sessions** | Viewport culling, profile gating, and render-side low-cost baseline checks are Track A implementation work. |
+| **Track B sessions** | SimStats, snapshot builder optimization, sim tick profiling, and headless SMR perf support are Track B implementation work. |
 
 ---
 

@@ -8,6 +8,11 @@ Scope: visuals + UX polish without changing core gameplay rules
 
 This is a portfolio-first, passion project direction. The target is a strong visual identity and a "wow" first impression, while keeping architecture clean and demo-ready.
 
+Low-cost alignment rule:
+
+- The default development/render baseline must stay cheap and stable (`DevLite`), while showcase/cinematic polish remains additive and explicit.
+- Graphics stays snapshot-driven; visual richness should come from state-driven rendering and quality-gated layers, not renderer-side gameplay logic.
+
 Phase 1 North Star:
 
 - Fullscreen and windowed both feel correct (no dead gray space, proper camera fit).
@@ -117,6 +122,7 @@ Implementation tasks:
 - Add occasional ore glint and food-node pulse.
 - Add specialized-building micro-activity effects.
 - Add season-sensitive color modulation.
+- Prefer CPU-side tint/palette/noise variation as the baseline path; shader-heavier variants remain optional.
 
 ### S2-C Atmosphere and weather layer
 
@@ -129,6 +135,7 @@ Implementation tasks:
 - Add drought visual mode (haze/tint shift).
 - Add event-driven visual cues (season switch pulse, threat pulse).
 - Bind overlay intensity to snapshot state (or deterministic fallback).
+- Keep every atmosphere element quality-gated so `DevLite` remains the default safe profile.
 
 ### S2-D Camera feel package
 
@@ -208,7 +215,7 @@ Large task:
 
 Implementation tasks:
 - Add quick settings overlay (theme, postfx, HUD scale, weather).
-- Add quality profiles Low/Medium/High.
+- Add operational profiles `Showcase` / `DevLite` / `Headless` visibility, with effect-quality subsettings where needed.
 - Add input hint strip for key controls.
 - Add high-contrast accessibility HUD theme.
 - Fix clipping/overflow and font fallback edge cases.
@@ -259,6 +266,14 @@ These are not separate sprints, but should be completed during Phase 1:
   - app host must not contain heavy draw logic
 - Add smoke checklist doc: `WorldSim.Runtime/Docs/Plans/Phase1-SmokeChecklist.md`.
 
+## Profile policy
+
+- `DevLite` is the default development baseline.
+- `Showcase` is explicit capture/demo mode, not the everyday default.
+- `Headless` remains the no-render / SMR-compatible mode and should not be blocked by visual feature assumptions.
+- Bloom, grain, particles, haze-heavy layers, and other polish passes must be quality-gated.
+- Viewport culling is baseline low-cost infrastructure, not optional late polish.
+
 ## Risk management
 
 - If FPS drops during Sprint 2, postpone bloom/grain to late Sprint 3 or optional profile.
@@ -290,3 +305,4 @@ These are not separate sprints, but should be completed during Phase 1:
 
 - This plan is Track A specific and intentionally overbuilt for visual impact.
 - Phase 2+ roadmap remains active but parked while Phase 1 executes.
+- Later low-cost baseline consolidation is sequenced in `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` Wave 7.5; this Phase 1 plan should stay compatible with that future baseline.

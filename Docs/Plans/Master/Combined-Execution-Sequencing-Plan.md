@@ -39,6 +39,13 @@ Turn-gate legend (agent handoff safety):
 - Combat sprints have internal ordering: **Track B first -> Track C + Track A after** (B owns snapshot, others consume it).
 - Director sprints are often Track D only (especially Phases 2-3, which are Java-side).
 
+### Global guiding constraint
+
+- Reference: `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md`
+- Default implementation choices must preserve a low-cost, snapshot-driven, profile-aware baseline.
+- Showcase/cinematic visual work is valid, but must remain additive on top of the cheap/stable default path.
+- Graphics consumes visual-driving state from snapshot/read-model boundaries; renderer-side gameplay-state recomputation is not an accepted shortcut.
+
 ### Merge Risk Zones
 
 | Zone | Wave | Risk | Mitigation |
@@ -670,15 +677,15 @@ Purpose:
 
 ### Sprint X4.5: Scenario Matrix Runner Hardening (Track B + C + Meta)
 
-- ⬜ **SMR-B1** Artifact bundle contract + output directory layout (`manifest`, runs, summaries, anomalies, logs) (Track B)
-- ⬜ **SMR-B2** Assertion + anomaly engine with explicit exit codes for agent/CI use (Track B)
-- ⬜ **SMR-B3** Baseline comparison + delta threshold policy (Track B)
-- ⬜ **SMR-B4** Unified CLI surface for clustering, balance, and perf evidence modes; SimStats headless infra (Track B)
-- ⬜ **SMR-B5** Lightweight evidence export hooks (event/sample timeline, worst-run drilldown, replay-oriented data without a viewer yet) (Track B)
-- ⬜ **SMR-B6** CI integration — `.github/workflows/balance-smoke.yml` with assert + perf modes, triggered on push/PR to `main` (Track B)
-- ⬜ **SMR-C1** AI/planner anomaly signals exposed to SMR only where runtime counters are insufficient (Track C)
+- ✅ **SMR-B1** Artifact bundle contract + output directory layout (`manifest`, runs, summaries, anomalies, logs) (Track B)
+- ✅ **SMR-B2** Assertion + anomaly engine with explicit exit codes for agent/CI use (Track B)
+- ✅ **SMR-B3** Baseline comparison + delta threshold policy (Track B)
+- ✅ **SMR-B4** Unified CLI surface for clustering, balance, and perf evidence modes; SimStats headless infra (Track B)
+- ✅ **SMR-B5** Lightweight evidence export hooks (event/sample timeline, worst-run drilldown, replay-oriented data without a viewer yet) (Track B)
+- ✅ **SMR-B6** CI integration — `.github/workflows/smr-headless.yml` with assert + perf modes, triggered on push/PR to `main` (Track B)
+- ✅ **SMR-C1** AI/planner anomaly signals exposed to SMR only where runtime counters are insufficient (Track C)
 - ✅ **SMR-M1** Absorb `Session-Balance-QA-Plan.md` + `Session-Perf-Profiling-Plan.md` expectations into one Combined-plan sequencing/evidence workflow (Meta)
-- ⬜ **SMR-M2** Baseline update policy, artifact retention policy, and evidence-review protocol (Meta)
+- ✅ **SMR-M2** Baseline update policy, artifact retention policy, and evidence-review protocol (Meta)
 
 ### Wave 4.5 — Execution Steps
 
@@ -700,7 +707,7 @@ Purpose:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | SMR-B3 | SMR-B2 ✅ | Baseline deltas and regression thresholds build directly on assertion/anomaly output |
+| Track B agent | SMR-B3 | SMR-B2 ✅ | Baseline deltas and regression thresholds build directly on assertion/anomaly output; interim compare path is acceptable before the final unified CLI lands |
 | Meta coordinator | SMR-M2 | SMR-B3 🔄 or ✅ | Define when baselines are updated, how artifacts are kept, and how evidence is reviewed |
 
 **Step 4 — unify the tool surface and export drilldown evidence**
@@ -714,7 +721,7 @@ Purpose:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | SMR-B6 | SMR-B2 ✅ (exit codes must exist first) | CI workflow: `.github/workflows/balance-smoke.yml` — push/PR trigger, assert mode, perf mode optional |
+| Track B agent | SMR-B6 | SMR-B2 ✅ (exit codes must exist first) | CI workflow: `.github/workflows/smr-headless.yml` — push/PR trigger, assert mode, perf mode optional |
 | Coordinator / QA session | SMR evidence gate | SMR-B4 ✅ + SMR-B5 ✅ + SMR-B6 ✅ + SMR-C1 ✅ + SMR-M1/M2 ✅ | Before Wave 5 formations/group combat starts, prove SMR can run repeatable evidence sweeps and identify suspicious runs without manual guesswork |
 
 ### Wave 4.5 — Design Notes
@@ -723,7 +730,7 @@ Purpose:
 - This wave intentionally lands **before** Wave 5 group combat and Wave 6 siege/LLM complexity so that those later systems inherit a stronger debugging and regression workflow.
 - The existing session plans are **absorbed/superseded** by Wave 4.5 SMR; their deliverables are fully consolidated here:
   - `Docs/Plans/Session-Balance-QA-Plan.md` → SMR-B2 (invariant catalog), SMR-B3 (multi-config matrix + baseline comparison), SMR-B6 (CI workflow)
-  - `Docs/Plans/Session-Perf-Profiling-Plan.md` → SMR-B4 (SimStats headless infra + `--perf` mode + perf budget enforcement), SMR-A-infra (RenderStats FPS + SimStats runtime file, out of band for Track A/B)
+- `Docs/Plans/Session-Perf-Profiling-Plan.md` → SMR-B4 (SimStats headless infra + `--perf` mode + headless perf budgets), SMR-A-infra (RenderStats FPS + render-frame HUD, explicitly deferred beyond Wave 4.5)
 
 #### Invariant catalog (from `Session-Balance-QA-Plan.md`) — input to SMR-B2
 
@@ -746,35 +753,36 @@ SMR-B2 must implement and register these invariant IDs in the assertion engine:
 
 Combat counters required from Track B for `COMB-*` invariants: `TotalCombatDeaths`, `TotalCombatKills`, `TotalCombatEngagements` on `World`. If not yet exposed, assertion engine must gracefully **skip** combat invariants (not fail with a hard error).
 
-#### Perf budget (from `Session-Perf-Profiling-Plan.md`) — input to SMR-B4
+#### Headless perf budget (from `Session-Perf-Profiling-Plan.md`) — input to SMR-B4
 
 | Metric | Green (target) | Yellow (warning) | Red (block) |
 |--------|----------------|------------------|-------------|
-| FPS (384×216, 1080p) | ≥ 60 | 30–59 | < 30 |
 | Sim tick time (avg) | ≤ 4 ms | 4–8 ms | > 8 ms |
+| Sim tick p99 | ≤ 8 ms | 8–12 ms | > 12 ms |
 | Snapshot build time | ≤ 2 ms | 2–5 ms | > 5 ms |
-| Render frame time | ≤ 12 ms | 12–16 ms | > 16 ms |
-| Total entity count | ≤ 5 000 | 5 000–10 000 | > 10 000 |
+| Peak entity count | ≤ 5 000 | 5 000–10 000 | > 10 000 |
 
 SMR `--perf` mode must report: `avgTickMs`, `maxTickMs`, `p99TickMs`, `peakEntities` per seed (JSON line). Red-zone violations in any mode should produce anomaly warnings, not hard assertion failures (perf regressions are evidence, not blockers by default).
+
+Render/FPS perf remains a later Track A concern and is intentionally not part of the Wave 4.5 headless acceptance gate.
 
 #### SimStats / FPS infra assignment
 
 `Session-Perf-Profiling-Plan.md` Phase A specifies two runtime measurement files not yet implemented:
 
 - **`WorldSim.Runtime/Diagnostics/SimStats.cs`** (new file): `LastTickMs`, `LastSnapshotBuildMs`, `EntityCountSnapshot` — Track B responsibility. Must be exposed via `SimulationRuntime` property, **no** dependency from Runtime → Graphics.
-- **`RenderStats` FPS extension** (`WorldSim.Graphics/Rendering/RenderStats.cs`): rolling 1-second `Fps`, `TotalEntitiesRendered`, 60-frame time history — Track A responsibility, lower priority (deferred until FPS < 60 or explicit perf sprint).
-- **F3 HUD extension** (`WorldSim.Graphics/UI/HudRenderer.cs`): `FPS | Tick Xms | Snap Xms | Render Xms | Entities N` — Track A, same trigger.
+- **`RenderStats` FPS extension** (`WorldSim.Graphics/Rendering/RenderStats.cs`): rolling 1-second `Fps`, `TotalEntitiesRendered`, 60-frame time history — Track A responsibility, lower priority, outside Wave 4.5 headless DoD.
+- **F3 HUD extension** (`WorldSim.Graphics/UI/HudRenderer.cs`): `FPS | Tick Xms | Snap Xms | Render Xms | Entities N` — Track A, same later trigger.
 - **ScenarioRunner `--perf` mode** (`WorldSim.ScenarioRunner/Program.cs`): `WORLDSIM_SCENARIO_PERF=true` env var — Track B, part of SMR-B4.
 
 These items are **not** new epics but are callouts within SMR-B4 (Track B) and a pending Track A subtask (low priority, Wave 5+ trigger).
 
 #### CI workflow spec (input to SMR-B6)
 
-File: `.github/workflows/balance-smoke.yml`
+File: `.github/workflows/smr-headless.yml`
 
 ```yaml
-name: Balance Smoke
+name: SMR Headless
 on:
   push:
     branches: [main]
@@ -783,20 +791,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  balance-smoke:
+  smr-headless:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [assert, perf]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
       - run: dotnet build WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj -c Release
-      - name: Run balance smoke
+      - name: Run SMR headless gate
         env:
+          WORLDSIM_SCENARIO_MODE: ${{ matrix.mode }}
           WORLDSIM_SCENARIO_SEEDS: "101,202,303,404,505"
           WORLDSIM_SCENARIO_TICKS: "1200"
-          WORLDSIM_SCENARIO_ASSERT: "true"
-          WORLDSIM_SCENARIO_JSON: "true"
+          WORLDSIM_SCENARIO_PLANNERS: "simple,goap,htn"
+          WORLDSIM_SCENARIO_OUTPUT: "json"
+          WORLDSIM_SCENARIO_ARTIFACT_DIR: ${{ runner.temp }}/smr-${{ matrix.mode }}-${{ github.run_id }}
         run: dotnet run --project WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj -c Release
 ```
 
@@ -983,6 +997,58 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 
 ---
 
+## Wave 7.5 — Low-Cost Visual Systems Baseline
+
+Purpose:
+- Convert the low-cost 2D strategy into an explicit execution wave after Director completion and before supply/campaign expansion.
+- Lock the default runtime/render path to a cheap, profile-aware baseline so later campaign growth does not silently assume showcase-only costs.
+- Keep visual polish, post-fx, and cinematic capture additive on top of the baseline instead of redefining it.
+
+### Sprint LC1: Profiles + Visual Driver Boundary (Track B -> A -> C)
+
+- ⬜ **LC1-B1** Snapshot visual-driver field audit + minimal additive export set for state-driven rendering (Track B)
+- ⬜ **LC1-B2** Runtime/profile plumbing for `Showcase`, `DevLite`, and `Headless` defaults (Track B)
+- ⬜ **LC1-A1** Terrain state-driven variation baseline -- palette/tint/noise/culling-friendly rendering (Track A)
+- ⬜ **LC1-A2** Atmosphere + ambient-life baseline under explicit quality gates (Track A)
+- ⬜ **LC1-A3** Settings/HUD/profile visibility + low-cost regression smoke checklist updates (Track A)
+- ⬜ **LC1-C1** AI/planner telemetry + profile-compatibility audit for headless/devlite determinism (Track C, additive only)
+
+### Wave 7.5 — Execution Steps
+
+**Step 1 — Track B sets the baseline contract first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | LC1-B1, LC1-B2 | Wave 7 ✅ | B1 first, then B2; define the visual-driver boundary and operational profiles before Track A layers on top |
+
+**Step 2 — Track A consumes the stable boundary**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | LC1-A1 | LC1-B1 ✅ | Terrain/state-driven variation can start once the snapshot driver contract is stable |
+| Track A agent | LC1-A2, LC1-A3 | LC1-B2 ✅ + LC1-A1 ✅ | Atmosphere/profile UI follows the agreed low-cost/default profile wiring |
+
+**Step 3 — Optional Track C compatibility closeout**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | LC1-C1 | LC1-B2 ✅ | Only additive telemetry/guardrails; no renderer scope or profile-owned game logic |
+
+Acceptance notes:
+- `DevLite` becomes the default development baseline; `Showcase` is explicit/opt-in and `Headless` remains available for SMR and batch runs.
+- New visual work remains snapshot-driven; Graphics does not compute gameplay-state stand-ins.
+- Viewport culling, cheap terrain variation, and quality-gated atmosphere are baseline concerns, not optional late polish.
+- Later combat/campaign waves consume the low-cost baseline instead of redefining the default rendering cost profile.
+
+Proof targets:
+- Runtime/snapshot docs and tests for the chosen visual-driver fields.
+- Track A smoke checks covering `Showcase`, `DevLite`, and `Headless` profile behavior.
+- Perf/QA evidence showing the default path stays cheap enough for multi-instance/dev workflows.
+
+**Parallelism:** `LC1-B1 -> LC1-B2` is the critical path. `LC1-A1` opens after `LC1-B1`, `LC1-A2/A3` after `LC1-B2`, and `LC1-C1` is optional/additive after the profile contract is stable.
+
+---
+
 ## Wave 8 — Supply & Inventory (Combat Phase 5a)
 
 ### Sprint C8: Personal Inventory + Storage (Track B -> C -> A)
@@ -1065,11 +1131,12 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 | 5 | D5 (Phase 2 S5) | C5 (Phase 3 S5) | Fully parallel |
 | 6 | D6 (Phase 3 S6) | C6 (Phase 3 S6) | MR-2: tick loop caution |
 | 7 | D7 (Phase 3 S7) | C7 (Phase 4 S7) | MR-3: sequential |
+| 7.5 | — | LC1 (Low-Cost baseline) | Track B -> A -> optional C |
 | 8 | — | C8 (Phase 5 S8) | N/A |
 | 9 | — | C9-C10 (Phase 5-6 S9-10) | Sequential |
 | 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential |
 
-**Totals:** 10 waves, 19 sprints (7 Director + 13 Combat), ~82 epics.
+**Totals:** 11 waves, 20 sprints (7 Director + 14 Combat/closeout), ~88 epics.
 
 ---
 
@@ -1080,6 +1147,7 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 | Track A Sprint 3 complete + Phase 0 green-lit | Combat Coordinator | `Docs/Plans/Session-Combat-Coordinator-Plan.md` |
 | FPS < 60 or Combat Phase 3 reached | Performance Profiling | `Docs/Plans/Session-Perf-Profiling-Plan.md` |
 | Combat Phase 0 end or balance regressions | Balance/QA Agent | `Docs/Plans/Session-Balance-QA-Plan.md` |
+| Wave 7 complete | Low-Cost 2D alignment / Wave 7.5 kickoff | `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` |
 
 ---
 

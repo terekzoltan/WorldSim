@@ -1,26 +1,28 @@
 # Session: Balance & QA Agent
 
-> Operational plan for a dedicated session that extends the ScenarioRunner into a balance
-> regression gate -- asserting game invariants headlessly, comparing multi-config runs, and
-> (eventually) running as a GitHub Actions CI workflow.
+> Operational plan for balance/profile QA using the Scenario Matrix Runner / SMR evidence path:
+> asserting invariants headlessly, comparing multi-config runs, and evaluating regressions across
+> `Showcase`, `DevLite`, and `Headless` policy lanes.
 >
-> **This session does not create a new project.** It extends `WorldSim.ScenarioRunner` (49 lines today)
-> with assertion mode, combat counters, exit codes, and structured output.
+> **Wave 4.5 owns the core SMR implementation track.** This session now acts as the QA policy layer:
+> it consumes the shared artifact/anomaly/baseline infrastructure instead of planning a separate runner rewrite.
+>
+> **Naming note:** `Showcase` / `DevLite` / `Headless` are the project-wide profile labels, but full runtime/profile
+> plumbing is sequenced later (Wave 7.5). In this doc they are primarily QA/evidence buckets, not a claim that every
+> profile toggle already exists in the live app.
 
 Status: Planned (trigger: Combat Phase 0 end, or earlier if balance regressions appear)
-Last updated: 2026-02-26
+Last updated: 2026-03-10
 
 ---
 
 ## CI REMINDER
 
-> **A GitHub Actions workflow does not yet exist.**
-> Until `.github/workflows/balance-smoke.yml` is created, all balance tests are manual
+> **The GitHub Actions workflow now exists in the workspace** at `.github/workflows/smr-headless.yml`.
+> Until it is adopted and validated in the mainline branch, manual session runs remain the fallback
 > (run ScenarioRunner by hand within a session).
 >
-> Creating the CI workflow is a deliverable of this session's Phase B.
-> Proposed file: `.github/workflows/balance-smoke.yml`
-> Trigger: push to `main`, PR to `main`, manual dispatch.
+> Wave 4.5 Phase B still owns the rollout/verification of that workflow.
 
 ---
 
@@ -35,38 +37,39 @@ Last updated: 2026-02-26
 
 ---
 
-## 2. Current ScenarioRunner state (baseline)
+## 2. Current SMR / ScenarioRunner state (baseline)
 
-File: `WorldSim.ScenarioRunner/Program.cs` (49 lines)
+Primary file: `WorldSim.ScenarioRunner/Program.cs`
 
 | Capability | Status |
 |---|---|
 | Headless multi-seed run | EXISTS |
 | Configurable seeds/ticks/dt via env vars | EXISTS |
 | Reports: livingColonies, people, food, avgFpp, death counters | EXISTS |
-| Combat death counters (`TotalCombatDeaths`, `TotalCombatKills`) | MISSING |
-| Assertion mode (exit code 1 on invariant violation) | MISSING |
-| Structured JSON output for machine parsing | MISSING |
-| Multi-config matrix (vary map size, pop, feature flags) | MISSING |
-| Perf timing (`--perf` mode) | MISSING (see Session-Perf-Profiling-Plan.md) |
-| CI integration (GitHub Actions) | MISSING |
+| Structured JSON output for machine parsing | EXISTS |
+| Multi-config matrix (vary map size, pop, feature flags) | EXISTS |
+| Planner matrix (`Simple` / `Goap` / `Htn`) | EXISTS |
+| Artifact bundle output | EXISTS (Wave 4.5 SMR-B1) |
+| Assertion + anomaly engine | EXISTS (Wave 4.5 SMR-B2) |
+| Baseline comparison | EXISTS / expanding (Wave 4.5 SMR-B3) |
+| Perf timing (`--perf` mode) | EXISTS / expanding via Wave 4.5 (see Session-Perf-Profiling-Plan.md) |
+| CI integration (GitHub Actions) | EXISTS in workspace; rollout/verification owned by Wave 4.5 SMR-B6 |
 
 ---
 
-## 3. Implementation phases
+## 3. Operational focus areas
 
-### Phase A -- Assert mode (core deliverable)
+### Phase A -- Invariant policy and result interpretation
 
-**A1. Assertion framework in ScenarioRunner**
+**A1. Assertion policy**
 
-Add to `Program.cs`:
-- Env var `WORLDSIM_SCENARIO_ASSERT=true` enables assertion mode
-- After each seed run, evaluate invariants (see section 4)
-- If any invariant fails: print `FAIL: [invariant name] [details]`, set exit code = 1
-- If all pass: print `PASS`, exit code = 0
-- Exit code is critical for CI integration
+Use the SMR assertion/anomaly outputs as the primary balance evidence source.
 
-**A2. Combat counters**
+- Keep invariant IDs and thresholds in sync with the shared SMR catalog.
+- Distinguish hard balance failures from non-blocking anomaly warnings.
+- Report failures using artifact outputs first; terminal summaries are secondary.
+
+**A2. Combat counter policy**
 
 Requires Track B to expose these on `World`:
 - `TotalCombatDeaths` (people killed in combat)
@@ -76,33 +79,21 @@ Requires Track B to expose these on `World`:
 Until Track B exposes them, the assertion framework should gracefully skip combat invariants
 (check via reflection or a version flag).
 
-**A3. Structured JSON output**
+**A3. Artifact consumption**
 
-When `WORLDSIM_SCENARIO_JSON=true`, output one JSON line per seed:
-```json
-{
-  "seed": 101,
-  "ticks": 1200,
-  "livingColonies": 3,
-  "people": 18,
-  "food": 245.5,
-  "avgFpp": 13.6,
-  "deaths": {"age": 2, "starvation": 1, "predator": 3, "combat": 0, "other": 0},
-  "combatEngagements": 0,
-  "assertions": {"total": 8, "passed": 8, "failed": 0, "skipped": 0},
-  "result": "PASS"
-}
-```
-Final line: summary JSON with overall pass/fail and aggregated stats.
+Prefer SMR artifact bundles / structured output over ad hoc terminal parsing.
+
+- `summary.json` / `assertions.json` / `anomalies.json` should be the default review inputs when available.
+- Same-seed comparisons matter more than anecdotal one-off manual impressions.
 
 ### Phase B -- CI integration
 
 **B1. GitHub Actions workflow**
 
-File: `.github/workflows/balance-smoke.yml`
+File: `.github/workflows/smr-headless.yml`
 
 ```yaml
-name: Balance Smoke
+name: SMR Headless
 on:
   push:
     branches: [main]
@@ -111,20 +102,26 @@ on:
   workflow_dispatch:
 
 jobs:
-  balance-smoke:
+  smr-headless:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [assert, perf]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
       - run: dotnet build WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj -c Release
-      - name: Run balance smoke
+      - name: Run SMR headless gate
         env:
+          WORLDSIM_SCENARIO_MODE: ${{ matrix.mode }}
           WORLDSIM_SCENARIO_SEEDS: "101,202,303,404,505"
           WORLDSIM_SCENARIO_TICKS: "1200"
-          WORLDSIM_SCENARIO_ASSERT: "true"
-          WORLDSIM_SCENARIO_JSON: "true"
+          WORLDSIM_SCENARIO_PLANNERS: "simple,goap,htn"
+          WORLDSIM_SCENARIO_OUTPUT: "json"
+          WORLDSIM_SCENARIO_ARTIFACT_DIR: ${{ runner.temp }}/smr-${{ matrix.mode }}-${{ github.run_id }}
         run: dotnet run --project WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj -c Release
 ```
 
@@ -132,14 +129,21 @@ jobs:
 
 Add balance smoke status badge to project README once CI is green.
 
-### Phase C -- Multi-config matrix
+### Phase C -- Profile-aware QA matrix
 
-**C1. Config matrix runner**
+**C1. Profile-aware matrix**
 
-Extend ScenarioRunner to accept multiple configurations in a single run:
-- Env var `WORLDSIM_SCENARIO_CONFIGS` pointing to a JSON file with an array of configs
-- Each config specifies: map size, initial pop, feature flags, seeds, ticks
-- Produces a comparison table across configs
+Use the shared SMR matrix to separate three regression classes:
+
+- **Sim/balance regression** -- colony survival, food, deaths, combat invariants.
+- **Perf regression** -- tick cost / throughput / density drift.
+- **Profile regression** -- `DevLite` or `Headless` expectations broken by changes that only make sense in `Showcase`.
+
+Recommended QA lanes:
+
+- `Showcase` -- visual/manual smoke lane.
+- `DevLite` -- default developer regression lane.
+- `Headless` -- evidence/balance/perf lane via SMR artifacts.
 
 Example config file (`balance-configs.json`):
 ```json
@@ -202,15 +206,16 @@ These invariants are evaluated per-seed after the run completes:
 
 ```
 1. PRE-CHECK
-   a. Verify ScenarioRunner builds: dotnet build WorldSim.ScenarioRunner
-   b. Check which assertion phases are available (Phase A core always, combat if counters exist)
-   c. Read current baseline (if exists)
+    a. Verify ScenarioRunner builds: dotnet build WorldSim.ScenarioRunner
+    b. Check which assertion phases are available (Phase A core always, combat if counters exist)
+    c. Read current baseline (if exists)
+    d. Decide which lane is under review: `Showcase`, `DevLite`, or `Headless`
 
 2. RUN ASSERTIONS
-   a. Run ScenarioRunner with ASSERT=true, JSON=true
-   b. Parse JSON output
-   c. Report: total assertions, passed, failed, skipped
-   d. If any FAIL: investigate the specific invariant
+    a. Run SMR in assertion/anomaly mode for the target matrix
+    b. Parse artifact output / structured JSON
+    c. Report: total assertions, passed, failed, skipped
+    d. If any FAIL: investigate the specific invariant
 
 3. COMPARE TO BASELINE (if baseline exists)
    a. Load baseline JSON
@@ -219,11 +224,12 @@ These invariants are evaluated per-seed after the run completes:
    d. Report delta table
 
 4. INVESTIGATE FAILURES
-   a. For each FAIL, identify the root cause:
-      - Is it a balance parameter change? (expected after tuning)
-      - Is it a bug? (unexpected regression)
-      - Is it a threshold that needs updating? (game has evolved)
-   b. Recommend action: fix bug / adjust threshold / update baseline
+    a. For each FAIL, identify the root cause:
+       - Is it a balance parameter change? (expected after tuning)
+       - Is it a bug? (unexpected regression)
+       - Is it a threshold that needs updating? (game has evolved)
+       - Is it actually a profile regression (e.g. `DevLite` assumptions broken by visual cost)?
+    b. Recommend action: fix bug / adjust threshold / update baseline
 
 5. UPDATE BASELINE (if run is clean or intentionally changed)
    a. Overwrite balance-baseline.json with current results
@@ -242,10 +248,10 @@ These invariants are evaluated per-seed after the run completes:
 | Session | Relationship |
 |---------|-------------|
 | **Combat Coordinator** | Calls this session at every sprint gate. Combat invariants added incrementally. |
-| **Performance Profiling** | Shares ScenarioRunner infrastructure. `--perf` mode is separate but complementary. |
+| **Performance Profiling** | Shares SMR infrastructure. This session consumes the same evidence for QA decisions. |
 | **Meta Coordinator** | Receives balance reports at phase boundaries. Updates risk registry on balance regressions. |
 | **Track B sessions** | Track B exposes the counters and world state that assertions check. |
-| **Track C sessions** | AI balance (NPC decision quality) is testable via assertion outcomes. |
+| **Track C sessions** | AI balance (NPC decision quality) is testable via assertion outcomes and planner matrix evidence. |
 
 ---
 
@@ -263,8 +269,8 @@ These invariants are evaluated per-seed after the run completes:
 
 | File | Purpose | Status |
 |---|---|---|
-| `WorldSim.ScenarioRunner/Program.cs` | Main runner, assertion host | EXISTS (49 lines, needs extension) |
-| `balance-configs.json` | Multi-config matrix definition | PLANNED (Phase C) |
-| `balance-baseline.json` | Stored baseline for comparison | PLANNED (Phase C) |
-| `.github/workflows/balance-smoke.yml` | CI workflow | PLANNED (Phase B) |
+| `WorldSim.ScenarioRunner/Program.cs` | Main runner / SMR entrypoint | EXISTS (expanded beyond the old baseline) |
+| `balance-configs.json` | Multi-config matrix definition | OPTIONAL helper input |
+| `balance-baseline.json` | Stored baseline for comparison | OPTIONAL local/canonical file once a clean baseline is established |
+| `.github/workflows/smr-headless.yml` | CI workflow | EXISTS in workspace |
 | `Docs/Plans/Session-Balance-QA-Plan.md` | This plan | EXISTS |
