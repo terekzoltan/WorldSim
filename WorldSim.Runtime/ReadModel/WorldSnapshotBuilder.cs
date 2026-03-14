@@ -82,7 +82,16 @@ public static class WorldSnapshotBuilder
                 p.NoProgressStreak,
                 p.BackoffTicksRemaining,
                 p.DebugDecisionCause,
-                p.DebugTargetKey))
+                p.DebugTargetKey,
+                p.CombatMorale,
+                p.IsRouting,
+                p.RoutingTicksRemaining,
+                p.ActiveCombatGroupId,
+                p.ActiveBattleId,
+                p.AssignedFormation.ToString(),
+                p.IsCombatCommander,
+                p.CommanderIntelligence,
+                p.CommanderMoraleStabilityBonus))
             .ToList();
 
         var animals = world._animals
@@ -101,6 +110,9 @@ public static class WorldSnapshotBuilder
                     : colonyPeople.Average(p => p.Stamina);
                 var foodPerPerson = colony.Stock[Resource.Food] / (float)Math.Max(1, colonyPeople.Count);
                 var deathStats = world.GetColonyDeathStats(colony.Id);
+                var averageCombatMorale = colonyPeople.Count == 0
+                    ? 100f
+                    : (float)colonyPeople.Average(person => person.CombatMorale);
                 var profSummary = string.Join(",", colonyPeople
                     .Where(p => p.Age >= 16f)
                     .GroupBy(p => p.Profession)
@@ -135,9 +147,48 @@ public static class WorldSnapshotBuilder
                     world.GetColonyWarState(colony.Id).ToString(),
                     world.GetColonyWarriorCount(colony.Id),
                     colony.WeaponLevel,
-                    colony.ArmorLevel
+                    colony.ArmorLevel,
+                    averageCombatMorale
                 );
             })
+            .ToList();
+
+        var combatGroups = world.GetActiveCombatGroups()
+            .Select(group => new CombatGroupRenderData(
+                group.GroupId,
+                group.ColonyId,
+                group.FactionId,
+                group.Formation.ToString(),
+                group.MemberCount,
+                group.RoutingMemberCount,
+                group.IsRouting,
+                group.AverageMorale,
+                group.CommanderActorId,
+                group.CommanderIntelligence,
+                group.CommanderMoraleStabilityBonus,
+                group.AnchorX,
+                group.AnchorY,
+                group.StrengthScore,
+                group.DefenseScore,
+                group.BattleId))
+            .ToList();
+
+        var battles = world.GetActiveBattles()
+            .Select(battle => new BattleRenderData(
+                battle.BattleId,
+                battle.LeftGroupId,
+                battle.RightGroupId,
+                battle.LeftAverageMorale,
+                battle.RightAverageMorale,
+                battle.LeftIsRouting,
+                battle.RightIsRouting,
+                battle.LeftCommanderActorId,
+                battle.RightCommanderActorId,
+                battle.CenterX,
+                battle.CenterY,
+                battle.Radius,
+                battle.Intensity,
+                battle.ElapsedTicks))
             .ToList();
 
         var factionStances = world.GetFactionStanceMatrix()
@@ -190,6 +241,8 @@ public static class WorldSnapshotBuilder
             people,
             animals,
             colonies,
+            combatGroups,
+            battles,
             factionStances,
             ecology,
             MapSeason(world.CurrentSeason),

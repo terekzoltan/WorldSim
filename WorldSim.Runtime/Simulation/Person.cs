@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using WorldSim.AI;
+using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Effects;
 using WorldSim.Simulation.Navigation;
 
@@ -46,6 +47,15 @@ public class Person
     public int Defense { get; set; }
     public bool IsInCombat { get; private set; }
     public int LastCombatTick { get; private set; } = -1;
+    public float CombatMorale { get; private set; } = 100f;
+    public bool IsRouting { get; private set; }
+    public int RoutingTicksRemaining { get; private set; }
+    public int ActiveCombatGroupId { get; private set; } = -1;
+    public int ActiveBattleId { get; private set; } = -1;
+    public Formation AssignedFormation { get; private set; } = Formation.Line;
+    public bool IsCombatCommander { get; private set; }
+    public int CommanderIntelligence { get; private set; }
+    public float CommanderMoraleStabilityBonus { get; private set; }
     public Colony Home => _home;
 
     Colony _home;
@@ -236,6 +246,17 @@ public class Person
             _backoffTicksRemaining--;
         if (_backoffTicksRemaining <= 0)
             _suppressPeacefulActionsDuringBackoff = false;
+
+        if (RoutingTicksRemaining > 0)
+        {
+            RoutingTicksRemaining--;
+            IsRouting = true;
+            Current = Job.Flee;
+        }
+        else if (IsRouting)
+        {
+            IsRouting = false;
+        }
 
         // perception step
         Perceive(w);
@@ -1140,6 +1161,12 @@ public class Person
         if (!w.EnableCombatPrimitives)
             return;
 
+        if (IsRouting)
+        {
+            ExecuteFleeAction(w);
+            return;
+        }
+
         var threatContext = BuildThreatContext(w);
         bool hasFactionThreat =
             threatContext.NearbyEnemyCount > 0 ||
@@ -2019,6 +2046,7 @@ public class Person
         float adjusted = amount * GetIncomingCombatDamageMultiplier(world);
         Health -= adjusted;
         EnterCombat(world);
+        ApplyMoraleDelta(-(adjusted * 0.08f));
         if (Health <= 0f)
             LastDeathReason = PersonDeathReason.Combat;
     }
@@ -2028,6 +2056,50 @@ public class Person
         IsInCombat = true;
         _combatMarkerSeconds = 1.25f;
         LastCombatTick = world?.CurrentTick ?? (LastCombatTick + 1);
+    }
+
+    public void SetCombatAssignment(int? groupId, int? battleId, Formation formation, bool isCommander)
+    {
+        ActiveCombatGroupId = groupId ?? -1;
+        ActiveBattleId = battleId ?? -1;
+        AssignedFormation = formation;
+        IsCombatCommander = isCommander;
+
+        if (!isCommander)
+        {
+            CommanderIntelligence = 0;
+            CommanderMoraleStabilityBonus = 0f;
+            return;
+        }
+
+        CommanderIntelligence = Intelligence;
+        CommanderMoraleStabilityBonus = Math.Clamp(Intelligence / 30f, 0f, 0.45f);
+    }
+
+    public void ApplyMoraleDelta(float delta)
+    {
+        var adjusted = delta;
+        if (delta < 0f)
+            adjusted *= (1f - CommanderMoraleStabilityBonus);
+        else if (delta > 0f)
+            adjusted *= (1f + (CommanderMoraleStabilityBonus * 0.5f));
+
+        CombatMorale = Math.Clamp(CombatMorale + adjusted, 0f, 100f);
+    }
+
+    public void BeginRouting(int ticks)
+    {
+        RoutingTicksRemaining = Math.Max(RoutingTicksRemaining, ticks);
+        IsRouting = RoutingTicksRemaining > 0;
+        if (IsRouting)
+            Current = Job.Flee;
+
+        SetCombatAssignment(null, null, AssignedFormation, isCommander: false);
+    }
+
+    public void MarkCombatPresence(World world)
+    {
+        EnterCombat(world);
     }
 
     bool HasNearbyOwnHouse(World w, int radius)

@@ -150,6 +150,32 @@ public sealed class WarriorRoleConsideration : Consideration
     }
 }
 
+public sealed class CommanderRoleConsideration : Consideration
+{
+    private readonly float _nonCommanderScore;
+
+    public CommanderRoleConsideration(float nonCommanderScore = 0.6f)
+    {
+        _nonCommanderScore = Math.Clamp(nonCommanderScore, 0f, 1f);
+    }
+
+    public override float Evaluate(in NpcAiContext context)
+    {
+        return context.IsCommander ? 1f : _nonCommanderScore;
+    }
+}
+
+public sealed class GroupMoraleReadinessConsideration : Consideration
+{
+    public override float Evaluate(in NpcAiContext context)
+    {
+        if (context.ActiveCombatGroupSize <= 1)
+            return 0.55f;
+
+        return Math.Clamp((context.ActiveGroupAverageMorale - 35f) / 55f, 0f, 1f);
+    }
+}
+
 public sealed class WarPressureConsideration : Consideration
 {
     public override float Evaluate(in NpcAiContext context)

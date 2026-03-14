@@ -468,6 +468,82 @@ public class DecisionTests
     }
 
     [Fact]
+    public void ThreatDecisionPolicy_CommanderLowGroupMorale_PrefersRetreat()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 3f,
+            Hunger: 12f,
+            Stamina: 78f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 82f,
+            Strength: 18,
+            Defense: 14,
+            NearbyHostilePeople: 1,
+            NearbyEnemyCount: 2,
+            LocalThreatScore: 0.66f,
+            IsWarStance: true,
+            IsWarriorRole: true,
+            IsCommander: true,
+            ActiveCombatGroupSize: 4,
+            ActiveGroupAverageMorale: 28f,
+            CommanderMoraleStabilityBonus: 0.35f,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
+
+        Assert.True(ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context));
+        Assert.False(ThreatDecisionPolicy.ShouldFight(context));
+    }
+
+    [Fact]
+    public void ThreatDecisionPolicy_CommanderHighMorale_CanPressAdvantage()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 4f,
+            Hunger: 10f,
+            Stamina: 86f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 92f,
+            Strength: 20,
+            Defense: 16,
+            NearbyHostilePeople: 1,
+            NearbyEnemyCount: 1,
+            LocalThreatScore: 0.46f,
+            IsWarStance: true,
+            IsWarriorRole: true,
+            IsCommander: true,
+            ActiveCombatGroupSize: 4,
+            ActiveGroupAverageMorale: 70f,
+            CommanderMoraleStabilityBonus: 0.32f,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
+
+        Assert.True(ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context));
+        Assert.True(ThreatDecisionPolicy.ShouldFight(context));
+    }
+
+    [Fact]
     public void SimplePlanner_BuildDefenses_UsesFortificationCommands_WhenHostile()
     {
         var planner = new SimplePlanner();
@@ -530,6 +606,48 @@ public class DecisionTests
         var decision = planner.GetNextCommand(context);
 
         Assert.Equal(NpcCommand.RaidBorder, decision.Command);
+    }
+
+    [Fact]
+    public void SimplePlanner_RaidBorder_CommanderLowMorale_FallsBackToFlee()
+    {
+        var planner = new SimplePlanner();
+        planner.SetGoal(new Goal("RaidBorder"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 15f,
+            Hunger: 18f,
+            Stamina: 82f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 6,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 84f,
+            Strength: 16,
+            Defense: 14,
+            IsWarStance: true,
+            IsContestedTile: true,
+            IsWarriorRole: true,
+            IsCommander: true,
+            ActiveCombatGroupSize: 4,
+            ActiveGroupAverageMorale: 26f,
+            CommanderMoraleStabilityBonus: 0.3f,
+            NearbyEnemyCount: 2,
+            LocalThreatScore: 0.68f,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.Flee, decision.Command);
     }
 
     [Fact]

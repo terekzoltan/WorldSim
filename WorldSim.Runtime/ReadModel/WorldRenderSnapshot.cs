@@ -60,6 +60,8 @@ public sealed record WorldRenderSnapshot(
     IReadOnlyList<PersonRenderData> People,
     IReadOnlyList<AnimalRenderData> Animals,
     IReadOnlyList<ColonyHudData> Colonies,
+    IReadOnlyList<CombatGroupRenderData> CombatGroups,
+    IReadOnlyList<BattleRenderData> Battles,
     IReadOnlyList<FactionStanceRenderData> FactionStances,
     EcoHudData Ecology,
     SeasonView CurrentSeason,
@@ -133,7 +135,16 @@ public sealed record PersonRenderData(
     int NoProgressStreak,
     int BackoffTicksRemaining,
     string DebugDecisionCause,
-    string DebugTargetKey);
+    string DebugTargetKey,
+    float CombatMorale = 100f,
+    bool IsRouting = false,
+    int RoutingTicksRemaining = 0,
+    int ActiveCombatGroupId = -1,
+    int ActiveBattleId = -1,
+    string Formation = "Line",
+    bool IsCommander = false,
+    int CommanderIntelligence = 0,
+    float CommanderMoraleStabilityBonus = 0f);
 
 public sealed record AnimalRenderData(int X, int Y, AnimalKindView Kind);
 
@@ -164,8 +175,43 @@ public sealed record ColonyHudData(
     string WarState,
     int WarriorCount,
     int WeaponLevel,
-    int ArmorLevel
+    int ArmorLevel,
+    float AverageCombatMorale = 100f
 );
+
+public sealed record CombatGroupRenderData(
+    int GroupId,
+    int ColonyId,
+    int FactionId,
+    string Formation,
+    int MemberCount,
+    int RoutingMemberCount,
+    bool IsRouting,
+    float AverageMorale,
+    int CommanderActorId,
+    int CommanderIntelligence,
+    float CommanderMoraleStabilityBonus,
+    int AnchorX,
+    int AnchorY,
+    float StrengthScore,
+    float DefenseScore,
+    int BattleId);
+
+public sealed record BattleRenderData(
+    int BattleId,
+    int LeftGroupId,
+    int RightGroupId,
+    float LeftAverageMorale,
+    float RightAverageMorale,
+    bool LeftIsRouting,
+    bool RightIsRouting,
+    int LeftCommanderActorId,
+    int RightCommanderActorId,
+    int CenterX,
+    int CenterY,
+    int Radius,
+    int Intensity,
+    int ElapsedTicks);
 
 public sealed record FactionStanceRenderData(int LeftFactionId, int RightFactionId, string Stance);
 

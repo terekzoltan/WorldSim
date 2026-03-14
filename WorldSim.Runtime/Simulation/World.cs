@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WorldSim.AI;
+using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
@@ -25,6 +26,40 @@ namespace WorldSim.Simulation
         Autumn,
         Winter
     }
+
+    public sealed record CombatGroupState(
+        int GroupId,
+        int ColonyId,
+        int FactionId,
+        Formation Formation,
+        int MemberCount,
+        int RoutingMemberCount,
+        bool IsRouting,
+        float AverageMorale,
+        int CommanderActorId,
+        int CommanderIntelligence,
+        float CommanderMoraleStabilityBonus,
+        int AnchorX,
+        int AnchorY,
+        float StrengthScore,
+        float DefenseScore,
+        int BattleId);
+
+    public sealed record BattleState(
+        int BattleId,
+        int LeftGroupId,
+        int RightGroupId,
+        float LeftAverageMorale,
+        float RightAverageMorale,
+        bool LeftIsRouting,
+        bool RightIsRouting,
+        int LeftCommanderActorId,
+        int RightCommanderActorId,
+        int CenterX,
+        int CenterY,
+        int Radius,
+        int Intensity,
+        int ElapsedTicks);
 
     public class World
     {
@@ -76,6 +111,8 @@ namespace WorldSim.Simulation
         public int TotalPredatorKillsByHumans { get; private set; }
         public int TotalPredatorHumanHits { get; private set; }
         public int TotalCombatEngagements { get; private set; }
+        public int TotalCombatDeaths { get; private set; }
+        public int TotalBattleTicks { get; private set; }
         public int TotalDeathsOldAge { get; private set; }
         public int TotalDeathsStarvation { get; private set; }
         public int TotalDeathsPredator { get; private set; }
@@ -96,6 +133,8 @@ namespace WorldSim.Simulation
         public int TotalAiResearchTechDecisions { get; private set; }
         public int DenseNeighborhoodTicks { get; private set; }
         public int LastTickDenseActors { get; private set; }
+        public int ActiveCombatGroupCount => _activeCombatGroups.Count;
+        public int ActiveBattleCount => _activeBattles.Count;
 
         public bool CanBuildFortifications(Colony colony)
         {
@@ -123,9 +162,13 @@ namespace WorldSim.Simulation
         readonly RelationManager _relationManager = new();
         readonly DefenseManager _defenseManager = new();
         readonly Dictionary<string, int> _softReservations = new(StringComparer.Ordinal);
+        readonly List<RuntimeCombatGroup> _activeCombatGroups = new();
+        readonly List<RuntimeBattleState> _activeBattles = new();
         int _navigationTopologyVersion;
         int _nextDefenseStructureId = 1;
         int _nextPersonId = 1;
+        int _nextCombatGroupId = 1;
+        int _nextBattleId = 1;
 
         float _simulationTimeSeconds;
         int _tickCounter;
@@ -325,6 +368,12 @@ namespace WorldSim.Simulation
             if (EnableDiplomacy)
                 _relationManager.Tick(this);
             RecomputeMobilizationState();
+
+            _activeCombatGroups.Clear();
+            _activeBattles.Clear();
+            foreach (var person in _people)
+                person.SetCombatAssignment(null, null, Formation.Line, isCommander: false);
+            ResolveGroupCombatPhase();
 
             TrimRecentDeathWindows();
         }
@@ -672,6 +721,7 @@ namespace WorldSim.Simulation
         public void ReportPredatorKilledByHumans() => TotalPredatorKillsByHumans++;
         public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
         public void ReportCombatEngagement() => TotalCombatEngagements++;
+        public void ReportCombatDeath() => TotalCombatDeaths++;
         public void ReportBuildSiteReset() => TotalBuildSiteResetCount++;
         public void ReportNoProgressBackoff(string context)
         {
@@ -804,6 +854,46 @@ namespace WorldSim.Simulation
                 .ThenBy(entry => entry.Right)
                 .ToList();
 
+        public IReadOnlyList<CombatGroupState> GetActiveCombatGroups()
+            => _activeCombatGroups
+                .Select(group => new CombatGroupState(
+                    GroupId: group.GroupId,
+                    ColonyId: group.Colony.Id,
+                    FactionId: (int)group.Colony.Faction,
+                    Formation: group.Formation,
+                    MemberCount: group.Members.Count,
+                    RoutingMemberCount: group.RoutingMemberCount,
+                    IsRouting: group.IsRouting,
+                    AverageMorale: group.AverageMorale,
+                    CommanderActorId: group.Commander?.Id ?? -1,
+                    CommanderIntelligence: group.CommanderIntelligence,
+                    CommanderMoraleStabilityBonus: group.CommanderMoraleStabilityBonus,
+                    AnchorX: group.Anchor.x,
+                    AnchorY: group.Anchor.y,
+                    StrengthScore: group.StrengthScore,
+                    DefenseScore: group.DefenseScore,
+                    BattleId: group.BattleId))
+                .ToList();
+
+        public IReadOnlyList<BattleState> GetActiveBattles()
+            => _activeBattles
+                .Select(battle => new BattleState(
+                    BattleId: battle.BattleId,
+                    LeftGroupId: battle.Left.GroupId,
+                    RightGroupId: battle.Right.GroupId,
+                    LeftAverageMorale: battle.Left.AverageMorale,
+                    RightAverageMorale: battle.Right.AverageMorale,
+                    LeftIsRouting: battle.Left.IsRouting,
+                    RightIsRouting: battle.Right.IsRouting,
+                    LeftCommanderActorId: battle.Left.Commander?.Id ?? -1,
+                    RightCommanderActorId: battle.Right.Commander?.Id ?? -1,
+                    CenterX: battle.Center.x,
+                    CenterY: battle.Center.y,
+                    Radius: battle.Radius,
+                    Intensity: battle.Intensity,
+                    ElapsedTicks: battle.ElapsedTicks))
+                .ToList();
+
         private void ReportPersonDeath(Person person)
         {
             PersonDeathReason reason = person.LastDeathReason;
@@ -820,6 +910,10 @@ namespace WorldSim.Simulation
                     break;
                 case PersonDeathReason.Predator:
                     TotalDeathsPredator++;
+                    break;
+                case PersonDeathReason.Combat:
+                    TotalCombatDeaths++;
+                    TotalDeathsOther++;
                     break;
                 default:
                     TotalDeathsOther++;
@@ -842,6 +936,9 @@ namespace WorldSim.Simulation
                     break;
                 case PersonDeathReason.Predator:
                     colonyStats.Predator++;
+                    break;
+                case PersonDeathReason.Combat:
+                    colonyStats.Other++;
                     break;
                 default:
                     colonyStats.Other++;
@@ -894,6 +991,308 @@ namespace WorldSim.Simulation
 
             DissipateLocalCrowds(occupied);
             UpdateDenseNeighborhoodTelemetry(occupied);
+        }
+
+        private void ResolveGroupCombatPhase()
+        {
+            if (!EnableCombatPrimitives)
+                return;
+
+            var groups = BuildCombatGroups();
+            if (groups.Count == 0)
+                return;
+
+            _activeCombatGroups.AddRange(groups);
+            var paired = new HashSet<int>();
+
+            while (true)
+            {
+                RuntimeCombatGroup? left = null;
+                RuntimeCombatGroup? right = null;
+                var bestDistance = int.MaxValue;
+
+                for (var i = 0; i < groups.Count; i++)
+                {
+                    var a = groups[i];
+                    if (paired.Contains(a.GroupId) || a.IsRouting || a.Members.Count == 0)
+                        continue;
+
+                    for (var j = i + 1; j < groups.Count; j++)
+                    {
+                        var b = groups[j];
+                        if (paired.Contains(b.GroupId) || b.IsRouting || b.Members.Count == 0)
+                            continue;
+                        if (a.Colony.Id == b.Colony.Id)
+                            continue;
+
+                        var stance = GetFactionStance(a.Colony.Faction, b.Colony.Faction);
+                        if (stance < Stance.Hostile)
+                            continue;
+
+                        var distance = Math.Abs(a.Anchor.x - b.Anchor.x) + Math.Abs(a.Anchor.y - b.Anchor.y);
+                        if (distance > 6 || distance >= bestDistance)
+                            continue;
+
+                        bestDistance = distance;
+                        left = a;
+                        right = b;
+                    }
+                }
+
+                if (left == null || right == null)
+                    break;
+
+                paired.Add(left.GroupId);
+                paired.Add(right.GroupId);
+
+                var battle = new RuntimeBattleState(_nextBattleId++, left, right);
+                left.BattleId = battle.BattleId;
+                right.BattleId = battle.BattleId;
+                _activeBattles.Add(battle);
+
+                foreach (var member in left.Members)
+                    member.SetCombatAssignment(left.GroupId, battle.BattleId, left.Formation, isCommander: ReferenceEquals(member, left.Commander));
+                foreach (var member in right.Members)
+                    member.SetCombatAssignment(right.GroupId, battle.BattleId, right.Formation, isCommander: ReferenceEquals(member, right.Commander));
+
+                ResolveBattleTick(battle);
+                TotalBattleTicks++;
+            }
+        }
+
+        private List<RuntimeCombatGroup> BuildCombatGroups()
+        {
+            var groups = new List<RuntimeCombatGroup>();
+            var eligibleByColony = _people
+                .Where(person => person.Health > 0f
+                                 && !person.IsRouting
+                                 && (person.Current is Job.Fight or Job.RaidBorder or Job.AttackStructure
+                                     || HasNearbyHostile(person, radius: 3)))
+                .GroupBy(person => person.Home)
+                .ToList();
+
+            foreach (var colonyGroup in eligibleByColony)
+            {
+                foreach (var members in ClusterByProximity(colonyGroup.ToList(), radius: 3))
+                {
+                    if (members.Count == 0)
+                        continue;
+
+                    var formation = PickFormation(members, colonyGroup.Key);
+                    var runtimeGroup = new RuntimeCombatGroup(
+                        groupId: _nextCombatGroupId++,
+                        colony: colonyGroup.Key,
+                        formation: formation,
+                        members: members);
+
+                    foreach (var member in members)
+                    {
+                        member.SetCombatAssignment(runtimeGroup.GroupId, null, formation, isCommander: ReferenceEquals(member, runtimeGroup.Commander));
+                        member.ApplyMoraleDelta(0.20f);
+                    }
+
+                    groups.Add(runtimeGroup);
+                }
+            }
+
+            return groups;
+        }
+
+        private static Formation PickFormation(IReadOnlyList<Person> members, Colony colony)
+        {
+            if (members.Count <= 2)
+                return Formation.Skirmish;
+
+            var commander = members
+                .OrderByDescending(person => person.Intelligence)
+                .ThenByDescending(person => person.Strength + person.Defense)
+                .FirstOrDefault();
+            var commanderIq = commander?.Intelligence ?? 0;
+            var avgStrength = members.Average(person => person.Strength);
+            var avgDefense = members.Average(person => person.Defense);
+
+            if (commanderIq >= 14)
+            {
+                if (colony.WeaponLevel > colony.ArmorLevel + 1)
+                    return Formation.Wedge;
+                if (avgDefense > avgStrength * 1.10f)
+                    return Formation.DefensiveCircle;
+            }
+
+            if (avgDefense > avgStrength * 1.20f)
+                return Formation.DefensiveCircle;
+            if (colony.WeaponLevel > colony.ArmorLevel && members.Count >= 3)
+                return Formation.Wedge;
+
+            return Formation.Line;
+        }
+
+        private bool HasNearbyHostile(Person actor, int radius)
+        {
+            for (var i = 0; i < _people.Count; i++)
+            {
+                var other = _people[i];
+                if (ReferenceEquals(actor, other) || other.Health <= 0f || other.Home == actor.Home)
+                    continue;
+
+                var stance = GetFactionStance(actor.Home.Faction, other.Home.Faction);
+                if (stance < Stance.Hostile)
+                    continue;
+
+                var distance = Math.Abs(actor.Pos.x - other.Pos.x) + Math.Abs(actor.Pos.y - other.Pos.y);
+                if (distance <= radius)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static List<List<Person>> ClusterByProximity(List<Person> people, int radius)
+        {
+            var clusters = new List<List<Person>>();
+            var visited = new HashSet<int>();
+
+            for (var i = 0; i < people.Count; i++)
+            {
+                var seed = people[i];
+                if (!visited.Add(seed.Id))
+                    continue;
+
+                var queue = new Queue<Person>();
+                var cluster = new List<Person>();
+                queue.Enqueue(seed);
+
+                while (queue.Count > 0)
+                {
+                    var current = queue.Dequeue();
+                    cluster.Add(current);
+
+                    for (var j = 0; j < people.Count; j++)
+                    {
+                        var candidate = people[j];
+                        if (visited.Contains(candidate.Id))
+                            continue;
+
+                        var distance = Math.Abs(current.Pos.x - candidate.Pos.x) + Math.Abs(current.Pos.y - candidate.Pos.y);
+                        if (distance > radius)
+                            continue;
+
+                        visited.Add(candidate.Id);
+                        queue.Enqueue(candidate);
+                    }
+                }
+
+                clusters.Add(cluster);
+            }
+
+            return clusters;
+        }
+
+        private void ResolveBattleTick(RuntimeBattleState battle)
+        {
+            var leftMembers = battle.Left.Members.Where(member => member.Health > 0f && !member.IsRouting).ToList();
+            var rightMembers = battle.Right.Members.Where(member => member.Health > 0f && !member.IsRouting).ToList();
+            if (leftMembers.Count == 0 || rightMembers.Count == 0)
+                return;
+
+            battle.ElapsedTicks++;
+
+            var leftAttack = GroupCombatResolver.ComputeGroupAttackScore(
+                battle.Left.StrengthScore,
+                battle.Left.Formation,
+                battle.Left.Colony.WeaponLevel);
+            var leftDefense = GroupCombatResolver.ComputeGroupDefenseScore(
+                battle.Left.DefenseScore,
+                battle.Left.Formation,
+                battle.Left.Colony.ArmorLevel);
+            var rightAttack = GroupCombatResolver.ComputeGroupAttackScore(
+                battle.Right.StrengthScore,
+                battle.Right.Formation,
+                battle.Right.Colony.WeaponLevel);
+            var rightDefense = GroupCombatResolver.ComputeGroupDefenseScore(
+                battle.Right.DefenseScore,
+                battle.Right.Formation,
+                battle.Right.Colony.ArmorLevel);
+
+            var exchanges = Math.Max(1, Math.Min(6, (leftMembers.Count + rightMembers.Count) / 2));
+            battle.Intensity = exchanges;
+
+            var leftBefore = leftMembers.Count;
+            var rightBefore = rightMembers.Count;
+
+            for (var i = 0; i < exchanges; i++)
+            {
+                if (leftMembers.Count == 0 || rightMembers.Count == 0)
+                    break;
+
+                var left = leftMembers[_rng.Next(leftMembers.Count)];
+                var right = rightMembers[_rng.Next(rightMembers.Count)];
+
+                left.MarkCombatPresence(this);
+                right.MarkCombatPresence(this);
+
+                var leftDamage = GroupCombatResolver.ComputePerHitDamage(_rng, leftAttack, rightDefense, leftMembers.Count, rightMembers.Count);
+                right.ApplyCombatDamage(this, left.ScaleOutgoingCombatDamage(this, leftDamage), "GroupCombat");
+                ReportCombatEngagement();
+
+                if (right.Health > 0f && _rng.NextDouble() < 0.65)
+                {
+                    var rightDamage = GroupCombatResolver.ComputePerHitDamage(_rng, rightAttack, leftDefense, rightMembers.Count, leftMembers.Count);
+                    left.ApplyCombatDamage(this, right.ScaleOutgoingCombatDamage(this, rightDamage), "GroupCombat");
+                    ReportCombatEngagement();
+                }
+
+                leftMembers = leftMembers.Where(member => member.Health > 0f && !member.IsRouting).ToList();
+                rightMembers = rightMembers.Where(member => member.Health > 0f && !member.IsRouting).ToList();
+            }
+
+            var leftLosses = Math.Max(0, leftBefore - leftMembers.Count);
+            var rightLosses = Math.Max(0, rightBefore - rightMembers.Count);
+
+            ApplyBattleMoraleShift(battle.Left, ownLosses: leftLosses, enemyLosses: rightLosses);
+            ApplyBattleMoraleShift(battle.Right, ownLosses: rightLosses, enemyLosses: leftLosses);
+
+            if (battle.Left.StrengthScore > battle.Right.StrengthScore * 1.8f)
+                ApplyBattleMoraleShift(battle.Right, ownLosses: 1, enemyLosses: 0);
+            else if (battle.Right.StrengthScore > battle.Left.StrengthScore * 1.8f)
+                ApplyBattleMoraleShift(battle.Left, ownLosses: 1, enemyLosses: 0);
+
+            TryStartRouting(battle.Left);
+            TryStartRouting(battle.Right);
+        }
+
+        private static void ApplyBattleMoraleShift(RuntimeCombatGroup group, int ownLosses, int enemyLosses)
+        {
+            var delta = (enemyLosses * 2.4f) - (ownLosses * 6.0f) - 1.2f;
+            if (group.Members.Count > 0)
+            {
+                var ownLossRatio = ownLosses / (float)Math.Max(1, group.Members.Count);
+                delta -= ownLossRatio * 6f;
+            }
+
+            foreach (var member in group.Members)
+            {
+                if (member.Health <= 0f)
+                    continue;
+                member.ApplyMoraleDelta(delta);
+            }
+        }
+
+        private void TryStartRouting(RuntimeCombatGroup group)
+        {
+            if (group.Members.Count == 0)
+                return;
+
+            var shouldRoute = group.AverageMorale <= 24f || group.RoutingMemberCount >= Math.Max(1, group.Members.Count / 2);
+            if (!shouldRoute)
+                return;
+
+            foreach (var member in group.Members)
+            {
+                if (member.Health <= 0f)
+                    continue;
+                member.BeginRouting(6 + _rng.Next(0, 3));
+            }
         }
 
         private bool TryFindNearbyFreePersonTile(Person person, (int x, int y) center, HashSet<(int x, int y)> occupied, out (int x, int y) tile)

@@ -107,13 +107,19 @@ public sealed class HtnPlanner : IPlanner
                 break;
 
             case "DefendSelf":
+                var commanderRetreat = ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context);
+                var commanderPress = ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context);
                 candidates.Add(new MethodCandidate(
                     "FightBack",
-                    ThreatDecisionPolicy.ShouldFight(context) ? 1.0f : 0.4f,
+                    commanderRetreat
+                        ? 0.2f
+                        : (ThreatDecisionPolicy.ShouldFight(context) ? (commanderPress ? 1.0f : 0.92f) : 0.4f),
                     new[] { NpcCommand.Fight }));
                 candidates.Add(new MethodCandidate(
                     "TacticalFlee",
-                    ThreatDecisionPolicy.ShouldFight(context) ? 0.55f : 0.95f,
+                    commanderRetreat
+                        ? 1.0f
+                        : (ThreatDecisionPolicy.ShouldFight(context) ? 0.55f : 0.95f),
                     new[] { NpcCommand.Flee }));
                 break;
 
@@ -133,13 +139,19 @@ public sealed class HtnPlanner : IPlanner
                 break;
 
             case "RaidBorder":
+                var raidRetreat = ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context);
+                var raidPress = ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context);
                 candidates.Add(new MethodCandidate(
                     "BorderRaid",
-                    context.IsWarriorRole ? 0.92f : 0.2f,
+                    !context.IsWarriorRole
+                        ? 0.2f
+                        : (raidRetreat ? 0.15f : (raidPress ? 1.0f : 0.9f)),
                     new[] { NpcCommand.RaidBorder }));
                 candidates.Add(new MethodCandidate(
                     "FallbackRetreat",
-                    context.IsWarriorRole ? 0.45f : 0.95f,
+                    !context.IsWarriorRole
+                        ? 0.95f
+                        : (raidRetreat ? 1.0f : 0.45f),
                     new[] { NpcCommand.Flee }));
                 break;
 

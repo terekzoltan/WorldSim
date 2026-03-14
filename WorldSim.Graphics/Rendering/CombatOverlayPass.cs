@@ -21,9 +21,69 @@ public sealed class CombatOverlayPass : IRenderPass
         var pixel = context.Textures.Pixel;
 
         DrawContestedTiles(spriteBatch, pixel, snapshot, settings.TileSize);
+        DrawBattleZones(spriteBatch, pixel, snapshot, settings.TileSize);
+        DrawFormationMarkers(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawCombatActors(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawNoProgressActors(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawColonyWarDiagnostics(spriteBatch, pixel, snapshot, settings.TileSize);
+    }
+
+    private static void DrawBattleZones(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)
+    {
+        foreach (var battle in snapshot.Battles.OrderBy(b => b.BattleId))
+        {
+            int centerX = (battle.CenterX * tileSize) + (tileSize / 2);
+            int centerY = (battle.CenterY * tileSize) + (tileSize / 2);
+            int radius = Math.Max(tileSize, battle.Radius * tileSize);
+
+            float intensityAlpha = Math.Clamp(0.18f + (battle.Intensity * 0.03f), 0.18f, 0.42f);
+            var fill = new Color(230, 104, 90) * intensityAlpha;
+            var edge = (battle.LeftIsRouting || battle.RightIsRouting)
+                ? new Color(236, 124, 208) * 0.65f
+                : new Color(232, 162, 112) * 0.58f;
+
+            DrawCircleFill(spriteBatch, pixel, centerX, centerY, radius, fill, step: Math.Max(2, tileSize / 2));
+            DrawCircleOutline(spriteBatch, pixel, centerX, centerY, radius, edge, Math.Max(1, tileSize / 4));
+        }
+    }
+
+    private static void DrawFormationMarkers(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)
+    {
+        int glyph = Math.Max(2, tileSize);
+        foreach (var group in snapshot.CombatGroups.OrderBy(g => g.GroupId))
+        {
+            int cx = (group.AnchorX * tileSize) + (tileSize / 2);
+            int cy = (group.AnchorY * tileSize) + (tileSize / 2);
+            var color = group.IsRouting
+                ? new Color(236, 125, 206) * 0.9f
+                : new Color(129, 206, 250) * 0.82f;
+
+            switch (group.Formation)
+            {
+                case "Wedge":
+                    DrawLine(spriteBatch, pixel, new Vector2(cx - glyph, cy + glyph), new Vector2(cx, cy - glyph), color, 1);
+                    DrawLine(spriteBatch, pixel, new Vector2(cx + glyph, cy + glyph), new Vector2(cx, cy - glyph), color, 1);
+                    break;
+                case "DefensiveCircle":
+                    DrawCircleOutline(spriteBatch, pixel, cx, cy, glyph, color, 1);
+                    break;
+                case "Skirmish":
+                    spriteBatch.Draw(pixel, new Rectangle(cx - glyph, cy - 1, 2, 2), color);
+                    spriteBatch.Draw(pixel, new Rectangle(cx, cy - glyph, 2, 2), color);
+                    spriteBatch.Draw(pixel, new Rectangle(cx + glyph - 1, cy, 2, 2), color);
+                    spriteBatch.Draw(pixel, new Rectangle(cx, cy + glyph - 1, 2, 2), color);
+                    break;
+                default:
+                    spriteBatch.Draw(pixel, new Rectangle(cx - glyph, cy, glyph * 2, 1), color);
+                    break;
+            }
+
+            if (group.CommanderActorId >= 0)
+            {
+                var commander = new Color(108, 234, 201) * 0.95f;
+                spriteBatch.Draw(pixel, new Rectangle(cx - 1, cy - glyph - 3, 3, 3), commander);
+            }
+        }
     }
 
     private static void DrawContestedTiles(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)
@@ -142,5 +202,54 @@ public sealed class CombatOverlayPass : IRenderPass
         spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Bottom - thickness, rect.Width, thickness), color);
         spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, thickness, rect.Height), color);
         spriteBatch.Draw(pixel, new Rectangle(rect.Right - thickness, rect.Y, thickness, rect.Height), color);
+    }
+
+    private static void DrawCircleOutline(SpriteBatch spriteBatch, Texture2D pixel, int cx, int cy, int radius, Color color, int thickness)
+    {
+        const int segments = 20;
+        Vector2? previous = null;
+        for (int i = 0; i <= segments; i++)
+        {
+            float t = i / (float)segments;
+            float angle = MathF.Tau * t;
+            var point = new Vector2(
+                cx + (MathF.Cos(angle) * radius),
+                cy + (MathF.Sin(angle) * radius));
+
+            if (previous.HasValue)
+                DrawLine(spriteBatch, pixel, previous.Value, point, color, thickness);
+            previous = point;
+        }
+    }
+
+    private static void DrawCircleFill(SpriteBatch spriteBatch, Texture2D pixel, int cx, int cy, int radius, Color color, int step)
+    {
+        for (int y = -radius; y <= radius; y += Math.Max(1, step))
+        {
+            float ratio = 1f - ((y * y) / (float)(radius * radius));
+            if (ratio <= 0f)
+                continue;
+            int halfWidth = (int)(MathF.Sqrt(ratio) * radius);
+            spriteBatch.Draw(pixel, new Rectangle(cx - halfWidth, cy + y, halfWidth * 2, Math.Max(1, step)), color);
+        }
+    }
+
+    private static void DrawLine(SpriteBatch spriteBatch, Texture2D pixel, Vector2 from, Vector2 to, Color color, int thickness)
+    {
+        var delta = to - from;
+        float length = delta.Length();
+        if (length < 1f)
+            return;
+
+        float angle = MathF.Atan2(delta.Y, delta.X);
+        spriteBatch.Draw(
+            pixel,
+            new Rectangle((int)from.X, (int)from.Y, (int)length, Math.Max(1, thickness)),
+            null,
+            color,
+            angle,
+            new Vector2(0f, Math.Max(1, thickness) * 0.5f),
+            SpriteEffects.None,
+            0f);
     }
 }

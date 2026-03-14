@@ -133,6 +133,16 @@ public sealed class RuntimeNpcBrain
         var resourceCrowdPressure = ComputeResourceCrowdPressure(world, actor.Pos, radius: 5);
         var buildCrowdPressure = ComputeBuildCrowdPressure(world, actor.Home.Origin, actor.Home.Id);
         var retreatCrowdPressure = ComputeRetreatCrowdPressure(world, actor.Home.Origin, actor.Home.Id);
+        var activeGroupSize = actor.ActiveCombatGroupId < 0
+            ? 0
+            : world._people.Count(person => person.ActiveCombatGroupId == actor.ActiveCombatGroupId && person.Health > 0f);
+        var activeGroupAverageMorale = actor.ActiveCombatGroupId < 0
+            ? 100f
+            : world._people
+                .Where(person => person.ActiveCombatGroupId == actor.ActiveCombatGroupId && person.Health > 0f)
+                .Select(person => person.CombatMorale)
+                .DefaultIfEmpty(100f)
+                .Average();
         var localThreatScore = ComputeThreatScore(
             nearbyPredators,
             nearbyHostiles,
@@ -187,7 +197,11 @@ public sealed class RuntimeNpcBrain
             HomeFortificationTechCount: homeFortificationTechCount,
             ResourceCrowdPressure: resourceCrowdPressure,
             BuildCrowdPressure: buildCrowdPressure,
-            RetreatCrowdPressure: retreatCrowdPressure);
+            RetreatCrowdPressure: retreatCrowdPressure,
+            IsCommander: actor.IsCombatCommander,
+            ActiveCombatGroupSize: activeGroupSize,
+            ActiveGroupAverageMorale: (float)activeGroupAverageMorale,
+            CommanderMoraleStabilityBonus: actor.CommanderMoraleStabilityBonus);
     }
 
     private static int CountUnlockedTechs(Colony colony, IEnumerable<string> techIds)

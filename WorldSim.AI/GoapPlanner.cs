@@ -29,7 +29,7 @@ public sealed class GoapPlanner : IPlanner
 
         if (_goal.Name == "DefendSelf")
         {
-            var threatCommand = ThreatDecisionPolicy.ShouldFight(context) ? NpcCommand.Fight : NpcCommand.Flee;
+            var threatCommand = SelectDefendSelfCommand(context);
             var threatReason = _goalChanged ? "GoalChanged" : "ThreatResponse";
             _goalChanged = false;
             return new PlannerDecision(threatCommand, 1, new[] { threatCommand }, 1, threatReason, "GoapThreatRule");
@@ -47,11 +47,7 @@ public sealed class GoapPlanner : IPlanner
 
         if (_goal.Name == "RaidBorder")
         {
-            var raidCommand = context.IsWarriorRole
-                ? (context.NearbyEnemyCount > 0 && ThreatDecisionPolicy.ShouldFight(context)
-                    ? NpcCommand.Fight
-                    : NpcCommand.RaidBorder)
-                : NpcCommand.Flee;
+            var raidCommand = SelectRaidBorderCommand(context);
             var raidReason = _goalChanged ? "GoalChanged" : "RaidPressure";
             _goalChanged = false;
             return new PlannerDecision(raidCommand, 1, new[] { raidCommand }, 1, raidReason, "GoapRaidRule");
@@ -255,6 +251,35 @@ public sealed class GoapPlanner : IPlanner
     }
 
     private sealed record Node(GoapState State, Node? Parent, GoapAction? Action, int G);
+
+    private static NpcCommand SelectDefendSelfCommand(in NpcAiContext context)
+    {
+        if (ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context))
+            return NpcCommand.Flee;
+
+        return ThreatDecisionPolicy.ShouldFight(context) ? NpcCommand.Fight : NpcCommand.Flee;
+    }
+
+    private static NpcCommand SelectRaidBorderCommand(in NpcAiContext context)
+    {
+        if (!context.IsWarriorRole)
+            return NpcCommand.Flee;
+
+        if (ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context))
+            return NpcCommand.Flee;
+
+        if (ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context)
+            && context.IsWarStance
+            && (context.IsContestedTile || context.HasContestedTilesNearby))
+            return NpcCommand.RaidBorder;
+
+        if (context.NearbyEnemyCount > 0 && ThreatDecisionPolicy.ShouldFight(context))
+            return NpcCommand.Fight;
+
+        return context.IsWarStance || context.IsHostileStance
+            ? NpcCommand.RaidBorder
+            : NpcCommand.Flee;
+    }
 
     private static bool ShouldUnlockMilitaryTech(in NpcAiContext context)
     {

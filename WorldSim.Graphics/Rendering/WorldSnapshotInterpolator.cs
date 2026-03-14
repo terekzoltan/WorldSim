@@ -19,6 +19,8 @@ public static class WorldSnapshotInterpolator
             InterpolatePeople(previous.People, current.People, alpha),
             InterpolateAnimals(previous.Animals, current.Animals, alpha),
             current.Colonies,
+            current.CombatGroups,
+            current.Battles,
             current.FactionStances,
             current.Ecology,
             current.CurrentSeason,
@@ -46,7 +48,16 @@ public static class WorldSnapshotInterpolator
                 cur.NoProgressStreak,
                 cur.BackoffTicksRemaining,
                 cur.DebugDecisionCause,
-                cur.DebugTargetKey));
+                cur.DebugTargetKey,
+                cur.CombatMorale,
+                cur.IsRouting,
+                cur.RoutingTicksRemaining,
+                cur.ActiveCombatGroupId,
+                cur.ActiveBattleId,
+                cur.Formation,
+                cur.IsCommander,
+                cur.CommanderIntelligence,
+                cur.CommanderMoraleStabilityBonus));
         }
 
         for (int i = shared; i < current.Count; i++)

@@ -873,17 +873,17 @@ Proof targets:
 
 > Director Plan > Phase 2 Sprint 5
 
-- ⬜ **S5-A** Runtime hardening — dedupe, counters, diagnostic logging
-- ⬜ **S5-B** Invariant pack completeness — INV-20, fuzzing (1000 random candidates)
+- ✅ **S5-A** Runtime hardening — dedupe, counters, diagnostic logging
+- ✅ **S5-B** Invariant pack completeness — INV-20, fuzzing (1000 random candidates)
 
 ### Sprint C5: Formations + Morale (Track B -> C -> A)
 
 > Combat Plan > Phase 3 Sprint 5
 
-- ⬜ **P3-A** Formation system + group combat resolver (Track B)
-- ⬜ **P3-B** Combat morale + routing (Track B)
-- ⬜ **P3-C** Commander bonus — Intelligence-based (Track B + C)
-- ⬜ **P3-D** Graphics for battles (Track A)
+- ✅ **P3-A** Formation system + group combat resolver (Track B)
+- ✅ **P3-B** Combat morale + routing (Track B)
+- ✅ **P3-C** Commander bonus — Intelligence-based (Track B + C)
+- ✅ **P3-D** Graphics for battles (Track A)
 
 ### Wave 5 — Execution Steps
 

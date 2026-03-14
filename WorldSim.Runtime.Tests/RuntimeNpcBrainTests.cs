@@ -297,6 +297,54 @@ public class RuntimeNpcBrainTests
     }
 
     [Fact]
+    public void Think_PopulatesCommanderAndGroupMoraleContext_WhenCommanderAssigned()
+    {
+        var world = new World(32, 20, 24, randomSeed: 9012)
+        {
+            EnableCombatPrimitives = true,
+            EnableDiplomacy = true
+        };
+
+        world._animals.Clear();
+        var colonyA = world._colonies[0];
+        var colonyB = world._colonies[1];
+        world.SetFactionStance(colonyA.Faction, colonyB.Faction, WorldSim.Simulation.Diplomacy.Stance.War);
+
+        var teamA = world._people.Where(person => person.Home == colonyA).Take(3).ToList();
+        var teamB = world._people.Where(person => person.Home == colonyB).Take(3).ToList();
+
+        teamA[0].Intelligence = 4;
+        teamA[1].Intelligence = 15;
+        teamA[2].Intelligence = 10;
+        foreach (var person in teamA)
+            person.Current = Job.Fight;
+        foreach (var person in teamB)
+            person.Current = Job.Fight;
+
+        var aPos = new[] { (12, 10), (12, 11), (11, 10) };
+        var bPos = new[] { (13, 10), (13, 11), (14, 10) };
+        for (var i = 0; i < teamA.Count; i++)
+            teamA[i].Pos = aPos[i];
+        for (var i = 0; i < teamB.Count; i++)
+            teamB[i].Pos = bPos[i];
+
+        foreach (var bystander in world._people.Except(teamA).Except(teamB))
+            bystander.Pos = (0, 0);
+
+        world.Update(0.25f);
+
+        var commander = teamA.OrderByDescending(person => person.Intelligence).First(person => person.IsCombatCommander);
+        var brain = new RuntimeNpcBrain(new CapturingBrain());
+        _ = brain.Think(commander, world, dt: 1f);
+
+        Assert.NotNull(CapturingBrain.LastContext);
+        Assert.True(CapturingBrain.LastContext!.Value.IsCommander);
+        Assert.True(CapturingBrain.LastContext.Value.ActiveCombatGroupSize >= 3);
+        Assert.InRange(CapturingBrain.LastContext.Value.ActiveGroupAverageMorale, 0f, 100f);
+        Assert.True(CapturingBrain.LastContext.Value.CommanderMoraleStabilityBonus > 0f);
+    }
+
+    [Fact]
     public void Think_ReportsPlannerSignals_ToWorldCounters()
     {
         var world = new World(16, 16, 10, randomSeed: 123);

@@ -63,7 +63,11 @@ public readonly record struct NpcAiContext(
     int HomeFortificationTechCount = 0,
     float ResourceCrowdPressure = 0f,
     float BuildCrowdPressure = 0f,
-    float RetreatCrowdPressure = 0f);
+    float RetreatCrowdPressure = 0f,
+    bool IsCommander = false,
+    int ActiveCombatGroupSize = 0,
+    float ActiveGroupAverageMorale = 100f,
+    float CommanderMoraleStabilityBonus = 0f);
 
 public interface IPlanner
 {

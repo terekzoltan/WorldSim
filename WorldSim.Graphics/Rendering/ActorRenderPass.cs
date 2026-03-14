@@ -48,6 +48,7 @@ public sealed class ActorRenderPass : IRenderPass
 
             DrawHealthBar(spriteBatch, textures, person, bounds, settings, theme);
             DrawCombatMarker(spriteBatch, textures, person, bounds, settings, theme);
+            DrawBattleMarkers(spriteBatch, textures, person, bounds, settings, theme);
         }
 
         DrawStackDebugMarkers(spriteBatch, textures, snapshot, settings);
@@ -164,6 +165,50 @@ public sealed class ActorRenderPass : IRenderPass
         spriteBatch.Draw(textures.Pixel, new Rectangle(marker.X, marker.Bottom - thickness, marker.Width, thickness), color);
         spriteBatch.Draw(textures.Pixel, new Rectangle(marker.X, marker.Y, thickness, marker.Height), color);
         spriteBatch.Draw(textures.Pixel, new Rectangle(marker.Right - thickness, marker.Y, thickness, marker.Height), color);
+    }
+
+    private static void DrawBattleMarkers(
+        SpriteBatch spriteBatch,
+        TextureCatalog textures,
+        PersonRenderData person,
+        Rectangle actorBounds,
+        WorldRenderSettings settings,
+        WorldRenderTheme theme)
+    {
+        bool inBattleContext = person.ActiveBattleId >= 0 || person.IsRouting;
+        if (!inBattleContext)
+            return;
+
+        var morale = Math.Clamp(person.CombatMorale / 100f, 0f, 1f);
+        int barWidth = Math.Max(actorBounds.Width, settings.TileSize);
+        int barHeight = Math.Max(1, settings.TileSize / 4);
+        int x = actorBounds.X + (actorBounds.Width - barWidth) / 2;
+        int y = actorBounds.Bottom + 1;
+
+        spriteBatch.Draw(textures.Pixel, new Rectangle(x, y, barWidth, barHeight), new Color(14, 18, 24, 190));
+        int innerWidth = Math.Max(1, barWidth - 2);
+        int fillWidth = Math.Clamp((int)MathF.Round(innerWidth * morale), 1, innerWidth);
+        var moraleColor = morale switch
+        {
+            < 0.30f => new Color(222, 92, 86),
+            < 0.65f => new Color(236, 188, 106),
+            _ => theme.Success
+        };
+        spriteBatch.Draw(textures.Pixel, new Rectangle(x + 1, y + 1, fillWidth, Math.Max(1, barHeight - 2)), moraleColor);
+
+        if (person.IsRouting)
+        {
+            int markerSize = Math.Max(1, settings.TileSize / 3);
+            var routeColor = new Color(235, 121, 205) * 0.92f;
+            spriteBatch.Draw(textures.Pixel, new Rectangle(actorBounds.X + 1, actorBounds.Y + 1, markerSize, markerSize), routeColor);
+        }
+
+        if (person.IsCommander)
+        {
+            int badge = Math.Max(1, settings.TileSize / 3);
+            var commanderColor = new Color(130, 214, 255) * 0.9f;
+            spriteBatch.Draw(textures.Pixel, new Rectangle(actorBounds.Right - badge - 1, actorBounds.Y + 1, badge, badge), commanderColor);
+        }
     }
 
     private static void DrawAnimals(SpriteBatch spriteBatch, WorldRenderSnapshot snapshot, TextureCatalog textures, WorldRenderSettings settings, WorldRenderTheme theme)
