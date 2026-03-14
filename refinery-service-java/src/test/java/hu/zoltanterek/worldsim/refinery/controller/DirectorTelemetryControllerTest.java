@@ -1,0 +1,94 @@
+package hu.zoltanterek.worldsim.refinery.controller;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+@SpringBootTest(properties = {
+        "planner.mode=pipeline",
+        "planner.llm.enabled=false",
+        "planner.refinery.enabled=true",
+        "planner.director.maxRetries=0",
+        "planner.director.outputMode=both"
+})
+@AutoConfigureMockMvc
+class DirectorTelemetryControllerTest {
+    @Autowired
+    private MockMvc mockMvc;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void telemetryEndpointReturnsQueryableCounters() throws Exception {
+        JsonNode body = getTelemetry();
+        assertTrue(body.has("directorRequestsCount"));
+        assertTrue(body.has("validatedOutputsCount"));
+        assertTrue(body.has("fallbackCount"));
+        assertTrue(body.has("rejectedCommandCount"));
+        assertTrue(body.has("retryAttemptsTotal"));
+        assertTrue(body.has("averageRetryCount"));
+        assertTrue(body.has("lastUpdatedUtc"));
+        assertTrue(body.has("pipelineVersion"));
+    }
+
+    @Test
+    void telemetryCountersTrackDirectorRequestsAndValidation() throws Exception {
+        JsonNode before = getTelemetry();
+
+        postDirectorRequest(0, 2);
+        postDirectorRequest(6, 2);
+
+        JsonNode after = getTelemetry();
+
+        assertTrue(after.path("directorRequestsCount").asLong() >= before.path("directorRequestsCount").asLong());
+        assertTrue(after.path("validatedOutputsCount").asLong() >= before.path("validatedOutputsCount").asLong());
+        assertTrue(after.path("fallbackCount").asLong() >= before.path("fallbackCount").asLong());
+        assertTrue(after.path("rejectedCommandCount").asLong() >= before.path("rejectedCommandCount").asLong());
+        assertTrue(after.path("averageRetryCount").asDouble() >= 0.0);
+    }
+
+    private JsonNode getTelemetry() throws Exception {
+        MvcResult result = mockMvc.perform(get("/v1/director/telemetry"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+    }
+
+    private void postDirectorRequest(long storyBeatCooldownTicks, int colonyCount) throws Exception {
+        String request = """
+                {
+                  "schemaVersion": "v1",
+                  "requestId": "%s",
+                  "seed": 321,
+                  "tick": 128,
+                  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+                  "snapshot": {
+                    "world": {
+                      "colonyCount": %d,
+                      "storyBeatCooldownTicks": %d
+                    }
+                  }
+                }
+                """.formatted(UUID.randomUUID(), colonyCount, storyBeatCooldownTicks);
+
+        mockMvc.perform(post("/v1/patch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk());
+    }
+}
