@@ -42,3 +42,10 @@ packages/
 *.sdf
 *.cache
 *.dbmdl
+
+# Local artifact outputs
+.artifacts/*
+!.artifacts/.gitkeep
+!.artifacts/smr/
+.artifacts/smr/*
+!.artifacts/smr/.gitkeep

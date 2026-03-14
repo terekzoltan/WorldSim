@@ -1,0 +1,58 @@
+{
+  "$schema": "balance-surface/v0-draft",
+  "$status": "draft-unwired",
+  "$note": "No runtime code loads this file yet. It becomes authoritative only for the wired curated subset.",
+  "$references": {
+    "spec": "Docs/Plans/Master/Balance-Loop-Specification.md",
+    "candidateSurface": "Docs/Plans/Master/balance-surface.md"
+  },
+  "survival": {
+    "hungerPerSecond": 1.65,
+    "starvationDamageSevere": 2.6,
+    "starvationDamageLight": 1.2,
+    "criticalEatPreemptThreshold": 78.0,
+    "emergencyInstantEatThreshold": 96.0,
+    "eatThresholdNormal": 62.0,
+    "eatThresholdEmergency": 54.0,
+    "seekFoodThresholdNormal": 50.0,
+    "seekFoodThresholdEmergency": 42.0,
+    "agingTickDivisor": 90.0,
+    "healthBonus": 0.0,
+    "maxAge": 80.0,
+    "birthRateMultiplier": 1.0
+  },
+  "economy": {
+    "woodYield": 1,
+    "stoneYield": 1,
+    "ironYield": 1,
+    "goldYield": 1,
+    "foodYield": 2,
+    "houseCapacity": 5,
+    "houseWoodCost": 50,
+    "houseStoneCost": 15
+  },
+  "combat": {
+    "predatorHumanDamage": 10.0,
+    "combatDamageBonusMultiplier": 1.0,
+    "combatDefenseBonusMultiplier": 1.0,
+    "siegeDamageMultiplier": 1.0,
+    "baseHumanDamage": 8.0,
+    "predatorStrength": 10,
+    "personCombatCooldownSeconds": 0.75,
+    "predatorCombatCooldownSeconds": 0.9,
+    "randomFactorMin": 0.85,
+    "randomFactorMax": 1.15,
+    "fortificationHpMultiplier": 1.0
+  },
+  "diplomacy": {
+    "borderPressureWeight": 0.35,
+    "skirmishPressureWeight": 8.0,
+    "passivePressureDecay": 1.2,
+    "neutralCooldownTicks": 180,
+    "escalatedCooldownTicks": 90,
+    "raidImpactFloor": 55.0,
+    "raidImpactBoost": 60.0,
+    "hostileThreshold": 55.0,
+    "warThreshold": 120.0
+  }
+}
