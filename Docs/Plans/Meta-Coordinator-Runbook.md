@@ -149,6 +149,7 @@ Ha VIOLATION talalhato, uzenofal bejegyzes is kotelezo.
 - `Docs/Plans/Session-Perf-Profiling-Plan.md` -- Performance Profiling session plan
 - `Docs/Plans/Session-Balance-QA-Plan.md` -- Balance/QA Agent session plan
 - `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` -- Low-cost 2D strategiai referencia + integration prompt pack
+- `Docs/Plans/Master/SMR-Minimum-Ops-Checklist.md` -- Minimal SMR operator workflow + report format
 - `Docs/Plans/Track-C-Phase0-Preflight-Checklist.md` -- Track C Phase 0 preflight checklist
 - `Docs/Plans/Track-C-Combat-Masterplan-Readiness-Roadmap.md` -- Track C combat readiness roadmap
 

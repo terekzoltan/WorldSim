@@ -846,6 +846,10 @@ Acceptance notes:
 - Perf, balance, and clustering evidence share one compatible schema/tool surface rather than separate ad hoc outputs.
 - The project has a documented evidence-review workflow before the heavier Wave 5+ runtime/AI complexity lands.
 
+Operational follow-up note (post-Wave 4.5, non-blocking):
+- Use `Docs/Plans/Master/SMR-Minimum-Ops-Checklist.md` as the lightweight operating standard for run naming, artifact placement, baseline discipline, and report shape.
+- Larger SMR improvements around reporting/workflow/baseline tooling/interpretation are intentionally deferred and should not interrupt the main wave critical path unless they become a proven blocker.
+
 Proof targets:
 - `SMR-B1`: sample artifact bundle checked into docs/example or captured in test fixtures.
 - `SMR-B2`: tests for assertion/anomaly classification and exit-code policy.

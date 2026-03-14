@@ -198,3 +198,5 @@ For PRs that touch only graphics, HUD, or UI (no runtime/AI changes), the review
 - **Perf budgets are hardware-dependent** — the thresholds in the perf budget table (avg ≤ 4ms, p99 ≤ 8ms) are calibrated for developer-class hardware. CI runners may show higher times; treat yellow-zone CI perf anomalies as advisory until a CI-calibrated budget is established (SMR-B6 concern).
 - **`COMB-*` invariants are skipped when combat is disabled** — this is intentional. Runs without `EnableCombatPrimitives=true` will always skip combat invariant assertions.
 - **Baseline must be regenerated after major simulation rewrites** — if `WorldSim.Runtime` undergoes a large structural change, the existing `balance-baseline.json` may no longer be comparable. In that case, delete the old baseline and start fresh after the rewrite stabilizes.
+
+For day-to-day operator workflow (run naming, artifact placement, minimum report shape), use `Docs/Plans/Master/SMR-Minimum-Ops-Checklist.md` alongside this protocol.
