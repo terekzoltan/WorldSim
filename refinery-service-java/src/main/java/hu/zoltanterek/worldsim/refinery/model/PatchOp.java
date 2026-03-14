@@ -2,6 +2,7 @@ package hu.zoltanterek.worldsim.refinery.model;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -43,19 +44,46 @@ public sealed interface PatchOp permits PatchOp.AddTech, PatchOp.TweakTech, Patc
     ) implements PatchOp {
     }
 
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     record AddStoryBeat(
             String opId,
             String beatId,
             String text,
-            long durationTicks
+            long durationTicks,
+            String severity,
+            List<EffectEntry> effects
     ) implements PatchOp {
+        public AddStoryBeat(String opId, String beatId, String text, long durationTicks) {
+            this(opId, beatId, text, durationTicks, null, List.of());
+        }
     }
 
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
     record SetColonyDirective(
             String opId,
             int colonyId,
             String directive,
-            long durationTicks
+            long durationTicks,
+            List<GoalBiasEntry> biases
     ) implements PatchOp {
+        public SetColonyDirective(String opId, int colonyId, String directive, long durationTicks) {
+            this(opId, colonyId, directive, durationTicks, List.of());
+        }
+    }
+
+    record EffectEntry(
+            String type,
+            String domain,
+            double modifier,
+            long durationTicks
+    ) {
+    }
+
+    record GoalBiasEntry(
+            String type,
+            String goalCategory,
+            double weight,
+            Long durationTicks
+    ) {
     }
 }

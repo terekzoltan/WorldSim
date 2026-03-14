@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
@@ -16,6 +18,8 @@ import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
 @Component
 @Primary
 public class ComposedPatchPlanner implements PatchPlanner {
+    private static final Logger logger = LoggerFactory.getLogger(ComposedPatchPlanner.class);
+
     private final MockPlanner mockPlanner;
     private final LlmPlanner llmPlanner;
     private final RefineryPlanner refineryPlanner;
@@ -54,6 +58,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
     }
 
     private PatchResponse planLegacyPipeline(PatchRequest request, PatchResponse mockResponse) {
+        logger.info("legacy pipeline start goal={} plannerMode={}", request.goal(), plannerMode);
         Optional<List<PatchOp>> llmProposal = llmPlanner.propose(request);
         List<PatchOp> candidatePatch = llmProposal.orElseGet(mockResponse::patch);
         List<PatchOp> validatedPatch;
@@ -87,7 +92,18 @@ public class ComposedPatchPlanner implements PatchPlanner {
         }
         if (refineryFailed) {
             warnings.add("Refinery validation failed, falling back to deterministic mock patch.");
+            logger.error("legacy pipeline refinery stage failed; falling back to mock output");
         }
+
+        logger.info(
+                "legacy pipeline completed goal={} candidateOps={} outputOps={} llmPresent={} refineryValidated={} refineryFailed={}",
+                request.goal(),
+                candidatePatch.size(),
+                validatedPatch.size(),
+                llmProposal.isPresent(),
+                refineryValidated,
+                refineryFailed
+        );
 
         return new PatchResponse(
                 mockResponse.schemaVersion(),
@@ -100,6 +116,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
     }
 
     private PatchResponse planDirectorPipeline(PatchRequest request, PatchResponse mockResponse) {
+        logger.info("director pipeline start outputMode={} plannerMode={}", directorOutputMode, plannerMode);
         Optional<List<PatchOp>> llmProposal = llmPlanner.propose(request);
         List<PatchOp> candidatePatch = applyDirectorOutputMode(
                 llmProposal.orElseGet(mockResponse::patch),
@@ -141,6 +158,26 @@ public class ComposedPatchPlanner implements PatchPlanner {
         }
         if (!validationResult.feedback().isEmpty()) {
             warnings.addAll(validationResult.feedback().stream().map(msg -> "directorFeedback:" + msg).toList());
+        }
+
+        logger.info(
+                "director pipeline completed stage={} candidateOps={} outputOps={} retries={} fallback={} llmPresent={} warningCount={}",
+                stage,
+                candidatePatch.size(),
+                validatedPatch.size(),
+                validationResult.retriesUsed(),
+                validationResult.fallbackUsed(),
+                llmProposal.isPresent(),
+                warnings.size()
+        );
+        if (validationResult.fallbackUsed()) {
+            logger.error(
+                    "director pipeline fallback was required after retries retries={} feedbackCount={}",
+                    validationResult.retriesUsed(),
+                    validationResult.feedback().size()
+            );
+        } else if (!validationResult.feedback().isEmpty()) {
+            logger.warn("director pipeline validation feedback emitted feedbackCount={}", validationResult.feedback().size());
         }
 
         return new PatchResponse(

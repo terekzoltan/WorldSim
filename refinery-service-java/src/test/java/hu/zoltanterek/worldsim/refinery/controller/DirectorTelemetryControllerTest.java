@@ -55,10 +55,15 @@ class DirectorTelemetryControllerTest {
 
         JsonNode after = getTelemetry();
 
-        assertTrue(after.path("directorRequestsCount").asLong() >= before.path("directorRequestsCount").asLong());
-        assertTrue(after.path("validatedOutputsCount").asLong() >= before.path("validatedOutputsCount").asLong());
-        assertTrue(after.path("fallbackCount").asLong() >= before.path("fallbackCount").asLong());
-        assertTrue(after.path("rejectedCommandCount").asLong() >= before.path("rejectedCommandCount").asLong());
+        long requestDelta = after.path("directorRequestsCount").asLong() - before.path("directorRequestsCount").asLong();
+        long validatedDelta = after.path("validatedOutputsCount").asLong() - before.path("validatedOutputsCount").asLong();
+        long fallbackDelta = after.path("fallbackCount").asLong() - before.path("fallbackCount").asLong();
+        long rejectedDelta = after.path("rejectedCommandCount").asLong() - before.path("rejectedCommandCount").asLong();
+
+        assertTrue(requestDelta >= 2);
+        assertTrue(validatedDelta >= 1);
+        assertTrue(fallbackDelta >= 0);
+        assertTrue(rejectedDelta >= 0);
         assertTrue(after.path("averageRetryCount").asDouble() >= 0.0);
     }
 

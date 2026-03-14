@@ -128,6 +128,39 @@
               },
               "durationTicks": {
                 "type": "integer"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["minor", "major", "epic"]
+              },
+              "effects": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "domain",
+                    "modifier",
+                    "durationTicks"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "domain_modifier"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "modifier": {
+                      "type": "number"
+                    },
+                    "durationTicks": {
+                      "type": "integer"
+                    }
+                  }
+                }
               }
             }
           },
@@ -190,6 +223,34 @@
               },
               "durationTicks": {
                 "type": "integer"
+              },
+              "biases": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "goalCategory",
+                    "weight"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "goal_bias"
+                    },
+                    "goalCategory": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "weight": {
+                      "type": "number"
+                    },
+                    "durationTicks": {
+                      "type": "integer"
+                    }
+                  }
+                }
               }
             }
           }

@@ -12,12 +12,40 @@ public final class DirectorDesign {
             "BoostIndustry"
     );
 
+    public static final Set<String> VALID_DOMAINS = Set.of(
+            "food",
+            "morale",
+            "economy",
+            "military",
+            "research"
+    );
+
+    public static final Set<String> VALID_GOAL_CATEGORIES = Set.of(
+            "farming",
+            "gathering",
+            "crafting",
+            "building",
+            "social",
+            "military",
+            "research",
+            "rest"
+    );
+
+    public static final Set<String> VALID_SEVERITIES = Set.of("minor", "major", "epic");
+
     public static final long MIN_STORY_DURATION = 1;
     public static final long MAX_STORY_DURATION = 96;
     public static final long MIN_DIRECTIVE_DURATION = 1;
     public static final long MAX_DIRECTIVE_DURATION = 48;
     public static final int MAX_STORY_TEXT_LENGTH = 160;
     public static final int MAX_OPS_PER_CHECKPOINT = 4;
+    public static final int MAX_EFFECTS_PER_BEAT = 3;
+    public static final int MAX_BIASES_PER_DIRECTIVE = 3;
+    public static final double MODIFIER_MIN = -0.30;
+    public static final double MODIFIER_MAX = 0.30;
+    public static final double WEIGHT_MIN = 0.0;
+    public static final double WEIGHT_MAX = 0.50;
+    public static final double MAX_DOMAIN_STACK = 0.40;
 
     /**
      * Invariant labels are implementation-level validator codes used in runtime feedback.
@@ -32,10 +60,10 @@ public final class DirectorDesign {
     public static final String INV_07 = "INV-07"; // directive vocabulary
     public static final String INV_08 = "INV-08"; // max one active major beat
     public static final String INV_09 = "INV-09"; // max one active epic beat
-    public static final String INV_10 = "INV-10"; // domain stacking cap (deferred)
+    public static final String INV_10 = "INV-10"; // domain stacking cap
     public static final String INV_11 = "INV-11"; // colony reference bounds
     public static final String INV_12 = "INV-12"; // no conflicting directives
     public static final String INV_13 = "INV-13"; // deterministic operation ordering
     public static final String INV_14 = "INV-14"; // conservative retry never adds new ops
-    public static final String INV_20 = "INV-20"; // deferred to S5-B: requires effects/biases fields
+    public static final String INV_20 = "INV-20"; // no contradictory same-domain modifiers
 }

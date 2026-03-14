@@ -1768,6 +1768,26 @@ Acceptance:
 - Fuzz test passes (1000 random candidates, no crashes)
 - All invariants have documented rationale
 
+Invariant rationale (Phase 0-2 pack):
+
+| Invariant | Rationale |
+|---|---|
+| INV-01 | Only supported director op types can pass, so runtime/apply behavior stays deterministic. |
+| INV-02 | Beat shape/cardinality rules prevent malformed or overloaded checkpoint payloads. |
+| INV-03 | Cooldown gate prevents story beat spam and event-loop instability. |
+| INV-04 | Required identity fields keep beat lifecycle traceable and debuggable. |
+| INV-05 | Text/effect cardinality caps protect payload size and processing cost. |
+| INV-06 | Duration bounds prevent infinite or instantly-expiring effects. |
+| INV-07 | Directive vocabulary gate protects against planner hallucinated directive names. |
+| INV-08 | At most one active major beat avoids excessive modifier pressure. |
+| INV-09 | At most one active epic beat avoids severe state shocks per checkpoint. |
+| INV-10 | Domain stack cap blocks runaway multipliers in economy/ecology/morale. |
+| INV-11 | opId and colony-reference validity is required for dedupe and target safety. |
+| INV-12 | Conflicting directives/bias forms are blocked to keep colony intent deterministic. |
+| INV-13 | Deterministic op ordering guarantees reproducible parity/fuzz/smoke outcomes. |
+| INV-14 | Conservative retry may only shrink/repair a candidate, never invent new ops. |
+| INV-20 | Contradictory same-domain modifiers in one checkpoint are rejected to avoid self-canceling ambiguous effect bundles. |
+
 ### Phase 3: LLM Creativity (Sprint 6-7)
 
 **Objective:** LLM proposes creative beats and directives. The Refinery validates compositions.

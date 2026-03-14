@@ -141,6 +141,96 @@ class DirectorModelValidatorTest {
         assertTrue(outcome.patch().get(0) instanceof PatchOp.AddStoryBeat);
     }
 
+    @Test
+    void validateAndRepair_RejectsContradictorySameDomainModifiers() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_story_conflict",
+                        "BEAT_CONFLICT",
+                        "Major pressure with contradictory modifiers",
+                        20,
+                        "major",
+                        List.of(
+                                new PatchOp.EffectEntry("domain_modifier", "food", 0.20, 10),
+                                new PatchOp.EffectEntry("domain_modifier", "food", -0.10, 10)
+                        )
+                )
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains(DirectorDesign.INV_20));
+    }
+
+    @Test
+    void validateAndRepair_AllowsSameSignSameDomainModifiers() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_story_same_sign",
+                        "BEAT_STACK",
+                        "Major pressure without contradiction",
+                        20,
+                        "major",
+                        List.of(
+                                new PatchOp.EffectEntry("domain_modifier", "food", 0.10, 10),
+                                new PatchOp.EffectEntry("domain_modifier", "food", 0.15, 10)
+                        )
+                )
+        );
+
+        DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
+        assertEquals(1, outcome.patch().size());
+        assertTrue(outcome.patch().get(0) instanceof PatchOp.AddStoryBeat);
+    }
+
+    @Test
+    void validateAndRepair_AllowsOppositeSignsAcrossDifferentDomains() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_story_diff_domains",
+                        "BEAT_DIFF",
+                        "Mixed domain directions",
+                        20,
+                        "major",
+                        List.of(
+                                new PatchOp.EffectEntry("domain_modifier", "food", -0.10, 10),
+                                new PatchOp.EffectEntry("domain_modifier", "morale", 0.10, 10)
+                        )
+                )
+        );
+
+        DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
+        assertEquals(1, outcome.patch().size());
+    }
+
+    @Test
+    void validateAndRepair_RejectsUnknownEffectDomain() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_story_bad_domain",
+                        "BEAT_BAD",
+                        "Invalid domain",
+                        20,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "unknown_domain", 0.10, 10))
+                )
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains(DirectorDesign.INV_02));
+    }
+
     private static DirectorRuntimeFacts facts(
             long tick,
             int colonyCount,

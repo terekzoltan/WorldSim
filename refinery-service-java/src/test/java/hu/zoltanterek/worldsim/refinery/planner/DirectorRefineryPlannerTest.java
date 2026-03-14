@@ -14,13 +14,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorPipelineTelemetry;
 
 class DirectorRefineryPlannerTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void validateAndRepair_UsesDeterministicFallbackAfterRetries() {
-        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 0);
+        DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 0, telemetry);
         PatchRequest request = directorRequest(128L, 2, 0);
 
         List<PatchOp> invalidCandidate = List.of(
@@ -36,11 +38,17 @@ class DirectorRefineryPlannerTest {
         assertTrue(result.patch().stream().allMatch(op ->
                 op instanceof PatchOp.AddStoryBeat || op instanceof PatchOp.SetColonyDirective
         ));
+
+        DirectorPipelineTelemetry.Snapshot snapshot = telemetry.snapshot();
+        assertEquals(1, snapshot.fallbackCount());
+        assertEquals(1, snapshot.rejectedCommandCount());
+        assertEquals(0, snapshot.validatedOutputsCount());
     }
 
     @Test
     void validateAndRepair_ReturnsValidatedResultForValidCandidate() {
-        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 2);
+        DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 2, telemetry);
         PatchRequest request = directorRequest(64L, 1, 0);
 
         List<PatchOp> validCandidate = List.of(
@@ -55,6 +63,27 @@ class DirectorRefineryPlannerTest {
         assertEquals(0, result.retriesUsed());
         assertEquals(2, result.patch().size());
         assertTrue(result.patch().get(0) instanceof PatchOp.AddStoryBeat);
+
+        DirectorPipelineTelemetry.Snapshot snapshot = telemetry.snapshot();
+        assertEquals(1, snapshot.validatedOutputsCount());
+        assertEquals(0, snapshot.fallbackCount());
+    }
+
+    @Test
+    void validateAndRepair_CountsRejectedDuplicatesWhenCandidateContainsDuplicateOpId() {
+        DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 1, telemetry);
+        PatchRequest request = directorRequest(64L, 1, 0);
+
+        List<PatchOp> duplicateOpIdCandidate = List.of(
+                new PatchOp.SetColonyDirective("op_dup", 0, "PrioritizeFood", 15),
+                new PatchOp.AddStoryBeat("op_dup", "BEAT_DUP", "major pressure wave", 22)
+        );
+
+        planner.validateAndRepair(request, duplicateOpIdCandidate);
+
+        DirectorPipelineTelemetry.Snapshot snapshot = telemetry.snapshot();
+        assertTrue(snapshot.rejectedCommandCount() >= 1);
     }
 
     private PatchRequest directorRequest(long tick, int colonyCount, long cooldownTicks) {

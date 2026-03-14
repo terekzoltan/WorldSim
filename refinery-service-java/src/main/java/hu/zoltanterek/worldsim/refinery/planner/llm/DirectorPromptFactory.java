@@ -18,13 +18,19 @@ public final class DirectorPromptFactory {
 
         StringBuilder sb = new StringBuilder();
         sb.append("Create a candidate director output with this JSON shape exactly: ");
-        sb.append("{\"storyBeat\":{\"enabled\":bool,\"beatId\":string,\"text\":string,\"durationTicks\":int},");
-        sb.append("\"nudge\":{\"enabled\":bool,\"colonyId\":int,\"directive\":string,\"durationTicks\":int}}.");
+        sb.append("{\"storyBeat\":{\"enabled\":bool,\"beatId\":string,\"text\":string,\"durationTicks\":int,");
+        sb.append("\"severity\":\"minor|major|epic\",\"effects\":[{\"type\":\"domain_modifier\",\"domain\":string,");
+        sb.append("\"modifier\":number,\"durationTicks\":int}]},");
+        sb.append("\"nudge\":{\"enabled\":bool,\"colonyId\":int,\"directive\":string,\"durationTicks\":int,");
+        sb.append("\"biases\":[{\"type\":\"goal_bias\",\"goalCategory\":string,\"weight\":number,\"durationTicks\":int}]}}.");
         sb.append(" Allowed directives: ").append(String.join(",", DirectorDesign.ALLOWED_DIRECTIVES)).append('.');
+        sb.append(" Allowed domains: ").append(String.join(",", DirectorDesign.VALID_DOMAINS)).append('.');
+        sb.append(" Allowed goal categories: ").append(String.join(",", DirectorDesign.VALID_GOAL_CATEGORIES)).append('.');
         sb.append(" outputMode=").append(outputMode).append('.');
         sb.append(" colonyCount=").append(colonyCount).append('.');
         sb.append(" storyBeatCooldownTicks=").append(cooldown).append('.');
         sb.append(" Keep text under 160 chars and durations positive.");
+        sb.append(" Do not emit contradictory same-domain modifiers with mixed signs in one checkpoint.");
 
         if (!feedbackHints.isEmpty()) {
             sb.append(" Previous formal validation feedback: ");
