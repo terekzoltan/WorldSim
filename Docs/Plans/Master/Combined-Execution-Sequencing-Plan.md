@@ -905,6 +905,96 @@ Proof targets:
 
 ---
 
+## Wave 5.1 — Combat Observability + Engagement Realization Closeout
+
+Purpose:
+- Treat Wave 5 as functionally successful combat foundation work, then immediately close the most important post-release gaps before Wave 6 siege work adds more complexity.
+- Make the new combat slice measurable in SMR and readable in the live app, so later reviews do not depend on proxy metrics alone.
+- Separate three concerns cleanly:
+  - combat really exists and engages,
+  - combat evidence is still incomplete,
+  - medium combat lanes show persistent crowd/backoff friction that may be a real runtime/AI issue.
+
+### Sprint C5.1: Combat Readability + SMR Evidence Closeout (Track B -> C -> A)
+
+> Post-Wave-5 closeout sprint
+
+- ⬜ **W5.1-B1** Combat counter parity in ScenarioRunner -- export death/kill counters so `COMB-01/02` no longer skip on combat-enabled runs (Track B)
+- ⬜ **W5.1-B2** Morale/routing/battle telemetry export -- summary + drilldown visibility for active battles, combat groups, routing counts, morale, battle ticks (Track B)
+- ⬜ **W5.1-B3** Combat engagement/congestion runtime closeout -- battle-local spacing / routed egress / contact realization improvements for the medium combat lane (Track B)
+- ⬜ **W5.1-B4** Predator-human toggle semantics fix -- if predator-human attacks are disabled, predator vs human combat should not silently remain active on one side (Track B)
+- ⬜ **W5.1-C1** AI re-engage / congestion audit -- routed or fleeing actors should not thrash back into congested fights without clear intent (Track C)
+- ⬜ **W5.1-A1** Battle readability cleanup -- clarify battle-state marker semantics without turning this into a full visual redesign (Track A)
+
+### Wave 5.1 — Execution Steps
+
+**Step 1 — Track B closes the evidence gap first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W5.1-B1, W5.1-B2, W5.1-B4 | Wave 5 C5 ✅ | Same runtime/runner ownership; treat as one closeout batch before broader diagnosis |
+
+**Step 2 — runtime combat behavior closeout**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W5.1-B3 | W5.1-B1 ✅ + W5.1-B2 ✅ | Fix should target combat-specific congestion/engagement realization, not reopen the full peaceful clustering problem |
+
+**Step 3 — AI and graphics consume the stabilized state**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | W5.1-C1 | W5.1-B3 ✅ | Re-engage/routing logic should reflect the actual post-fix combat model |
+| Track A agent | W5.1-A1 | W5.1-B2 ✅ | Improve readability after battle/routing semantics are visible enough to label correctly |
+
+**Critical path:** `W5.1-B1/B2/B4 -> W5.1-B3 -> W5.1-C1`, while `W5.1-A1` can overlap after telemetry semantics are stable.
+
+### Wave 5.1 — Design Notes
+
+- Wave 5 already delivered real combat. This closeout wave should not be framed as "combat does not work"; it should be framed as "combat now needs to be measurable, interpretable, and less friction-heavy before siege/campaign layers build on it."
+- Manual screenshot evidence plus written operator notes are valid inputs for this wave, alongside SMR artifacts. Use both:
+  - manual/live app evidence answers: "can a human read the battle?"
+  - SMR evidence answers: "what actually happens across seeds/planners/configs?"
+- Manual notes so far suggest that individual combat definitely occurs, while large-scale grouped battle readability is still inconsistent and may depend heavily on local trigger geometry.
+- This wave should remain narrow:
+  - no siege mechanics,
+  - no major campaign/supply work,
+  - no large visual overhaul,
+  - no broad rebalance pass beyond combat-local closeout.
+- `W5.1-B4` is intentionally in scope because the predator-human toggle semantics currently produce confusing evidence and manual behavior. The runtime policy should match the operator expectation.
+
+### Wave 5.1 — Evidence Expectations
+
+- Peaceful regression guard:
+  - `small-default` compare baseline remains clean.
+- Combat evidence minimum:
+  - combat-enabled runs evaluate `COMB-01/02/03` rather than skipping `COMB-01/02`.
+  - SMR summary/drilldown exposes enough combat fields that morale/routing/battle-state can be reasoned about directly.
+- Combat lane quality target:
+  - medium combat lane still may be noisy, but post-fix evidence should show either improvement or much clearer attribution of the remaining problem.
+- Manual verification target:
+  - a human should be able to distinguish at a glance between active combat, routing state, contested pressure, and non-combat damage markers more reliably than in raw Wave 5.
+
+### Wave 5.1 — Risks And Mitigations
+
+- **Risk: this turns into an SMR feature wave instead of a combat closeout.**
+  - Mitigation: only add the minimum combat observability required to validate Wave 5 claims.
+- **Risk: combat congestion fixes accidentally reopen the broader peaceful clustering problem.**
+  - Mitigation: keep `W5.1-B3` scoped to battle-local spacing / routed egress / contact realization.
+- **Risk: screenshots drive premature visual over-polish.**
+  - Mitigation: use manual images as evidence inputs, not as justification for a full art/UI redesign inside this closeout wave.
+- **Risk: predator-human behavior remains inconsistent across manual app vs SMR.**
+  - Mitigation: fix the toggle semantics and ensure the resulting counters/fields are visible in SMR output.
+
+### Wave 5.1 — Proof Targets
+
+- `W5.1-B1/B2`: combat-enabled SMR runs no longer produce `ANOM-COMB-COUNTERS-MISSING`, and artifacts contain morale/routing/battle-state evidence fields.
+- `W5.1-B3/C1`: medium combat lane shows reduced or better-explained combat backoff/crowding without breaking the peaceful smoke baseline.
+- `W5.1-B4`: predator-human attack toggle behavior is semantically aligned in runtime and visible enough to verify in SMR/manual tests.
+- `W5.1-A1`: manual screenshots + notes show more readable battle-state cues without requiring internal code knowledge to interpret the overlay.
+
+---
+
 ## Wave 6 — LLM Integration + Siege (Director Phase 3a + Combat Phase 3b)
 
 ### Sprint D6: LLM Creativity + Budget (Track D + B)
@@ -1133,6 +1223,7 @@ Proof targets:
 | 3 | D3 (Phase 1 S3) | C3 (Phase 1 S3) | Fully parallel |
 | 4 | D4 (Phase 2 S4) | C4 (Phase 2 S4) | Fully parallel |
 | 5 | D5 (Phase 2 S5) | C5 (Phase 3 S5) | Fully parallel |
+| 5.1 | — | C5.1 (Combat closeout) | Track B -> C + A |
 | 6 | D6 (Phase 3 S6) | C6 (Phase 3 S6) | MR-2: tick loop caution |
 | 7 | D7 (Phase 3 S7) | C7 (Phase 4 S7) | MR-3: sequential |
 | 7.5 | — | LC1 (Low-Cost baseline) | Track B -> A -> optional C |
@@ -1140,7 +1231,7 @@ Proof targets:
 | 9 | — | C9-C10 (Phase 5-6 S9-10) | Sequential |
 | 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential |
 
-**Totals:** 11 waves, 20 sprints (7 Director + 14 Combat/closeout), ~88 epics.
+**Totals:** 12 waves, 21 sprints (7 Director + 15 Combat/closeout), ~94 epics.
 
 ---
 
@@ -1149,6 +1240,7 @@ Proof targets:
 | Trigger condition | Session to launch | Plan doc |
 |-------------------|-------------------|----------|
 | Track A Sprint 3 complete + Phase 0 green-lit | Combat Coordinator | `Docs/Plans/Session-Combat-Coordinator-Plan.md` |
+| Manual app/SMR testing questions, commands, or env setup help | Manual Test Helper | `Docs/Plans/Session-Manual-Test-Helper-Plan.md` |
 | FPS < 60 or Combat Phase 3 reached | Performance Profiling | `Docs/Plans/Session-Perf-Profiling-Plan.md` |
 | Combat Phase 0 end or balance regressions | Balance/QA Agent | `Docs/Plans/Session-Balance-QA-Plan.md` |
 | Wave 7 complete | Low-Cost 2D alignment / Wave 7.5 kickoff | `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` |

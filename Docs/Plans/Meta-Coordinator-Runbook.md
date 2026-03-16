@@ -146,6 +146,7 @@ Ha VIOLATION talalhato, uzenofal bejegyzes is kotelezo.
 - `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md` -- Jovobeni combat/campaign master plan
 - `WorldSim.Runtime/Docs/Plans/TODO.md` -- Runtime korai TODO (legacy)
 - `Docs/Plans/Session-Combat-Coordinator-Plan.md` -- Combat Coordinator session playbook
+- `Docs/Plans/Session-Manual-Test-Helper-Plan.md` -- Manual testing / commands / env helper session
 - `Docs/Plans/Session-Perf-Profiling-Plan.md` -- Performance Profiling session plan
 - `Docs/Plans/Session-Balance-QA-Plan.md` -- Balance/QA Agent session plan
 - `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` -- Low-cost 2D strategiai referencia + integration prompt pack
