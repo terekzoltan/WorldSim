@@ -91,6 +91,12 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
             List<double>? tickTimesMs = perfEnabled ? new List<double>(config.Ticks) : null;
             long peakEntities = 0;
             var timelineSamples = drilldownEnabled ? new List<ScenarioTimelineSample>() : null;
+            var peakActiveBattles = 0;
+            var peakActiveCombatGroups = 0;
+            var peakRoutingPeople = 0;
+            var ticksWithActiveBattle = 0;
+            var minCombatMoraleObserved = 100f;
+            var sawLivingPerson = false;
 
             for (var i = 0; i < config.Ticks; i++)
             {
@@ -117,9 +123,39 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
 
                 if (timelineSamples is not null && ShouldCaptureTickSample(i, config.Ticks, drilldownSampleEvery))
                     timelineSamples.Add(BuildTimelineSample(world, i + 1, perfTickMs));
+
+                peakActiveBattles = Math.Max(peakActiveBattles, world.ActiveBattleCount);
+                peakActiveCombatGroups = Math.Max(peakActiveCombatGroups, world.ActiveCombatGroupCount);
+                if (world.ActiveBattleCount > 0)
+                    ticksWithActiveBattle++;
+
+                var routingPeople = 0;
+                foreach (var person in world._people)
+                {
+                    if (person.Health <= 0f)
+                        continue;
+
+                    sawLivingPerson = true;
+                    routingPeople += person.IsRouting ? 1 : 0;
+                    if (person.CombatMorale < minCombatMoraleObserved)
+                        minCombatMoraleObserved = person.CombatMorale;
+                }
+
+                peakRoutingPeople = Math.Max(peakRoutingPeople, routingPeople);
             }
 
-            var runResult = BuildRunResult(world, config, planner, seed, tickTimesMs, peakEntities);
+            var runResult = BuildRunResult(
+                world,
+                config,
+                planner,
+                seed,
+                tickTimesMs,
+                peakEntities,
+                peakActiveBattles,
+                peakActiveCombatGroups,
+                peakRoutingPeople,
+                ticksWithActiveBattle,
+                sawLivingPerson ? minCombatMoraleObserved : 100f);
             runs.Add(runResult);
             if (timelineSamples is not null)
                 runTimelines[BuildRunKey(runResult)] = timelineSamples;
@@ -179,7 +215,12 @@ static ScenarioRunResult BuildRunResult(
     NpcPlannerMode planner,
     int seed,
     List<double>? tickTimesMs,
-    long peakEntities)
+    long peakEntities,
+    int peakActiveBattles,
+    int peakActiveCombatGroups,
+    int peakRoutingPeople,
+    int ticksWithActiveBattle,
+    float minCombatMoraleObserved)
 {
     var livingColonies = world._colonies.Count(colony => world._people.Any(person => person.Home == colony && person.Health > 0f));
     var totalFood = world._colonies.Sum(colony => colony.Stock[Resource.Food]);
@@ -224,7 +265,15 @@ static ScenarioRunResult BuildRunResult(
         DeathsStarvation: world.TotalDeathsStarvation,
         DeathsPredator: world.TotalDeathsPredator,
         DeathsOther: world.TotalDeathsOther,
+        CombatDeaths: world.TotalCombatDeaths,
         CombatEngagements: world.TotalCombatEngagements,
+        PredatorKillsByHumans: world.TotalPredatorKillsByHumans,
+        BattleTicks: world.TotalBattleTicks,
+        PeakActiveBattles: peakActiveBattles,
+        PeakActiveCombatGroups: peakActiveCombatGroups,
+        PeakRoutingPeople: peakRoutingPeople,
+        TicksWithActiveBattle: ticksWithActiveBattle,
+        MinCombatMoraleObserved: minCombatMoraleObserved,
         DeathsStarvationRecent60s: world.RecentDeathsStarvation60s,
         DeathsStarvationWithFood: world.TotalStarvationDeathsWithFood,
         OverlapResolveMoves: world.TotalOverlapResolveMoves,
@@ -621,8 +670,8 @@ static List<ScenarioAssertionResult> EvaluateAssertions(IReadOnlyList<ScenarioRu
             continue;
         }
 
-        AddSkippedAssertion("COMB-01", "combat", runKey, "combat_counters_unavailable", "TotalCombatDeaths is not exported in ScenarioRunner yet", results);
-        AddSkippedAssertion("COMB-02", "combat", runKey, "combat_counters_unavailable", "TotalCombatDeaths is not exported in ScenarioRunner yet", results);
+        AddAssertion("COMB-01", "combat", "error", runKey, assertEnabled, run.CombatDeaths > 0, run.CombatDeaths.ToString(), ">0", "Combat deaths are observed in combat-enabled runs", results);
+        AddAssertion("COMB-02", "combat", "error", runKey, assertEnabled, (run.CombatDeaths + run.PredatorKillsByHumans) > 0, (run.CombatDeaths + run.PredatorKillsByHumans).ToString(), ">0", "Combat kills/deaths counters are active", results);
         AddAssertion("COMB-03", "combat", "error", runKey, assertEnabled, run.CombatEngagements > 0, run.CombatEngagements.ToString(), ">0", "Combat engagements exist", results);
     }
 
@@ -690,23 +739,7 @@ static List<ScenarioAnomaly> DetectAnomalies(
         if (!run.EnableCombatPrimitives)
             continue;
 
-        var missingCombatCounters = assertions.Any(a =>
-            string.Equals(a.RunKey, BuildRunKey(run), StringComparison.Ordinal) &&
-            string.Equals(a.InvariantId, "COMB-01", StringComparison.Ordinal) &&
-            a.Skipped &&
-            string.Equals(a.SkipReason, "combat_counters_unavailable", StringComparison.Ordinal));
-
-        if (missingCombatCounters)
-        {
-            anomalies.Add(new ScenarioAnomaly(
-                Id: "ANOM-COMB-COUNTERS-MISSING",
-                Category: "combat",
-                Severity: "warning",
-                RunKey: BuildRunKey(run),
-                Message: "Combat invariants skipped because death/kill counters are unavailable",
-                Value: "missing",
-                Threshold: "counters_present"));
-        }
+        // W5.1-B1: COMB-01/02 now evaluate directly from exported counters.
     }
 
     if (assertEnabled && assertions.All(a => a.Skipped))
@@ -1126,13 +1159,25 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
     var livingColonies = world._colonies.Count(colony => world._people.Any(person => person.Home == colony && person.Health > 0f));
     var totalFood = world._colonies.Sum(colony => colony.Stock[Resource.Food]);
     var totalPeople = world._people.Count(person => person.Health > 0f);
+    var routingPeople = world._people.Count(person => person.Health > 0f && person.IsRouting);
+    var minCombatMorale = world._people
+        .Where(person => person.Health > 0f)
+        .Select(person => person.CombatMorale)
+        .DefaultIfEmpty(100f)
+        .Min();
 
     return new ScenarioTimelineSample(
         Tick: tick,
         People: totalPeople,
         Food: totalFood,
         LivingColonies: livingColonies,
+        CombatDeaths: world.TotalCombatDeaths,
         CombatEngagements: world.TotalCombatEngagements,
+        BattleTicks: world.TotalBattleTicks,
+        ActiveBattles: world.ActiveBattleCount,
+        ActiveCombatGroups: world.ActiveCombatGroupCount,
+        RoutingPeople: routingPeople,
+        MinCombatMorale: minCombatMorale,
         NoProgressBackoffResource: world.TotalNoProgressBackoffResource,
         NoProgressBackoffBuild: world.TotalNoProgressBackoffBuild,
         NoProgressBackoffFlee: world.TotalNoProgressBackoffFlee,
@@ -1424,7 +1469,15 @@ sealed record ScenarioRunResult(
     int DeathsStarvation,
     int DeathsPredator,
     int DeathsOther,
+    int CombatDeaths,
     int CombatEngagements,
+    int PredatorKillsByHumans,
+    int BattleTicks,
+    int PeakActiveBattles,
+    int PeakActiveCombatGroups,
+    int PeakRoutingPeople,
+    int TicksWithActiveBattle,
+    float MinCombatMoraleObserved,
     int DeathsStarvationRecent60s,
     int DeathsStarvationWithFood,
     int OverlapResolveMoves,
@@ -1604,7 +1657,13 @@ sealed record ScenarioTimelineSample(
     int People,
     int Food,
     int LivingColonies,
+    int CombatDeaths,
     int CombatEngagements,
+    int BattleTicks,
+    int ActiveBattles,
+    int ActiveCombatGroups,
+    int RoutingPeople,
+    float MinCombatMorale,
     int NoProgressBackoffResource,
     int NoProgressBackoffBuild,
     int NoProgressBackoffFlee,

@@ -34,7 +34,7 @@ public sealed class AssertionEngineTests
     }
 
     [Fact]
-    public void Assertions_CombatSkippedWhenCountersUnavailable()
+    public void Assertions_CombatCountersEvaluatedWhenEnabled()
     {
         var artifactDir = CreateArtifactDir();
         var configJson = "[{\"Name\":\"combat\",\"Width\":64,\"Height\":40,\"InitialPop\":24,\"Ticks\":10,\"Dt\":0.25,\"EnableCombatPrimitives\":true,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0}]";
@@ -54,12 +54,10 @@ public sealed class AssertionEngineTests
         var assertions = ReadJson(Path.Combine(artifactDir, "assertions.json"));
         Assert.Contains(assertions.RootElement.EnumerateArray(), a =>
             a.GetProperty("invariantId").GetString() == "COMB-01" &&
-            a.GetProperty("skipped").GetBoolean() &&
-            a.GetProperty("skipReason").GetString() == "combat_counters_unavailable");
+            !a.GetProperty("skipped").GetBoolean());
         Assert.Contains(assertions.RootElement.EnumerateArray(), a =>
             a.GetProperty("invariantId").GetString() == "COMB-02" &&
-            a.GetProperty("skipped").GetBoolean() &&
-            a.GetProperty("skipReason").GetString() == "combat_counters_unavailable");
+            !a.GetProperty("skipped").GetBoolean());
     }
 
     [Fact]
@@ -81,7 +79,7 @@ public sealed class AssertionEngineTests
             });
 
         var anomalies = ReadJson(Path.Combine(artifactDir, "anomalies.json"));
-        Assert.Contains(anomalies.RootElement.EnumerateArray(), a =>
+        Assert.DoesNotContain(anomalies.RootElement.EnumerateArray(), a =>
             a.GetProperty("id").GetString() == "ANOM-COMB-COUNTERS-MISSING");
 
         var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));

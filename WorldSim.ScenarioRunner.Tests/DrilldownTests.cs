@@ -39,6 +39,15 @@ public sealed class DrilldownTests
         Assert.True(File.Exists(Path.Combine(firstRunDir, "timeline.json")));
         Assert.True(File.Exists(Path.Combine(firstRunDir, "events.json")));
         Assert.True(File.Exists(Path.Combine(firstRunDir, "replay.json")));
+
+        var timeline = ReadJson(Path.Combine(firstRunDir, "timeline.json"));
+        var firstSample = timeline.RootElement.EnumerateArray().First();
+        Assert.True(firstSample.TryGetProperty("combatDeaths", out _));
+        Assert.True(firstSample.TryGetProperty("battleTicks", out _));
+        Assert.True(firstSample.TryGetProperty("activeBattles", out _));
+        Assert.True(firstSample.TryGetProperty("activeCombatGroups", out _));
+        Assert.True(firstSample.TryGetProperty("routingPeople", out _));
+        Assert.True(firstSample.TryGetProperty("minCombatMorale", out _));
     }
 
     [Fact]

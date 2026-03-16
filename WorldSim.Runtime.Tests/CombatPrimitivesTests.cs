@@ -65,6 +65,36 @@ public class CombatPrimitivesTests
     }
 
     [Fact]
+    public void PredatorHumanAttacks_Off_DisablesBothDirections()
+    {
+        var world = new World(width: 24, height: 16, initialPop: 8, randomSeed: 223)
+        {
+            EnablePredatorHumanAttacks = false,
+            EnableCombatPrimitives = true
+        };
+
+        world._animals.Clear();
+        var predator = new Predator((10, 10), new Random(18));
+        world._animals.Add(predator);
+
+        var fighter = world._people.OrderByDescending(p => p.Strength).First();
+        fighter.Pos = (10, 10);
+        fighter.Current = Job.Fight;
+        fighter.Health = 300f;
+
+        foreach (var person in world._people.Where(p => p != fighter))
+            person.Pos = (0, 0);
+
+        var startHealth = fighter.Health;
+        for (int i = 0; i < 80; i++)
+            world.Update(0.25f);
+
+        Assert.Equal(0, world.TotalPredatorHumanHits);
+        Assert.Equal(0, world.TotalPredatorKillsByHumans);
+        Assert.True(fighter.Health >= startHealth - 0.001f);
+    }
+
+    [Fact]
     public void ThreatResponse_AdjacentEnemies_TriggersFightOrFlee()
     {
         var world = new World(width: 24, height: 16, initialPop: 8, randomSeed: 42)

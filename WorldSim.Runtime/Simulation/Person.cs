@@ -1206,16 +1206,19 @@ public class Person
 
         Predator? nearest = null;
         int best = int.MaxValue;
-        foreach (var animal in w._animals)
+        if (w.EnablePredatorHumanAttacks)
         {
-            if (animal is not Predator predator || !predator.IsAlive)
-                continue;
-
-            int dist = Math.Abs(predator.Pos.x - Pos.x) + Math.Abs(predator.Pos.y - Pos.y);
-            if (dist < best)
+            foreach (var animal in w._animals)
             {
-                best = dist;
-                nearest = predator;
+                if (animal is not Predator predator || !predator.IsAlive)
+                    continue;
+
+                int dist = Math.Abs(predator.Pos.x - Pos.x) + Math.Abs(predator.Pos.y - Pos.y);
+                if (dist < best)
+                {
+                    best = dist;
+                    nearest = predator;
+                }
             }
         }
 
