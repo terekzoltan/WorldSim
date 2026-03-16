@@ -921,7 +921,7 @@ Purpose:
 
 - ✅ **W5.1-B1** Combat counter parity in ScenarioRunner -- export death/kill counters so `COMB-01/02` no longer skip on combat-enabled runs (Track B)
 - ✅ **W5.1-B2** Morale/routing/battle telemetry export -- summary + drilldown visibility for active battles, combat groups, routing counts, morale, battle ticks (Track B)
-- ⬜ **W5.1-B3** Combat engagement/congestion runtime closeout -- battle-local spacing / routed egress / contact realization improvements for the medium combat lane (Track B)
+- ✅ **W5.1-B3** Combat engagement/congestion runtime closeout -- battle-local spacing / routed egress / contact realization improvements for the medium combat lane (Track B)
 - ✅ **W5.1-B4** Predator-human toggle semantics fix -- if predator-human attacks are disabled, predator vs human combat should not silently remain active on one side (Track B)
 - ⬜ **W5.1-C1** AI re-engage / congestion audit -- routed or fleeing actors should not thrash back into congested fights without clear intent (Track C)
 - ⬜ **W5.1-A1** Battle readability cleanup -- clarify battle-state marker semantics without turning this into a full visual redesign (Track A)

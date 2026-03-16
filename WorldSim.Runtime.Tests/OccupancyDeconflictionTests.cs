@@ -472,6 +472,96 @@ public class OccupancyDeconflictionTests
         Assert.True(world.TotalOverlapResolveMoves > 0);
     }
 
+    [Fact]
+    public void BattleLocalSpacing_RoutingActorsMoveAwayFromBattleCenter()
+    {
+        var world = new World(width: 36, height: 24, initialPop: 24, randomSeed: 912)
+        {
+            EnableCombatPrimitives = true,
+            EnableDiplomacy = true,
+            BirthRateMultiplier = 0f
+        };
+
+        world._animals.Clear();
+        var colonyA = world._colonies[0];
+        var colonyB = world._colonies[1];
+        world.SetFactionStance(colonyA.Faction, colonyB.Faction, WorldSim.Simulation.Diplomacy.Stance.War);
+
+        colonyA.Stock[Resource.Food] = 0;
+        colonyB.Stock[Resource.Food] = 120;
+
+        var teamA = world._people.Where(person => person.Home == colonyA).Take(4).ToList();
+        var teamB = world._people.Where(person => person.Home == colonyB).Take(4).ToList();
+
+        var stack = (x: 18, y: 12);
+        foreach (var person in teamA.Concat(teamB))
+        {
+            person.Pos = stack;
+            person.Profession = Profession.Hunter;
+            person.Current = Job.Fight;
+            person.Health = person.Home == colonyA ? 90f : 220f;
+        }
+
+        foreach (var bystander in world._people.Except(teamA).Except(teamB))
+            bystander.Pos = (0, 0);
+
+        for (int i = 0; i < 16; i++)
+            world.Update(0.25f);
+
+        var routing = world._people.Where(person => person.IsRouting).ToList();
+        Assert.NotEmpty(routing);
+
+        var beforePositions = routing.ToDictionary(person => person.Id, person => person.Pos);
+        for (int i = 0; i < 3; i++)
+            world.Update(0.25f);
+
+        Assert.Contains(routing, person => person.Pos != beforePositions[person.Id] || Manhattan(person.Pos, stack) >= 2);
+    }
+
+    [Fact]
+    public void CombatNoProgressBackoff_IsLowerThanEngagementsInBattleLane()
+    {
+        var world = new World(width: 36, height: 24, initialPop: 24, randomSeed: 913)
+        {
+            EnableCombatPrimitives = true,
+            EnableDiplomacy = true,
+            BirthRateMultiplier = 0f
+        };
+
+        world._animals.Clear();
+        var colonyA = world._colonies[0];
+        var colonyB = world._colonies[1];
+        world.SetFactionStance(colonyA.Faction, colonyB.Faction, WorldSim.Simulation.Diplomacy.Stance.War);
+
+        var teamA = world._people.Where(person => person.Home == colonyA).Take(5).ToList();
+        var teamB = world._people.Where(person => person.Home == colonyB).Take(5).ToList();
+        var aPos = new[] { (16, 12), (16, 13), (15, 12), (15, 13), (16, 11) };
+        var bPos = new[] { (18, 12), (18, 13), (19, 12), (19, 13), (18, 11) };
+
+        for (int i = 0; i < teamA.Count; i++)
+        {
+            teamA[i].Pos = aPos[i];
+            teamA[i].Current = Job.Fight;
+            teamA[i].Profession = Profession.Hunter;
+        }
+
+        for (int i = 0; i < teamB.Count; i++)
+        {
+            teamB[i].Pos = bPos[i];
+            teamB[i].Current = Job.Fight;
+            teamB[i].Profession = Profession.Hunter;
+        }
+
+        foreach (var bystander in world._people.Except(teamA).Except(teamB))
+            bystander.Pos = (0, 0);
+
+        for (int i = 0; i < 24; i++)
+            world.Update(0.25f);
+
+        Assert.True(world.TotalCombatEngagements > 0);
+        Assert.True(world.TotalNoProgressBackoffCombat <= world.TotalCombatEngagements);
+    }
+
     private static (int x, int y) FindLandTile(World world)
     {
         for (int y = 0; y < world.Height; y++)

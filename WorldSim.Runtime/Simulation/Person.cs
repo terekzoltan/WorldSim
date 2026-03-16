@@ -116,6 +116,7 @@ public class Person
     string _noProgressTrackContext = "move";
     bool _suppressPeacefulActionsDuringBackoff;
     bool _protectFromDissipationThisTick;
+    (int x, int y)? _routingOrigin;
     int _lastAiThinkTick = -1;
     float _lastAiThinkDt = -1f;
     Job _lastAiThinkResult = Job.Idle;
@@ -256,6 +257,7 @@ public class Person
         else if (IsRouting)
         {
             IsRouting = false;
+            _routingOrigin = null;
         }
 
         // perception step
@@ -1257,6 +1259,42 @@ public class Person
 
     void ExecuteFleeAction(World w)
     {
+        if (IsRouting && _routingOrigin.HasValue)
+        {
+            var origin = _routingOrigin.Value;
+            var best = Pos;
+            var bestDist = Math.Abs(Pos.x - origin.x) + Math.Abs(Pos.y - origin.y);
+
+            for (int oy = -1; oy <= 1; oy++)
+            {
+                for (int ox = -1; ox <= 1; ox++)
+                {
+                    if (ox == 0 && oy == 0)
+                        continue;
+
+                    int nx = Math.Clamp(Pos.x + ox, 0, w.Width - 1);
+                    int ny = Math.Clamp(Pos.y + oy, 0, w.Height - 1);
+                    if (w.IsMovementBlocked(nx, ny, _home.Id))
+                        continue;
+
+                    var dist = Math.Abs(nx - origin.x) + Math.Abs(ny - origin.y);
+                    if (dist > bestDist)
+                    {
+                        bestDist = dist;
+                        best = (nx, ny);
+                    }
+                }
+            }
+
+            if (best != Pos)
+            {
+                _trackNoProgressForCurrentMove = true;
+                _noProgressTrackContext = "flee";
+                MoveTowards(w, best, 1);
+                return;
+            }
+        }
+
         var threatContext = BuildThreatContext(w);
         bool hasFactionThreat =
             threatContext.IsHostileStance ||
@@ -2090,10 +2128,11 @@ public class Person
         CombatMorale = Math.Clamp(CombatMorale + adjusted, 0f, 100f);
     }
 
-    public void BeginRouting(int ticks)
+    public void BeginRouting(int ticks, (int x, int y)? origin = null)
     {
         RoutingTicksRemaining = Math.Max(RoutingTicksRemaining, ticks);
         IsRouting = RoutingTicksRemaining > 0;
+        _routingOrigin = origin;
         if (IsRouting)
             Current = Job.Flee;
 

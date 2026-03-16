@@ -1058,6 +1058,8 @@ namespace WorldSim.Simulation
                 ResolveBattleTick(battle);
                 TotalBattleTicks++;
             }
+
+            ResolveBattleLocalSpacing();
         }
 
         private List<RuntimeCombatGroup> BuildCombatGroups()
@@ -1291,8 +1293,106 @@ namespace WorldSim.Simulation
             {
                 if (member.Health <= 0f)
                     continue;
-                member.BeginRouting(6 + _rng.Next(0, 3));
+                member.BeginRouting(6 + _rng.Next(0, 3), origin: group.Anchor);
             }
+        }
+
+        private void ResolveBattleLocalSpacing()
+        {
+            if (_activeBattles.Count == 0)
+                return;
+
+            var occupied = _people
+                .Where(person => person.Health > 0f)
+                .Select(person => person.Pos)
+                .ToHashSet();
+
+            var battleCenters = _activeBattles
+                .ToDictionary(battle => battle.BattleId, battle => battle.Center);
+
+            int maxMoves = Math.Max(1, _activeBattles.Count * 3);
+            int moves = 0;
+
+            var candidates = _people
+                .Where(person => person.Health > 0f && person.ActiveBattleId >= 0)
+                .OrderByDescending(person => person.IsRouting)
+                .ThenByDescending(person => CountNeighbors(occupied, person.Pos, 1))
+                .ToList();
+
+            foreach (var person in candidates)
+            {
+                if (moves >= maxMoves)
+                    break;
+                if (!battleCenters.TryGetValue(person.ActiveBattleId, out var center))
+                    continue;
+
+                int crowd = CountNeighbors(occupied, person.Pos, 1);
+                if (!person.IsRouting && crowd <= 3)
+                    continue;
+
+                if (!TryFindBattleSpacingTile(person, center, occupied, out var target))
+                    continue;
+
+                occupied.Remove(person.Pos);
+                person.Pos = target;
+                occupied.Add(target);
+                moves++;
+                TotalOverlapResolveMoves++;
+            }
+        }
+
+        private bool TryFindBattleSpacingTile(Person person, (int x, int y) center, HashSet<(int x, int y)> occupied, out (int x, int y) tile)
+        {
+            float bestScore = float.MinValue;
+            (int x, int y)? best = null;
+            int currentCrowd = CountNeighbors(occupied, person.Pos, 1);
+            int currentDist = Math.Abs(person.Pos.x - center.x) + Math.Abs(person.Pos.y - center.y);
+
+            for (int radius = 1; radius <= 3; radius++)
+            {
+                for (int dy = -radius; dy <= radius; dy++)
+                {
+                    for (int dx = -radius; dx <= radius; dx++)
+                    {
+                        int nx = person.Pos.x + dx;
+                        int ny = person.Pos.y + dy;
+                        if (!InBounds(nx, ny))
+                            continue;
+                        if (_map[nx, ny].Ground == Ground.Water)
+                            continue;
+                        if (IsMovementBlocked(nx, ny, person.Home.Id))
+                            continue;
+                        if (occupied.Contains((nx, ny)))
+                            continue;
+
+                        int dist = Math.Abs(nx - center.x) + Math.Abs(ny - center.y);
+                        int crowd = CountNeighbors(occupied, (nx, ny), 1);
+                        if (!person.IsRouting)
+                        {
+                            if (dist > 4)
+                                continue;
+                            if (crowd >= currentCrowd)
+                                continue;
+                        }
+
+                        float score = person.IsRouting
+                            ? (dist * 10f) - crowd - radius
+                            : ((4 - dist) * 4f) - (crowd * 6f) - radius;
+
+                        if (!person.IsRouting && dist > currentDist + 1)
+                            score -= 10f;
+
+                        if (score > bestScore)
+                        {
+                            bestScore = score;
+                            best = (nx, ny);
+                        }
+                    }
+                }
+            }
+
+            tile = best ?? person.Pos;
+            return best != null;
         }
 
         private bool TryFindNearbyFreePersonTile(Person person, (int x, int y) center, HashSet<(int x, int y)> occupied, out (int x, int y) tile)
