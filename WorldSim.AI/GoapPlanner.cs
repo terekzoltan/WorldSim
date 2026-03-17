@@ -254,6 +254,10 @@ public sealed class GoapPlanner : IPlanner
 
     private static NpcCommand SelectDefendSelfCommand(in NpcAiContext context)
     {
+        if (ThreatDecisionPolicy.ShouldSuppressReengage(context)
+            && !ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context))
+            return NpcCommand.Flee;
+
         if (ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context))
             return NpcCommand.Flee;
 
@@ -262,6 +266,10 @@ public sealed class GoapPlanner : IPlanner
 
     private static NpcCommand SelectRaidBorderCommand(in NpcAiContext context)
     {
+        if (ThreatDecisionPolicy.ShouldSuppressReengage(context)
+            && !ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context))
+            return NpcCommand.Flee;
+
         if (!context.IsWarriorRole)
             return NpcCommand.Flee;
 

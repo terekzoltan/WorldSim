@@ -345,6 +345,26 @@ public class RuntimeNpcBrainTests
     }
 
     [Fact]
+    public void Think_PopulatesRoutingAndBackoffFields()
+    {
+        var world = new World(20, 20, 12, randomSeed: 77);
+        var actor = world._people[0];
+
+        actor.BeginRouting(6, origin: actor.Pos);
+        var backoffField = typeof(Person).GetField("_backoffTicksRemaining", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(backoffField);
+        backoffField!.SetValue(actor, 3);
+
+        var brain = new RuntimeNpcBrain(new CapturingBrain());
+        _ = brain.Think(actor, world, dt: 1f);
+
+        Assert.NotNull(CapturingBrain.LastContext);
+        Assert.True(CapturingBrain.LastContext!.Value.IsRouting);
+        Assert.True(CapturingBrain.LastContext.Value.RoutingTicksRemaining >= 1);
+        Assert.True(CapturingBrain.LastContext.Value.BackoffTicksRemaining >= 1);
+    }
+
+    [Fact]
     public void Think_ReportsPlannerSignals_ToWorldCounters()
     {
         var world = new World(16, 16, 10, randomSeed: 123);

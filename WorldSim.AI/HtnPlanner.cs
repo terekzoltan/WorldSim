@@ -109,14 +109,22 @@ public sealed class HtnPlanner : IPlanner
             case "DefendSelf":
                 var commanderRetreat = ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context);
                 var commanderPress = ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context);
+                var suppressReengage = ThreatDecisionPolicy.ShouldSuppressReengage(context);
+                var suppressWithoutPress = suppressReengage && !commanderPress;
                 candidates.Add(new MethodCandidate(
                     "FightBack",
+                    suppressWithoutPress
+                        ? 0.15f
+                        :
                     commanderRetreat
                         ? 0.2f
                         : (ThreatDecisionPolicy.ShouldFight(context) ? (commanderPress ? 1.0f : 0.92f) : 0.4f),
                     new[] { NpcCommand.Fight }));
                 candidates.Add(new MethodCandidate(
                     "TacticalFlee",
+                    suppressWithoutPress
+                        ? 1.0f
+                        :
                     commanderRetreat
                         ? 1.0f
                         : (ThreatDecisionPolicy.ShouldFight(context) ? 0.55f : 0.95f),
@@ -141,14 +149,22 @@ public sealed class HtnPlanner : IPlanner
             case "RaidBorder":
                 var raidRetreat = ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context);
                 var raidPress = ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context);
+                var raidSuppressReengage = ThreatDecisionPolicy.ShouldSuppressReengage(context);
+                var raidSuppressWithoutPress = raidSuppressReengage && !raidPress;
                 candidates.Add(new MethodCandidate(
                     "BorderRaid",
+                    raidSuppressWithoutPress
+                        ? 0.1f
+                        :
                     !context.IsWarriorRole
                         ? 0.2f
                         : (raidRetreat ? 0.15f : (raidPress ? 1.0f : 0.9f)),
                     new[] { NpcCommand.RaidBorder }));
                 candidates.Add(new MethodCandidate(
                     "FallbackRetreat",
+                    raidSuppressWithoutPress
+                        ? 1.0f
+                        :
                     !context.IsWarriorRole
                         ? 0.95f
                         : (raidRetreat ? 1.0f : 0.45f),

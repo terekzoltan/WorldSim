@@ -201,7 +201,10 @@ public sealed class RuntimeNpcBrain
             IsCommander: actor.IsCombatCommander,
             ActiveCombatGroupSize: activeGroupSize,
             ActiveGroupAverageMorale: (float)activeGroupAverageMorale,
-            CommanderMoraleStabilityBonus: actor.CommanderMoraleStabilityBonus);
+            CommanderMoraleStabilityBonus: actor.CommanderMoraleStabilityBonus,
+            IsRouting: actor.IsRouting,
+            RoutingTicksRemaining: actor.RoutingTicksRemaining,
+            BackoffTicksRemaining: actor.BackoffTicksRemaining);
     }
 
     private static int CountUnlockedTechs(Colony colony, IEnumerable<string> techIds)

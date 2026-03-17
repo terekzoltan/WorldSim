@@ -36,8 +36,8 @@ public sealed class CombatOverlayPass : IRenderPass
             int centerY = (battle.CenterY * tileSize) + (tileSize / 2);
             int radius = Math.Max(tileSize, battle.Radius * tileSize);
 
-            float intensityAlpha = Math.Clamp(0.18f + (battle.Intensity * 0.03f), 0.18f, 0.42f);
-            var fill = new Color(230, 104, 90) * intensityAlpha;
+            float intensityAlpha = Math.Clamp(0.10f + (battle.Intensity * 0.02f), 0.10f, 0.28f);
+            var fill = new Color(226, 124, 96) * intensityAlpha;
             var edge = (battle.LeftIsRouting || battle.RightIsRouting)
                 ? new Color(236, 124, 208) * 0.65f
                 : new Color(232, 162, 112) * 0.58f;
@@ -49,11 +49,11 @@ public sealed class CombatOverlayPass : IRenderPass
 
     private static void DrawFormationMarkers(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)
     {
-        int glyph = Math.Max(2, tileSize);
-        foreach (var group in snapshot.CombatGroups.OrderBy(g => g.GroupId))
-        {
-            int cx = (group.AnchorX * tileSize) + (tileSize / 2);
-            int cy = (group.AnchorY * tileSize) + (tileSize / 2);
+            int glyph = Math.Max(2, tileSize);
+            foreach (var group in snapshot.CombatGroups.OrderBy(g => g.GroupId))
+            {
+                int cx = (group.AnchorX * tileSize) + (tileSize / 2);
+                int cy = (group.AnchorY * tileSize) + (tileSize / 2);
             var color = group.IsRouting
                 ? new Color(236, 125, 206) * 0.9f
                 : new Color(129, 206, 250) * 0.82f;
@@ -78,13 +78,14 @@ public sealed class CombatOverlayPass : IRenderPass
                     break;
             }
 
-            if (group.CommanderActorId >= 0)
-            {
-                var commander = new Color(108, 234, 201) * 0.95f;
-                spriteBatch.Draw(pixel, new Rectangle(cx - 1, cy - glyph - 3, 3, 3), commander);
+                if (group.CommanderActorId >= 0)
+                {
+                    var commander = new Color(108, 234, 201) * 0.95f;
+                    spriteBatch.Draw(pixel, new Rectangle(cx - 2, cy - glyph - 4, 5, 5), new Color(10, 16, 22, 180));
+                    spriteBatch.Draw(pixel, new Rectangle(cx - 1, cy - glyph - 3, 3, 3), commander);
+                }
             }
         }
-    }
 
     private static void DrawContestedTiles(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)
     {
@@ -111,6 +112,9 @@ public sealed class CombatOverlayPass : IRenderPass
         int dot = Math.Max(1, tileSize / 3);
         foreach (var person in snapshot.People.Where(person => person.NoProgressStreak > 0 || person.BackoffTicksRemaining > 0))
         {
+            if (person.ActiveBattleId >= 0 || person.IsRouting)
+                continue;
+
             var severity = Math.Max(person.NoProgressStreak, person.BackoffTicksRemaining);
             var color = severity >= 6
                 ? new Color(240, 88, 212) * 0.85f

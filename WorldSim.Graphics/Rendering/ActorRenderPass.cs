@@ -154,7 +154,7 @@ public sealed class ActorRenderPass : IRenderPass
         WorldRenderSettings settings,
         WorldRenderTheme theme)
     {
-        if (!person.IsInCombat)
+        if (!person.IsInCombat || person.IsRouting)
             return;
 
         int thickness = Math.Max(1, settings.TileSize / 4);
@@ -198,9 +198,13 @@ public sealed class ActorRenderPass : IRenderPass
 
         if (person.IsRouting)
         {
-            int markerSize = Math.Max(1, settings.TileSize / 3);
+            int markerSize = Math.Max(2, settings.TileSize / 3);
             var routeColor = new Color(235, 121, 205) * 0.92f;
-            spriteBatch.Draw(textures.Pixel, new Rectangle(actorBounds.X + 1, actorBounds.Y + 1, markerSize, markerSize), routeColor);
+            var centerX = actorBounds.X + actorBounds.Width / 2;
+            var centerY = actorBounds.Y + actorBounds.Height / 2;
+            spriteBatch.Draw(textures.Pixel, new Rectangle(centerX - markerSize / 2, centerY - markerSize / 2, markerSize, markerSize), routeColor);
+            spriteBatch.Draw(textures.Pixel, new Rectangle(centerX + markerSize / 2, centerY - markerSize / 2, markerSize, markerSize), routeColor * 0.85f);
+            spriteBatch.Draw(textures.Pixel, new Rectangle(centerX + markerSize - 1, centerY - markerSize / 2 + 1, markerSize, markerSize), routeColor * 0.7f);
         }
 
         if (person.IsCommander)

@@ -544,6 +544,125 @@ public class DecisionTests
     }
 
     [Fact]
+    public void ThreatDecisionPolicy_RoutingState_SuppressesReengage()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 4f,
+            Hunger: 10f,
+            Stamina: 86f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 90f,
+            Strength: 20,
+            Defense: 16,
+            NearbyHostilePeople: 2,
+            NearbyEnemyCount: 2,
+            LocalThreatScore: 0.65f,
+            IsWarStance: true,
+            IsWarriorRole: true,
+            IsRouting: true,
+            RoutingTicksRemaining: 5,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
+
+        Assert.True(ThreatDecisionPolicy.ShouldSuppressReengage(context));
+        Assert.False(ThreatDecisionPolicy.ShouldFight(context));
+    }
+
+    [Fact]
+    public void ThreatDecisionPolicy_CommanderPressAdvantage_OverridesSuppressionGuard()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 5f,
+            Hunger: 12f,
+            Stamina: 84f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 92f,
+            Strength: 20,
+            Defense: 16,
+            NearbyHostilePeople: 1,
+            NearbyEnemyCount: 1,
+            LocalThreatScore: 0.5f,
+            IsWarStance: true,
+            IsWarriorRole: true,
+            IsCommander: true,
+            ActiveCombatGroupSize: 4,
+            ActiveGroupAverageMorale: 70f,
+            CommanderMoraleStabilityBonus: 0.3f,
+            RoutingTicksRemaining: 3,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
+
+        Assert.True(ThreatDecisionPolicy.ShouldSuppressReengage(context));
+        Assert.True(ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context));
+        Assert.True(ThreatDecisionPolicy.ShouldFight(context));
+    }
+
+    [Fact]
+    public void SimplePlanner_RaidBorder_CommanderPressAdvantage_CanRaidDuringSuppressionWindow()
+    {
+        var planner = new SimplePlanner();
+        planner.SetGoal(new Goal("RaidBorder"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 16f,
+            Hunger: 15f,
+            Stamina: 86f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 6,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 90f,
+            Strength: 18,
+            Defense: 14,
+            IsWarStance: true,
+            IsContestedTile: true,
+            IsWarriorRole: true,
+            IsCommander: true,
+            ActiveCombatGroupSize: 4,
+            ActiveGroupAverageMorale: 72f,
+            CommanderMoraleStabilityBonus: 0.35f,
+            NearbyEnemyCount: 1,
+            LocalThreatScore: 0.5f,
+            RoutingTicksRemaining: 3,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.RaidBorder, decision.Command);
+    }
+
+    [Fact]
     public void SimplePlanner_BuildDefenses_UsesFortificationCommands_WhenHostile()
     {
         var planner = new SimplePlanner();

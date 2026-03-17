@@ -67,7 +67,10 @@ public readonly record struct NpcAiContext(
     bool IsCommander = false,
     int ActiveCombatGroupSize = 0,
     float ActiveGroupAverageMorale = 100f,
-    float CommanderMoraleStabilityBonus = 0f);
+    float CommanderMoraleStabilityBonus = 0f,
+    bool IsRouting = false,
+    int RoutingTicksRemaining = 0,
+    int BackoffTicksRemaining = 0);
 
 public interface IPlanner
 {

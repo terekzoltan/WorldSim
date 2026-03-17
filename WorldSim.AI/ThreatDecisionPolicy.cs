@@ -11,6 +11,8 @@ public static class ThreatDecisionPolicy
     private const float CommanderRetreatMoraleThreshold = 32f;
     private const float CommanderCautionMoraleThreshold = 40f;
     private const float CommanderPressMoraleThreshold = 62f;
+    private const int RoutingReengageThresholdTicks = 2;
+    private const int BackoffReengageThresholdTicks = 1;
 
     public static bool IsCommanderCombatContext(in NpcAiContext context)
         => context.IsCommander && context.ActiveCombatGroupSize >= CommanderGroupMinSize;
@@ -46,6 +48,26 @@ public static class ThreatDecisionPolicy
             && context.ActiveCombatGroupSize >= 4
             && context.LocalThreatScore <= 0.6f)
             return true;
+
+        return false;
+    }
+
+    public static bool ShouldSuppressReengage(in NpcAiContext context)
+    {
+        if (context.IsRouting)
+            return true;
+        if (context.RoutingTicksRemaining > RoutingReengageThresholdTicks)
+            return true;
+        if (context.BackoffTicksRemaining > BackoffReengageThresholdTicks)
+            return true;
+
+        if (context.ActiveCombatGroupSize >= 3)
+        {
+            if (context.ActiveGroupAverageMorale < 35f)
+                return true;
+            if (context.ActiveGroupAverageMorale < 42f && context.LocalThreatScore >= 0.55f)
+                return true;
+        }
 
         return false;
     }
@@ -88,6 +110,9 @@ public static class ThreatDecisionPolicy
     public static bool ShouldFight(in NpcAiContext context)
     {
         if (!ShouldPrioritizeDefense(context))
+            return false;
+
+        if (ShouldSuppressReengage(context) && !ShouldCommanderPressAdvantage(context))
             return false;
 
         if (ShouldCommanderInitiateRetreat(context))
