@@ -35,6 +35,36 @@ public class CombatPrimitivesTests
     }
 
     [Fact]
+    public void WorldUpdate_PreservesCombatDeathReason_ForDeferredRemoval()
+    {
+        var world = new World(width: 24, height: 16, initialPop: 8, randomSeed: 111);
+        var person = world._people[0];
+
+        person.ApplyCombatDamage(world, amount: 999f, source: "UnitTest");
+
+        world.Update(0.25f);
+
+        Assert.Equal(1, world.TotalCombatDeaths);
+        Assert.Equal(1, world.TotalDeathsOther);
+        Assert.DoesNotContain(person, world._people);
+    }
+
+    [Fact]
+    public void WorldUpdate_PreservesPredatorDeathReason_ForDeferredRemoval()
+    {
+        var world = new World(width: 24, height: 16, initialPop: 8, randomSeed: 112);
+        var person = world._people[0];
+
+        person.ApplyDamage(amount: 999f, source: "Predator");
+
+        world.Update(0.25f);
+
+        Assert.Equal(1, world.TotalDeathsPredator);
+        Assert.Equal(0, world.TotalCombatDeaths);
+        Assert.DoesNotContain(person, world._people);
+    }
+
+    [Fact]
     public void PredatorHumanAttacks_On_ProducesStableCombatCounters()
     {
         var world = new World(width: 24, height: 16, initialPop: 8, randomSeed: 222)

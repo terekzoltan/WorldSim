@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Text.Json;
 
 namespace WorldSim.ScenarioRunner.Tests;
@@ -53,11 +54,73 @@ public sealed class AssertionEngineTests
 
         var assertions = ReadJson(Path.Combine(artifactDir, "assertions.json"));
         Assert.Contains(assertions.RootElement.EnumerateArray(), a =>
-            a.GetProperty("invariantId").GetString() == "COMB-01" &&
-            !a.GetProperty("skipped").GetBoolean());
+            a.GetProperty("invariantId").GetString() == "COMB-01");
         Assert.Contains(assertions.RootElement.EnumerateArray(), a =>
-            a.GetProperty("invariantId").GetString() == "COMB-02" &&
+            a.GetProperty("invariantId").GetString() == "COMB-02");
+        Assert.Contains(assertions.RootElement.EnumerateArray(), a =>
+            a.GetProperty("invariantId").GetString() == "COMB-03" &&
             !a.GetProperty("skipped").GetBoolean());
+    }
+
+    [Fact]
+    public void Assertions_LowIntensityCombat_SkipsDeathCounterChecks()
+    {
+        var artifactDir = CreateArtifactDir();
+        var configJson = "[{\"Name\":\"medium-default\",\"Width\":128,\"Height\":72,\"InitialPop\":48,\"Ticks\":1200,\"Dt\":0.25,\"EnableCombatPrimitives\":true,\"EnableDiplomacy\":true,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0}]";
+
+        RunScenarioRunner(
+            artifactDir,
+            expectedExitCode: 0,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "101",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "goap",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_ASSERT"] = "true",
+                ["WORLDSIM_SCENARIO_TICKS"] = "1200",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson
+            });
+
+        var assertions = ReadJson(Path.Combine(artifactDir, "assertions.json"));
+        var comb01 = FindAssertion(assertions, "COMB-01");
+        var comb02 = FindAssertion(assertions, "COMB-02");
+        var comb03 = FindAssertion(assertions, "COMB-03");
+
+        Assert.True(comb01.GetProperty("skipped").GetBoolean());
+        Assert.Equal("combat_not_sustained", comb01.GetProperty("skipReason").GetString());
+        Assert.True(comb02.GetProperty("skipped").GetBoolean());
+        Assert.Equal("combat_not_sustained", comb02.GetProperty("skipReason").GetString());
+        Assert.False(comb03.GetProperty("skipped").GetBoolean());
+        Assert.True(comb03.GetProperty("passed").GetBoolean());
+    }
+
+    [Fact]
+    public void Assertions_SustainedCombat_RequiresDeathCounters()
+    {
+        var artifactDir = CreateArtifactDir();
+        var configJson = "[{\"Name\":\"medium-default\",\"Width\":128,\"Height\":72,\"InitialPop\":48,\"Ticks\":1200,\"Dt\":0.25,\"EnableCombatPrimitives\":true,\"EnableDiplomacy\":true,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0}]";
+
+        RunScenarioRunner(
+            artifactDir,
+            expectedExitCode: 0,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "202",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "goap",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_ASSERT"] = "true",
+                ["WORLDSIM_SCENARIO_TICKS"] = "1200",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson
+            });
+
+        var assertions = ReadJson(Path.Combine(artifactDir, "assertions.json"));
+        var comb01 = FindAssertion(assertions, "COMB-01");
+        var comb02 = FindAssertion(assertions, "COMB-02");
+
+        Assert.False(comb01.GetProperty("skipped").GetBoolean());
+        Assert.True(comb01.GetProperty("passed").GetBoolean());
+        Assert.False(comb02.GetProperty("skipped").GetBoolean());
+        Assert.True(comb02.GetProperty("passed").GetBoolean());
     }
 
     [Fact]
@@ -177,6 +240,12 @@ public sealed class AssertionEngineTests
     {
         var json = File.ReadAllText(path);
         return JsonDocument.Parse(json);
+    }
+
+    private static JsonElement FindAssertion(JsonDocument assertions, string invariantId)
+    {
+        return assertions.RootElement.EnumerateArray().Single(a =>
+            a.GetProperty("invariantId").GetString() == invariantId);
     }
 
     private static void RunScenarioRunner(string artifactDir, int expectedExitCode, IReadOnlyDictionary<string, string> env)

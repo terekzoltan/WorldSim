@@ -318,6 +318,9 @@ public class Person
 
         if (Health <= 0f)
         {
+            if (LastDeathReason != PersonDeathReason.None)
+                return false;
+
             // Last-chance starvation rescue: consume food if available before declaring death.
             if (hunger >= 85f && _home.Stock[Resource.Food] > 0)
             {

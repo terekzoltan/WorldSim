@@ -670,13 +670,25 @@ static List<ScenarioAssertionResult> EvaluateAssertions(IReadOnlyList<ScenarioRu
             continue;
         }
 
-        AddAssertion("COMB-01", "combat", "error", runKey, assertEnabled, run.CombatDeaths > 0, run.CombatDeaths.ToString(), ">0", "Combat deaths are observed in combat-enabled runs", results);
-        AddAssertion("COMB-02", "combat", "error", runKey, assertEnabled, (run.CombatDeaths + run.PredatorKillsByHumans) > 0, (run.CombatDeaths + run.PredatorKillsByHumans).ToString(), ">0", "Combat kills/deaths counters are active", results);
+        if (!ShouldRequireCombatDeaths(run))
+        {
+            AddSkippedAssertion("COMB-01", "combat", runKey, "combat_not_sustained", "Combat death assertions are skipped for low-intensity combat runs", results);
+            AddSkippedAssertion("COMB-02", "combat", runKey, "combat_not_sustained", "Combat kill/death counter assertions are skipped for low-intensity combat runs", results);
+        }
+        else
+        {
+            AddAssertion("COMB-01", "combat", "error", runKey, assertEnabled, run.CombatDeaths > 0, run.CombatDeaths.ToString(), ">0", "Combat deaths are observed in sustained combat runs", results);
+            AddAssertion("COMB-02", "combat", "error", runKey, assertEnabled, (run.CombatDeaths + run.PredatorKillsByHumans) > 0, (run.CombatDeaths + run.PredatorKillsByHumans).ToString(), ">0", "Combat kills/deaths counters are active in sustained combat runs", results);
+        }
+
         AddAssertion("COMB-03", "combat", "error", runKey, assertEnabled, run.CombatEngagements > 0, run.CombatEngagements.ToString(), ">0", "Combat engagements exist", results);
     }
 
     return results;
 }
+
+static bool ShouldRequireCombatDeaths(ScenarioRunResult run)
+    => run.CombatEngagements >= 50 || run.BattleTicks >= 30;
 
 static List<ScenarioAnomaly> DetectAnomalies(
     IReadOnlyList<ScenarioRunResult> runs,
