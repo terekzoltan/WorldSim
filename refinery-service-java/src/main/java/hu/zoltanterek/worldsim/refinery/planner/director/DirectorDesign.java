@@ -46,6 +46,9 @@ public final class DirectorDesign {
     public static final double WEIGHT_MIN = 0.0;
     public static final double WEIGHT_MAX = 0.50;
     public static final double MAX_DOMAIN_STACK = 0.40;
+    public static final double DEFAULT_INFLUENCE_BUDGET = 5.0;
+    public static final double DOMAIN_MODIFIER_COST_FACTOR = 0.5;
+    public static final double GOAL_BIAS_COST_FACTOR = 0.3;
 
     /**
      * Invariant labels are implementation-level validator codes used in runtime feedback.
@@ -65,5 +68,6 @@ public final class DirectorDesign {
     public static final String INV_12 = "INV-12"; // no conflicting directives
     public static final String INV_13 = "INV-13"; // deterministic operation ordering
     public static final String INV_14 = "INV-14"; // conservative retry never adds new ops
+    public static final String INV_15 = "INV-15"; // total checkpoint cost within influence budget
     public static final String INV_20 = "INV-20"; // no contradictory same-domain modifiers
 }

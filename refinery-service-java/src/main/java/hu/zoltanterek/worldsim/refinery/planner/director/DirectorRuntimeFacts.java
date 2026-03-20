@@ -6,6 +6,7 @@ public record DirectorRuntimeFacts(
         long tick,
         int colonyCount,
         long beatCooldownTicks,
+        double remainingInfluenceBudget,
         List<ActiveBeatFact> activeBeats,
         List<ActiveDirectiveFact> activeDirectives
 ) {

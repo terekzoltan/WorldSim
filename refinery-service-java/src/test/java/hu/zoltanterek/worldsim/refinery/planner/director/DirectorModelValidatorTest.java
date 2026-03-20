@@ -231,16 +231,67 @@ class DirectorModelValidatorTest {
         assertTrue(ex.getMessage().contains(DirectorDesign.INV_02));
     }
 
+    @Test
+    void validateAndRepair_RejectsWhenBudgetExceeded() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, 0.5, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_budget_over",
+                        "BEAT_BUDGET_OVER",
+                        "Heavy pressure event",
+                        30,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", 0.20, 30))
+                )
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains(DirectorDesign.INV_15));
+    }
+
+    @Test
+    void validateAndRepair_AllowsWhenBudgetAtBoundary() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, 3.0, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_budget_edge",
+                        "BEAT_BUDGET_EDGE",
+                        "Edge budget event",
+                        30,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", 0.20, 30))
+                )
+        );
+
+        DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
+        assertEquals(1, outcome.patch().size());
+    }
+
     private static DirectorRuntimeFacts facts(
             long tick,
             int colonyCount,
             long cooldownTicks,
             List<DirectorRuntimeFacts.ActiveBeatFact> activeBeats
     ) {
+        return facts(tick, colonyCount, cooldownTicks, DirectorDesign.DEFAULT_INFLUENCE_BUDGET, activeBeats);
+    }
+
+    private static DirectorRuntimeFacts facts(
+            long tick,
+            int colonyCount,
+            long cooldownTicks,
+            double remainingBudget,
+            List<DirectorRuntimeFacts.ActiveBeatFact> activeBeats
+    ) {
         return new DirectorRuntimeFacts(
                 tick,
                 colonyCount,
                 cooldownTicks,
+                remainingBudget,
                 activeBeats,
                 List.of()
         );

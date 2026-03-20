@@ -11,9 +11,17 @@ planner:
   llm:
     enabled: ${PLANNER_LLM_ENABLED:false}
     apiKey: ${PLANNER_LLM_API_KEY:}
+    baseUrl: ${PLANNER_LLM_BASE_URL:https://openrouter.ai/api/v1}
+    model: ${PLANNER_LLM_MODEL:openai/gpt-4o-mini}
+    timeoutMs: ${PLANNER_LLM_TIMEOUT_MS:3000}
+    httpReferer: ${PLANNER_LLM_HTTP_REFERER:https://worldsim.local}
+    appTitle: ${PLANNER_LLM_APP_TITLE:WorldSim}
+    temperature: ${PLANNER_LLM_TEMPERATURE:0.4}
+    maxTokens: ${PLANNER_LLM_MAX_TOKENS:500}
   director:
     outputMode: ${PLANNER_DIRECTOR_OUTPUT_MODE:both}
     maxRetries: ${PLANNER_DIRECTOR_MAX_RETRIES:2}
+    budget: ${PLANNER_DIRECTOR_BUDGET:5.0}
 
 logging:
   pattern:

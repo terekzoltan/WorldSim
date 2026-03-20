@@ -12,9 +12,17 @@ public final class DirectorPromptFactory {
                 "Do not include markdown, code fences, explanations, or extra keys.";
     }
 
-    public String userPrompt(JsonNode snapshot, String outputMode, List<String> feedbackHints) {
-        int colonyCount = Math.max(1, snapshot.path("world").path("colonyCount").asInt(1));
-        long cooldown = Math.max(0L, snapshot.path("world").path("storyBeatCooldownTicks").asLong(0L));
+    public String userPrompt(JsonNode snapshot, String outputMode, double remainingInfluenceBudget, List<String> feedbackHints) {
+        JsonNode director = snapshot.path("director");
+        JsonNode world = snapshot.path("world");
+        int colonyCount = Math.max(
+                1,
+                readIntWithFallback(director, "colonyCount", world, "colonyCount", 1)
+        );
+        long cooldown = Math.max(
+                0L,
+                readLongWithFallback(director, "beatCooldownRemainingTicks", world, "storyBeatCooldownTicks", 0L)
+        );
 
         StringBuilder sb = new StringBuilder();
         sb.append("Create a candidate director output with this JSON shape exactly: ");
@@ -29,8 +37,10 @@ public final class DirectorPromptFactory {
         sb.append(" outputMode=").append(outputMode).append('.');
         sb.append(" colonyCount=").append(colonyCount).append('.');
         sb.append(" storyBeatCooldownTicks=").append(cooldown).append('.');
+        sb.append(" remainingInfluenceBudget=").append(String.format(java.util.Locale.ROOT, "%.3f", remainingInfluenceBudget)).append('.');
         sb.append(" Keep text under 160 chars and durations positive.");
         sb.append(" Do not emit contradictory same-domain modifiers with mixed signs in one checkpoint.");
+        sb.append(" Stay within influence budget, otherwise INV-15 will reject the candidate.");
 
         if (!feedbackHints.isEmpty()) {
             sb.append(" Previous formal validation feedback: ");
@@ -44,5 +54,33 @@ public final class DirectorPromptFactory {
         }
 
         return sb.toString();
+    }
+
+    private static int readIntWithFallback(
+            JsonNode primary,
+            String primaryField,
+            JsonNode fallback,
+            String fallbackField,
+            int defaultValue
+    ) {
+        JsonNode value = primary.path(primaryField);
+        if (!value.isMissingNode() && !value.isNull()) {
+            return value.asInt(defaultValue);
+        }
+        return fallback.path(fallbackField).asInt(defaultValue);
+    }
+
+    private static long readLongWithFallback(
+            JsonNode primary,
+            String primaryField,
+            JsonNode fallback,
+            String fallbackField,
+            long defaultValue
+    ) {
+        JsonNode value = primary.path(primaryField);
+        if (!value.isMissingNode() && !value.isNull()) {
+            return value.asLong(defaultValue);
+        }
+        return fallback.path(fallbackField).asLong(defaultValue);
     }
 }

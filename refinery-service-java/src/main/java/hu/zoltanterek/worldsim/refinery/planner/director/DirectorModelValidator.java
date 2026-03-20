@@ -139,6 +139,8 @@ public final class DirectorModelValidator {
             throw invalid(DirectorDesign.INV_01, "Director checkpoint supports only addStoryBeat/setColonyDirective ops.");
         }
 
+        validateInfluenceBudget(repaired, facts);
+
         repaired.sort(Comparator.comparingInt(DirectorModelValidator::sortKey)
                 .thenComparing(DirectorModelValidator::stableSecondaryKey));
         if (!candidatePatch.equals(repaired)) {
@@ -219,6 +221,10 @@ public final class DirectorModelValidator {
 
         filtered.sort(Comparator.comparingInt(DirectorModelValidator::sortKey)
                 .thenComparing(DirectorModelValidator::stableSecondaryKey));
+
+        if (DirectorInfluenceBudget.calculateBudgetUsed(filtered) > facts.remainingInfluenceBudget()) {
+            return List.of();
+        }
 
         return filtered;
     }
@@ -419,6 +425,16 @@ public final class DirectorModelValidator {
                                 + " (max abs " + DirectorDesign.MAX_DOMAIN_STACK + ")"
                 );
             }
+        }
+    }
+
+    private static void validateInfluenceBudget(List<PatchOp> repaired, DirectorRuntimeFacts facts) {
+        double budgetUsed = DirectorInfluenceBudget.calculateBudgetUsed(repaired);
+        if (budgetUsed > facts.remainingInfluenceBudget()) {
+            throw invalid(
+                    DirectorDesign.INV_15,
+                    "Budget cost " + budgetUsed + " exceeds limit " + facts.remainingInfluenceBudget()
+            );
         }
     }
 

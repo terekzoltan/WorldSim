@@ -24,11 +24,21 @@ Planner mode defaults to deterministic mock:
 - `PLANNER_MODE=pipeline` (scaffolded LLM -> Refinery chain with deterministic fallback)
 - `PLANNER_REFINERY_ENABLED=false` (default)
 - `PLANNER_LLM_ENABLED=false` (default)
+- `PLANNER_LLM_API_KEY=` (required for live LLM calls)
+- `PLANNER_LLM_BASE_URL=https://openrouter.ai/api/v1`
+- `PLANNER_LLM_MODEL=openai/gpt-4o-mini`
+- `PLANNER_LLM_TIMEOUT_MS=3000`
+- `PLANNER_LLM_HTTP_REFERER=https://worldsim.local`
+- `PLANNER_LLM_APP_TITLE=WorldSim`
+- `PLANNER_LLM_TEMPERATURE=0.4`
+- `PLANNER_LLM_MAX_TOKENS=500`
+- `PLANNER_DIRECTOR_BUDGET=5.0` (default influence budget limit for director checkpoints)
 
 When `PLANNER_MODE=pipeline`, responses include an explicit explain marker:
 
 - `refineryStage:enabled` if Refinery stage is enabled
 - `refineryStage:disabled` if Refinery stage is off
+- Director responses may include `budgetUsed:<decimal>` in `explain` for budget handoff/debugging
 
 ## Test
 
@@ -61,6 +71,7 @@ Request DTO: `PatchRequest`
 - `seed` long for deterministic planning
 - `tick` long simulation tick
 - `goal` enum: `TECH_TREE_PATCH`, `WORLD_EVENT`, `NPC_POLICY`
+- director goal: `SEASON_DIRECTOR_CHECKPOINT`
 - `snapshot` object (`JsonNode`) required
 - `constraints` object (`JsonNode`) optional
 

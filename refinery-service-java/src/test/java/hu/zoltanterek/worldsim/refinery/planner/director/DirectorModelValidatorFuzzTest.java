@@ -55,6 +55,7 @@ class DirectorModelValidatorFuzzTest {
                 random.nextInt(2000),
                 colonyCount,
                 cooldown,
+                random.nextDouble() * 6.0,
                 List.copyOf(activeBeats),
                 List.of()
         );

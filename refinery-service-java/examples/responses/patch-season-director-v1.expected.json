@@ -21,6 +21,7 @@
   "explain": [
     "directorStage:mock",
     "directorOutputMode:both",
+    "budgetUsed:0.000",
     "MockPlanner produced deterministic director checkpoint output.",
     "Given the same goal, seed, and tick, this service returns the same patch."
   ],

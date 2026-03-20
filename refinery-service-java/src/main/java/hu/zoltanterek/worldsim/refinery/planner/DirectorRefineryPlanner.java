@@ -3,7 +3,9 @@ package hu.zoltanterek.worldsim.refinery.planner;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +30,7 @@ public class DirectorRefineryPlanner {
 
     private final boolean refineryEnabled;
     private final int maxRetries;
+    private final double directorBudget;
     private final DirectorPipelineTelemetry telemetry;
     private final DirectorSnapshotMapper snapshotMapper = new DirectorSnapshotMapper();
     private final DirectorModelValidator validator = new DirectorModelValidator();
@@ -36,24 +39,38 @@ public class DirectorRefineryPlanner {
     public DirectorRefineryPlanner(
             @Value("${planner.refinery.enabled:false}") boolean refineryEnabled,
             @Value("${planner.director.maxRetries:2}") int maxRetries,
+            @Value("${planner.director.budget:5.0}") double directorBudget,
             DirectorPipelineTelemetry telemetry
     ) {
         this.refineryEnabled = refineryEnabled;
         this.maxRetries = Math.max(0, maxRetries);
+        this.directorBudget = directorBudget > 0d ? directorBudget : DirectorDesign.DEFAULT_INFLUENCE_BUDGET;
         this.telemetry = telemetry;
     }
 
     DirectorRefineryPlanner(boolean refineryEnabled, int maxRetries) {
-        this(refineryEnabled, maxRetries, new DirectorPipelineTelemetry());
+        this(refineryEnabled, maxRetries, DirectorDesign.DEFAULT_INFLUENCE_BUDGET, new DirectorPipelineTelemetry());
+    }
+
+    DirectorRefineryPlanner(boolean refineryEnabled, int maxRetries, DirectorPipelineTelemetry telemetry) {
+        this(refineryEnabled, maxRetries, DirectorDesign.DEFAULT_INFLUENCE_BUDGET, telemetry);
     }
 
     public DirectorValidationResult validateAndRepair(PatchRequest request, List<PatchOp> candidatePatch) {
+        return validateAndRepair(request, candidatePatch, feedback -> Optional.empty());
+    }
+
+    public DirectorValidationResult validateAndRepair(
+            PatchRequest request,
+            List<PatchOp> candidatePatch,
+            Function<List<String>, Optional<List<PatchOp>>> retryCandidateProvider
+    ) {
         if (!refineryEnabled) {
             logger.info("director refinery validation disabled; pass-through candidateOps={}", candidatePatch.size());
             return new DirectorValidationResult(candidatePatch, false, List.of(), List.of(), 0, false);
         }
 
-        DirectorRuntimeFacts facts = snapshotMapper.map(request);
+        DirectorRuntimeFacts facts = snapshotMapper.map(request, directorBudget);
         List<PatchOp> attempt = candidatePatch;
         List<String> feedback = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
@@ -69,11 +86,12 @@ public class DirectorRefineryPlanner {
         }
 
         logger.info(
-                "director validation start candidateOps={} maxRetries={} colonyCount={} beatCooldownTicks={}",
+                "director validation start candidateOps={} maxRetries={} colonyCount={} beatCooldownTicks={} remainingBudget={}",
                 candidatePatch.size(),
                 maxRetries,
                 facts.colonyCount(),
-                facts.beatCooldownTicks()
+                facts.beatCooldownTicks(),
+                facts.remainingInfluenceBudget()
         );
 
         for (int retry = 0; retry <= maxRetries; retry++) {
@@ -114,6 +132,18 @@ public class DirectorRefineryPlanner {
                 );
                 if (retry == maxRetries) {
                     break;
+                }
+
+                Optional<List<PatchOp>> regenerated = retryCandidateProvider.apply(List.copyOf(feedback));
+                if (regenerated.isPresent() && !regenerated.get().isEmpty()) {
+                    attempt = regenerated.get();
+                    logger.warn(
+                            "director retry prepared from llm feedback retry={} nextAttemptOps={} feedbackCount={}",
+                            retry + 1,
+                            attempt.size(),
+                            feedback.size()
+                    );
+                    continue;
                 }
 
                 int attemptBeforeRetry = attempt.size();

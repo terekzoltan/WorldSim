@@ -1,6 +1,7 @@
 package hu.zoltanterek.worldsim.refinery.planner;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,7 @@ import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorInfluenceBudget;
 import hu.zoltanterek.worldsim.refinery.util.DeterministicIds;
 
 @Component
@@ -47,6 +49,7 @@ public class MockPlanner implements PatchPlanner {
                 ? List.of(
                 "directorStage:mock",
                 "directorOutputMode:" + directorOutputMode,
+                "budgetUsed:" + formatBudgetUsed(DirectorInfluenceBudget.calculateBudgetUsed(patch)),
                 "MockPlanner produced deterministic director checkpoint output.",
                 "Given the same goal, seed, and tick, this service returns the same patch."
         )
@@ -152,5 +155,9 @@ public class MockPlanner implements PatchPlanner {
             case "off" -> List.of();
             default -> patch;
         };
+    }
+
+    private static String formatBudgetUsed(double budgetUsed) {
+        return String.format(Locale.ROOT, "%.3f", budgetUsed);
     }
 }

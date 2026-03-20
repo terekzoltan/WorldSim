@@ -2,6 +2,7 @@ package hu.zoltanterek.worldsim.refinery.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -14,6 +15,7 @@ import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorInfluenceBudget;
 
 @Component
 @Primary
@@ -124,7 +126,12 @@ public class ComposedPatchPlanner implements PatchPlanner {
         );
 
         DirectorRefineryPlanner.DirectorValidationResult validationResult =
-                directorRefineryPlanner.validateAndRepair(request, candidatePatch);
+                directorRefineryPlanner.validateAndRepair(
+                        request,
+                        candidatePatch,
+                        feedbackHints -> llmPlanner.proposeWithFeedback(request, feedbackHints)
+                                .map(patch -> applyDirectorOutputMode(patch, directorOutputMode))
+                );
         List<PatchOp> validatedPatch = applyDirectorOutputMode(validationResult.patch(), directorOutputMode);
 
         String stage = validationResult.fallbackUsed()
@@ -138,6 +145,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
         explain.add("directorOutputMode:" + directorOutputMode);
         explain.add(llmProposal.isPresent() ? "llmStage:candidate" : "llmStage:disabled");
         explain.add("llmRetries:" + validationResult.retriesUsed());
+        explain.add("budgetUsed:" + formatBudgetUsed(DirectorInfluenceBudget.calculateBudgetUsed(validatedPatch)));
         if (llmProposal.isPresent()) {
             explain.add("LLM planner proposed director candidate patch.");
         } else {
@@ -205,5 +213,9 @@ public class ComposedPatchPlanner implements PatchPlanner {
             case "off" -> List.of();
             default -> patch;
         };
+    }
+
+    private static String formatBudgetUsed(double budgetUsed) {
+        return String.format(Locale.ROOT, "%.3f", budgetUsed);
     }
 }

@@ -18,23 +18,28 @@ class DirectorSnapshotMapperTest {
 
     @Test
     void map_PopulatesActiveBeatsAndDirectives() {
+        ObjectNode director = objectMapper.createObjectNode();
+        director.put("colonyPopulation", 47);
+        director.put("beatCooldownRemainingTicks", 5);
+        director.put("remainingInfluenceBudget", 4.25);
+
         ObjectNode world = objectMapper.createObjectNode();
         world.put("colonyCount", 3);
-        world.put("storyBeatCooldownTicks", 5);
 
-        ArrayNode activeBeats = world.putArray("activeBeats");
+        ArrayNode activeBeats = director.putArray("activeBeats");
         activeBeats.addObject()
                 .put("beatId", "BEAT_MAJOR_1")
                 .put("severity", "major")
                 .put("remainingTicks", 12);
 
-        ArrayNode activeDirectives = world.putArray("activeDirectives");
+        ArrayNode activeDirectives = director.putArray("activeDirectives");
         activeDirectives.addObject()
                 .put("colonyId", 1)
                 .put("directive", "PrioritizeFood");
 
         ObjectNode snapshot = objectMapper.createObjectNode();
         snapshot.set("world", world);
+        snapshot.set("director", director);
 
         PatchRequest request = new PatchRequest(
                 "v1",
@@ -49,9 +54,92 @@ class DirectorSnapshotMapperTest {
         DirectorRuntimeFacts facts = mapper.map(request);
 
         assertEquals(1, facts.activeBeats().size());
+        assertEquals(3, facts.colonyCount());
         assertEquals("major", facts.activeBeats().get(0).severity());
         assertEquals(1, facts.activeDirectives().size());
         assertEquals("PrioritizeFood", facts.activeDirectives().get(0).directive());
+        assertEquals(4.25, facts.remainingInfluenceBudget());
+    }
+
+    @Test
+    void map_UsesWorldColonyCountInsteadOfDirectorPopulation() {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.putObject("world").put("colonyCount", 2);
+        snapshot.putObject("director")
+                .put("colonyPopulation", 47)
+                .put("beatCooldownRemainingTicks", 0)
+                .put("remainingInfluenceBudget", 4.0);
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-map-colony-count",
+                21L,
+                100L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                snapshot,
+                null
+        );
+
+        DirectorRuntimeFacts facts = mapper.map(request, 5.0);
+        assertEquals(2, facts.colonyCount());
+    }
+
+    @Test
+    void map_FallsBackToLegacyWorldFields() {
+        ObjectNode world = objectMapper.createObjectNode();
+        world.put("colonyCount", 2);
+        world.put("storyBeatCooldownTicks", 7);
+        ArrayNode activeBeats = world.putArray("activeBeats");
+        activeBeats.addObject()
+                .put("beatId", "BEAT_MINOR_1")
+                .put("severity", "minor")
+                .put("remainingTicks", 4);
+
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.set("world", world);
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-map-legacy",
+                42L,
+                256L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                snapshot,
+                null
+        );
+
+        DirectorRuntimeFacts facts = mapper.map(request);
+
+        assertEquals(2, facts.colonyCount());
+        assertEquals(7, facts.beatCooldownTicks());
+        assertEquals(1, facts.activeBeats().size());
+        assertEquals(5.0, facts.remainingInfluenceBudget());
+    }
+
+    @Test
+    void map_ConstraintsMaxBudgetOverridesSnapshotBudget() {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.putObject("world").put("colonyCount", 2);
+        snapshot.putObject("director")
+                .put("colonyPopulation", 47)
+                .put("beatCooldownRemainingTicks", 0)
+                .put("remainingInfluenceBudget", 4.0);
+
+        ObjectNode constraints = objectMapper.createObjectNode();
+        constraints.put("maxBudget", 2.5);
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-map-budget",
+                21L,
+                100L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                snapshot,
+                constraints
+        );
+
+        DirectorRuntimeFacts facts = mapper.map(request, 5.0);
+        assertEquals(2.5, facts.remainingInfluenceBudget());
     }
 
     @Test

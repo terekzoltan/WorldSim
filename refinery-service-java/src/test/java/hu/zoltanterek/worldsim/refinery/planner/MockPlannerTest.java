@@ -1,6 +1,7 @@
 package hu.zoltanterek.worldsim.refinery.planner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
@@ -64,5 +65,6 @@ class MockPlannerTest {
         assertEquals(first.patch(), second.patch());
         assertEquals("directorStage:mock", first.explain().get(0));
         assertEquals("directorOutputMode:both", first.explain().get(1));
+        assertTrue(first.explain().stream().anyMatch(item -> item.startsWith("budgetUsed:")));
     }
 }
