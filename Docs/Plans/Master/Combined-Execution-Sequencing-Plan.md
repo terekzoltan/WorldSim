@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-03-10
+Last updated: 2026-03-19
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -997,22 +997,27 @@ Purpose:
 
 ## Wave 6 — LLM Integration + Siege (Director Phase 3a + Combat Phase 3b)
 
+Wave turn-gate:
+- Wave 6 is `READY` only after Wave 5.1 closeout is `✅`.
+- Reason: Wave 5.1 explicitly closes the combat observability / engagement gaps that would otherwise make Wave 6 siege debugging noisier.
+
 ### Sprint D6: LLM Creativity + Budget (Track D + B)
 
 > Director Plan > Phase 3 Sprint 6
 
-- ⬜ **S6-A** LLM director proposal stage — OpenRouter (Track D — Java)
-- ⬜ **S6-B** LLM + Refinery iterative correction loop (Track D — Java)
-- ⬜ **S6-C** Influence budget system (Track D Java + Track B runtime tracking)
+- ✅ **S6-A** LLM director proposal stage — OpenRouter (Track D — Java)
+- ✅ **S6-B** LLM + Refinery iterative correction loop (Track D — Java)
+- ✅ **S6-C (D part)** Influence budget semantics (Track D — Java)
+- ✅ **S6-C (B part)** Runtime budget mirror + checkpoint reset + snapshot export (Track B — C#)
 
 ### Sprint C6: Siege Mechanics (Track B -> C -> A)
 
 > Combat Plan > Phase 3 Sprint 6
 
-- ⬜ **P3-E** Siege state + breach logic (Track B)
-- ⬜ **P3-F** Structure damage integration (Track B)
-- ⬜ **P3-G** AI siege tactics — attack vs retreat vs sortie (Track C)
-- ⬜ **P3-H** Siege UI/overlays (Track A)
+- ✅ **P3-E** Siege state + breach logic (Track B)
+- ✅ **P3-F** Structure damage integration (Track B)
+- ✅ **P3-G** AI siege tactics — attack vs retreat vs sortie (Track C)
+- ✅ **P3-H** Siege UI/overlays (Track A)
 
 ### Wave 6 — Execution Steps
 
@@ -1021,10 +1026,10 @@ Purpose:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track D agent | S6-A, S6-B | Wave 5 D5 ✅ | Java-only; S6-A → S6-B sequential |
-| Track B agent | P3-E, P3-F, S6-C (B part) | Wave 5 C5 ✅ | P3-E → P3-F first, then S6-C runtime |
+| Track B agent | P3-E, P3-F | Wave 5 C5 ✅ + Wave 5.1 ✅ | P3-E → P3-F first; keep S6-C runtime blocked until the Java budget semantics are stable |
 
 **MR-2 caution:** S6-C adds budget tracking to `DirectorState`; P3-E/F add siege state to tick loop.
-Both are additive — low risk if Track B agent handles both C6 combat epics AND S6-C runtime part.
+Both are additive, but the clean order is: Track B finishes P3-E/F first, then picks up the S6-C runtime slice after Track D stabilizes the budget model.
 
 **Step 2 — opens when P3-E + P3-F ✅**
 
@@ -1033,13 +1038,20 @@ Both are additive — low risk if Track B agent handles both C6 combat epics AND
 | Track C agent | P3-G | P3-E ✅ + P3-F ✅ | AI siege needs breach + damage models |
 | Track A agent | P3-H | P3-E ✅ | Siege overlay needs siege state model |
 
-**Step 3 — opens when S6-A + S6-B ✅**
+**Step 3 — S6-C sequencing (Track D -> Track B, then optional Track A consume)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D + Track B | S6-C (both parts) | S6-A ✅ + S6-B ✅ | Budget system wiring after LLM pipeline is stable |
+| Track D agent | S6-C (D part) | S6-A ✅ + S6-B ✅ | Define budget costs, validator invariant, and prompt-context budget fields first |
+| Track B agent | S6-C (B part) | S6-C (D part) ready + P3-E ✅ + P3-F ✅ | Mirror budget usage into `DirectorState`, checkpoint reset, and snapshot export after the Java semantics are stable |
+| Track A agent | S6-C (consume, if needed) | S6-C (B part) ready | Minimal HUD/debug consume only if manual verification needs same-wave visibility |
 
-**Critical path:** Track D S6-A/B (LLM pipeline) → S6-C. Combat side: Track B → Track C + A parallel.
+Wave 6 closeout note:
+- ✅ `S6-C (consume, if needed)` Track A consume visibility finalized in HUD/debug: director budget line shows remaining/max/used and debug adds checkpoint tick + used percentage from snapshot budget fields.
+
+**S6-C split note:** S6-C is not "Track B first, then Track D". The intended order is `Track D first -> Track B second` because the runtime budget state should mirror the already-defined Java validator/prompt budget semantics, not invent them independently.
+
+**Critical path:** Track D `S6-A -> S6-B -> S6-C (D)` → Track B `S6-C (B)`. Combat side: Track B `P3-E -> P3-F`, then Track C + A parallel.
 
 ---
 
@@ -1077,16 +1089,29 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D + Track A | S7-B | S7-A ✅ | UX/debug toggles build on causal chain monitoring |
+| Track D agent | S7-B (D part) | S7-A ✅ | Profiles/env cleanup build on the causal-chain contract and monitoring shape |
+| Track A agent | S7-B (A part) | S7-A ✅ | In-game debug toggles and consume-side UX build on the same stabilized monitoring shape |
 
 **Step 3 — opens when D7 fully ✅ (S7-A + S7-B). C7 is sequential after D7.**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | P4-A, P4-B, P4-D | S7-A ✅ + S7-B ✅ | v2 contract expansion for combat ops |
-| Track B agent | P4-C | P4-A ✅ + P4-B ✅ | Runtime endpoints need contract + adapter first |
+| Track D agent | P4-A | S7-A ✅ + S7-B ✅ | Expand contracts for combat-facing director/runtime ops first |
 
-**Critical path:** D7 (S7-A → S7-B) → C7 (P4-A/B/D → P4-C). Strictly sequential.
+**Step 4 — opens when P4-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | P4-B | P4-A ✅ | Adapter translation depends on the new contract ops existing first |
+
+**Step 5 — opens when P4-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | P4-D | P4-B ✅ | Java service beat generation should target the already-mapped adapter contract |
+| Track B agent | P4-C | P4-A ✅ + P4-B ✅ | Runtime endpoints need the contract and adapter semantics defined first |
+
+**Critical path:** D7 (S7-A → S7-B) → C7 (P4-A → P4-B → {P4-D + P4-C}). Strictly sequential across waves, with only the final C7 step parallelized.
 **Director pipeline is COMPLETE after this wave.**
 
 ---
@@ -1113,20 +1138,27 @@ Purpose:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | LC1-B1, LC1-B2 | Wave 7 ✅ | B1 first, then B2; define the visual-driver boundary and operational profiles before Track A layers on top |
+| Track B agent | LC1-B1 | Wave 7 ✅ | Define the visual-driver boundary before any profile or rendering follow-up starts |
 
-**Step 2 — Track A consumes the stable boundary**
+**Step 2 — opens when LC1-B1 ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
+| Track B agent | LC1-B2 | LC1-B1 ✅ | Profile plumbing builds on the agreed snapshot/visual-driver boundary |
 | Track A agent | LC1-A1 | LC1-B1 ✅ | Terrain/state-driven variation can start once the snapshot driver contract is stable |
-| Track A agent | LC1-A2, LC1-A3 | LC1-B2 ✅ + LC1-A1 ✅ | Atmosphere/profile UI follows the agreed low-cost/default profile wiring |
 
-**Step 3 — Optional Track C compatibility closeout**
+**Step 3 — opens when LC1-B2 ✅ + LC1-A1 ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
+| Track A agent | LC1-A2 | LC1-B2 ✅ + LC1-A1 ✅ | Atmosphere/ambient-life tuning should respect the finalized low-cost profile wiring |
 | Track C agent | LC1-C1 | LC1-B2 ✅ | Only additive telemetry/guardrails; no renderer scope or profile-owned game logic |
+
+**Step 4 — opens when LC1-A2 ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | LC1-A3 | LC1-B2 ✅ + LC1-A2 ✅ | Settings/HUD/profile visibility and checklist updates should document the final baseline, not an intermediate one |
 
 Acceptance notes:
 - `DevLite` becomes the default development baseline; `Showcase` is explicit/opt-in and `Headless` remains available for SMR and batch runs.
@@ -1139,7 +1171,7 @@ Proof targets:
 - Track A smoke checks covering `Showcase`, `DevLite`, and `Headless` profile behavior.
 - Perf/QA evidence showing the default path stays cheap enough for multi-instance/dev workflows.
 
-**Parallelism:** `LC1-B1 -> LC1-B2` is the critical path. `LC1-A1` opens after `LC1-B1`, `LC1-A2/A3` after `LC1-B2`, and `LC1-C1` is optional/additive after the profile contract is stable.
+**Parallelism:** `LC1-B1` is the gate. After that, `LC1-B2` and `LC1-A1` run in parallel. After `LC1-B2 + LC1-A1`, `LC1-A2` and `LC1-C1` can run in parallel, and `LC1-A3` closes the wave after the final Track A baseline is stable.
 
 ---
 
@@ -1154,6 +1186,46 @@ Proof targets:
 - ⬜ **P5-C** Consumption from inventory first (Track B)
 - ⬜ **P5-D** Snapshot and UI indicators (Track B -> A)
 - ⬜ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
+
+### Wave 8 — Execution Steps
+
+**Step 1 — inventory data first (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-A | Wave 7.5 ✅ | Inventory data model is the base for storage, consumption, tech hooks, and UI |
+
+**Step 2 — opens when P5-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-B | P5-A ✅ | Storehouse withdraw/deposit rules depend on the inventory model existing |
+
+**Step 3 — opens when P5-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-C | P5-B ✅ | Consumption should switch to inventory only after refill/storehouse semantics are stable |
+
+**Step 4 — opens when P5-C ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-E | P5-C ✅ | Tech effects should target the stabilized inventory/carry rules |
+
+**Step 5 — opens when P5-E ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-D (B part) | P5-E ✅ | Snapshot/export side should reflect the final inventory + tech shape |
+
+**Step 6 — opens when P5-D (B part) ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | P5-D (A part) | P5-D (B part) ✅ | UI indicators consume the finalized carry/supply snapshot fields |
+
+**Parallelism:** Wave 8 is intentionally mostly sequential Track B work; only the final Track A consume step is separate.
 
 ---
 
@@ -1178,6 +1250,74 @@ Proof targets:
 - ⬜ **P6-D** Snapshot + overlays (Track B + A)
 
 **Parallelism:** C9 and C10 are **sequential** (C10 depends on supply model from C9).
+
+### Wave 9 — Execution Steps
+
+**Step 1 — army supply foundation (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-F | Wave 8 ✅ | Aggregate army supply and consumption rules are the base for every later campaign step |
+
+**Step 2 — opens when P5-F ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-I | P5-F ✅ | The fallback budget should mirror the already-defined supply model instead of competing with it |
+
+**Step 3 — opens when P5-I ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-G (B part) | P5-F ✅ + P5-I ✅ | Runtime role/state hooks for supply carriers build on the settled supply model |
+
+**Step 4 — opens when P5-G (B part) ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P5-H (B part) | P5-G (B part) ✅ | Foraging runtime behavior should layer onto the carrier/resupply baseline |
+
+**Step 5 — opens when P5-H (B part) ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P5-G (C part) | P5-H (B part) ✅ | AI carrier behavior should target the actual runtime hooks, not placeholders |
+
+**Step 6 — opens when P5-G (C part) ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P5-H (C part) | P5-H (B part) ✅ | Foraging decision logic depends on the runtime forage command/state existing |
+
+**Step 7 — campaign entities (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P6-A | P5-F ✅ + P5-I ✅ + P5-G ✅ + P5-H ✅ | Start campaign work only after the supply baseline is usable |
+
+**Step 8 — opens when P6-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P6-B | P6-A ✅ | Assembly/rally depends on campaign and army entities |
+
+**Step 9 — opens when P6-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P6-C | P6-B ✅ | March and encounters need the assembly/rally flow to exist first |
+
+**Step 10 — opens when P6-C ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P6-D (B part) | P6-C ✅ | Snapshot/export should reflect the actual campaign loop, not an incomplete placeholder |
+
+**Step 11 — opens when P6-D (B part) ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | P6-D (A part) | P6-D (B part) ✅ | Overlays consume the campaign snapshot once it is stable |
 
 ---
 
@@ -1212,6 +1352,68 @@ Proof targets:
 
 **Parallelism:** C11 -> C12 -> C13 are **sequential** (each builds on previous).
 
+### Wave 10 — Execution Steps
+
+**Step 1 — campaign siege/runtime resolution first (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P6-E | Wave 9 ✅ | Campaign siege flow must exist before resolution or campaign-AI/UI follow-ups |
+
+**Step 2 — opens when P6-E ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P6-F | P6-E ✅ | Resolution rules depend on the campaign reaching siege/engagement outcomes |
+
+**Step 3 — opens when P6-F ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P6-G | P6-E ✅ + P6-F ✅ | Strategic campaign AI should target the finalized campaign state machine |
+| Track A agent | P6-H | P6-E ✅ + P6-F ✅ | UI polish should visualize the full resolution flow, not only partial siege state |
+
+**Step 4 — supply lines foundation (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P7-A | P6-E ✅ + P6-F ✅ + P6-G ✅ + P6-H ✅ | Start Phase 7 only after the end-to-end campaign loop is complete |
+
+**Step 5 — opens when P7-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P7-B | P7-A ✅ | Forward bases depend on convoy/supply-line structure existing first |
+
+**Step 6 — opens when P7-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P7-C (B part) | P7-B ✅ | Scout role runtime hooks should build on the supply-line/forward-base layer |
+
+**Step 7 — opens when P7-C (B part) ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P7-C (C part) | P7-C (B part) ✅ | Scout AI consumes the actual runtime scout/intel hooks |
+| Track A agent | P7-D | P7-A ✅ + P7-B ✅ | UI for convoys and forward bases can proceed once those runtime entities exist |
+
+**Step 8 — dedicated siege units first (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P7-E | P7-A ✅ + P7-B ✅ + P7-C ✅ + P7-D ✅ | Multi-front and siege-unit follow-ups should build on the completed logistics layer |
+
+**Step 9 — opens when P7-E ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P7-F | P7-E ✅ | Siege-unit AI needs the dedicated unit types and behaviors first |
+| Track B agent | P7-G | P7-E ✅ | Multi-front war should be bounded using the finalized siege-unit/runtime constraints |
+| Track A agent | P7-H | P7-E ✅ | Graphics consume the siege-unit snapshot once the runtime entity set is stable |
+
+**Parallelism:** Wave 10 stays sequential across major phases (`C11 -> C12 -> C13`), but inside each phase the final consumer steps are grouped into the same step whenever cross-track work can proceed in parallel.
+
 ---
 
 ## Summary Table
@@ -1226,10 +1428,10 @@ Proof targets:
 | 5.1 | — | C5.1 (Combat closeout) | Track B -> C + A |
 | 6 | D6 (Phase 3 S6) | C6 (Phase 3 S6) | MR-2: tick loop caution |
 | 7 | D7 (Phase 3 S7) | C7 (Phase 4 S7) | MR-3: sequential |
-| 7.5 | — | LC1 (Low-Cost baseline) | Track B -> A -> optional C |
-| 8 | — | C8 (Phase 5 S8) | N/A |
-| 9 | — | C9-C10 (Phase 5-6 S9-10) | Sequential |
-| 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential |
+| 7.5 | — | LC1 (Low-Cost baseline) | Staged parallel after `LC1-B1` |
+| 8 | — | C8 (Phase 5 S8) | Mostly sequential; final Track A consume |
+| 9 | — | C9-C10 (Phase 5-6 S9-10) | Mostly sequential; Track A only at final campaign overlay consume |
+| 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential by phase, parallel consumer steps inside phases |
 
 **Totals:** 12 waves, 21 sprints (7 Director + 15 Combat/closeout), ~94 epics.
 
