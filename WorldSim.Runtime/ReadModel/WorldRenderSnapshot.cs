@@ -62,6 +62,8 @@ public sealed record WorldRenderSnapshot(
     IReadOnlyList<ColonyHudData> Colonies,
     IReadOnlyList<CombatGroupRenderData> CombatGroups,
     IReadOnlyList<BattleRenderData> Battles,
+    IReadOnlyList<SiegeRenderData> Sieges,
+    IReadOnlyList<BreachRenderData> Breaches,
     IReadOnlyList<FactionStanceRenderData> FactionStances,
     EcoHudData Ecology,
     SeasonView CurrentSeason,
@@ -77,6 +79,11 @@ public sealed record DirectorRenderState(
     int BeatCooldownRemainingTicks,
     int MajorBeatCooldownRemainingTicks,
     int EpicBeatCooldownRemainingTicks,
+    double MaxInfluenceBudget,
+    double RemainingInfluenceBudget,
+    double LastCheckpointBudgetUsed,
+    long LastBudgetCheckpointTick,
+    bool HasBudgetData,
     IReadOnlyList<DirectorActiveBeatRenderData> ActiveBeats,
     IReadOnlyList<DirectorActiveDirectiveRenderData> ActiveDirectives,
     IReadOnlyList<DirectorDomainModifierRenderData> ActiveDomainModifiers,
@@ -90,6 +97,11 @@ public sealed record DirectorRenderState(
         BeatCooldownRemainingTicks: 0,
         MajorBeatCooldownRemainingTicks: 0,
         EpicBeatCooldownRemainingTicks: 0,
+        MaxInfluenceBudget: 5d,
+        RemainingInfluenceBudget: 5d,
+        LastCheckpointBudgetUsed: 0d,
+        LastBudgetCheckpointTick: -1,
+        HasBudgetData: false,
         ActiveBeats: Array.Empty<DirectorActiveBeatRenderData>(),
         ActiveDirectives: Array.Empty<DirectorActiveDirectiveRenderData>(),
         ActiveDomainModifiers: Array.Empty<DirectorDomainModifierRenderData>(),
@@ -212,6 +224,29 @@ public sealed record BattleRenderData(
     int Radius,
     int Intensity,
     int ElapsedTicks);
+
+public sealed record SiegeRenderData(
+    int SiegeId,
+    int AttackerColonyId,
+    int DefenderColonyId,
+    int TargetStructureId,
+    DefensiveStructureKindView TargetKind,
+    int CenterX,
+    int CenterY,
+    int ActiveAttackerCount,
+    int StartedTick,
+    int LastActiveTick,
+    int BreachCount,
+    string Status);
+
+public sealed record BreachRenderData(
+    int StructureId,
+    int DefenderColonyId,
+    int AttackerColonyId,
+    int X,
+    int Y,
+    int CreatedTick,
+    DefensiveStructureKindView StructureKind);
 
 public sealed record FactionStanceRenderData(int LeftFactionId, int RightFactionId, string Stance);
 

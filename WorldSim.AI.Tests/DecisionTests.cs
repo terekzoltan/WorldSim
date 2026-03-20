@@ -829,6 +829,131 @@ public class DecisionTests
         Assert.NotEqual(NpcCommand.ResearchTech, decision.Command);
     }
 
+    [Fact]
+    public void ThreatDecisionPolicy_SiegeAttackerWithTowerPressure_PrioritizesStructureTargeting()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 11f,
+            Hunger: 18f,
+            Stamina: 74f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 0,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 78f,
+            Strength: 16,
+            Defense: 14,
+            IsNearActiveSiege: true,
+            IsSiegeAttackerRole: true,
+            NearbyEnemyDefensiveStructures: 3,
+            NearbyEnemyTowerCount: 2,
+            NearbyEnemyWallCount: 1,
+            NearbySiegePressure: 0.68f,
+            LocalThreatScore: 0.62f,
+            ActiveCombatGroupSize: 4,
+            ActiveGroupAverageMorale: 54f);
+
+        Assert.True(ThreatDecisionPolicy.ShouldPrioritizeSiegeTargeting(context));
+        Assert.True(ThreatDecisionPolicy.ShouldAvoidTowerTunnel(context));
+    }
+
+    [Fact]
+    public void SimplePlanner_RaidBorder_PrefersAttackStructure_WhenSiegeTargetingIsPreferred()
+    {
+        var planner = new SimplePlanner();
+        planner.SetGoal(new Goal("RaidBorder"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 12f,
+            Hunger: 12f,
+            Stamina: 82f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 6,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 86f,
+            Strength: 17,
+            Defense: 15,
+            IsWarStance: true,
+            IsWarriorRole: true,
+            NearbyEnemyCount: 0,
+            IsNearActiveSiege: true,
+            IsSiegeAttackerRole: true,
+            NearbyEnemyDefensiveStructures: 2,
+            NearbyEnemyTowerCount: 2,
+            NearbyEnemyWallCount: 0,
+            NearbySiegePressure: 0.6f,
+            LocalThreatScore: 0.58f,
+            ActiveCombatGroupSize: 4,
+            ActiveGroupAverageMorale: 56f,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.AttackStructure, decision.Command);
+    }
+
+    [Fact]
+    public void SimplePlanner_DefendSelf_SiegeDefenderSortie_PrefersFight()
+    {
+        var planner = new SimplePlanner();
+        planner.SetGoal(new Goal("DefendSelf"));
+
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 13f,
+            Hunger: 14f,
+            Stamina: 88f,
+            HomeWood: 0,
+            HomeStone: 0,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 6,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 90f,
+            Strength: 18,
+            Defense: 16,
+            NearbyEnemyCount: 2,
+            IsNearActiveSiege: true,
+            IsSiegeDefenderRole: true,
+            NearbyFriendlyTowerCount: 1,
+            NearbyFriendlyWallCount: 2,
+            NearbySiegePressure: 0.4f,
+            IsRouting: false,
+            ActiveCombatGroupSize: 4,
+            ActiveGroupAverageMorale: 68f,
+            CommanderMoraleStabilityBonus: 0.25f,
+            LocalThreatScore: 0.42f,
+            HomeWeaponLevel: 1,
+            HomeArmorLevel: 1);
+
+        var decision = planner.GetNextCommand(context);
+
+        Assert.Equal(NpcCommand.Fight, decision.Command);
+    }
+
     private sealed class FixedConsideration : Consideration
     {
         private readonly float _value;

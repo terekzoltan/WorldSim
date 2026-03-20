@@ -61,6 +61,7 @@ if (configs.Count == 0 && string.IsNullOrWhiteSpace(rawConfigsJson))
         Dt: fallbackDt,
         EnableCombatPrimitives: false,
         EnableDiplomacy: false,
+        EnableSiege: true,
         StoneBuildingsEnabled: false,
         BirthRateMultiplier: 1f,
         MovementSpeedMultiplier: 1f));
@@ -83,6 +84,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
             {
                 EnableCombatPrimitives = config.EnableCombatPrimitives,
                 EnableDiplomacy = config.EnableDiplomacy,
+                EnableSiege = config.EnableSiege,
                 StoneBuildingsEnabled = config.StoneBuildingsEnabled,
                 BirthRateMultiplier = config.BirthRateMultiplier,
                 MovementSpeedMultiplier = config.MovementSpeedMultiplier
@@ -254,6 +256,7 @@ static ScenarioRunResult BuildRunResult(
         Dt: config.Dt,
         EnableCombatPrimitives: config.EnableCombatPrimitives,
         EnableDiplomacy: config.EnableDiplomacy,
+        EnableSiege: config.EnableSiege,
         StoneBuildingsEnabled: config.StoneBuildingsEnabled,
         BirthRateMultiplier: config.BirthRateMultiplier,
         MovementSpeedMultiplier: config.MovementSpeedMultiplier,
@@ -1457,7 +1460,8 @@ sealed record ScenarioConfig(
     bool EnableDiplomacy,
     bool StoneBuildingsEnabled,
     float BirthRateMultiplier,
-    float MovementSpeedMultiplier);
+    float MovementSpeedMultiplier,
+    bool EnableSiege = true);
 
 sealed record ScenarioRunResult(
     string ConfigName,
@@ -1470,6 +1474,7 @@ sealed record ScenarioRunResult(
     float Dt,
     bool EnableCombatPrimitives,
     bool EnableDiplomacy,
+    bool EnableSiege,
     bool StoneBuildingsEnabled,
     float BirthRateMultiplier,
     float MovementSpeedMultiplier,

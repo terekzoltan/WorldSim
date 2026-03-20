@@ -37,6 +37,11 @@ public sealed class DirectorState
 
     public int MajorBeatCooldownRemainingTicks { get; private set; }
     public int EpicBeatCooldownRemainingTicks { get; private set; }
+    public double MaxInfluenceBudget { get; private set; } = 5d;
+    public double RemainingInfluenceBudget { get; private set; } = 5d;
+    public double LastCheckpointBudgetUsed { get; private set; }
+    public long LastBudgetCheckpointTick { get; private set; } = -1;
+    public bool HasBudgetData { get; private set; }
 
     public IReadOnlyList<ActiveBeatState> ActiveBeats => _beats.Values
         .Select(beat => beat.ToState())
@@ -49,6 +54,27 @@ public sealed class DirectorState
         .ToList();
 
     public int BeatCooldownRemainingTicks => Math.Max(MajorBeatCooldownRemainingTicks, EpicBeatCooldownRemainingTicks);
+
+    public void BeginCheckpointBudget(long tick, double maxBudget)
+    {
+        var normalizedMaxBudget = NormalizeBudget(maxBudget, fallback: 5d);
+        MaxInfluenceBudget = normalizedMaxBudget;
+        RemainingInfluenceBudget = normalizedMaxBudget;
+        LastCheckpointBudgetUsed = 0d;
+        LastBudgetCheckpointTick = tick;
+        HasBudgetData = true;
+    }
+
+    public void ApplyCheckpointBudgetUsed(long tick, double budgetUsed)
+    {
+        if (!HasBudgetData)
+            BeginCheckpointBudget(tick, MaxInfluenceBudget);
+
+        var normalizedBudgetUsed = NormalizeBudget(budgetUsed, fallback: 0d);
+        LastCheckpointBudgetUsed = Math.Clamp(normalizedBudgetUsed, 0d, MaxInfluenceBudget);
+        RemainingInfluenceBudget = Math.Max(0d, MaxInfluenceBudget - LastCheckpointBudgetUsed);
+        LastBudgetCheckpointTick = tick;
+    }
 
     public void Tick()
     {
@@ -101,6 +127,14 @@ public sealed class DirectorState
     {
         _directives[colonyId] = new ActiveDirectiveMutable(colonyId, directive, durationTicks, durationTicks);
         return DirectorApplyResult.Ok($"Applied directive '{directive}' to colony {colonyId} ({durationTicks} ticks)");
+    }
+
+    private static double NormalizeBudget(double value, double fallback)
+    {
+        if (double.IsNaN(value) || double.IsInfinity(value))
+            return fallback;
+
+        return Math.Max(0d, value);
     }
 
     private sealed class ActiveBeatMutable

@@ -13,6 +13,8 @@ public static class ThreatDecisionPolicy
     private const float CommanderPressMoraleThreshold = 62f;
     private const int RoutingReengageThresholdTicks = 2;
     private const int BackoffReengageThresholdTicks = 1;
+    private const float SiegeRetreatMoraleThreshold = 36f;
+    private const float SiegePressureRetreatThreshold = 0.75f;
 
     public static bool IsCommanderCombatContext(in NpcAiContext context)
         => context.IsCommander && context.ActiveCombatGroupSize >= CommanderGroupMinSize;
@@ -72,6 +74,85 @@ public static class ThreatDecisionPolicy
         return false;
     }
 
+    public static bool ShouldPrioritizeSiegeTargeting(in NpcAiContext context)
+    {
+        if (!context.IsNearActiveSiege)
+            return false;
+        if (!context.IsSiegeAttackerRole)
+            return false;
+        if (context.NearbyEnemyDefensiveStructures <= 0)
+            return false;
+
+        if (ShouldAvoidTowerTunnel(context))
+            return true;
+
+        if (context.HasRecentBreachNearby && context.NearbyEnemyTowerCount > 0)
+            return true;
+
+        return context.NearbyEnemyTowerCount > context.NearbyEnemyWallCount;
+    }
+
+    public static bool ShouldAvoidTowerTunnel(in NpcAiContext context)
+    {
+        if (!context.IsNearActiveSiege || !context.IsSiegeAttackerRole)
+            return false;
+        if (context.NearbyEnemyTowerCount <= 0)
+            return false;
+
+        var towerPressure = context.NearbyEnemyTowerCount >= Math.Max(1, context.NearbyEnemyWallCount);
+        var moraleRisk = context.ActiveCombatGroupSize >= 3 && context.ActiveGroupAverageMorale < 58f;
+        var pressureRisk = context.NearbySiegePressure >= 0.55f || context.LocalThreatScore >= 0.6f;
+
+        return towerPressure && (moraleRisk || pressureRisk);
+    }
+
+    public static bool ShouldRetreatFromSiege(in NpcAiContext context)
+    {
+        if (!context.IsNearActiveSiege)
+            return false;
+
+        if (context.IsSiegeAttackerRole)
+        {
+            if (context.ActiveCombatGroupSize >= 3 && context.ActiveGroupAverageMorale <= SiegeRetreatMoraleThreshold)
+                return true;
+            if (context.NearbySiegePressure >= SiegePressureRetreatThreshold && context.ActiveGroupAverageMorale < 52f)
+                return true;
+            if (context.BackoffTicksRemaining > 0 && context.NearbySiegePressure >= 0.6f)
+                return true;
+            return false;
+        }
+
+        if (context.IsSiegeDefenderRole)
+        {
+            if (context.ActiveCombatGroupSize >= 3 && context.ActiveGroupAverageMorale < 30f)
+                return true;
+            if (context.Health < 42f && context.LocalThreatScore >= 0.55f)
+                return true;
+        }
+
+        return false;
+    }
+
+    public static bool ShouldSortie(in NpcAiContext context)
+    {
+        if (!context.IsSiegeDefenderRole)
+            return false;
+        if (!context.IsNearActiveSiege)
+            return false;
+        if (context.IsRouting || context.RoutingTicksRemaining > 0)
+            return false;
+        if (context.ActiveCombatGroupSize < 3)
+            return false;
+        if (context.ActiveGroupAverageMorale < 58f)
+            return false;
+        if (context.CommanderMoraleStabilityBonus < 0.15f)
+            return false;
+
+        var attackerWeak = context.NearbyEnemyCount <= 2 && context.NearbySiegePressure <= 0.5f;
+        var defenderHasCover = context.NearbyFriendlyTowerCount >= 1 || context.NearbyFriendlyWallCount >= 2;
+        return attackerWeak && defenderHasCover;
+    }
+
     public static bool IsPeacefulZeroSignal(in NpcAiContext context)
     {
         if (Math.Max(0, context.NearbyPredators) > 0)
@@ -110,6 +191,9 @@ public static class ThreatDecisionPolicy
     public static bool ShouldFight(in NpcAiContext context)
     {
         if (!ShouldPrioritizeDefense(context))
+            return false;
+
+        if (ShouldRetreatFromSiege(context))
             return false;
 
         if (ShouldSuppressReengage(context) && !ShouldCommanderPressAdvantage(context))

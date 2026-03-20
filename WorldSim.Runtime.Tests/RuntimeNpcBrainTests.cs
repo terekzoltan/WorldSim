@@ -365,6 +365,50 @@ public class RuntimeNpcBrainTests
     }
 
     [Fact]
+    public void Think_PopulatesSiegeContextFields_WhenNearbyActiveSiegeExists()
+    {
+        var world = new World(28, 20, 16, randomSeed: 88)
+        {
+            EnableCombatPrimitives = true,
+            EnableDiplomacy = true,
+            EnableSiege = true,
+            BirthRateMultiplier = 0f
+        };
+
+        world._animals.Clear();
+        var actor = world._people[0];
+        var attacker = actor.Home;
+        var defender = world._colonies.First(colony => colony.Faction != attacker.Faction);
+        world.SetFactionStance(attacker.Faction, defender.Faction, WorldSim.Simulation.Diplomacy.Stance.War);
+
+        var wallPos = (
+            x: Math.Clamp(actor.Pos.x + 1, 0, world.Width - 1),
+            y: Math.Clamp(actor.Pos.y, 0, world.Height - 1));
+        if (!IsBuildable(world, wallPos))
+            wallPos = FindBuildableTileNear(world, actor.Pos);
+
+        Assert.True(world.TryAddWoodWall(defender, wallPos));
+        actor.Pos = (Math.Clamp(wallPos.x - 1, 0, world.Width - 1), wallPos.y);
+        actor.Current = Job.AttackStructure;
+        ForceAttackStructureTick(actor);
+        actor.Needs["Hunger"] = 0f;
+        attacker.Stock[Resource.Food] = 250;
+        world.Update(0.25f);
+
+        var brain = new RuntimeNpcBrain(new CapturingBrain());
+        _ = brain.Think(actor, world, dt: 1f);
+
+        Assert.NotNull(CapturingBrain.LastContext);
+        Assert.True(CapturingBrain.LastContext!.Value.IsNearActiveSiege);
+        Assert.True(CapturingBrain.LastContext.Value.IsSiegeAttackerRole);
+        Assert.True(
+            CapturingBrain.LastContext.Value.NearbyEnemyDefensiveStructures
+            + CapturingBrain.LastContext.Value.NearbyFriendlyWallCount
+            + CapturingBrain.LastContext.Value.NearbyFriendlyTowerCount >= 1);
+        Assert.True(CapturingBrain.LastContext.Value.NearbySiegePressure > 0f);
+    }
+
+    [Fact]
     public void Think_ReportsPlannerSignals_ToWorldCounters()
     {
         var world = new World(16, 16, 10, randomSeed: 123);
@@ -483,5 +527,45 @@ public class RuntimeNpcBrainTests
         var value = field!.GetValue(runtime);
         Assert.IsType<World>(value);
         return (World)value!;
+    }
+
+    private static (int x, int y) FindBuildableTileNear(World world, (int x, int y) center)
+    {
+        for (int radius = 0; radius <= 8; radius++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    var candidate = (x: center.x + dx, y: center.y + dy);
+                    if (IsBuildable(world, candidate))
+                        return candidate;
+                }
+            }
+        }
+
+        return center;
+    }
+
+    private static bool IsBuildable(World world, (int x, int y) pos)
+    {
+        if (pos.x < 0 || pos.y < 0 || pos.x >= world.Width || pos.y >= world.Height)
+            return false;
+        if (world.GetTile(pos.x, pos.y).Ground == Ground.Water)
+            return false;
+        if (world.Houses.Any(house => house.Pos == pos))
+            return false;
+        if (world.SpecializedBuildings.Any(building => building.Pos == pos))
+            return false;
+        if (world.DefensiveStructures.Any(structure => structure.Pos == pos && !structure.IsDestroyed))
+            return false;
+        return true;
+    }
+
+    private static void ForceAttackStructureTick(Person raider)
+    {
+        typeof(Person)
+            .GetField("_doingJob", BindingFlags.Instance | BindingFlags.NonPublic)?
+            .SetValue(raider, 1);
     }
 }

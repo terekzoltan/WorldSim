@@ -1102,7 +1102,7 @@ public class Person
             return false;
 
         var next = ThinkAiOncePerTick(w, dt);
-        if (next != Job.Fight && next != Job.Flee && next != Job.RaidBorder)
+        if (next != Job.Fight && next != Job.Flee && next != Job.RaidBorder && next != Job.AttackStructure)
         {
             if (context.IsWarriorRole && context.IsWarStance && (context.IsContestedTile || context.HasContestedTilesNearby))
                 next = Job.RaidBorder;
@@ -1623,7 +1623,16 @@ public class Person
 
     void ExecuteRaidBorderAction(World w)
     {
-        var adjacentEnemyStructure = FindNearestEnemyStructure(w, radius: 1);
+        var threatContext = BuildThreatContext(w);
+        if (ThreatDecisionPolicy.ShouldRetreatFromSiege(threatContext))
+        {
+            ExecuteFleeAction(w);
+            return;
+        }
+
+        var preferTowerTargets = ThreatDecisionPolicy.ShouldPrioritizeSiegeTargeting(threatContext);
+
+        var adjacentEnemyStructure = FindNearestEnemyStructure(w, radius: 1, prioritizeSiege: true, preferTowerTargets: preferTowerTargets);
         if (adjacentEnemyStructure != null)
         {
             Current = Job.AttackStructure;
@@ -1631,7 +1640,7 @@ public class Person
             return;
         }
 
-        var target = FindRaidTarget(w);
+        var target = FindRaidTarget(w, preferTowerTargets);
         if (target == null)
             return;
 
@@ -1640,7 +1649,7 @@ public class Person
         if (Pos != previous)
             return;
 
-        var nearbyEnemyStructure = FindNearestEnemyStructure(w, radius: 2);
+        var nearbyEnemyStructure = FindNearestEnemyStructure(w, radius: 2, prioritizeSiege: true, preferTowerTargets: preferTowerTargets);
         if (nearbyEnemyStructure != null)
         {
             Current = Job.AttackStructure;
@@ -1650,13 +1659,26 @@ public class Person
 
     void ExecuteAttackStructureAction(World w)
     {
-        var target = FindNearestEnemyStructure(w, radius: 1);
+        if (!w.EnableSiege)
+            return;
+
+        var threatContext = BuildThreatContext(w);
+        if (ThreatDecisionPolicy.ShouldRetreatFromSiege(threatContext))
+        {
+            ExecuteFleeAction(w);
+            return;
+        }
+
+        var preferTowerTargets = ThreatDecisionPolicy.ShouldPrioritizeSiegeTargeting(threatContext);
+        var target = FindNearestEnemyStructure(w, radius: 1, prioritizeSiege: true, preferTowerTargets: preferTowerTargets);
         if (target == null)
             return;
 
         w.ReportCombatEngagement();
+        w.ReportSiegePressure(_home, target.Value.structure);
         var beforeDestroyed = target.Value.structure.IsDestroyed;
-        var damaged = w.TryDamageDefensiveStructure(target.Value.structure.Pos, StructureRaidDamage);
+        var damage = ComputeStructureRaidDamage(w, target.Value.structure);
+        var damaged = w.TryDamageDefensiveStructure(target.Value.structure.Pos, damage, _home);
         if (!damaged)
             return;
 
@@ -1691,6 +1713,33 @@ public class Person
             (_home.UnlockedTechs.Contains("fortification") ? 1 : 0)
             + (_home.UnlockedTechs.Contains("advanced_fortification") ? 1 : 0)
             + (_home.UnlockedTechs.Contains("siege_craft") ? 1 : 0);
+        var activeSieges = w.GetActiveSieges();
+        var colonySieges = activeSieges
+            .Where(siege => siege.AttackerColonyId == colonyId || siege.DefenderColonyId == colonyId)
+            .ToList();
+        var nearSieges = colonySieges
+            .Where(siege => Math.Abs(siege.CenterX - Pos.x) + Math.Abs(siege.CenterY - Pos.y) <= 8)
+            .ToList();
+        var isColonyUnderSiege = colonySieges.Any(siege => siege.DefenderColonyId == colonyId);
+        var isNearActiveSiege = nearSieges.Count > 0;
+        var isSiegeAttackerRole = nearSieges.Any(siege => siege.AttackerColonyId == colonyId);
+        var isSiegeDefenderRole = nearSieges.Any(siege => siege.DefenderColonyId == colonyId);
+        var nearbySiegePressure = nearSieges.Count == 0
+            ? 0f
+            : Math.Clamp(nearSieges.Max(siege => siege.ActiveAttackerCount) / 8f, 0f, 1f);
+        var hasRecentBreachNearby = w.GetRecentBreaches().Any(breach =>
+            (breach.AttackerColonyId == colonyId || breach.DefenderColonyId == colonyId)
+            && Math.Abs(breach.X - Pos.x) + Math.Abs(breach.Y - Pos.y) <= 8);
+
+        CountNearbySiegeStructures(
+            w,
+            radius: 6,
+            out var nearbyEnemyDefensiveStructures,
+            out var nearbyEnemyTowerCount,
+            out var nearbyEnemyWallCount,
+            out var nearbyFriendlyTowerCount,
+            out var nearbyFriendlyWallCount);
+
         var localThreat = Math.Clamp(
             (nearbyPredators / 3f) * 0.45f +
             (nearbyHostiles / 4f) * 0.55f +
@@ -1733,8 +1782,79 @@ public class Person
             HomeWeaponLevel: _home.WeaponLevel,
             HomeArmorLevel: _home.ArmorLevel,
             HomeMilitaryTechCount: homeMilitaryTechCount,
-            HomeFortificationTechCount: homeFortificationTechCount);
+            HomeFortificationTechCount: homeFortificationTechCount,
+            IsColonyUnderSiege: isColonyUnderSiege,
+            IsNearActiveSiege: isNearActiveSiege,
+            HasRecentBreachNearby: hasRecentBreachNearby,
+            NearbyEnemyDefensiveStructures: nearbyEnemyDefensiveStructures,
+            NearbyEnemyTowerCount: nearbyEnemyTowerCount,
+            NearbyEnemyWallCount: nearbyEnemyWallCount,
+            NearbyFriendlyTowerCount: nearbyFriendlyTowerCount,
+            NearbyFriendlyWallCount: nearbyFriendlyWallCount,
+            NearbySiegePressure: nearbySiegePressure,
+            IsSiegeAttackerRole: isSiegeAttackerRole,
+            IsSiegeDefenderRole: isSiegeDefenderRole,
+            IsRouting: IsRouting,
+            RoutingTicksRemaining: RoutingTicksRemaining,
+            BackoffTicksRemaining: _backoffTicksRemaining);
     }
+
+    private void CountNearbySiegeStructures(
+        World w,
+        int radius,
+        out int enemyDefensiveStructures,
+        out int enemyTowerCount,
+        out int enemyWallCount,
+        out int friendlyTowerCount,
+        out int friendlyWallCount)
+    {
+        enemyDefensiveStructures = 0;
+        enemyTowerCount = 0;
+        enemyWallCount = 0;
+        friendlyTowerCount = 0;
+        friendlyWallCount = 0;
+
+        foreach (var structure in w.DefensiveStructures)
+        {
+            if (structure.IsDestroyed)
+                continue;
+
+            int dist = Math.Abs(structure.Pos.x - Pos.x) + Math.Abs(structure.Pos.y - Pos.y);
+            if (dist > radius)
+                continue;
+
+            bool isEnemy = structure.Owner.Faction != _home.Faction;
+            bool isTower = IsTowerKind(structure.Kind);
+            bool isWall = IsWallKind(structure.Kind);
+
+            if (isEnemy)
+            {
+                enemyDefensiveStructures++;
+                if (isTower)
+                    enemyTowerCount++;
+                else if (isWall)
+                    enemyWallCount++;
+            }
+            else
+            {
+                if (isTower)
+                    friendlyTowerCount++;
+                else if (isWall)
+                    friendlyWallCount++;
+            }
+        }
+    }
+
+    private static bool IsTowerKind(WorldSim.Simulation.Defense.DefensiveStructureKind kind)
+        => kind is WorldSim.Simulation.Defense.DefensiveStructureKind.Watchtower
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.ArrowTower
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.CatapultTower;
+
+    private static bool IsWallKind(WorldSim.Simulation.Defense.DefensiveStructureKind kind)
+        => kind is WorldSim.Simulation.Defense.DefensiveStructureKind.WoodWall
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.StoneWall
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.ReinforcedWall
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.Gate;
 
     private bool IsWarriorRole(World w)
     {
@@ -1908,7 +2028,7 @@ public class Person
         return best ?? candidates[_rng.Next(candidates.Count)];
     }
 
-    private (int x, int y)? FindRaidTarget(World w)
+    private (int x, int y)? FindRaidTarget(World w, bool preferTowerTargets)
     {
         var nearestContested = FindNearestContestedTile(w, radius: 12);
         if (nearestContested != null)
@@ -1918,7 +2038,7 @@ public class Person
                 return nearestContested;
         }
 
-        var structure = FindNearestEnemyStructure(w, radius: 10);
+        var structure = FindNearestEnemyStructure(w, radius: 10, prioritizeSiege: true, preferTowerTargets: preferTowerTargets);
         if (structure != null)
             return structure.Value.structure.Pos;
 
@@ -1926,26 +2046,70 @@ public class Person
         return enemy?.person.Pos;
     }
 
-    private (WorldSim.Simulation.Defense.DefensiveStructure structure, int dist)? FindNearestEnemyStructure(World w, int radius)
+    private float ComputeStructureRaidDamage(World w, WorldSim.Simulation.Defense.DefensiveStructure structure)
+    {
+        var baseDamage = StructureRaidDamage * Math.Max(1f, w.SiegeDamageMultiplier);
+        var roleBonus = Profession == Profession.Hunter ? 1.12f : 1f;
+        var strengthBonus = 1f + (Strength / 120f);
+        var techBonus = _home.UnlockedTechs.Contains("siege_craft") ? 1.15f : 1f;
+        var targetMitigation = structure.Kind switch
+        {
+            WorldSim.Simulation.Defense.DefensiveStructureKind.WoodWall => 1.05f,
+            WorldSim.Simulation.Defense.DefensiveStructureKind.Gate => 1.0f,
+            WorldSim.Simulation.Defense.DefensiveStructureKind.StoneWall => 0.86f,
+            WorldSim.Simulation.Defense.DefensiveStructureKind.ReinforcedWall => 0.78f,
+            WorldSim.Simulation.Defense.DefensiveStructureKind.Watchtower => 0.9f,
+            WorldSim.Simulation.Defense.DefensiveStructureKind.ArrowTower => 0.86f,
+            WorldSim.Simulation.Defense.DefensiveStructureKind.CatapultTower => 0.82f,
+            _ => 1f
+        };
+
+        return Math.Max(6f, baseDamage * roleBonus * strengthBonus * techBonus * targetMitigation);
+    }
+
+    private (WorldSim.Simulation.Defense.DefensiveStructure structure, int dist)? FindNearestEnemyStructure(
+        World w,
+        int radius,
+        bool prioritizeSiege = false,
+        bool preferTowerTargets = false)
     {
         WorldSim.Simulation.Defense.DefensiveStructure? nearest = null;
-        int best = int.MaxValue;
+        float best = float.MaxValue;
         foreach (var structure in w.DefensiveStructures)
         {
             if (structure.IsDestroyed || structure.Owner == _home || structure.Owner.Faction == _home.Faction)
                 continue;
 
             int dist = Math.Abs(structure.Pos.x - Pos.x) + Math.Abs(structure.Pos.y - Pos.y);
-            if (dist <= radius && dist < best)
+            if (dist > radius)
+                continue;
+
+            float score = dist;
+            if (prioritizeSiege)
             {
-                best = dist;
+                int priority = structure.Kind switch
+                {
+                    WorldSim.Simulation.Defense.DefensiveStructureKind.ArrowTower or WorldSim.Simulation.Defense.DefensiveStructureKind.CatapultTower or WorldSim.Simulation.Defense.DefensiveStructureKind.Watchtower => preferTowerTargets ? 0 : 2,
+                    WorldSim.Simulation.Defense.DefensiveStructureKind.Gate => preferTowerTargets ? 1 : 0,
+                    WorldSim.Simulation.Defense.DefensiveStructureKind.WoodWall or WorldSim.Simulation.Defense.DefensiveStructureKind.StoneWall or WorldSim.Simulation.Defense.DefensiveStructureKind.ReinforcedWall => preferTowerTargets ? 2 : 1,
+                    _ => 3
+                };
+
+                score += (priority * 100f) + (structure.Hp / Math.Max(1f, structure.MaxHp));
+            }
+
+            if (score < best)
+            {
+                best = score;
                 nearest = structure;
             }
         }
 
         if (nearest == null)
             return null;
-        return (nearest, best);
+
+        var finalDist = Math.Abs(nearest.Pos.x - Pos.x) + Math.Abs(nearest.Pos.y - Pos.y);
+        return (nearest, finalDist);
     }
 
     private void ApplyRaidSuccess(World w, Colony enemyColony)

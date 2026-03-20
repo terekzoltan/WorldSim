@@ -1,8 +1,10 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using WorldSim.Runtime;
@@ -111,6 +113,10 @@ public sealed class RefineryPatchRuntime
 
     private async Task RunApplyAsync(SimulationRuntime runtime, long tick)
     {
+        var isDirectorGoal = string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal);
+        if (isDirectorGoal)
+            runtime.PrepareDirectorCheckpointBudget(_options.DirectorMaxBudget, tick);
+
         var beforeHash = CanonicalStateSerializer.Sha256(_patchState);
 
         PatchResponse rawResponse = _options.Mode switch
@@ -139,13 +145,18 @@ public sealed class RefineryPatchRuntime
                                item.StartsWith("refineryStage:", StringComparison.Ordinal)
                                || item.StartsWith("directorStage:", StringComparison.Ordinal))
                           ?? "refineryStage:unknown";
+        var hasBudgetMarker = TryReadBudgetUsed(response, out var budgetUsed);
+        if (isDirectorGoal)
+            runtime.RecordDirectorCheckpointBudgetUsed(hasBudgetMarker ? budgetUsed : 0d, tick);
 
         LastDirectorExecutionStatus = new DirectorExecutionStatus(
             EffectiveOutputMode: selectedOutputMode.Mode,
             EffectiveOutputModeSource: selectedOutputMode.Source,
             Stage: stageMarker,
             Tick: tick,
-            IsDirectorGoal: string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal)
+            IsDirectorGoal: isDirectorGoal,
+            BudgetUsed: hasBudgetMarker ? budgetUsed : 0d,
+            BudgetMarkerPresent: hasBudgetMarker
         );
 
         runtime.SetDirectorExecutionState(
@@ -156,10 +167,13 @@ public sealed class RefineryPatchRuntime
             isDirectorGoal: LastDirectorExecutionStatus.IsDirectorGoal);
 
         var warningHead = response.Warnings.FirstOrDefault();
+        var budgetLabel = isDirectorGoal
+            ? (hasBudgetMarker ? budgetUsed.ToString("0.###", CultureInfo.InvariantCulture) : "missing->0")
+            : "n/a";
         LastStatus =
             $"Refinery applied: applied={result.AppliedCount}, deduped={result.DedupedCount}, noop={result.NoOpCount}, " +
             $"techs={_patchState.TechIds.Count}, events={_patchState.EventIds.Count}, " +
-            $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={stageMarker}, mode={selectedOutputMode.Mode}, source={selectedOutputMode.Source}" +
+            $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={stageMarker}, mode={selectedOutputMode.Mode}, source={selectedOutputMode.Source}, budget={budgetLabel}" +
             (warningHead is null ? string.Empty : $", warn={warningHead}");
     }
 
@@ -270,7 +284,7 @@ public sealed class RefineryPatchRuntime
             tick,
             _options.Goal,
             runtime.BuildRefinerySnapshot(),
-            null
+            BuildRequestConstraints()
         );
 
         Exception? lastError = null;
@@ -321,6 +335,44 @@ public sealed class RefineryPatchRuntime
             return code >= 500 || code == (int)HttpStatusCode.RequestTimeout;
         }
 
+        return false;
+    }
+
+    private JsonObject? BuildRequestConstraints()
+    {
+        if (!string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal))
+            return null;
+
+        var constraints = new JsonObject
+        {
+            ["maxBudget"] = _options.DirectorMaxBudget
+        };
+
+        if (!string.Equals(_options.DirectorOutputMode, "auto", StringComparison.Ordinal))
+            constraints["outputMode"] = _options.DirectorOutputMode;
+
+        return constraints;
+    }
+
+    private static bool TryReadBudgetUsed(PatchResponse response, out double budgetUsed)
+    {
+        foreach (var explain in response.Explain)
+        {
+            const string prefix = "budgetUsed:";
+            if (!explain.StartsWith(prefix, StringComparison.Ordinal))
+                continue;
+
+            var raw = explain[prefix.Length..].Trim();
+            if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+                continue;
+            if (double.IsNaN(parsed) || double.IsInfinity(parsed))
+                continue;
+
+            budgetUsed = Math.Max(0d, parsed);
+            return true;
+        }
+
+        budgetUsed = 0d;
         return false;
     }
 

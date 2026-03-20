@@ -79,6 +79,15 @@ dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj
 | `PLANNER_MODE` | `mock` | `mock` or `pipeline` |
 | `PLANNER_REFINERY_ENABLED` | `false` | Enables minimal Refinery stage in pipeline mode |
 | `PLANNER_LLM_ENABLED` | `false` | Enables LLM proposal stage |
+| `PLANNER_LLM_API_KEY` | empty | OpenRouter API key |
+| `PLANNER_LLM_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL |
+| `PLANNER_LLM_MODEL` | `openai/gpt-4o-mini` | LLM model name |
+| `PLANNER_LLM_TIMEOUT_MS` | `3000` | LLM request timeout |
+| `PLANNER_LLM_HTTP_REFERER` | `https://worldsim.local` | OpenRouter referer header |
+| `PLANNER_LLM_APP_TITLE` | `WorldSim` | OpenRouter title header |
+| `PLANNER_LLM_TEMPERATURE` | `0.4` | Sampling temperature |
+| `PLANNER_LLM_MAX_TOKENS` | `500` | Completion token cap |
+| `PLANNER_DIRECTOR_BUDGET` | `5.0` | Director checkpoint influence budget limit (Java validator side) |
 
 ## HUD Status Field Guide
 

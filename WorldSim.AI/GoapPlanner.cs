@@ -254,6 +254,12 @@ public sealed class GoapPlanner : IPlanner
 
     private static NpcCommand SelectDefendSelfCommand(in NpcAiContext context)
     {
+        if (ThreatDecisionPolicy.ShouldRetreatFromSiege(context))
+            return NpcCommand.Flee;
+
+        if (ThreatDecisionPolicy.ShouldSortie(context))
+            return NpcCommand.Fight;
+
         if (ThreatDecisionPolicy.ShouldSuppressReengage(context)
             && !ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context))
             return NpcCommand.Flee;
@@ -266,6 +272,9 @@ public sealed class GoapPlanner : IPlanner
 
     private static NpcCommand SelectRaidBorderCommand(in NpcAiContext context)
     {
+        if (ThreatDecisionPolicy.ShouldRetreatFromSiege(context))
+            return NpcCommand.Flee;
+
         if (ThreatDecisionPolicy.ShouldSuppressReengage(context)
             && !ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context))
             return NpcCommand.Flee;
@@ -280,6 +289,9 @@ public sealed class GoapPlanner : IPlanner
             && context.IsWarStance
             && (context.IsContestedTile || context.HasContestedTilesNearby))
             return NpcCommand.RaidBorder;
+
+        if (ThreatDecisionPolicy.ShouldPrioritizeSiegeTargeting(context))
+            return NpcCommand.AttackStructure;
 
         if (context.NearbyEnemyCount > 0 && ThreatDecisionPolicy.ShouldFight(context))
             return NpcCommand.Fight;

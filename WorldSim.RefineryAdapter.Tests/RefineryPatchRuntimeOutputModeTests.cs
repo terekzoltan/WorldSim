@@ -47,11 +47,16 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         Assert.Equal(expectedSource, patchRuntime.LastDirectorExecutionStatus.EffectiveOutputModeSource);
         Assert.Equal("directorStage:mock", patchRuntime.LastDirectorExecutionStatus.Stage);
         Assert.True(patchRuntime.LastDirectorExecutionStatus.IsDirectorGoal);
+        Assert.True(patchRuntime.LastDirectorExecutionStatus.BudgetMarkerPresent);
+        Assert.Equal(0d, patchRuntime.LastDirectorExecutionStatus.BudgetUsed, 3);
 
         var snapshotDirector = runtime.GetSnapshot().Director;
         Assert.Equal(expectedMode, snapshotDirector.OutputMode);
         Assert.Equal(expectedSource, snapshotDirector.OutputModeSource);
         Assert.Equal("directorStage:mock", snapshotDirector.StageMarker);
+        Assert.True(snapshotDirector.HasBudgetData);
+        Assert.Equal(5d, snapshotDirector.MaxInfluenceBudget, 3);
+        Assert.Equal(5d, snapshotDirector.RemainingInfluenceBudget, 3);
     }
 
     [Fact]
@@ -121,6 +126,51 @@ public sealed class RefineryPatchRuntimeOutputModeTests
             Assert.Equal("both", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputMode);
             Assert.Equal("fallback", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputModeSource);
             Assert.Contains("applied=2", patchRuntime.LastStatus, StringComparison.Ordinal);
+            Assert.False(patchRuntime.LastDirectorExecutionStatus.BudgetMarkerPresent);
+            Assert.Equal(0d, patchRuntime.LastDirectorExecutionStatus.BudgetUsed, 3);
+        }
+        finally
+        {
+            File.Delete(fixturePath);
+        }
+    }
+
+    [Fact]
+    public void FixtureDirectorOutputMode_MirrorsBudgetUsedMarkerIntoRuntimeState()
+    {
+        var fixturePath = WriteTempDirectorFixture("both", includeModeMarker: true, includeBudgetMarker: true, budgetUsed: 1.875d);
+
+        try
+        {
+            var runtime = CreateRuntime();
+            var options = new RefineryRuntimeOptions(
+                Mode: RefineryIntegrationMode.Fixture,
+                Goal: DirectorGoals.SeasonDirectorCheckpoint,
+                DirectorOutputMode: "auto",
+                FixtureResponsePath: fixturePath,
+                ServiceBaseUrl: "http://localhost:8091",
+                StrictMode: true,
+                RequestSeed: 123,
+                LiveTimeoutMs: 1000,
+                LiveRetryCount: 0,
+                CircuitBreakerSeconds: 5,
+                ApplyToWorld: false,
+                MinTriggerIntervalMs: 0,
+                DirectorMaxBudget: 5d
+            );
+
+            var patchRuntime = new RefineryPatchRuntime(options);
+            patchRuntime.Trigger(runtime, tick: 300);
+            PumpUntilSettled(patchRuntime);
+
+            Assert.True(patchRuntime.LastDirectorExecutionStatus.BudgetMarkerPresent);
+            Assert.Equal(1.875d, patchRuntime.LastDirectorExecutionStatus.BudgetUsed, 3);
+
+            var director = runtime.BuildRefinerySnapshot()["director"]?.AsObject();
+            Assert.NotNull(director);
+            Assert.Equal(5d, director!["maxInfluenceBudget"]?.GetValue<double>() ?? -1d, 3);
+            Assert.Equal(1.875d, director["lastCheckpointBudgetUsed"]?.GetValue<double>() ?? -1d, 3);
+            Assert.Equal(3.125d, director["remainingInfluenceBudget"]?.GetValue<double>() ?? -1d, 3);
         }
         finally
         {
@@ -158,7 +208,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         return Path.Combine(repoRoot, "refinery-service-java", "examples", "responses", "patch-season-director-v1.expected.json");
     }
 
-    private static string WriteTempDirectorFixture(string mode, bool includeModeMarker)
+    private static string WriteTempDirectorFixture(string mode, bool includeModeMarker, bool includeBudgetMarker = false, double budgetUsed = 0d)
     {
         var json = """
         {
@@ -184,11 +234,14 @@ public sealed class RefineryPatchRuntimeOutputModeTests
           "explain": [
             "directorStage:mock",
             "directorOutputMode:__MODE__",
+            "budgetUsed:__BUDGET__",
             "MockPlanner produced deterministic director checkpoint output."
           ],
           "warnings": []
         }
         """;
+
+        json = json.Replace("__BUDGET__", budgetUsed.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
 
         if (includeModeMarker)
         {
@@ -198,6 +251,14 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         {
             json = json.Replace("\"directorOutputMode:__MODE__\",\r\n", string.Empty, StringComparison.Ordinal)
                 .Replace("\"directorOutputMode:__MODE__\",\n", string.Empty, StringComparison.Ordinal);
+        }
+
+        if (!includeBudgetMarker)
+        {
+            json = json.Replace("\"budgetUsed:__BUDGET__\",\r\n", string.Empty, StringComparison.Ordinal)
+                .Replace("\"budgetUsed:__BUDGET__\",\n", string.Empty, StringComparison.Ordinal)
+                .Replace("\"budgetUsed:" + budgetUsed.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + "\",\r\n", string.Empty, StringComparison.Ordinal)
+                .Replace("\"budgetUsed:" + budgetUsed.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + "\",\n", string.Empty, StringComparison.Ordinal);
         }
 
         var path = Path.Combine(Path.GetTempPath(), $"director-fixture-{Guid.NewGuid():N}.json");

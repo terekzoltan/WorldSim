@@ -61,6 +61,29 @@ namespace WorldSim.Simulation
         int Intensity,
         int ElapsedTicks);
 
+    public sealed record SiegeState(
+        int SiegeId,
+        int AttackerColonyId,
+        int DefenderColonyId,
+        int TargetStructureId,
+        DefensiveStructureKind TargetKind,
+        int CenterX,
+        int CenterY,
+        int ActiveAttackerCount,
+        int StartedTick,
+        int LastActiveTick,
+        int BreachCount,
+        string Status);
+
+    public sealed record BreachState(
+        int StructureId,
+        int DefenderColonyId,
+        int AttackerColonyId,
+        int X,
+        int Y,
+        int CreatedTick,
+        DefensiveStructureKind StructureKind);
+
     public class World
     {
         readonly Func<Colony, RuntimeNpcBrain> _brainFactory;
@@ -94,6 +117,7 @@ namespace WorldSim.Simulation
         public bool EnablePredatorHumanAttacks { get; set; } = false;
         public bool EnableCombatPrimitives { get; set; }
         public bool EnableDiplomacy { get; set; }
+        public bool EnableSiege { get; set; } = true;
         public float PredatorHumanDamage { get; set; } = 10f;
         public float CombatDamageBonusMultiplier { get; set; } = 1f;
         public float CombatDefenseBonusMultiplier { get; set; } = 1f;
@@ -113,6 +137,13 @@ namespace WorldSim.Simulation
         public int TotalCombatEngagements { get; private set; }
         public int TotalCombatDeaths { get; private set; }
         public int TotalBattleTicks { get; private set; }
+        public int TotalSiegesStarted { get; private set; }
+        public int TotalSiegesRepelled { get; private set; }
+        public int TotalBreaches { get; private set; }
+        public int TotalStructuresDestroyed { get; private set; }
+        public int TotalWallsDestroyed { get; private set; }
+        public int TotalGatesDestroyed { get; private set; }
+        public int TotalTowersDestroyed { get; private set; }
         public int TotalDeathsOldAge { get; private set; }
         public int TotalDeathsStarvation { get; private set; }
         public int TotalDeathsPredator { get; private set; }
@@ -135,6 +166,7 @@ namespace WorldSim.Simulation
         public int LastTickDenseActors { get; private set; }
         public int ActiveCombatGroupCount => _activeCombatGroups.Count;
         public int ActiveBattleCount => _activeBattles.Count;
+        public int ActiveSiegeCount => _activeSieges.Count;
 
         public bool CanBuildFortifications(Colony colony)
         {
@@ -164,11 +196,16 @@ namespace WorldSim.Simulation
         readonly Dictionary<string, int> _softReservations = new(StringComparer.Ordinal);
         readonly List<RuntimeCombatGroup> _activeCombatGroups = new();
         readonly List<RuntimeBattleState> _activeBattles = new();
+        readonly List<RuntimeSiegeState> _activeSieges = new();
+        readonly List<RuntimeBreachState> _recentBreaches = new();
+        readonly List<RuntimeSiegePressure> _siegePressureThisTick = new();
+        readonly Dictionary<(int attackerColonyId, int defenderColonyId), RuntimeSiegeSession> _siegeSessions = new();
         int _navigationTopologyVersion;
         int _nextDefenseStructureId = 1;
         int _nextPersonId = 1;
         int _nextCombatGroupId = 1;
         int _nextBattleId = 1;
+        int _nextSiegeId = 1;
 
         float _simulationTimeSeconds;
         int _tickCounter;
@@ -294,6 +331,7 @@ namespace WorldSim.Simulation
         {
             _tickCounter++;
             _softReservations.Clear();
+            _siegePressureThisTick.Clear();
             _simulationTimeSeconds += Math.Max(0f, dt);
             _domainModifierEngine.Tick();
             _goalBiasEngine.Tick();
@@ -371,9 +409,12 @@ namespace WorldSim.Simulation
 
             _activeCombatGroups.Clear();
             _activeBattles.Clear();
+            _activeSieges.Clear();
             foreach (var person in _people)
                 person.SetCombatAssignment(null, null, Formation.Line, isCommander: false);
             ResolveGroupCombatPhase();
+            ResolveSiegeStatePhase();
+            TrimRecentBreachWindow();
 
             TrimRecentDeathWindows();
         }
@@ -620,16 +661,64 @@ namespace WorldSim.Simulation
         }
 
         public bool TryDamageDefensiveStructure((int x, int y) pos, float damage)
+            => TryDamageDefensiveStructure(pos, damage, null);
+
+        public bool TryDamageDefensiveStructure((int x, int y) pos, float damage, Colony? attacker)
         {
             var structure = DefensiveStructures.FirstOrDefault(s => s.Pos == pos && !s.IsDestroyed);
             if (structure == null)
                 return false;
 
+            var wasDestroyed = structure.IsDestroyed;
             structure.ApplyDamage(damage);
-            if (structure.IsDestroyed)
+            if (!wasDestroyed && structure.IsDestroyed)
             {
                 _navigationTopologyVersion++;
                 MarkTerritoryDirty();
+
+                TotalStructuresDestroyed++;
+                switch (structure.Kind)
+                {
+                    case DefensiveStructureKind.WoodWall:
+                    case DefensiveStructureKind.StoneWall:
+                    case DefensiveStructureKind.ReinforcedWall:
+                        TotalWallsDestroyed++;
+                        break;
+                    case DefensiveStructureKind.Gate:
+                        TotalGatesDestroyed++;
+                        break;
+                    case DefensiveStructureKind.Watchtower:
+                    case DefensiveStructureKind.ArrowTower:
+                    case DefensiveStructureKind.CatapultTower:
+                        TotalTowersDestroyed++;
+                        break;
+                }
+
+                if (structure.Kind is DefensiveStructureKind.WoodWall
+                    or DefensiveStructureKind.StoneWall
+                    or DefensiveStructureKind.ReinforcedWall
+                    or DefensiveStructureKind.Gate)
+                {
+                    TotalBreaches++;
+                    var attackerColonyId = attacker?.Id ?? -1;
+                    _recentBreaches.Add(new RuntimeBreachState(
+                        structure.Id,
+                        structure.Owner.Id,
+                        attackerColonyId,
+                        structure.Pos,
+                        _tickCounter,
+                        structure.Kind));
+                    AddEvent($"Wall breached near {structure.Owner.Name}!");
+
+                    if (attacker != null)
+                    {
+                        var key = (attackerColonyId: attacker.Id, defenderColonyId: structure.Owner.Id);
+                        if (_siegeSessions.TryGetValue(key, out var session))
+                            session.BreachCount++;
+                    }
+                }
+
+                AddEvent($"{structure.Owner.Name} lost {structure.Kind}");
             }
             return true;
         }
@@ -722,6 +811,18 @@ namespace WorldSim.Simulation
         public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
         public void ReportCombatEngagement() => TotalCombatEngagements++;
         public void ReportCombatDeath() => TotalCombatDeaths++;
+        public void ReportSiegePressure(Colony attacker, DefensiveStructure target)
+        {
+            if (attacker == null || target == null)
+                return;
+
+            _siegePressureThisTick.Add(new RuntimeSiegePressure(
+                attackerColonyId: attacker.Id,
+                defenderColonyId: target.Owner.Id,
+                targetStructureId: target.Id,
+                targetKind: target.Kind,
+                targetPos: target.Pos));
+        }
         public void ReportBuildSiteReset() => TotalBuildSiteResetCount++;
         public void ReportNoProgressBackoff(string context)
         {
@@ -892,6 +993,35 @@ namespace WorldSim.Simulation
                     Radius: battle.Radius,
                     Intensity: battle.Intensity,
                     ElapsedTicks: battle.ElapsedTicks))
+                .ToList();
+
+        public IReadOnlyList<SiegeState> GetActiveSieges()
+            => _activeSieges
+                .Select(siege => new SiegeState(
+                    siege.SiegeId,
+                    siege.AttackerColonyId,
+                    siege.DefenderColonyId,
+                    siege.TargetStructureId,
+                    siege.TargetKind,
+                    siege.Center.x,
+                    siege.Center.y,
+                    siege.ActiveAttackerCount,
+                    siege.StartedTick,
+                    siege.LastActiveTick,
+                    siege.BreachCount,
+                    siege.Status))
+                .ToList();
+
+        public IReadOnlyList<BreachState> GetRecentBreaches()
+            => _recentBreaches
+                .Select(breach => new BreachState(
+                    breach.StructureId,
+                    breach.DefenderColonyId,
+                    breach.AttackerColonyId,
+                    breach.Pos.x,
+                    breach.Pos.y,
+                    breach.CreatedTick,
+                    breach.StructureKind))
                 .ToList();
 
         private void ReportPersonDeath(Person person)
@@ -1393,6 +1523,80 @@ namespace WorldSim.Simulation
 
             tile = best ?? person.Pos;
             return best != null;
+        }
+
+        private void ResolveSiegeStatePhase()
+        {
+            if (!EnableSiege || !EnableCombatPrimitives)
+            {
+                _activeSieges.Clear();
+                return;
+            }
+
+            foreach (var session in _siegeSessions.Values)
+                session.ActiveAttackerCount = 0;
+
+            var activeKeys = new HashSet<(int attackerColonyId, int defenderColonyId)>();
+            foreach (var pressure in _siegePressureThisTick)
+            {
+                if (pressure.attackerColonyId == pressure.defenderColonyId)
+                    continue;
+
+                var key = (attackerColonyId: pressure.attackerColonyId, defenderColonyId: pressure.defenderColonyId);
+                activeKeys.Add(key);
+
+                if (!_siegeSessions.TryGetValue(key, out var session))
+                {
+                    session = new RuntimeSiegeSession(_nextSiegeId++, pressure.attackerColonyId, pressure.defenderColonyId, _tickCounter);
+                    _siegeSessions[key] = session;
+                    TotalSiegesStarted++;
+                    var defender = _colonies.FirstOrDefault(colony => colony.Id == pressure.defenderColonyId);
+                    if (defender != null)
+                        AddEvent($"Siege began near {defender.Name}");
+                }
+
+                session.LastActiveTick = _tickCounter;
+                session.ActiveAttackerCount++;
+
+                var status = session.BreachCount > 0 ? "breached" : "active";
+                _activeSieges.Add(new RuntimeSiegeState(
+                    session.SiegeId,
+                    session.AttackerColonyId,
+                    session.DefenderColonyId,
+                    pressure.targetStructureId,
+                    pressure.targetKind,
+                    pressure.targetPos,
+                    session.ActiveAttackerCount,
+                    session.StartedTick,
+                    session.LastActiveTick,
+                    session.BreachCount,
+                    status));
+            }
+
+            var stale = _siegeSessions
+                .Where(entry => !activeKeys.Contains(entry.Key) && (_tickCounter - entry.Value.LastActiveTick) > 6)
+                .Select(entry => entry.Key)
+                .ToList();
+
+            foreach (var key in stale)
+            {
+                var session = _siegeSessions[key];
+                if (session.BreachCount == 0)
+                {
+                    TotalSiegesRepelled++;
+                    var defender = _colonies.FirstOrDefault(colony => colony.Id == session.DefenderColonyId);
+                    if (defender != null)
+                        AddEvent($"Siege repelled by {defender.Name}");
+                }
+
+                _siegeSessions.Remove(key);
+            }
+        }
+
+        private void TrimRecentBreachWindow()
+        {
+            const int breachVisibleTicks = 120;
+            _recentBreaches.RemoveAll(breach => (_tickCounter - breach.CreatedTick) > breachVisibleTicks);
         }
 
         private bool TryFindNearbyFreePersonTile(Person person, (int x, int y) center, HashSet<(int x, int y)> occupied, out (int x, int y) tile)

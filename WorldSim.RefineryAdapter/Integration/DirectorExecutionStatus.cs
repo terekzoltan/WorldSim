@@ -5,7 +5,9 @@ public sealed record DirectorExecutionStatus(
     string EffectiveOutputModeSource,
     string Stage,
     long Tick,
-    bool IsDirectorGoal
+    bool IsDirectorGoal,
+    double BudgetUsed = 0d,
+    bool BudgetMarkerPresent = false
 )
 {
     public static DirectorExecutionStatus NotTriggered { get; } = new(
@@ -13,6 +15,8 @@ public sealed record DirectorExecutionStatus(
         EffectiveOutputModeSource: "unknown",
         Stage: "not_triggered",
         Tick: -1,
-        IsDirectorGoal: false
+        IsDirectorGoal: false,
+        BudgetUsed: 0d,
+        BudgetMarkerPresent: false
     );
 }

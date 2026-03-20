@@ -21,6 +21,8 @@ public static class WorldSnapshotInterpolator
             current.Colonies,
             current.CombatGroups,
             current.Battles,
+            current.Sieges,
+            current.Breaches,
             current.FactionStances,
             current.Ecology,
             current.CurrentSeason,

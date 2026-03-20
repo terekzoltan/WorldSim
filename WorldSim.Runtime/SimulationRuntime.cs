@@ -56,6 +56,7 @@ public sealed class SimulationRuntime
 
         _world.EnableDiplomacy = ReadBoolEnv("WORLDSIM_ENABLE_DIPLOMACY", fallback: false);
         _world.EnableCombatPrimitives = ReadBoolEnv("WORLDSIM_ENABLE_COMBAT_PRIMITIVES", fallback: false);
+        _world.EnableSiege = ReadBoolEnv("WORLDSIM_ENABLE_SIEGE", fallback: true);
         _world.EnablePredatorHumanAttacks = ReadBoolEnv("WORLDSIM_ENABLE_PREDATOR_ATTACKS", fallback: false);
         _world.RequireFortificationTechUnlock = true;
 
@@ -169,11 +170,26 @@ public sealed class SimulationRuntime
             BeatCooldownRemainingTicks: _directorState.BeatCooldownRemainingTicks,
             MajorBeatCooldownRemainingTicks: _directorState.MajorBeatCooldownRemainingTicks,
             EpicBeatCooldownRemainingTicks: _directorState.EpicBeatCooldownRemainingTicks,
+            MaxInfluenceBudget: _directorState.MaxInfluenceBudget,
+            RemainingInfluenceBudget: _directorState.RemainingInfluenceBudget,
+            LastCheckpointBudgetUsed: _directorState.LastCheckpointBudgetUsed,
+            LastBudgetCheckpointTick: _directorState.LastBudgetCheckpointTick,
+            HasBudgetData: _directorState.HasBudgetData,
             ActiveBeats: activeBeats,
             ActiveDirectives: activeDirectives,
             ActiveDomainModifiers: activeModifiers,
             ActiveGoalBiases: activeBiases,
             LastActionStatus: LastDirectorActionStatus);
+    }
+
+    public void PrepareDirectorCheckpointBudget(double maxBudget, long tick)
+    {
+        _directorState.BeginCheckpointBudget(tick, maxBudget);
+    }
+
+    public void RecordDirectorCheckpointBudgetUsed(double budgetUsed, long tick)
+    {
+        _directorState.ApplyCheckpointBudgetUsed(tick, budgetUsed);
     }
 
     public void SetDirectorExecutionState(
@@ -618,7 +634,10 @@ public sealed class SimulationRuntime
             ["activeBeats"] = activeBeats,
             ["activeDirectives"] = activeDirectives,
             ["beatCooldownRemainingTicks"] = _directorState.BeatCooldownRemainingTicks,
-            ["remainingInfluenceBudget"] = 1.0,
+            ["maxInfluenceBudget"] = _directorState.MaxInfluenceBudget,
+            ["remainingInfluenceBudget"] = _directorState.RemainingInfluenceBudget,
+            ["lastCheckpointBudgetUsed"] = _directorState.LastCheckpointBudgetUsed,
+            ["lastBudgetCheckpointTick"] = _directorState.LastBudgetCheckpointTick,
             ["dampeningFactor"] = _directorDampeningFactor,
             ["activeDomainModifiers"] = activeDomainModifiers,
             ["activeGoalBiases"] = activeGoalBiases

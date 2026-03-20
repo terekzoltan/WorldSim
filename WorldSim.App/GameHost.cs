@@ -782,7 +782,7 @@ public class GameHost : Game
         var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | Director:{snapshot.Director.OutputMode}({snapshot.Director.OutputModeSource})@{snapshot.Director.StageMarker} | Sim:{simStatus}";
 #if DEBUG
         plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F6 HUD scale | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
-        plannerStatus += " [F8 legend: battle-zone ring, magenta=route, cyan=commander, amber=contested]";
+        plannerStatus += " [F8 legend: battle ring, siege ring, breach X, magenta=route, cyan=commander, amber=contested]";
 #endif
         if (_showTelemetryHud && !_cleanShotMode && !panelExclusive)
         {

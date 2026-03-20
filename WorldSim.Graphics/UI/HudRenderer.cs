@@ -77,6 +77,9 @@ public sealed class HudRenderer
             }
         }
 
+        if (showAiDebug && director.HasBudgetData)
+            directorExtraLines += 1;
+
         var baseHeight = 120 + (snapshot.Colonies.Count * 44) + 84 + (visibleEventCount * 26);
         baseHeight += directorExtraLines * 20;
         if (renderStats != null)
@@ -88,6 +91,7 @@ public sealed class HudRenderer
         var y = 18;
         y = _colonyPanel.Draw(spriteBatch, font, snapshot.Colonies, leftX, y, contentWidth, Theme);
         y = _ecologyPanel.Draw(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, Theme);
+        y = DrawSiegeStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth);
         y = DrawDirectorStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, showAiDebug);
         y = _eventFeed.Draw(spriteBatch, font, snapshot.RecentEvents.Take(visibleEventCount).ToList(), leftX, y + 4, contentWidth, Theme);
         y = TextWrap.DrawWrapped(spriteBatch, font, refineryStatus, new Vector2(leftX, y + 10), Theme.StatusText, contentWidth, 20);
@@ -117,11 +121,14 @@ public sealed class HudRenderer
         var directiveLabel = directive == null
             ? "none"
             : $"{directive.Directive} C{directive.ColonyId} ({directive.RemainingTicks}/{directive.TotalTicks}t)";
+        var budgetLabel = state.HasBudgetData
+            ? $"{state.RemainingInfluenceBudget:0.###}/{state.MaxInfluenceBudget:0.###} used={state.LastCheckpointBudgetUsed:0.###}"
+            : "n/a";
 
         int y = TextWrap.DrawWrapped(
             spriteBatch,
             font,
-            $"Director: stage={state.StageMarker} mode={state.OutputMode} src={state.OutputModeSource} cd={state.BeatCooldownRemainingTicks}t",
+            $"Director: stage={state.StageMarker} mode={state.OutputMode} src={state.OutputModeSource} cd={state.BeatCooldownRemainingTicks}t budget={budgetLabel}",
             new Vector2(startX, startY),
             Theme.DirectorEventText,
             maxWidth,
@@ -153,6 +160,55 @@ public sealed class HudRenderer
                 .Take(3)
                 .Select(bias => $"C{bias.ColonyId}.{bias.GoalCategory}:{bias.EffectiveWeight:0.00}"));
             y = TextWrap.DrawWrapped(spriteBatch, font, $"Dir bias: {biases}", new Vector2(startX, y), Theme.SecondaryText, maxWidth, 18);
+        }
+
+        if (state.HasBudgetData)
+        {
+            var checkpointTickLabel = state.LastBudgetCheckpointTick >= 0
+                ? state.LastBudgetCheckpointTick.ToString()
+                : "n/a";
+            var usedPct = state.MaxInfluenceBudget > 0d
+                ? (state.LastCheckpointBudgetUsed / state.MaxInfluenceBudget) * 100d
+                : 0d;
+            y = TextWrap.DrawWrapped(
+                spriteBatch,
+                font,
+                $"Dir budget: checkpoint={checkpointTickLabel} remaining={state.RemainingInfluenceBudget:0.###} used={state.LastCheckpointBudgetUsed:0.###} ({usedPct:0.#}%)",
+                new Vector2(startX, y),
+                Theme.SecondaryText,
+                maxWidth,
+                18);
+        }
+
+        return y;
+    }
+
+    private int DrawSiegeStatus(
+        SpriteBatch spriteBatch,
+        SpriteFont font,
+        WorldRenderSnapshot snapshot,
+        int startX,
+        int startY,
+        int maxWidth)
+    {
+        if (snapshot.Sieges.Count == 0 && snapshot.Breaches.Count == 0)
+            return startY;
+
+        int breachedCount = snapshot.Sieges.Count(s => string.Equals(s.Status, "breached", StringComparison.OrdinalIgnoreCase) || s.BreachCount > 0);
+        int activeCount = snapshot.Sieges.Count;
+        int breachMarkers = snapshot.Breaches.Count;
+
+        var primary = $"Siege: active={activeCount} breached={breachedCount} breaches={breachMarkers}";
+        int y = TextWrap.DrawWrapped(spriteBatch, font, primary, new Vector2(startX, startY), Theme.SiegeEventText, maxWidth, 18);
+
+        var hotSiege = snapshot.Sieges
+            .OrderByDescending(s => s.ActiveAttackerCount)
+            .ThenByDescending(s => s.LastActiveTick)
+            .FirstOrDefault();
+        if (hotSiege != null)
+        {
+            var secondary = $"Hot siege: C{hotSiege.AttackerColonyId}->C{hotSiege.DefenderColonyId} at ({hotSiege.CenterX},{hotSiege.CenterY}) attackers={hotSiege.ActiveAttackerCount} status={hotSiege.Status}";
+            y = TextWrap.DrawWrapped(spriteBatch, font, secondary, new Vector2(startX, y), Theme.SecondaryText, maxWidth, 18);
         }
 
         return y;

@@ -147,10 +147,47 @@ public class SimulationRuntimeDirectorStateTests
         Assert.NotNull(director["activeBeats"]);
         Assert.NotNull(director["activeDirectives"]);
         Assert.NotNull(director["beatCooldownRemainingTicks"]);
+        Assert.NotNull(director["maxInfluenceBudget"]);
         Assert.NotNull(director["remainingInfluenceBudget"]);
+        Assert.NotNull(director["lastCheckpointBudgetUsed"]);
+        Assert.NotNull(director["lastBudgetCheckpointTick"]);
         Assert.NotNull(director["dampeningFactor"]);
         Assert.NotNull(director["activeDomainModifiers"]);
         Assert.NotNull(director["activeGoalBiases"]);
+    }
+
+    [Fact]
+    public void DirectorBudgetCheckpoint_ResetAndUsageMirror_AppearInSnapshot()
+    {
+        var runtime = CreateRuntime();
+
+        runtime.PrepareDirectorCheckpointBudget(maxBudget: 4.5d, tick: 120);
+        runtime.RecordDirectorCheckpointBudgetUsed(budgetUsed: 1.875d, tick: 120);
+
+        var director = runtime.BuildRefinerySnapshot()["director"]?.AsObject();
+        Assert.NotNull(director);
+        Assert.Equal(4.5d, director!["maxInfluenceBudget"]?.GetValue<double>() ?? -1d, 3);
+        Assert.Equal(1.875d, director["lastCheckpointBudgetUsed"]?.GetValue<double>() ?? -1d, 3);
+        Assert.Equal(2.625d, director["remainingInfluenceBudget"]?.GetValue<double>() ?? -1d, 3);
+        Assert.Equal(120L, director["lastBudgetCheckpointTick"]?.GetValue<long>() ?? -1L);
+    }
+
+    [Fact]
+    public void DirectorBudgetCheckpoint_NewCheckpointResetsPreviousUsage()
+    {
+        var runtime = CreateRuntime();
+
+        runtime.PrepareDirectorCheckpointBudget(maxBudget: 4d, tick: 200);
+        runtime.RecordDirectorCheckpointBudgetUsed(budgetUsed: 1.5d, tick: 200);
+
+        runtime.PrepareDirectorCheckpointBudget(maxBudget: 6d, tick: 250);
+
+        var director = runtime.BuildRefinerySnapshot()["director"]?.AsObject();
+        Assert.NotNull(director);
+        Assert.Equal(6d, director!["maxInfluenceBudget"]?.GetValue<double>() ?? -1d, 3);
+        Assert.Equal(0d, director["lastCheckpointBudgetUsed"]?.GetValue<double>() ?? -1d, 3);
+        Assert.Equal(6d, director["remainingInfluenceBudget"]?.GetValue<double>() ?? -1d, 3);
+        Assert.Equal(250L, director["lastBudgetCheckpointTick"]?.GetValue<long>() ?? -1L);
     }
 
     [Fact]

@@ -22,10 +22,58 @@ public sealed class CombatOverlayPass : IRenderPass
 
         DrawContestedTiles(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawBattleZones(spriteBatch, pixel, snapshot, settings.TileSize);
+        DrawSiegeZones(spriteBatch, pixel, snapshot, settings.TileSize);
+        DrawBreachMarkers(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawFormationMarkers(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawCombatActors(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawNoProgressActors(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawColonyWarDiagnostics(spriteBatch, pixel, snapshot, settings.TileSize);
+    }
+
+    private static void DrawSiegeZones(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)
+    {
+        foreach (var siege in snapshot.Sieges
+                     .GroupBy(s => s.SiegeId)
+                     .Select(group => group.OrderByDescending(s => s.ActiveAttackerCount).First())
+                     .OrderBy(s => s.SiegeId))
+        {
+            int centerX = (siege.CenterX * tileSize) + (tileSize / 2);
+            int centerY = (siege.CenterY * tileSize) + (tileSize / 2);
+            int radius = Math.Max(tileSize, tileSize + (Math.Clamp(siege.ActiveAttackerCount, 1, 9) * Math.Max(1, tileSize / 3)));
+            bool breached = string.Equals(siege.Status, "breached", StringComparison.OrdinalIgnoreCase) || siege.BreachCount > 0;
+
+            var fill = breached
+                ? new Color(190, 106, 76) * 0.16f
+                : new Color(156, 126, 96) * 0.12f;
+            var edge = breached
+                ? new Color(239, 140, 104) * 0.74f
+                : new Color(206, 178, 124) * 0.62f;
+
+            DrawCircleFill(spriteBatch, pixel, centerX, centerY, radius, fill, step: Math.Max(2, tileSize / 2));
+            DrawCircleOutline(spriteBatch, pixel, centerX, centerY, radius, edge, Math.Max(1, tileSize / 4));
+
+            if (breached)
+            {
+                int breachHalo = Math.Max(1, tileSize / 2);
+                DrawCircleOutline(spriteBatch, pixel, centerX, centerY, Math.Max(2, radius - breachHalo), new Color(245, 194, 120) * 0.78f, Math.Max(1, tileSize / 5));
+            }
+        }
+    }
+
+    private static void DrawBreachMarkers(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)
+    {
+        int marker = Math.Max(2, tileSize);
+        foreach (var breach in snapshot.Breaches.OrderBy(b => b.CreatedTick))
+        {
+            int cx = (breach.X * tileSize) + (tileSize / 2);
+            int cy = (breach.Y * tileSize) + (tileSize / 2);
+            var glow = new Color(246, 199, 110) * 0.66f;
+            var slash = new Color(246, 138, 92) * 0.92f;
+
+            spriteBatch.Draw(pixel, new Rectangle(cx - marker, cy - marker, marker * 2, marker * 2), glow * 0.35f);
+            DrawLine(spriteBatch, pixel, new Vector2(cx - marker, cy - marker), new Vector2(cx + marker, cy + marker), slash, Math.Max(1, tileSize / 4));
+            DrawLine(spriteBatch, pixel, new Vector2(cx - marker, cy + marker), new Vector2(cx + marker, cy - marker), slash, Math.Max(1, tileSize / 4));
+        }
     }
 
     private static void DrawBattleZones(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)

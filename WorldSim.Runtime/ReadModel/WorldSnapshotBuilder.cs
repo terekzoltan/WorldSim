@@ -191,6 +191,33 @@ public static class WorldSnapshotBuilder
                 battle.ElapsedTicks))
             .ToList();
 
+        var sieges = world.GetActiveSieges()
+            .Select(siege => new SiegeRenderData(
+                siege.SiegeId,
+                siege.AttackerColonyId,
+                siege.DefenderColonyId,
+                siege.TargetStructureId,
+                MapDefensiveStructureKind(siege.TargetKind),
+                siege.CenterX,
+                siege.CenterY,
+                siege.ActiveAttackerCount,
+                siege.StartedTick,
+                siege.LastActiveTick,
+                siege.BreachCount,
+                siege.Status))
+            .ToList();
+
+        var breaches = world.GetRecentBreaches()
+            .Select(breach => new BreachRenderData(
+                breach.StructureId,
+                breach.DefenderColonyId,
+                breach.AttackerColonyId,
+                breach.X,
+                breach.Y,
+                breach.CreatedTick,
+                MapDefensiveStructureKind(breach.StructureKind)))
+            .ToList();
+
         var factionStances = world.GetFactionStanceMatrix()
             .Select(entry => new FactionStanceRenderData(
                 (int)entry.Left,
@@ -243,6 +270,8 @@ public static class WorldSnapshotBuilder
             colonies,
             combatGroups,
             battles,
+            sieges,
+            breaches,
             factionStances,
             ecology,
             MapSeason(world.CurrentSeason),

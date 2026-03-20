@@ -110,9 +110,17 @@ public sealed class HtnPlanner : IPlanner
                 var commanderRetreat = ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context);
                 var commanderPress = ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context);
                 var suppressReengage = ThreatDecisionPolicy.ShouldSuppressReengage(context);
+                var siegeRetreat = ThreatDecisionPolicy.ShouldRetreatFromSiege(context);
+                var sortie = ThreatDecisionPolicy.ShouldSortie(context);
                 var suppressWithoutPress = suppressReengage && !commanderPress;
                 candidates.Add(new MethodCandidate(
                     "FightBack",
+                    siegeRetreat
+                        ? 0.15f
+                        :
+                    sortie
+                        ? 1.0f
+                        :
                     suppressWithoutPress
                         ? 0.15f
                         :
@@ -122,6 +130,9 @@ public sealed class HtnPlanner : IPlanner
                     new[] { NpcCommand.Fight }));
                 candidates.Add(new MethodCandidate(
                     "TacticalFlee",
+                    siegeRetreat
+                        ? 1.0f
+                        :
                     suppressWithoutPress
                         ? 1.0f
                         :
@@ -150,9 +161,14 @@ public sealed class HtnPlanner : IPlanner
                 var raidRetreat = ThreatDecisionPolicy.ShouldCommanderInitiateRetreat(context);
                 var raidPress = ThreatDecisionPolicy.ShouldCommanderPressAdvantage(context);
                 var raidSuppressReengage = ThreatDecisionPolicy.ShouldSuppressReengage(context);
+                var siegeAwareRetreat = ThreatDecisionPolicy.ShouldRetreatFromSiege(context);
+                var prioritizeSiegeTarget = ThreatDecisionPolicy.ShouldPrioritizeSiegeTargeting(context);
                 var raidSuppressWithoutPress = raidSuppressReengage && !raidPress;
                 candidates.Add(new MethodCandidate(
                     "BorderRaid",
+                    siegeAwareRetreat
+                        ? 0.1f
+                        :
                     raidSuppressWithoutPress
                         ? 0.1f
                         :
@@ -169,6 +185,10 @@ public sealed class HtnPlanner : IPlanner
                         ? 0.95f
                         : (raidRetreat ? 1.0f : 0.45f),
                     new[] { NpcCommand.Flee }));
+                candidates.Add(new MethodCandidate(
+                    "SiegeTargetShift",
+                    (!siegeAwareRetreat && prioritizeSiegeTarget) ? 0.97f : 0.25f,
+                    new[] { NpcCommand.AttackStructure }));
                 break;
 
             case "UnlockMilitaryTech":

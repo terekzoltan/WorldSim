@@ -1,3 +1,4 @@
+using System.Globalization;
 using WorldSim.Contracts.V2;
 
 namespace WorldSim.RefineryAdapter.Integration;
@@ -14,7 +15,8 @@ public sealed record RefineryRuntimeOptions(
     int LiveRetryCount,
     int CircuitBreakerSeconds,
     bool ApplyToWorld,
-    int MinTriggerIntervalMs
+    int MinTriggerIntervalMs,
+    double DirectorMaxBudget = 5d
 )
 {
     public static RefineryRuntimeOptions FromEnvironment(string baseDirectory)
@@ -39,6 +41,7 @@ public sealed record RefineryRuntimeOptions(
         var breakerSeconds = ParseIntEnv("REFINERY_BREAKER_SECONDS", 10);
         var applyToWorld = string.Equals(System.Environment.GetEnvironmentVariable("REFINERY_APPLY_TO_WORLD"), "true", System.StringComparison.OrdinalIgnoreCase);
         var minTriggerIntervalMs = ParseIntEnv("REFINERY_MIN_TRIGGER_MS", 500);
+        var directorMaxBudget = ParseDoubleEnv("REFINERY_DIRECTOR_MAX_BUDGET", 5d);
 
         var defaultFixtureFile = string.Equals(goal, DirectorGoals.SeasonDirectorCheckpoint, System.StringComparison.Ordinal)
             ? "patch-season-director-v1.expected.json"
@@ -65,7 +68,8 @@ public sealed record RefineryRuntimeOptions(
             retryCount,
             breakerSeconds,
             applyToWorld,
-            minTriggerIntervalMs
+            minTriggerIntervalMs,
+            directorMaxBudget
         );
     }
 
@@ -79,6 +83,18 @@ public sealed record RefineryRuntimeOptions(
     {
         var raw = System.Environment.GetEnvironmentVariable(key);
         return long.TryParse(raw, out var parsed) ? parsed : fallback;
+    }
+
+    private static double ParseDoubleEnv(string key, double fallback)
+    {
+        var raw = System.Environment.GetEnvironmentVariable(key);
+        if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+            return fallback;
+
+        if (double.IsNaN(parsed) || double.IsInfinity(parsed))
+            return fallback;
+
+        return Math.Max(0d, parsed);
     }
 
     private static string FindRepoRoot(string baseDirectory)

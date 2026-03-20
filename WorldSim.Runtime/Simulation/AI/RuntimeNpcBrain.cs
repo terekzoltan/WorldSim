@@ -26,6 +26,8 @@ public sealed class RuntimeNpcBrain
 
     private const int ThreatSenseRadius = 4;
     private const int ContestedSenseRadius = 2;
+    private const int SiegeSenseRadius = 8;
+    private const int SiegeStructureSenseRadius = 6;
     private readonly INpcDecisionBrain _brain;
     private float _simulationTimeSeconds;
     private long _decisionSequence;
@@ -154,6 +156,34 @@ public sealed class RuntimeNpcBrain
         var isWarriorRole = IsWarriorRole(world, actor, colonyId, isHostileStance);
         var homeMilitaryTechCount = CountUnlockedTechs(actor.Home, MilitaryTechIds);
         var homeFortificationTechCount = CountUnlockedTechs(actor.Home, FortificationTechIds);
+        var activeSieges = world.GetActiveSieges();
+        var colonySieges = activeSieges
+            .Where(siege => siege.AttackerColonyId == colonyId || siege.DefenderColonyId == colonyId)
+            .ToList();
+        var nearSieges = colonySieges
+            .Where(siege => Manhattan(actor.Pos, (siege.CenterX, siege.CenterY)) <= SiegeSenseRadius)
+            .ToList();
+        var recentBreaches = world.GetRecentBreaches();
+        var hasRecentBreachNearby = recentBreaches.Any(breach =>
+            (breach.AttackerColonyId == colonyId || breach.DefenderColonyId == colonyId)
+            && Manhattan(actor.Pos, (breach.X, breach.Y)) <= SiegeSenseRadius);
+        var isColonyUnderSiege = colonySieges.Any(siege => siege.DefenderColonyId == colonyId);
+        var isNearActiveSiege = nearSieges.Count > 0;
+        var isSiegeAttackerRole = nearSieges.Any(siege => siege.AttackerColonyId == colonyId);
+        var isSiegeDefenderRole = nearSieges.Any(siege => siege.DefenderColonyId == colonyId);
+        var nearbySiegePressure = nearSieges.Count == 0
+            ? 0f
+            : Math.Clamp(nearSieges.Max(siege => siege.ActiveAttackerCount) / 8f, 0f, 1f);
+
+        CountNearbyDefensiveStructures(
+            world,
+            actor,
+            SiegeStructureSenseRadius,
+            out var nearbyEnemyDefensiveStructures,
+            out var nearbyEnemyTowerCount,
+            out var nearbyEnemyWallCount,
+            out var nearbyFriendlyTowerCount,
+            out var nearbyFriendlyWallCount);
 
         return new NpcAiContext(
             SimulationTimeSeconds: _simulationTimeSeconds,
@@ -202,6 +232,17 @@ public sealed class RuntimeNpcBrain
             ActiveCombatGroupSize: activeGroupSize,
             ActiveGroupAverageMorale: (float)activeGroupAverageMorale,
             CommanderMoraleStabilityBonus: actor.CommanderMoraleStabilityBonus,
+            IsColonyUnderSiege: isColonyUnderSiege,
+            IsNearActiveSiege: isNearActiveSiege,
+            HasRecentBreachNearby: hasRecentBreachNearby,
+            NearbyEnemyDefensiveStructures: nearbyEnemyDefensiveStructures,
+            NearbyEnemyTowerCount: nearbyEnemyTowerCount,
+            NearbyEnemyWallCount: nearbyEnemyWallCount,
+            NearbyFriendlyTowerCount: nearbyFriendlyTowerCount,
+            NearbyFriendlyWallCount: nearbyFriendlyWallCount,
+            NearbySiegePressure: nearbySiegePressure,
+            IsSiegeAttackerRole: isSiegeAttackerRole,
+            IsSiegeDefenderRole: isSiegeDefenderRole,
             IsRouting: actor.IsRouting,
             RoutingTicksRemaining: actor.RoutingTicksRemaining,
             BackoffTicksRemaining: actor.BackoffTicksRemaining);
@@ -221,6 +262,65 @@ public sealed class RuntimeNpcBrain
         var stance = world.GetFactionStance(actor.Home.Faction, other.Home.Faction);
         return stance >= WorldSim.Simulation.Diplomacy.Stance.Hostile;
     }
+
+    private static void CountNearbyDefensiveStructures(
+        World world,
+        Person actor,
+        int radius,
+        out int enemyDefensiveStructures,
+        out int enemyTowerCount,
+        out int enemyWallCount,
+        out int friendlyTowerCount,
+        out int friendlyWallCount)
+    {
+        enemyDefensiveStructures = 0;
+        enemyTowerCount = 0;
+        enemyWallCount = 0;
+        friendlyTowerCount = 0;
+        friendlyWallCount = 0;
+
+        foreach (var structure in world.DefensiveStructures)
+        {
+            if (structure.IsDestroyed)
+                continue;
+
+            var dist = Manhattan(actor.Pos, structure.Pos);
+            if (dist > radius)
+                continue;
+
+            var stance = world.GetFactionStance(actor.Home.Faction, structure.Owner.Faction);
+            var isEnemy = stance >= WorldSim.Simulation.Diplomacy.Stance.Hostile;
+            var isTower = IsTowerKind(structure.Kind);
+            var isWall = IsWallKind(structure.Kind);
+
+            if (isEnemy)
+            {
+                enemyDefensiveStructures++;
+                if (isTower)
+                    enemyTowerCount++;
+                else if (isWall)
+                    enemyWallCount++;
+            }
+            else
+            {
+                if (isTower)
+                    friendlyTowerCount++;
+                else if (isWall)
+                    friendlyWallCount++;
+            }
+        }
+    }
+
+    private static bool IsTowerKind(WorldSim.Simulation.Defense.DefensiveStructureKind kind)
+        => kind is WorldSim.Simulation.Defense.DefensiveStructureKind.Watchtower
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.ArrowTower
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.CatapultTower;
+
+    private static bool IsWallKind(WorldSim.Simulation.Defense.DefensiveStructureKind kind)
+        => kind is WorldSim.Simulation.Defense.DefensiveStructureKind.WoodWall
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.StoneWall
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.ReinforcedWall
+            or WorldSim.Simulation.Defense.DefensiveStructureKind.Gate;
 
     private static bool HasContestedTilesNearby(World world, (int x, int y) pos, int radius)
     {
