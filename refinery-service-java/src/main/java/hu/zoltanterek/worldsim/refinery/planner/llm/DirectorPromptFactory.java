@@ -38,6 +38,7 @@ public final class DirectorPromptFactory {
         sb.append(" colonyCount=").append(colonyCount).append('.');
         sb.append(" storyBeatCooldownTicks=").append(cooldown).append('.');
         sb.append(" remainingInfluenceBudget=").append(String.format(java.util.Locale.ROOT, "%.3f", remainingInfluenceBudget)).append('.');
+        sb.append(" For every story beat effect, set effect.durationTicks exactly equal to storyBeat.durationTicks.");
         sb.append(" Keep text under 160 chars and durations positive.");
         sb.append(" Do not emit contradictory same-domain modifiers with mixed signs in one checkpoint.");
         sb.append(" Stay within influence budget, otherwise INV-15 will reject the candidate.");

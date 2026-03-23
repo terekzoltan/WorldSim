@@ -186,6 +186,10 @@ class DirectorModelValidatorTest {
         DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
         assertEquals(1, outcome.patch().size());
         assertTrue(outcome.patch().get(0) instanceof PatchOp.AddStoryBeat);
+        PatchOp.AddStoryBeat repaired = (PatchOp.AddStoryBeat) outcome.patch().get(0);
+        assertEquals(20, repaired.effects().get(0).durationTicks());
+        assertEquals(20, repaired.effects().get(1).durationTicks());
+        assertTrue(outcome.warnings().stream().anyMatch(msg -> msg.contains(DirectorDesign.INV_06)));
     }
 
     @Test
@@ -207,6 +211,32 @@ class DirectorModelValidatorTest {
 
         DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
         assertEquals(1, outcome.patch().size());
+        PatchOp.AddStoryBeat repaired = (PatchOp.AddStoryBeat) outcome.patch().get(0);
+        assertEquals(20, repaired.effects().get(0).durationTicks());
+        assertEquals(20, repaired.effects().get(1).durationTicks());
+    }
+
+    @Test
+    void validateAndRepair_AlignsStoryEffectDurationToBeatDuration() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_story_align_duration",
+                        "BEAT_ALIGN_DURATION",
+                        "Duration alignment sample",
+                        30,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", 0.10, 5))
+                )
+        );
+
+        DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
+        assertEquals(1, outcome.patch().size());
+        PatchOp.AddStoryBeat repaired = (PatchOp.AddStoryBeat) outcome.patch().get(0);
+        assertEquals(30, repaired.durationTicks());
+        assertEquals(30, repaired.effects().get(0).durationTicks());
+        assertTrue(outcome.repaired());
+        assertTrue(outcome.warnings().stream().anyMatch(msg -> msg.contains(DirectorDesign.INV_06)));
     }
 
     @Test
@@ -242,6 +272,28 @@ class DirectorModelValidatorTest {
                         30,
                         "major",
                         List.of(new PatchOp.EffectEntry("domain_modifier", "food", 0.20, 30))
+                )
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains(DirectorDesign.INV_15));
+    }
+
+    @Test
+    void validateAndRepair_RejectsWhenBudgetExceededAfterDurationAlignment() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, 0.5, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_budget_after_align",
+                        "BEAT_BUDGET_ALIGN",
+                        "Alignment should still enforce budget",
+                        30,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", 0.20, 1))
                 )
         );
 

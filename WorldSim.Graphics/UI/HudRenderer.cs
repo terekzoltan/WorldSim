@@ -128,7 +128,7 @@ public sealed class HudRenderer
         int y = TextWrap.DrawWrapped(
             spriteBatch,
             font,
-            $"Director: stage={state.StageMarker} mode={state.OutputMode} src={state.OutputModeSource} cd={state.BeatCooldownRemainingTicks}t budget={budgetLabel}",
+            $"Director: stage={state.StageMarker} apply={state.ApplyStatus} mode={state.OutputMode} src={state.OutputModeSource} cd={state.BeatCooldownRemainingTicks}t budget={budgetLabel}",
             new Vector2(startX, startY),
             Theme.DirectorEventText,
             maxWidth,

@@ -1070,13 +1070,13 @@ Wave turn-gate:
 
 ### Sprint D6.1: Contract Freeze + Live Hardening (Track D primary, Track A/B consume as needed)
 
-- ⬜ **D6.1-A** Director story-beat duration contract alignment (Track D — Java)
+- ✅ **D6.1-A** Director story-beat duration contract alignment (Track D — Java)
   - Enforce/repair `effect.durationTicks == beat.durationTicks` in the Java sanitize + validator path.
   - Add regression tests so Java-validated director output is always acceptable to the current C# runtime apply path.
-- ⬜ **D6.1-B** Director apply observability hardening (Track D — C# adapter, with minimal runtime/HUD consume if needed)
+- ✅ **D6.1-B** Director apply observability hardening (Track D — C# adapter, with minimal runtime/HUD consume if needed)
   - Preserve response-level `stage`, `mode`, `source`, and `budgetUsed` even when runtime apply throws.
   - Distinguish "director pipeline succeeded but apply failed" from "live request failed before response" in local manual smoke.
-- ⬜ **D6.1-C** Live smoke recipe + ops/docs refresh (Track D docs)
+- ✅ **D6.1-C** Live smoke recipe + ops/docs refresh (Track D docs)
   - Record the recommended local live profile (`REFINERY_TIMEOUT_MS` high, `REFINERY_RETRY_COUNT=0`, `REFINERY_APPLY_TO_WORLD=true`).
   - Document that one `F6` may cause `1..(maxRetries+1)` LLM completions because iterative correction is inside one `/patch` request.
 

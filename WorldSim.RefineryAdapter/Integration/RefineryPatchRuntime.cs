@@ -118,63 +118,111 @@ public sealed class RefineryPatchRuntime
             runtime.PrepareDirectorCheckpointBudget(_options.DirectorMaxBudget, tick);
 
         var beforeHash = CanonicalStateSerializer.Sha256(_patchState);
-
-        PatchResponse rawResponse = _options.Mode switch
-        {
-            RefineryIntegrationMode.Fixture => LoadFixtureResponse(),
-            RefineryIntegrationMode.Live => await LoadLiveResponseAsync(runtime, tick),
-            _ => throw new InvalidOperationException("Integration mode is OFF")
-        };
-
-        var selectedOutputMode = SelectOutputMode(rawResponse);
-        var response = ApplyOutputMode(rawResponse, selectedOutputMode);
-
-        var result = _applier.Apply(_patchState, response, new PatchApplyOptions(_options.StrictMode));
-
-        if (_options.ApplyToWorld)
-        {
-            var commands = _translator.Translate(response);
-            _executor.Execute(runtime, commands);
-        }
-
-        _consecutiveFailures = 0;
-        _circuitBreakerUntilUtc = DateTime.MinValue;
-
-        var afterHash = CanonicalStateSerializer.Sha256(_patchState);
-        var stageMarker = response.Explain.FirstOrDefault(item =>
-                               item.StartsWith("refineryStage:", StringComparison.Ordinal)
-                               || item.StartsWith("directorStage:", StringComparison.Ordinal))
-                          ?? "refineryStage:unknown";
-        var hasBudgetMarker = TryReadBudgetUsed(response, out var budgetUsed);
-        if (isDirectorGoal)
-            runtime.RecordDirectorCheckpointBudgetUsed(hasBudgetMarker ? budgetUsed : 0d, tick);
-
-        LastDirectorExecutionStatus = new DirectorExecutionStatus(
-            EffectiveOutputMode: selectedOutputMode.Mode,
-            EffectiveOutputModeSource: selectedOutputMode.Source,
-            Stage: stageMarker,
+        var context = new DirectorExecutionContext(
+            Mode: "unknown",
+            Source: "unknown",
+            Stage: DirectorExecutionStatus.NotTriggered.Stage,
             Tick: tick,
             IsDirectorGoal: isDirectorGoal,
-            BudgetUsed: hasBudgetMarker ? budgetUsed : 0d,
-            BudgetMarkerPresent: hasBudgetMarker
+            BudgetUsed: 0d,
+            BudgetMarkerPresent: false,
+            ResponseReceived: false);
+
+        try
+        {
+            PatchResponse rawResponse = _options.Mode switch
+            {
+                RefineryIntegrationMode.Fixture => LoadFixtureResponse(),
+                RefineryIntegrationMode.Live => await LoadLiveResponseAsync(runtime, tick),
+                _ => throw new InvalidOperationException("Integration mode is OFF")
+            };
+
+            var selectedOutputMode = SelectOutputMode(rawResponse);
+            var response = ApplyOutputMode(rawResponse, selectedOutputMode);
+            var stageMarker = response.Explain.FirstOrDefault(item =>
+                                   item.StartsWith("refineryStage:", StringComparison.Ordinal)
+                                   || item.StartsWith("directorStage:", StringComparison.Ordinal))
+                              ?? "refineryStage:unknown";
+            var hasBudgetMarker = TryReadBudgetUsed(response, out var budgetUsed);
+
+            context = context with
+            {
+                Mode = selectedOutputMode.Mode,
+                Source = selectedOutputMode.Source,
+                Stage = stageMarker,
+                BudgetUsed = hasBudgetMarker ? budgetUsed : 0d,
+                BudgetMarkerPresent = hasBudgetMarker,
+                ResponseReceived = true
+            };
+
+            if (isDirectorGoal)
+                runtime.RecordDirectorCheckpointBudgetUsed(context.BudgetUsed, tick);
+
+            var result = _applier.Apply(_patchState, response, new PatchApplyOptions(_options.StrictMode));
+
+            if (_options.ApplyToWorld)
+            {
+                var commands = _translator.Translate(response);
+                _executor.Execute(runtime, commands);
+            }
+
+            _consecutiveFailures = 0;
+            _circuitBreakerUntilUtc = DateTime.MinValue;
+
+            var afterHash = CanonicalStateSerializer.Sha256(_patchState);
+            LastDirectorExecutionStatus = BuildDirectorExecutionStatus(context, applyStatus: "applied");
+            runtime.SetDirectorExecutionState(
+                effectiveOutputMode: LastDirectorExecutionStatus.EffectiveOutputMode,
+                effectiveOutputModeSource: LastDirectorExecutionStatus.EffectiveOutputModeSource,
+                stage: LastDirectorExecutionStatus.Stage,
+                tick: LastDirectorExecutionStatus.Tick,
+                isDirectorGoal: LastDirectorExecutionStatus.IsDirectorGoal,
+                applyStatus: LastDirectorExecutionStatus.ApplyStatus);
+
+            var warningHead = response.Warnings.FirstOrDefault();
+            var budgetLabel = isDirectorGoal
+                ? (context.BudgetMarkerPresent ? context.BudgetUsed.ToString("0.###", CultureInfo.InvariantCulture) : "missing->0")
+                : "n/a";
+            LastStatus =
+                $"Refinery applied: applied={result.AppliedCount}, deduped={result.DedupedCount}, noop={result.NoOpCount}, " +
+                $"techs={_patchState.TechIds.Count}, events={_patchState.EventIds.Count}, " +
+                $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={context.Stage}, mode={context.Mode}, source={context.Source}, budget={budgetLabel}" +
+                (warningHead is null ? string.Empty : $", warn={warningHead}");
+        }
+        catch (Exception ex)
+        {
+            var applyStatus = context.ResponseReceived ? "apply_failed" : "request_failed";
+            LastDirectorExecutionStatus = BuildDirectorExecutionStatus(context, applyStatus);
+
+            runtime.SetDirectorExecutionState(
+                effectiveOutputMode: LastDirectorExecutionStatus.EffectiveOutputMode,
+                effectiveOutputModeSource: LastDirectorExecutionStatus.EffectiveOutputModeSource,
+                stage: LastDirectorExecutionStatus.Stage,
+                tick: LastDirectorExecutionStatus.Tick,
+                isDirectorGoal: LastDirectorExecutionStatus.IsDirectorGoal,
+                applyStatus: LastDirectorExecutionStatus.ApplyStatus,
+                actionStatus: ex.Message);
+
+            var budgetLabel = isDirectorGoal
+                ? (context.BudgetMarkerPresent ? context.BudgetUsed.ToString("0.###", CultureInfo.InvariantCulture) : "n/a")
+                : "n/a";
+            LastStatus =
+                $"Refinery apply failed: outcome={applyStatus}, stage={context.Stage}, mode={context.Mode}, source={context.Source}, budget={budgetLabel}, error={ex.Message}";
+        }
+    }
+
+    private static DirectorExecutionStatus BuildDirectorExecutionStatus(DirectorExecutionContext context, string applyStatus)
+    {
+        return new DirectorExecutionStatus(
+            EffectiveOutputMode: context.Mode,
+            EffectiveOutputModeSource: context.Source,
+            Stage: context.Stage,
+            Tick: context.Tick,
+            IsDirectorGoal: context.IsDirectorGoal,
+            ApplyStatus: applyStatus,
+            BudgetUsed: context.BudgetUsed,
+            BudgetMarkerPresent: context.BudgetMarkerPresent
         );
-
-        runtime.SetDirectorExecutionState(
-            effectiveOutputMode: LastDirectorExecutionStatus.EffectiveOutputMode,
-            effectiveOutputModeSource: LastDirectorExecutionStatus.EffectiveOutputModeSource,
-            stage: LastDirectorExecutionStatus.Stage,
-            tick: LastDirectorExecutionStatus.Tick,
-            isDirectorGoal: LastDirectorExecutionStatus.IsDirectorGoal);
-
-        var warningHead = response.Warnings.FirstOrDefault();
-        var budgetLabel = isDirectorGoal
-            ? (hasBudgetMarker ? budgetUsed.ToString("0.###", CultureInfo.InvariantCulture) : "missing->0")
-            : "n/a";
-        LastStatus =
-            $"Refinery applied: applied={result.AppliedCount}, deduped={result.DedupedCount}, noop={result.NoOpCount}, " +
-            $"techs={_patchState.TechIds.Count}, events={_patchState.EventIds.Count}, " +
-            $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={stageMarker}, mode={selectedOutputMode.Mode}, source={selectedOutputMode.Source}, budget={budgetLabel}" +
-            (warningHead is null ? string.Empty : $", warn={warningHead}");
     }
 
     private DirectorOutputModeSelection SelectOutputMode(PatchResponse response)
@@ -377,5 +425,14 @@ public sealed class RefineryPatchRuntime
     }
 
     private sealed record DirectorOutputModeSelection(string Mode, string Source);
+    private sealed record DirectorExecutionContext(
+        string Mode,
+        string Source,
+        string Stage,
+        long Tick,
+        bool IsDirectorGoal,
+        double BudgetUsed,
+        bool BudgetMarkerPresent,
+        bool ResponseReceived);
 
 }

@@ -1,66 +1,97 @@
-# Wave 3 Director Smoke Checklist
+# Director Live Smoke Checklist (Wave 6.1)
 
 Status: Active
 Owner: Track D
-Last updated: 2026-03-06
+Last updated: 2026-03-24
 
 Purpose:
-- Manual smoke checklist for `S3-D` parity + runtime verification.
-- Focus on `SEASON_DIRECTOR_CHECKPOINT` behavior via fixture/live trigger path.
+- Manual smoke checklist for the live `SEASON_DIRECTOR_CHECKPOINT` path after Wave 6.1 hardening.
+- Validate contract freeze (D6.1-A), apply observability split (D6.1-B), and operator-facing status semantics.
 
 ## Preconditions
 
-- Java service running on `http://localhost:8091`.
-- App runs with refinery trigger enabled (`F6` path).
-- `REFINERY_GOAL=SEASON_DIRECTOR_CHECKPOINT`.
+- Java service reachable at `http://localhost:8091`.
+- App running with refinery trigger (`F6`).
+- Goal is `SEASON_DIRECTOR_CHECKPOINT`.
 
-Recommended baseline env:
+## Recommended Live Profile
+
+Java:
 
 ```powershell
-$env:REFINERY_INTEGRATION_MODE="fixture"
+$env:PLANNER_MODE="pipeline"
+$env:PLANNER_REFINERY_ENABLED="true"
+$env:PLANNER_LLM_ENABLED="true"
+$env:PLANNER_LLM_API_KEY="<your-openrouter-key>"
+./gradlew bootRun
+```
+
+C#:
+
+```powershell
+$env:REFINERY_INTEGRATION_MODE="live"
+$env:REFINERY_BASE_URL="http://localhost:8091"
 $env:REFINERY_GOAL="SEASON_DIRECTOR_CHECKPOINT"
 $env:REFINERY_APPLY_TO_WORLD="true"
 $env:REFINERY_DIRECTOR_OUTPUT_MODE="auto"
+$env:REFINERY_TIMEOUT_MS="12000"
+$env:REFINERY_RETRY_COUNT="0"
 $env:REFINERY_DIRECTOR_DAMPENING="1.0"
+dotnet run --project WorldSim.App/WorldSim.App.csproj
 ```
 
-## Marker Smoke (Java)
+## Expected Marker Semantics
 
-- Run mode matrix marker checks:
+- HUD director line includes: `stage=<...> apply=<...> mode=<...> src=<...> budget=<...>`.
+- Top status line starts with either:
+  - `Refinery applied: ...`
+  - `Refinery apply failed: outcome=<apply_failed|request_failed>, ...`
 
-```powershell
-./scripts/run-smoke.ps1 -ExpectedMode both
-./scripts/run-smoke.ps1 -ExpectedMode story_only
-./scripts/run-smoke.ps1 -ExpectedMode nudge_only
-./scripts/run-smoke.ps1 -ExpectedMode off
-```
+`apply` meanings:
+- `applied`: response arrived and C# apply completed.
+- `apply_failed`: response arrived, but C# translate/apply path failed.
+- `request_failed`: no usable response reached apply phase.
+- `not_triggered`: no completed checkpoint yet.
 
-- Expect `PASS` each run.
+## Core Manual Smoke
 
-## App Smoke (F6)
+1. Press `F6` once.
+2. Verify director HUD updates (`stage`, `apply`, `mode`, `src`, `budget`).
+3. Verify status line updates with `Refinery applied:` or `Refinery apply failed:` outcome payload.
+4. If `apply=applied`, verify at least one gameplay-visible director effect (story beat feed or directive).
+5. Verify trigger throttling/cooldown still prevents rapid accidental retriggers.
 
-- Trigger once with `F6`.
-- Verify event feed contains a `[Director]` beat entry (story mode enabled).
-- Verify active directive appears (nudge mode enabled).
-- Verify no rapid retrigger when cooldown/throttle is active.
+## Failure Matrix Smoke
 
-## Dampening Smoke
+- **Case A — response + apply success**
+  - HUD: `apply=applied`.
+  - Status: `Refinery applied: ...`.
+  - `stage/mode/src` are non-empty and consistent.
 
-1. Set:
+- **Case B — response + apply failure**
+  - HUD: `apply=apply_failed`.
+  - Status: `Refinery apply failed: outcome=apply_failed, ...`.
+  - `stage/mode/src/budget` still reflect response-level truth.
 
-```powershell
-$env:REFINERY_DIRECTOR_DAMPENING="0.0"
-```
+- **Case C — request failure before response**
+  - HUD: `apply=request_failed`.
+  - Status: `Refinery apply failed: outcome=request_failed, ...`.
+  - `stage` may remain `not_triggered`/unknown, which is expected.
 
-2. Trigger `F6` with `REFINERY_APPLY_TO_WORLD=true`.
-3. Verify director status and markers are present, but gameplay multipliers stay neutral.
-4. Restore:
+## Wave 6.1 Contract Guardrails
 
-```powershell
-$env:REFINERY_DIRECTOR_DAMPENING="1.0"
-```
+- Story beat effect duration follows parent beat duration in the Java pipeline.
+- If a live run appears to fail with a duration mismatch, treat it as regression and capture raw response for triage.
 
-## Parity Gate
+## Retry / OpenRouter Note
 
-- C# fixture replay test passes for director expected state.
-- Optional live parity test (`REFINERY_PARITY_TEST=true`) shows same canonical hash for fixture vs live for season director.
+- One manual `F6` may trigger `1..(PLANNER_DIRECTOR_MAX_RETRIES+1)` OpenRouter completions within a single `/v1/patch` request.
+- This is expected behavior of the iterative correction loop, not duplicate user input.
+
+## Optional Checks
+
+- Java telemetry snapshot:
+  - `curl http://localhost:8091/v1/director/telemetry`
+- Optional parity lane:
+  - `$env:REFINERY_PARITY_TEST="true"`
+  - `dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj`

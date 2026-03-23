@@ -191,6 +191,28 @@ public class SimulationRuntimeDirectorStateTests
     }
 
     [Fact]
+    public void SetDirectorExecutionState_ApplyFailure_IsMirroredInSnapshot()
+    {
+        var runtime = CreateRuntime();
+
+        runtime.SetDirectorExecutionState(
+            effectiveOutputMode: "story_only",
+            effectiveOutputModeSource: "response",
+            stage: "directorStage:refinery-validated",
+            tick: 311,
+            isDirectorGoal: true,
+            applyStatus: "apply_failed",
+            actionStatus: "unknown colonyId in setColonyDirective: 999");
+
+        var snapshot = runtime.GetSnapshot().Director;
+        Assert.Equal("directorStage:refinery-validated", snapshot.StageMarker);
+        Assert.Equal("story_only", snapshot.OutputMode);
+        Assert.Equal("response", snapshot.OutputModeSource);
+        Assert.Equal("apply_failed", snapshot.ApplyStatus);
+        Assert.Contains("unknown colonyId", snapshot.LastActionStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ApplyStoryBeat_WithEffects_RegistersDomainModifiers_AndDecays()
     {
         var runtime = CreateRuntime();

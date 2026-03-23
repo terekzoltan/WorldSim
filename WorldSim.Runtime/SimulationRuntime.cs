@@ -167,6 +167,7 @@ public sealed class SimulationRuntime
             StageMarker: stageMarker,
             OutputMode: outputMode,
             OutputModeSource: outputModeSource,
+            ApplyStatus: _directorExecutionState.ApplyStatus,
             BeatCooldownRemainingTicks: _directorState.BeatCooldownRemainingTicks,
             MajorBeatCooldownRemainingTicks: _directorState.MajorBeatCooldownRemainingTicks,
             EpicBeatCooldownRemainingTicks: _directorState.EpicBeatCooldownRemainingTicks,
@@ -197,14 +198,20 @@ public sealed class SimulationRuntime
         string effectiveOutputModeSource,
         string stage,
         long tick,
-        bool isDirectorGoal)
+        bool isDirectorGoal,
+        string applyStatus = "applied",
+        string? actionStatus = null)
     {
         _directorExecutionState = new DirectorExecutionState(
             EffectiveOutputMode: NormalizeOutputMode(effectiveOutputMode),
             EffectiveOutputModeSource: string.IsNullOrWhiteSpace(effectiveOutputModeSource) ? "unknown" : effectiveOutputModeSource.Trim().ToLowerInvariant(),
             Stage: string.IsNullOrWhiteSpace(stage) ? "idle" : stage.Trim(),
             Tick: tick,
-            IsDirectorGoal: isDirectorGoal);
+            IsDirectorGoal: isDirectorGoal,
+            ApplyStatus: NormalizeApplyStatus(applyStatus));
+
+        if (!string.IsNullOrWhiteSpace(actionStatus))
+            LastDirectorActionStatus = actionStatus.Trim();
     }
 
     private static string NormalizeOutputMode(string? outputMode)
@@ -213,6 +220,14 @@ public sealed class SimulationRuntime
         return normalized is "both" or "story_only" or "nudge_only" or "off"
             ? normalized
             : "both";
+    }
+
+    private static string NormalizeApplyStatus(string? applyStatus)
+    {
+        var normalized = string.IsNullOrWhiteSpace(applyStatus) ? "applied" : applyStatus.Trim().ToLowerInvariant();
+        return normalized is "not_triggered" or "applied" or "apply_failed" or "request_failed"
+            ? normalized
+            : "applied";
     }
 
     public AiDebugSnapshot GetAiDebugSnapshot() => _latestAiDebugSnapshot;

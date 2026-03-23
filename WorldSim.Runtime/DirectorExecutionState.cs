@@ -5,12 +5,14 @@ public sealed record DirectorExecutionState(
     string EffectiveOutputModeSource,
     string Stage,
     long Tick,
-    bool IsDirectorGoal)
+    bool IsDirectorGoal,
+    string ApplyStatus)
 {
     public static DirectorExecutionState NotTriggered { get; } = new(
         EffectiveOutputMode: "both",
         EffectiveOutputModeSource: "unknown",
         Stage: "idle",
         Tick: -1,
-        IsDirectorGoal: false);
+        IsDirectorGoal: false,
+        ApplyStatus: "not_triggered");
 }

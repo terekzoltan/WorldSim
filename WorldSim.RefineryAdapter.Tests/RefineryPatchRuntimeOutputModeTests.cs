@@ -46,6 +46,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         Assert.Equal(expectedMode, patchRuntime.LastDirectorExecutionStatus.EffectiveOutputMode);
         Assert.Equal(expectedSource, patchRuntime.LastDirectorExecutionStatus.EffectiveOutputModeSource);
         Assert.Equal("directorStage:mock", patchRuntime.LastDirectorExecutionStatus.Stage);
+        Assert.Equal("applied", patchRuntime.LastDirectorExecutionStatus.ApplyStatus);
         Assert.True(patchRuntime.LastDirectorExecutionStatus.IsDirectorGoal);
         Assert.True(patchRuntime.LastDirectorExecutionStatus.BudgetMarkerPresent);
         Assert.Equal(0d, patchRuntime.LastDirectorExecutionStatus.BudgetUsed, 3);
@@ -54,6 +55,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         Assert.Equal(expectedMode, snapshotDirector.OutputMode);
         Assert.Equal(expectedSource, snapshotDirector.OutputModeSource);
         Assert.Equal("directorStage:mock", snapshotDirector.StageMarker);
+        Assert.Equal("applied", snapshotDirector.ApplyStatus);
         Assert.True(snapshotDirector.HasBudgetData);
         Assert.Equal(5d, snapshotDirector.MaxInfluenceBudget, 3);
         Assert.Equal(5d, snapshotDirector.RemainingInfluenceBudget, 3);
@@ -165,6 +167,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
 
             Assert.True(patchRuntime.LastDirectorExecutionStatus.BudgetMarkerPresent);
             Assert.Equal(1.875d, patchRuntime.LastDirectorExecutionStatus.BudgetUsed, 3);
+            Assert.Equal("applied", patchRuntime.LastDirectorExecutionStatus.ApplyStatus);
 
             var director = runtime.BuildRefinerySnapshot()["director"]?.AsObject();
             Assert.NotNull(director);
@@ -176,6 +179,95 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         {
             File.Delete(fixturePath);
         }
+    }
+
+    [Fact]
+    public void DirectorApplyFailure_PreservesResponseStageModeAndBudget_AndSetsApplyFailedStatus()
+    {
+        var fixturePath = WriteTempDirectorFailureFixture(includeBudgetMarker: true, budgetUsed: 1.250d);
+
+        try
+        {
+            var runtime = CreateRuntime();
+            var options = new RefineryRuntimeOptions(
+                Mode: RefineryIntegrationMode.Fixture,
+                Goal: DirectorGoals.SeasonDirectorCheckpoint,
+                DirectorOutputMode: "auto",
+                FixtureResponsePath: fixturePath,
+                ServiceBaseUrl: "http://localhost:8091",
+                StrictMode: true,
+                RequestSeed: 123,
+                LiveTimeoutMs: 1000,
+                LiveRetryCount: 0,
+                CircuitBreakerSeconds: 5,
+                ApplyToWorld: true,
+                MinTriggerIntervalMs: 0,
+                DirectorMaxBudget: 5d
+            );
+
+            var patchRuntime = new RefineryPatchRuntime(options);
+            patchRuntime.Trigger(runtime, tick: 310);
+            PumpUntilSettled(patchRuntime);
+
+            Assert.StartsWith("Refinery apply failed:", patchRuntime.LastStatus, StringComparison.Ordinal);
+            Assert.Contains("outcome=apply_failed", patchRuntime.LastStatus, StringComparison.Ordinal);
+            Assert.Equal("directorStage:mock", patchRuntime.LastDirectorExecutionStatus.Stage);
+            Assert.Equal("both", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputMode);
+            Assert.Equal("response", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputModeSource);
+            Assert.True(patchRuntime.LastDirectorExecutionStatus.BudgetMarkerPresent);
+            Assert.Equal(1.25d, patchRuntime.LastDirectorExecutionStatus.BudgetUsed, 3);
+            Assert.Equal("apply_failed", patchRuntime.LastDirectorExecutionStatus.ApplyStatus);
+
+            var snapshotDirector = runtime.GetSnapshot().Director;
+            Assert.Equal("directorStage:mock", snapshotDirector.StageMarker);
+            Assert.Equal("both", snapshotDirector.OutputMode);
+            Assert.Equal("response", snapshotDirector.OutputModeSource);
+            Assert.Equal("apply_failed", snapshotDirector.ApplyStatus);
+            Assert.Equal(1.25d, snapshotDirector.LastCheckpointBudgetUsed, 3);
+            Assert.Contains("unknown colonyId", runtime.LastDirectorActionStatus, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(fixturePath);
+        }
+    }
+
+    [Fact]
+    public void DirectorRequestFailureBeforeResponse_SetsRequestFailedStatus()
+    {
+        var runtime = CreateRuntime();
+        var missingFixture = Path.Combine(Path.GetTempPath(), $"director-fixture-missing-{Guid.NewGuid():N}.json");
+        var options = new RefineryRuntimeOptions(
+            Mode: RefineryIntegrationMode.Fixture,
+            Goal: DirectorGoals.SeasonDirectorCheckpoint,
+            DirectorOutputMode: "auto",
+            FixtureResponsePath: missingFixture,
+            ServiceBaseUrl: "http://localhost:8091",
+            StrictMode: true,
+            RequestSeed: 123,
+            LiveTimeoutMs: 1000,
+            LiveRetryCount: 0,
+            CircuitBreakerSeconds: 5,
+            ApplyToWorld: true,
+            MinTriggerIntervalMs: 0,
+            DirectorMaxBudget: 5d
+        );
+
+        var patchRuntime = new RefineryPatchRuntime(options);
+        patchRuntime.Trigger(runtime, tick: 311);
+        PumpUntilSettled(patchRuntime);
+
+        Assert.StartsWith("Refinery apply failed:", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Contains("outcome=request_failed", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Equal("request_failed", patchRuntime.LastDirectorExecutionStatus.ApplyStatus);
+        Assert.Equal("not_triggered", patchRuntime.LastDirectorExecutionStatus.Stage);
+        Assert.Equal("unknown", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputMode);
+        Assert.Equal("unknown", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputModeSource);
+
+        var snapshotDirector = runtime.GetSnapshot().Director;
+        Assert.Equal("request_failed", snapshotDirector.ApplyStatus);
+        Assert.Equal("not_triggered", snapshotDirector.StageMarker);
+        Assert.Contains("Fixture response file not found", runtime.LastDirectorActionStatus, StringComparison.Ordinal);
     }
 
     private static void PumpUntilSettled(RefineryPatchRuntime runtime)
@@ -262,6 +354,46 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         }
 
         var path = Path.Combine(Path.GetTempPath(), $"director-fixture-{Guid.NewGuid():N}.json");
+        File.WriteAllText(path, json);
+        return path;
+    }
+
+    private static string WriteTempDirectorFailureFixture(bool includeBudgetMarker, double budgetUsed)
+    {
+        var json = """
+        {
+          "schemaVersion": "v1",
+          "requestId": "temp-director-apply-fail",
+          "seed": 321,
+          "patch": [
+            {
+              "op": "setColonyDirective",
+              "opId": "op_director_bad_nudge_1",
+              "colonyId": 999,
+              "directive": "PrioritizeFood",
+              "durationTicks": 18
+            }
+          ],
+          "explain": [
+            "directorStage:mock",
+            "directorOutputMode:both",
+            "budgetUsed:__BUDGET__",
+            "MockPlanner produced deterministic director checkpoint output."
+          ],
+          "warnings": []
+        }
+        """;
+
+        json = json.Replace("__BUDGET__", budgetUsed.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        if (!includeBudgetMarker)
+        {
+            json = json.Replace("\"budgetUsed:__BUDGET__\",\r\n", string.Empty, StringComparison.Ordinal)
+                .Replace("\"budgetUsed:__BUDGET__\",\n", string.Empty, StringComparison.Ordinal)
+                .Replace("\"budgetUsed:" + budgetUsed.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + "\",\r\n", string.Empty, StringComparison.Ordinal)
+                .Replace("\"budgetUsed:" + budgetUsed.ToString("0.000", System.Globalization.CultureInfo.InvariantCulture) + "\",\n", string.Empty, StringComparison.Ordinal);
+        }
+
+        var path = Path.Combine(Path.GetTempPath(), $"director-fixture-fail-{Guid.NewGuid():N}.json");
         File.WriteAllText(path, json);
         return path;
     }

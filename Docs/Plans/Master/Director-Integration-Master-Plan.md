@@ -1658,7 +1658,7 @@ Acceptance:
 - Beat narratives appear in event feed
 - Active directive visible in HUD
 - Debug overlay shows all director internals
-- Manual smoke test: trigger F6, observe feed + HUD + overlay
+- Manual smoke test: trigger F6, observe feed + HUD + overlay, and verify apply outcome separation (`applied` vs `apply_failed` vs `request_failed`)
 
 #### Sprint 3 — Epic S3-C: Output Mode Matrix (End-to-End)
 
@@ -2291,9 +2291,13 @@ Note:
 Canonical explain markers for Phase 0-1:
 - `directorStage:<mock|refinery-validated|llm|fallback>`
 - `directorOutputMode:<both|story_only|nudge_only|off>`
-- `retryCount:<n>`
+- `llmRetries:<n>`
 - `budgetUsed:<decimal>`
 - optional repeated `warning:<text>` entries
+
+Wave 6.1 smoke note:
+- The Java `directorStage:*` marker is response-level pipeline truth; local C# apply outcome is tracked separately (`not_triggered|applied|apply_failed|request_failed`).
+- One manual `F6` may consume `1..(maxRetries+1)` LLM completions because iterative correction happens inside a single `/v1/patch` request.
 
 ---
 

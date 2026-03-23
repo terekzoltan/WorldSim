@@ -3,7 +3,7 @@
 Local Java 21 service for the WorldSim polyglot monorepo.
 
 It receives a simulation snapshot and returns a deterministic patch/delta over HTTP.
-Current default planner is deterministic mock; pipeline mode can enable a minimal Refinery-backed TECH_TREE slice.
+The service supports both baseline deterministic mock output and the Season Director pipeline (`LLM -> formal validation/repair -> deterministic fallback`).
 
 ## Prerequisites
 
@@ -18,10 +18,10 @@ Current default planner is deterministic mock; pipeline mode can enable a minima
 Default port is `8091`.
 Override with environment variable `REFINERY_SERVICE_PORT`.
 
-Planner mode defaults to deterministic mock:
+Planner env profile:
 
 - `PLANNER_MODE=mock` (default)
-- `PLANNER_MODE=pipeline` (scaffolded LLM -> Refinery chain with deterministic fallback)
+- `PLANNER_MODE=pipeline` (LLM -> formal validator -> bounded retries -> deterministic fallback)
 - `PLANNER_REFINERY_ENABLED=false` (default)
 - `PLANNER_LLM_ENABLED=false` (default)
 - `PLANNER_LLM_API_KEY=` (required for live LLM calls)
@@ -32,13 +32,39 @@ Planner mode defaults to deterministic mock:
 - `PLANNER_LLM_APP_TITLE=WorldSim`
 - `PLANNER_LLM_TEMPERATURE=0.4`
 - `PLANNER_LLM_MAX_TOKENS=500`
-- `PLANNER_DIRECTOR_BUDGET=5.0` (default influence budget limit for director checkpoints)
+- `PLANNER_DIRECTOR_OUTPUT_MODE=both` (default Java-side director output mode)
+- `PLANNER_DIRECTOR_MAX_RETRIES=2` (iterative correction retries)
+- `PLANNER_DIRECTOR_BUDGET=5.0` (influence budget limit for director checkpoints)
 
-When `PLANNER_MODE=pipeline`, responses include an explicit explain marker:
+When `PLANNER_MODE=pipeline`, responses include explicit explain markers:
 
-- `refineryStage:enabled` if Refinery stage is enabled
-- `refineryStage:disabled` if Refinery stage is off
-- Director responses may include `budgetUsed:<decimal>` in `explain` for budget handoff/debugging
+- `refineryStage:enabled` / `refineryStage:disabled`
+- `directorStage:<...>`
+- `directorOutputMode:<both|story_only|nudge_only|off>`
+- `llmRetries:<n>`
+- `budgetUsed:<decimal>`
+
+## Director Live Smoke Notes (Wave 6.1)
+
+Recommended Java-side local profile:
+
+```bash
+export PLANNER_MODE=pipeline
+export PLANNER_REFINERY_ENABLED=true
+export PLANNER_LLM_ENABLED=true
+export PLANNER_LLM_API_KEY=<your-openrouter-key>
+./gradlew bootRun
+```
+
+Important behavior:
+
+- One manual `F6` on the C# side may trigger `1..(PLANNER_DIRECTOR_MAX_RETRIES+1)` OpenRouter completions inside one `/v1/patch` request.
+- This is expected: iterative correction runs inside a single director request lifecycle.
+- For quick local observability, query telemetry counters:
+
+```bash
+curl http://localhost:8091/v1/director/telemetry
+```
 
 ## Test
 
@@ -122,7 +148,7 @@ Example response:
 - Patch operations are modeled as a discriminated union via `op`.
 - Every patch operation includes deterministic `opId` for idempotent client-side dedupe.
 - `opId` is derived from stable inputs only: `goal` string + `seed` + `tick` + op stable key.
-- Supported operations now:
+- Supported operations:
   - `addTech`
   - `tweakTech`
   - `addWorldEvent`
@@ -142,11 +168,8 @@ Package root: `hu.zoltanterek.worldsim.refinery`
 
 `PatchPlanner` is the extension seam:
 
-- `MockPlanner` exists now for deterministic scaffolding.
-- TODO next:
-  1. `LlmPlanner` proposes candidate patch.
-  2. `RefineryPlanner` validates/repairs candidates against constraints.
-  3. Compose as pipeline: `LLM -> Refinery validation/repair -> PatchResponse`.
+- `MockPlanner` provides deterministic baseline output.
+- Pipeline mode composes LLM proposals with formal validator/repair and fallback behavior.
 
 ## How this integrates with C# MonoGame
 
@@ -171,26 +194,28 @@ Package root: `hu.zoltanterek.worldsim.refinery`
   3. Trigger patch from game with `F6`
   4. Optional parity check: `REFINERY_PARITY_TEST=true` then `dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj`
 
-### Current Refinery slice
+### Current slices
 
-- Enabled with `PLANNER_MODE=pipeline` and `PLANNER_REFINERY_ENABLED=true`.
-- Scope is intentionally narrow: `TECH_TREE_PATCH` with `addTech` operations.
-- Invariants currently enforced in this slice:
-  - `addTech.techId` must be known.
-  - `addTech.prereqTechIds` must reference known tech IDs.
-  - Self-prereq is removed.
-  - `cost.research` is repaired to `80` if missing or non-positive.
-- Non-`addTech` operations under `TECH_TREE_PATCH` are rejected by this slice.
+- `TECH_TREE_PATCH` slice:
+  - Enabled with `PLANNER_MODE=pipeline` and `PLANNER_REFINERY_ENABLED=true`.
+  - Scope: `TECH_TREE_PATCH` with `addTech` operations.
+  - Invariants include known IDs, prereq checks, and deterministic repair for invalid research cost.
+- `SEASON_DIRECTOR_CHECKPOINT` slice:
+  - Supports story beats + colony directives with output mode gating.
+  - Includes budget-aware validation (`budgetUsed` explain marker) and iterative correction loop.
+  - Runtime-safe contract for Wave 6.1 keeps story effect duration aligned to parent beat duration.
 
-### Season Director next slice (planned)
+For runtime/HUD-side smoke interpretation, see `WorldSim.Runtime/Integration/README.md`.
 
-- Planned Track D direction is a checkpoint-based Season Director goal that can emit:
-  - `story beat`
-  - `planner nudge`
-- Planned output gating modes: `both`, `story_only`, `nudge_only`, `off`.
-- LLM stage remains optional; formal Refinery gate remains mandatory for accepted output in director pipeline mode.
-- Detailed implementation plan is documented in:
-  - `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`
+### Deprecated wording notice
+
+Older references in this repo that describe the director as "planned" are historical planning artifacts.
+The live director path is implemented; smoke and ops should follow the Wave 6.1 guidance.
+
+### Director design and implementation docs
+
+- `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`
+- `Docs/Plans/Master/Director-Integration-Master-Plan.md`
 
 ## Fixtures for integration tests
 

@@ -45,7 +45,19 @@ public final class DirectorModelValidator {
                 if (facts.beatCooldownTicks() > 0) {
                     throw invalid(DirectorDesign.INV_03, "Story beat cooldown active; cannot emit beat this checkpoint.");
                 }
-                List<PatchOp.EffectEntry> effects = sanitizeEffects(storyBeat.effects());
+                long repairedDuration = clamp(storyBeat.durationTicks(), DirectorDesign.MIN_STORY_DURATION, DirectorDesign.MAX_STORY_DURATION);
+                if (repairedDuration != storyBeat.durationTicks()) {
+                    warnings.add(code(DirectorDesign.INV_06, "Clamped story beat duration to safe range."));
+                    feedback.add(code(DirectorDesign.INV_06, "Story beat duration was clamped from " + storyBeat.durationTicks() + " to " + repairedDuration + '.'));
+                    changed = true;
+                }
+                if (hasMismatchedEffectDuration(storyBeat.effects(), repairedDuration)) {
+                    warnings.add(code(DirectorDesign.INV_06, "Aligned story effect durations to parent story beat duration."));
+                    feedback.add(code(DirectorDesign.INV_06, "Story effect durationTicks must match story beat durationTicks " + repairedDuration + '.'));
+                    changed = true;
+                }
+
+                List<PatchOp.EffectEntry> effects = sanitizeEffects(storyBeat.effects(), repairedDuration);
                 String explicitSeverity = normalizeOptionalSeverity(storyBeat.severity());
                 String newBeatSeverity = inferSeverity(storyBeat, effects, explicitSeverity);
                 if ("major".equals(newBeatSeverity) && hasActiveSeverity(facts, "major")) {
@@ -68,13 +80,6 @@ public final class DirectorModelValidator {
                             "Story beat text too long: " + storyBeat.text().length() +
                                     " (max " + DirectorDesign.MAX_STORY_TEXT_LENGTH + ")"
                     );
-                }
-
-                long repairedDuration = clamp(storyBeat.durationTicks(), DirectorDesign.MIN_STORY_DURATION, DirectorDesign.MAX_STORY_DURATION);
-                if (repairedDuration != storyBeat.durationTicks()) {
-                    warnings.add(code(DirectorDesign.INV_06, "Clamped story beat duration to safe range."));
-                    feedback.add(code(DirectorDesign.INV_06, "Story beat duration was clamped from " + storyBeat.durationTicks() + " to " + repairedDuration + '.'));
-                    changed = true;
                 }
 
                 repaired.add(new PatchOp.AddStoryBeat(
@@ -168,7 +173,7 @@ public final class DirectorModelValidator {
                 List<PatchOp.EffectEntry> effects;
                 String severity;
                 try {
-                    effects = sanitizeEffects(storyBeat.effects());
+                    effects = sanitizeEffects(storyBeat.effects(), duration);
                     validateNoContradictoryModifiers(effects);
                     validateDomainStackCap(effects);
                     severity = normalizeOptionalSeverity(storyBeat.severity());
@@ -307,7 +312,7 @@ public final class DirectorModelValidator {
         return severity;
     }
 
-    private static List<PatchOp.EffectEntry> sanitizeEffects(List<PatchOp.EffectEntry> effects) {
+    private static List<PatchOp.EffectEntry> sanitizeEffects(List<PatchOp.EffectEntry> effects, long storyDurationTicks) {
         if (effects == null || effects.isEmpty()) {
             return List.of();
         }
@@ -336,17 +341,27 @@ public final class DirectorModelValidator {
                         "Effect modifier out of range for domain '" + domain + "': " + effect.modifier()
                 );
             }
-            long duration = clamp(effect.durationTicks(), DirectorDesign.MIN_STORY_DURATION, DirectorDesign.MAX_STORY_DURATION);
-            if (duration != effect.durationTicks()) {
-                throw invalid(
-                        DirectorDesign.INV_06,
-                        "Effect duration out of range for domain '" + domain + "': " + effect.durationTicks()
-                );
-            }
-            sanitized.add(new PatchOp.EffectEntry("domain_modifier", domain, effect.modifier(), duration));
+            sanitized.add(new PatchOp.EffectEntry("domain_modifier", domain, effect.modifier(), storyDurationTicks));
         }
 
         return List.copyOf(sanitized);
+    }
+
+    private static boolean hasMismatchedEffectDuration(List<PatchOp.EffectEntry> effects, long storyDurationTicks) {
+        if (effects == null || effects.isEmpty()) {
+            return false;
+        }
+
+        for (PatchOp.EffectEntry effect : effects) {
+            if (effect == null) {
+                continue;
+            }
+            if (effect.durationTicks() != storyDurationTicks) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static List<PatchOp.GoalBiasEntry> sanitizeBiases(List<PatchOp.GoalBiasEntry> biases) {

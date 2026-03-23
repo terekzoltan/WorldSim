@@ -145,7 +145,7 @@ public class LlmDirectorPlanner {
             if (beatId != null && text != null) {
                 long duration = clamp(story.durationTicks(), DirectorDesign.MIN_STORY_DURATION, DirectorDesign.MAX_STORY_DURATION);
                 String severity = normalizeSeverity(story.severity());
-                List<PatchOp.EffectEntry> effects = sanitizeEffects(story.effects());
+                List<PatchOp.EffectEntry> effects = sanitizeEffects(story.effects(), duration);
                 String storyOpId = DeterministicIds.opId(
                         request.seed(),
                         request.tick(),
@@ -179,7 +179,10 @@ public class LlmDirectorPlanner {
         return List.copyOf(ops);
     }
 
-    private static List<PatchOp.EffectEntry> sanitizeEffects(List<DirectorCandidateParser.StoryEffectCandidate> effects) {
+    private static List<PatchOp.EffectEntry> sanitizeEffects(
+            List<DirectorCandidateParser.StoryEffectCandidate> effects,
+            long storyDurationTicks
+    ) {
         if (effects == null || effects.isEmpty()) {
             return List.of();
         }
@@ -199,8 +202,7 @@ public class LlmDirectorPlanner {
                 continue;
             }
             double modifier = clampDouble(effect.modifier(), DirectorDesign.MODIFIER_MIN, DirectorDesign.MODIFIER_MAX);
-            long duration = clamp(effect.durationTicks(), DirectorDesign.MIN_STORY_DURATION, DirectorDesign.MAX_STORY_DURATION);
-            sanitized.add(new PatchOp.EffectEntry("domain_modifier", normalizedDomain, modifier, duration));
+            sanitized.add(new PatchOp.EffectEntry("domain_modifier", normalizedDomain, modifier, storyDurationTicks));
             if (sanitized.size() >= DirectorDesign.MAX_EFFECTS_PER_BEAT) {
                 break;
             }

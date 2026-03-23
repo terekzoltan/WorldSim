@@ -111,6 +111,7 @@ class LlmDirectorPlannerTest {
         assertEquals("LLM narrative text", story.text());
         assertEquals(96, story.durationTicks());
         assertEquals(1, story.effects().size());
+        assertEquals(96, story.effects().get(0).durationTicks());
 
         PatchOp.SetColonyDirective directive = (PatchOp.SetColonyDirective) ops.get(1);
         assertEquals(1, directive.colonyId());
@@ -210,6 +211,7 @@ class LlmDirectorPlannerTest {
         String prompt = capturedUserPrompt.get();
         assertTrue(prompt.contains("colonyCount=2"));
         assertTrue(prompt.contains("remainingInfluenceBudget=3.750"));
+        assertTrue(prompt.contains("effect.durationTicks exactly equal to storyBeat.durationTicks"));
     }
 
     private PatchRequest directorRequest() {
