@@ -1055,7 +1055,64 @@ Wave 6 closeout note:
 
 ---
 
+## Wave 6.1 — Director Live Contract Alignment + Apply Observability
+
+Purpose:
+- Convert the first real live `F6` evidence into a small stabilization wave before Wave 7 expands the director model further.
+- Freeze the current Phase 3a story-beat contract to the simpler runtime-safe rule: every `domain_modifier.durationTicks` must equal the parent `addStoryBeat.durationTicks`.
+- Treat the existing C# runtime rule as the source of truth for Wave 6.1; defer richer per-effect durations to a later director-model wave.
+- Make live smoke easier to read by separating "Java director pipeline validated/fallback completed" from "C# adapter/runtime apply succeeded/failed".
+- Document that one manual `F6` checkpoint may legitimately consume multiple OpenRouter completions because the LLM retry loop runs inside a single director request.
+
+Wave turn-gate:
+- Wave 6.1 is `READY` only after Wave 6 closeout is `✅`.
+- Reason: this wave is a hardening response to real live evidence, not a parallel feature track.
+
+### Sprint D6.1: Contract Freeze + Live Hardening (Track D primary, Track A/B consume as needed)
+
+- ⬜ **D6.1-A** Director story-beat duration contract alignment (Track D — Java)
+  - Enforce/repair `effect.durationTicks == beat.durationTicks` in the Java sanitize + validator path.
+  - Add regression tests so Java-validated director output is always acceptable to the current C# runtime apply path.
+- ⬜ **D6.1-B** Director apply observability hardening (Track D — C# adapter, with minimal runtime/HUD consume if needed)
+  - Preserve response-level `stage`, `mode`, `source`, and `budgetUsed` even when runtime apply throws.
+  - Distinguish "director pipeline succeeded but apply failed" from "live request failed before response" in local manual smoke.
+- ⬜ **D6.1-C** Live smoke recipe + ops/docs refresh (Track D docs)
+  - Record the recommended local live profile (`REFINERY_TIMEOUT_MS` high, `REFINERY_RETRY_COUNT=0`, `REFINERY_APPLY_TO_WORLD=true`).
+  - Document that one `F6` may cause `1..(maxRetries+1)` LLM completions because iterative correction is inside one `/patch` request.
+
+### Wave 6.1 — Execution Steps
+
+**Step 1 — D6.1-A first (contract fix before more live smoke)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | D6.1-A | Wave 6 ✅ | Java contract must stop generating C#-invalid story beats before any further live validation is trusted |
+
+**Step 2 — opens when D6.1-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | D6.1-B | D6.1-A ✅ | Adapter/runtime status should reflect the now-aligned response/apply path, including apply failures |
+
+**Step 3 — opens when D6.1-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | D6.1-C | D6.1-A ✅ + D6.1-B ✅ | Finalize the practical smoke recipe after the behavior and HUD/status wording are stable |
+
+Wave 6.1 non-goal note:
+- Per-effect story modifier durations that differ from the parent beat duration are explicitly deferred.
+- If the project later chooses the richer model from the Director master plan examples, that should be treated as a separate design/contract wave, not silently folded into this hotfix.
+
+**Critical path:** `D6.1-A -> D6.1-B -> D6.1-C`.
+
+---
+
 ## Wave 7 — Causal Chains + Director x Combat Intersection (Director Phase 3b + Combat Phase 4)
+
+Wave turn-gate:
+- Wave 7 is `READY` only after Wave 6.1 closeout is `✅`.
+- Reason: causal chains should build on a live-stable director baseline, not on a contract-mismatched checkpoint path.
 
 ### Sprint D7: Causal Chains + Operational UX (Track D + A + B)
 
@@ -1082,8 +1139,8 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | S7-A (D part: contracts + monitoring) | Wave 6 D6 ✅ | Java + C# contract changes |
-| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6 C6 ✅ | Parallel with Track D on different files |
+| Track D agent | S7-A (D part: contracts + monitoring) | Wave 6.1 ✅ | Java + C# contract changes |
+| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6.1 ✅ | Parallel with Track D on different files |
 
 **Step 2 — opens when S7-A ✅**
 
