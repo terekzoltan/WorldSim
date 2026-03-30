@@ -71,6 +71,12 @@ The Refinery validates proposals against the design and model layers.
 
 Reference: `OnlabRefineryDocumentation.txt` (sections 2.2-2.4)
 
+Transition-state note:
+- The currently shipped WorldSim implementation is still a transition-state director pipeline that uses imperative Java validation/repair around patch-like candidates.
+- The target direction is true `tools.refinery` integration with versioned Refinery artifacts as the primary formal source of truth.
+- That migration is tracked separately in `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md`.
+- Any task that creates or changes refinery/model artifacts must first read `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` and its linked official Refinery references.
+
 ### 1.3 Emergence Preservation Principle
 
 The Director must enhance emergence, not suppress it. Design rules:
@@ -141,8 +147,9 @@ Step 4: CANDIDATE GENERATION (Java)
   ComposedPatchPlanner routes to DirectorRefineryPlanner:
     a) MockPlanner generates deterministic baseline candidate
     b) OR LlmPlanner (Phase 3+) proposes creative candidate via OpenRouter
-    c) DirectorModelValidator validates candidate against formal model
-    d) If invalid: feedback → retry (bounded) → deterministic fallback
+    c) Current transition path: DirectorModelValidator validates/repairs candidate imperatively
+    d) Target path: `tools.refinery` validates the designated output area against layered model artifacts
+    e) If invalid: feedback → retry (bounded) → deterministic fallback
 
 Step 5: RESPONSE
   Java service returns validated PatchResponse:
@@ -1174,9 +1181,13 @@ public CommandResult ApplyColonyDirective(SetColonyDirectiveOp op)
 
 ### 10.1 Overview
 
-The Refinery formal model follows the OnlabRefinery layered pattern. It is implemented as imperative
-Java validation (not the actual `tools.refinery` solver SDK), consistent with the existing WorldSim
-Java service architecture.
+The Refinery formal model follows the OnlabRefinery layered pattern.
+
+Important transition-state clarification:
+- The currently shipped WorldSim implementation still uses imperative Java validation/repair as a bridge.
+- That bridge is not the intended final formal layer.
+- The intended target is actual `tools.refinery` model artifacts plus solver-backed validation/refinement.
+- The dedicated migration path is defined in `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md`.
 
 The model defines what the LLM CAN propose. Everything not explicitly allowed is rejected.
 
@@ -1223,7 +1234,11 @@ public final class DirectorDesign {
 
 ### 10.3 Model Layer (Constraints and Invariants)
 
-The model layer defines validation rules. Each rule is a predicate that returns pass/fail + error message.
+The model layer defines validation rules.
+
+Transition note:
+- In the current bridge implementation, these rules are largely represented by imperative Java validation examples.
+- In the target `tools.refinery` architecture, these rules should become real Refinery predicates / error predicates over versioned artifacts.
 
 ```java
 // DirectorModelValidator.java (extended from existing 109 lines)
@@ -1265,6 +1280,10 @@ public final class DirectorModelValidator {
 
 The runtime layer provides current world state that the validator uses for contextual checks
 (e.g., cooldown remaining, active effects).
+
+Transition note:
+- Today this layer is mirrored into Java runtime fact objects and validator inputs.
+- Target state is a true Refinery runtime-layer artifact assembled from checkpoint facts before solve/refinement.
 
 ```java
 // DirectorRuntimeFacts.java (extended)
@@ -1344,7 +1363,11 @@ In Phase 3 (LLM active): the loop handles LLM hallucinations via feedback + retr
 
 ### 11.1 Prompt Architecture (Phase 3)
 
-The LLM receives a structured prompt with three sections, matching the layered model:
+The LLM receives a structured prompt with three sections, matching the layered model.
+
+Transition note:
+- The current shipped pipeline still uses a patch/candidate-oriented response format.
+- The migration target is a structured assertion-candidate that maps deterministically into a designated output area inside the Refinery model, not a patch-like candidate as the long-term internal representation.
 
 ```
 SYSTEM PROMPT:
@@ -1396,6 +1419,7 @@ Important:
 - This is the internal LLM/refinery candidate format.
 - The candidate's `explanation` field is not the same thing as the wire-level PatchResponse `explain` field.
 - PatchResponse `explain` stays a marker-oriented `IReadOnlyList<string>` in the current contract.
+- In the migration target, this candidate format becomes a structured assertion-oriented ingest shape, while `PatchResponse` remains only a bridge output contract.
 
 ```json
 {

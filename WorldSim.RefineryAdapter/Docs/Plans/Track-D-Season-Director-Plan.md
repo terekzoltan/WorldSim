@@ -3,6 +3,10 @@
 Status: planning approved, implementation pending
 Owner: Track D (Refinery boundary)
 
+Mandatory pre-read for refinery/model work:
+- Before any task that creates or changes refinery/model artifacts, read `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` fully, then open and read the official links referenced there.
+- This rule applies to Java refinery service work, formal model artifacts, designated output area design, solver integration, and related planning changes.
+
 ## 1. Goal
 
 Build a checkpoint-driven Director layer for WorldSim that produces two outcomes from the same world snapshot:
@@ -42,15 +46,15 @@ Planned control points:
 - `WorldSim.Contracts`: versioned contract source of truth
 - `WorldSim.RefineryClient`: HTTP + parser/applier helpers
 - `WorldSim.RefineryAdapter`: anti-corruption translation, deterministic errors
-- `refinery-service-java`: candidate generation, LLM (optional), Refinery validation/repair loop
+- `refinery-service-java`: HTTP host + orchestration + LLM (optional) + `tools.refinery` solve/refinement target + bridge contract mapping
 
 ### 3.2 Pipeline
 
 1) Runtime builds checkpoint snapshot.
 2) Adapter sends request to Java service.
-3) Planner pipeline builds candidate output.
-4) Refinery validates/repairs candidate.
-5) Service returns contract patch.
+3) Planner pipeline builds structured assertion-oriented candidate output.
+4) `tools.refinery` validates/solves the designated output area against layered artifacts.
+5) Service returns bridge contract patch/v2 output for the current C# boundary.
 6) Adapter translates patch ops to runtime commands.
 7) Runtime applies commands and updates state.
 8) Graphics shows beat/nudge state and event feed.
@@ -61,6 +65,13 @@ Planned control points:
 - Iterative loop: invalid candidate -> feedback -> retry.
 - Deterministic fallback after bounded retries.
 - Strict output contract + op-level validation.
+
+### 3.4 Transition-state note
+
+- The shipped Wave 6 / 6.1 / 6.1.1 pipeline is still transitional: patch-like candidate output + imperative Java validation/repair.
+- Going forward, Track D should treat that validator-centric path as a bridge, not as the intended final formal architecture.
+- The real migration target is defined in `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md`.
+- The current patch/v2 output should be treated as bridge contract, not as the primary internal modeling language.
 
 ## 4. Sprint plan (3 sprints)
 
@@ -247,6 +258,24 @@ Tasks:
 
 Acceptance:
 - Developers can run common modes from profile presets.
+
+## 4.5 Tools.Refinery migration overlay (post-Wave 6.1.1)
+
+After the current transition-state director slice, Track D follow-on work should align with the dedicated migration plan:
+
+- `TR1-A`: Java / `tools.refinery` integration spike
+- `TR1-B`: artifact layout + shared/common vocabulary strategy
+- `TR1-C`: director problem family skeleton (`design/model/runtime/output`)
+- `TR1-D`: structured assertion-candidate ingest shape
+- `TR1-E`: bridge contract policy (`validated symbolic facts -> current patch/v2 output`)
+
+Reference:
+- `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md`
+
+Track D policy after this point:
+- new formal semantics should preferentially land in versioned Refinery artifacts,
+- not as ever-growing Java validator logic,
+- unless there is an explicit temporary bridge reason documented in the migration plan.
 
 ## 5. Cross-track dependencies
 

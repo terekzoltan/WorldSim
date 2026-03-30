@@ -32,6 +32,7 @@ Local reference sources in this repo:
 - `OnlabRefineryDocumentation.txt`
 - `OnlabRefineryDocumentation.pdf`
 - `gitingest_OnlabRefinery.txt`
+- `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md`
 - `Docs/Plans/Master/Director-Integration-Master-Plan.md`
 
 ## What tools.refinery Actually Is

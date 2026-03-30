@@ -1182,11 +1182,71 @@ Wave 6.1.1 non-goal note:
 
 ---
 
+## Wave 6.2 — Tools.Refinery Migration Foundation (Director TR1)
+
+Purpose:
+- Start the actual migration from the current validator-centric transition state toward versioned `tools.refinery` artifacts as the primary formal truth.
+- Keep the external Spring Boot + patch/v2 boundary stable while the Java internals move to layered Refinery artifacts and solver-backed thinking.
+- Define the designated output area, structured assertion-candidate ingest shape, and bridge-contract policy before later director waves expand capability further.
+- Make `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` the mandatory pre-read for any refinery/model artifact work.
+
+Wave turn-gate:
+- Wave 6.2 is `READY` only after Wave 6.1.1 closeout is `✅`.
+- Reason: the migration should build on the now-stabilized live director path rather than replacing a moving target.
+
+### Sprint TR1: Tools.Refinery foundation (Track D primary, Track B consult on runtime-fact boundary)
+
+- ⬜ **TR1-A** Java / `tools.refinery` integration spike (Track D)
+- ⬜ **TR1-B** Artifact layout + shared/common vocabulary strategy (Track D)
+- ⬜ **TR1-C** Director problem family skeleton (`design/model/runtime/output`) (Track D, Track B consult)
+- ⬜ **TR1-D** Structured assertion-candidate ingest design (Track D)
+- ⬜ **TR1-E** Bridge contract policy (`validated symbolic facts -> current patch/v2 output`) (Track D)
+
+### Wave 6.2 — Execution Steps
+
+**Step 1 — TR1-A first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR1-A | Wave 6.1.1 ✅ | Prove the Java service can load actual Refinery artifacts and invoke solver components before larger planning assumptions harden |
+
+**Step 2 — opens when TR1-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR1-B | TR1-A ✅ | Lock repository artifact layout and shared/common vocabulary ownership before authoring real family files |
+
+**Step 3 — opens when TR1-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR1-C | TR1-B ✅ | Create the first real director family artifact set and define designated output-area boundaries |
+| Track B agent | TR1-C consult (runtime-fact boundary) | TR1-B ✅ | Confirm snapshot/runtime fact ownership and keep the C# bridge boundary stable while Java internals shift |
+
+**Step 4 — opens when TR1-C ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR1-D | TR1-C ✅ | Move LLM ingest toward an assertion-oriented candidate shape instead of treating patch-like output as internal ontology |
+
+**Step 5 — opens when TR1-D ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR1-E | TR1-D ✅ | Freeze the transition policy: validated symbolic facts inside, current patch/v2 only as bridge output |
+
+Wave 6.2 policy note:
+- Any task in this wave that creates or edits refinery/model artifacts requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
+
+**Critical path:** `TR1-A -> TR1-B -> TR1-C -> TR1-D -> TR1-E`.
+
+---
+
 ## Wave 7 — Causal Chains + Director x Combat Intersection (Director Phase 3b + Combat Phase 4)
 
 Wave turn-gate:
-- Wave 7 is `READY` only after Wave 6.1.1 closeout is `✅`.
-- Reason: causal chains should build on a live-stable and recoverable director baseline, not on a path with unresolved apply atomicity or status-semantic drift.
+- Wave 7 is `READY` only after Wave 6.2 closeout is `✅`.
+- Reason: causal chains should build on a live-stable director path whose formal-model migration direction and bridge-contract policy are already fixed.
 
 ### Sprint D7: Causal Chains + Operational UX (Track D + A + B)
 
@@ -1213,8 +1273,8 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | S7-A (D part: contracts + monitoring) | Wave 6.1.1 ✅ | Java + C# contract changes |
-| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6.1.1 ✅ | Parallel with Track D on different files |
+| Track D agent | S7-A (D part: contracts + monitoring) | Wave 6.2 ✅ | Java + C# contract changes |
+| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6.2 ✅ | Parallel with Track D on different files |
 
 **Step 2 — opens when S7-A ✅**
 
