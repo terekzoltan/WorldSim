@@ -156,4 +156,40 @@ public sealed class PatchApplySemanticsTests
         Assert.Contains("BEAT_SAMPLE_1", state.StoryBeatIds);
         Assert.Equal("PrioritizeFood", state.ColonyDirectives[0]);
     }
+
+    [Fact]
+    public void StagedPatchState_DoesNotMutateLiveStateUntilCommitted()
+    {
+        var liveState = SimulationPatchState.CreateBaseline();
+        var stagedState = liveState.Clone();
+        var applier = new PatchApplier();
+
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-stage-1",
+            123,
+            new List<PatchOp>
+            {
+                new AddStoryBeatOp
+                {
+                    OpId = "op_story_stage_1",
+                    BeatId = "BEAT_STAGE_1",
+                    Text = "Staged beat",
+                    DurationTicks = 20
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        applier.Apply(stagedState, response, new PatchApplyOptions(true));
+
+        Assert.DoesNotContain("op_story_stage_1", liveState.AppliedOpIds);
+        Assert.DoesNotContain("BEAT_STAGE_1", liveState.StoryBeatIds);
+
+        liveState.CopyFrom(stagedState);
+
+        Assert.Contains("op_story_stage_1", liveState.AppliedOpIds);
+        Assert.Contains("BEAT_STAGE_1", liveState.StoryBeatIds);
+    }
 }

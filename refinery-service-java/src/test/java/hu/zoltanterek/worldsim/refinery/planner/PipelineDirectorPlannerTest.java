@@ -46,6 +46,9 @@ class PipelineDirectorPlannerTest {
         assertTrue(arrayContains(body.path("explain"), "directorStage:mock"));
         assertTrue(arrayContains(body.path("explain"), "directorOutputMode:nudge_only"));
         assertTrue(arrayContains(body.path("explain"), "llmStage:disabled"));
+        assertTrue(arrayContains(body.path("explain"), "llmCompletionCount:0"));
+        assertTrue(arrayContains(body.path("explain"), "llmRetryRounds:0"));
+        assertTrue(arrayContains(body.path("explain"), "llmCandidateSanitized:false"));
     }
 
     private JsonNode callPatch(String requestBody) throws Exception {

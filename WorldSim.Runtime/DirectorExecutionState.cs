@@ -9,9 +9,9 @@ public sealed record DirectorExecutionState(
     string ApplyStatus)
 {
     public static DirectorExecutionState NotTriggered { get; } = new(
-        EffectiveOutputMode: "both",
+        EffectiveOutputMode: "unknown",
         EffectiveOutputModeSource: "unknown",
-        Stage: "idle",
+        Stage: "not_triggered",
         Tick: -1,
         IsDirectorGoal: false,
         ApplyStatus: "not_triggered");

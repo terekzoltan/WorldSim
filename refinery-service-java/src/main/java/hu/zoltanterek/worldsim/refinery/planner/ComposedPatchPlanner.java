@@ -1,9 +1,11 @@
 package hu.zoltanterek.worldsim.refinery.planner;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +18,7 @@ import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorInfluenceBudget;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorPipelineTelemetry;
 
 @Component
 @Primary
@@ -26,6 +29,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
     private final LlmPlanner llmPlanner;
     private final RefineryPlanner refineryPlanner;
     private final DirectorRefineryPlanner directorRefineryPlanner;
+    private final DirectorPipelineTelemetry directorTelemetry;
     private final String plannerMode;
     private final String directorOutputMode;
 
@@ -34,6 +38,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
             LlmPlanner llmPlanner,
             RefineryPlanner refineryPlanner,
             DirectorRefineryPlanner directorRefineryPlanner,
+            DirectorPipelineTelemetry directorTelemetry,
             @Value("${planner.mode:mock}") String plannerMode,
             @Value("${planner.director.outputMode:both}") String directorOutputMode
     ) {
@@ -41,6 +46,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
         this.llmPlanner = llmPlanner;
         this.refineryPlanner = refineryPlanner;
         this.directorRefineryPlanner = directorRefineryPlanner;
+        this.directorTelemetry = directorTelemetry;
         this.plannerMode = plannerMode;
         this.directorOutputMode = normalizeOutputMode(directorOutputMode);
     }
@@ -119,20 +125,32 @@ public class ComposedPatchPlanner implements PatchPlanner {
 
     private PatchResponse planDirectorPipeline(PatchRequest request, PatchResponse mockResponse) {
         logger.info("director pipeline start outputMode={} plannerMode={}", directorOutputMode, plannerMode);
-        Optional<List<PatchOp>> llmProposal = llmPlanner.propose(request);
+        LlmDirectorPlanner.ProposalResult initialProposal = llmPlanner.proposeDirectorWithFeedback(request, List.of());
+        Optional<List<PatchOp>> llmProposal = initialProposal.patch();
         List<PatchOp> candidatePatch = applyDirectorOutputMode(
                 llmProposal.orElseGet(mockResponse::patch),
                 directorOutputMode
         );
+        int[] llmCompletionCount = new int[] { initialProposal.completionCount() };
+        Set<String> sanitizeTags = new LinkedHashSet<>(initialProposal.sanitizeTags());
+        boolean[] sanitized = new boolean[] { initialProposal.sanitized() };
 
         DirectorRefineryPlanner.DirectorValidationResult validationResult =
                 directorRefineryPlanner.validateAndRepair(
                         request,
                         candidatePatch,
-                        feedbackHints -> llmPlanner.proposeWithFeedback(request, feedbackHints)
-                                .map(patch -> applyDirectorOutputMode(patch, directorOutputMode))
+                        feedbackHints -> {
+                            LlmDirectorPlanner.ProposalResult retryProposal = llmPlanner.proposeDirectorWithFeedback(request, feedbackHints);
+                            llmCompletionCount[0] += retryProposal.completionCount();
+                            if (retryProposal.sanitized()) {
+                                sanitized[0] = true;
+                                sanitizeTags.addAll(retryProposal.sanitizeTags());
+                            }
+                            return retryProposal.patch().map(patch -> applyDirectorOutputMode(patch, directorOutputMode));
+                        }
                 );
         List<PatchOp> validatedPatch = applyDirectorOutputMode(validationResult.patch(), directorOutputMode);
+        directorTelemetry.recordLlmProposalObservability(llmCompletionCount[0], sanitized[0]);
 
         String stage = validationResult.fallbackUsed()
                 ? "directorStage:fallback-deterministic"
@@ -144,7 +162,13 @@ public class ComposedPatchPlanner implements PatchPlanner {
         explain.add(stage);
         explain.add("directorOutputMode:" + directorOutputMode);
         explain.add(llmProposal.isPresent() ? "llmStage:candidate" : "llmStage:disabled");
+        explain.add("llmCompletionCount:" + llmCompletionCount[0]);
+        explain.add("llmRetryRounds:" + validationResult.retriesUsed());
         explain.add("llmRetries:" + validationResult.retriesUsed());
+        explain.add("llmCandidateSanitized:" + (sanitized[0] ? "true" : "false"));
+        if (sanitized[0]) {
+            explain.add("llmCandidateSanitizeTags:" + String.join(",", sanitizeTags));
+        }
         explain.add("budgetUsed:" + formatBudgetUsed(DirectorInfluenceBudget.calculateBudgetUsed(validatedPatch)));
         if (llmProposal.isPresent()) {
             explain.add("LLM planner proposed director candidate patch.");
@@ -169,11 +193,13 @@ public class ComposedPatchPlanner implements PatchPlanner {
         }
 
         logger.info(
-                "director pipeline completed stage={} candidateOps={} outputOps={} retries={} fallback={} llmPresent={} warningCount={}",
+                "director pipeline completed stage={} candidateOps={} outputOps={} retries={} llmCompletions={} llmSanitized={} fallback={} llmPresent={} warningCount={}",
                 stage,
                 candidatePatch.size(),
                 validatedPatch.size(),
                 validationResult.retriesUsed(),
+                llmCompletionCount[0],
+                sanitized[0],
                 validationResult.fallbackUsed(),
                 llmProposal.isPresent(),
                 warnings.size()

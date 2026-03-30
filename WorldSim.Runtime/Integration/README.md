@@ -105,7 +105,7 @@ dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj
 
 Director HUD line:
 ```text
-Director: stage=<directorStage:*|refineryStage:*> apply=<not_triggered|applied|apply_failed|request_failed> mode=<...> src=<...> cd=<...> budget=<...>
+Director: stage=<directorStage:*> apply=<not_triggered|applied|apply_failed|request_failed> mode=<...> src=<...> cd=<...> budget=<...>
 ```
 
 Top status line (`GameHost`):
@@ -114,11 +114,18 @@ Refinery applied: ...
 Refinery apply failed: outcome=<apply_failed|request_failed>, stage=..., mode=..., source=..., budget=..., error=...
 ```
 
+`request_failed` error taxonomy (top status line `error=...`):
+- `kind=timeout`
+- `kind=connection_refused`
+- `kind=http_<status>`
+- `kind=request_error`
+
 Interpretation rules:
-- `stage`: Java response-level marker (`directorStage:*` / `refineryStage:*`).
+- `stage`: Java response-level stage marker for season director (`directorStage:*`).
 - `apply`: C# local outcome.
 - `mode/src`: effective output mode and decision source (`response|env|fallback|...`).
 - `budget`: director budget marker mirrored from Java explain if present.
+- Java explain also includes `llmCompletionCount`, `llmRetryRounds`, and `llmCandidateSanitized` markers for director retry/repair observability.
 
 ## Failure Playbook
 
@@ -130,6 +137,8 @@ Interpretation rules:
 2. **`apply=request_failed`**
    - Request failed before a usable Java response reached apply.
    - Check Java service health, URL, timeout, or API key/network issues.
+   - Status line now includes failure kind (`timeout`, `connection_refused`, `http_<status>`, `request_error`) and attempt count.
+   - Budget policy: request failure does not reset or consume checkpoint budget; HUD keeps last committed checkpoint budget values.
 
 3. **`circuit open` / throttled triggers**
    - Wait `REFINERY_BREAKER_SECONDS`, or reduce repeated failures.
@@ -143,3 +152,4 @@ Interpretation rules:
 
 - One manual `F6` may cause multiple OpenRouter completions (`1..(PLANNER_DIRECTOR_MAX_RETRIES+1)`) inside one `/v1/patch` request.
 - Use Java telemetry endpoint for quick counters during live smoke: `GET /v1/director/telemetry`.
+- Final Wave 6.1.1 manual regression matrix and pass/fail checklist: `Docs/Wave3-Director-Smoke-Checklist.md`.

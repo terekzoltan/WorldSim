@@ -1,6 +1,7 @@
 package hu.zoltanterek.worldsim.refinery.planner;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -99,9 +100,15 @@ class LlmDirectorPlannerTest {
                 (m, t, tok, s, u) -> response
         );
 
-        Optional<List<PatchOp>> maybeOps = planner.propose(directorRequest(), List.of());
-        assertTrue(maybeOps.isPresent());
-        List<PatchOp> ops = maybeOps.get();
+        LlmDirectorPlanner.ProposalResult detailed = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(detailed.patch().isPresent());
+        assertEquals(1, detailed.completionCount());
+        assertTrue(detailed.sanitized());
+        assertFalse(detailed.sanitizeTags().isEmpty());
+        assertTrue(detailed.sanitizeTags().contains("story_duration_clamped"));
+        assertTrue(detailed.sanitizeTags().contains("directive_duration_clamped"));
+
+        List<PatchOp> ops = detailed.patch().get();
         assertEquals(2, ops.size());
         assertTrue(ops.get(0) instanceof PatchOp.AddStoryBeat);
         assertTrue(ops.get(1) instanceof PatchOp.SetColonyDirective);

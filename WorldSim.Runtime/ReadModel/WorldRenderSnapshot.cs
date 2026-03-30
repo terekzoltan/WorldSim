@@ -92,8 +92,8 @@ public sealed record DirectorRenderState(
     string LastActionStatus)
 {
     public static DirectorRenderState Empty { get; } = new(
-        StageMarker: "idle",
-        OutputMode: "both",
+        StageMarker: "not_triggered",
+        OutputMode: "unknown",
         OutputModeSource: "unknown",
         ApplyStatus: "not_triggered",
         BeatCooldownRemainingTicks: 0,

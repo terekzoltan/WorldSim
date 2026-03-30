@@ -31,13 +31,21 @@ public class LlmPlanner {
         return proposeWithFeedback(request, List.of());
     }
 
+    public LlmDirectorPlanner.ProposalResult proposeDirectorWithFeedback(PatchRequest request, List<String> feedbackHints) {
+        if (!enabled || request.goal() != Goal.SEASON_DIRECTOR_CHECKPOINT) {
+            return LlmDirectorPlanner.ProposalResult.empty();
+        }
+
+        return llmDirectorPlanner.proposeDetailed(request, feedbackHints);
+    }
+
     public Optional<List<PatchOp>> proposeWithFeedback(PatchRequest request, List<String> feedbackHints) {
         if (!enabled) {
             return Optional.empty();
         }
 
         if (request.goal() == Goal.SEASON_DIRECTOR_CHECKPOINT) {
-            return llmDirectorPlanner.propose(request, feedbackHints);
+            return proposeDirectorWithFeedback(request, feedbackHints).patch();
         }
 
         logger.info(

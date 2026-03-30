@@ -1106,13 +1106,87 @@ Wave 6.1 non-goal note:
 
 **Critical path:** `D6.1-A -> D6.1-B -> D6.1-C`.
 
+Wave 6.1 closeout note:
+- Real post-closeout review found one remaining reliability blocker and several observability inconsistencies in the live apply path, so Wave 6.1.1 is required before Wave 7 kickoff.
+
+---
+
+## Wave 6.1.1 — Director Apply Atomicity + Status Semantics Closeout
+
+Purpose:
+- Close the remaining reliability gap after Wave 6.1 so the live director path is not just diagnosable, but recoverable and internally consistent.
+- Make the adapter/runtime apply flow atomic enough that failed multi-op director responses do not leave the world partially mutated while the dedupe state has already accepted those ops.
+- Align all default/not-triggered/request-failure status semantics so the HUD, runtime snapshot, and adapter all tell the same truth (`not_triggered` / `unknown`) instead of falling back to `idle` / `both`.
+- Preserve richer request-failure diagnostics in the top status line so local live smoke can distinguish timeout, connection, HTTP, and apply-level failures without digging through code.
+- Clarify LLM retry accounting and silent Java-side repair semantics so one `F6` can be interpreted correctly in OpenRouter telemetry and local logs.
+
+Wave turn-gate:
+- Wave 6.1.1 is `READY` only after Wave 6.1 closeout is `✅`.
+- Reason: this is a post-review stabilization wave driven by defects found in the just-landed Wave 6.1 implementation.
+
+### Sprint D6.1.1: Reliability + Semantic Consistency (Track D primary, Track B/A consume as needed)
+
+- ✅ **D6.1.1-A** Atomic director apply boundary + dedupe safety (Track D — C# adapter/runtime)
+  - Rework the adapter/runtime apply sequence so a failed multi-op director response cannot permanently consume opIds before the world apply is known-good.
+  - Define explicit rollback or commit-order policy for `_patchState` vs runtime command execution, and cover partial-failure scenarios with regression tests.
+  - Acceptance: a response that fails on command N does not leave unrecoverable partial world/apply-state divergence.
+- ✅ **D6.1.1-B** Canonical status semantics for `not_triggered` / `unknown` / `request_failed` (Track D — C# adapter/runtime/HUD)
+  - Remove the misleading `unknown -> both` and `not_triggered -> idle` drift in the director status path.
+  - Keep request-failure snapshots truthful all the way from adapter state to runtime snapshot to HUD line.
+  - Acceptance: before first `F6`, and after a request failure before any response, all director surfaces agree on the same non-applied semantic state.
+- ✅ **D6.1.1-C** Request-failure diagnostics + budget attempt policy (Track D — C# adapter/runtime/docs)
+  - Surface the real underlying live-request failure cause in the top status line instead of only `Live refinery request failed`.
+  - Decide and document the intended budget semantics for "checkpoint attempt started but no usable response arrived"; then make adapter/runtime/HUD behavior match that policy.
+  - Acceptance: local smoke can distinguish timeout vs refused connection vs HTTP error, and budget behavior on request failure is intentional and documented.
+- ✅ **D6.1.1-D** Java retry/repair observability cleanup (Track D — Java + docs)
+  - Split or clarify `llmRetries` vs total completion count so one `F6` can be mapped unambiguously to OpenRouter usage.
+  - Expose when planner-side duration repair/normalization happened, so prompt-quality regressions are not silently hidden behind a successful validated output.
+  - Clean up docs to distinguish `directorStage:*` from generic `refineryStage:*` where the live Season Director path is specifically being discussed.
+  - Acceptance: manual smoke + logs can answer "how many completions happened?" and "did Java have to repair the LLM candidate before validation?" without code inspection.
+- ✅ **D6.1.1-E** Live regression matrix + closeout docs (Track D docs, optional minimal Track A consume)
+  - Refresh the manual smoke checklist and ops guidance around the new atomicity/status semantics.
+  - Include a regression matrix for: success, apply failure after response, request failure before response, deterministic fallback, and retry-heavy validated output.
+
+### Wave 6.1.1 — Execution Steps
+
+**Step 1 — D6.1.1-A first (reliability blocker)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | D6.1.1-A | Wave 6.1 ✅ | Atomic apply/dedupe correctness is the remaining blocker; no later semantic cleanup should proceed on top of a non-recoverable apply path |
+
+**Step 2 — opens when D6.1.1-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | D6.1.1-B | D6.1.1-A ✅ | Canonical status semantics depend on the final apply pipeline shape |
+| Track D agent | D6.1.1-C | D6.1.1-A ✅ | Request-failure and budget-attempt semantics should be finalized after the apply boundary is stable |
+
+**Step 3 — opens when D6.1.1-B + D6.1.1-C ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | D6.1.1-D | D6.1.1-B ✅ + D6.1.1-C ✅ | Retry/repair telemetry and terminology should reflect the final local status model |
+
+**Step 4 — opens when D6.1.1-D ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | D6.1.1-E | D6.1.1-A ✅ + D6.1.1-B ✅ + D6.1.1-C ✅ + D6.1.1-D ✅ | Freeze the final smoke/ops matrix only after the behavior and terminology stop moving |
+
+Wave 6.1.1 non-goal note:
+- This wave still does not introduce the richer per-effect story modifier duration model from the broader Director master plan examples.
+- This wave also does not broaden director outputs beyond the current story beat + colony directive checkpoint surface; it only makes the existing live path safer and clearer.
+
+**Critical path:** `D6.1.1-A -> {D6.1.1-B + D6.1.1-C} -> D6.1.1-D -> D6.1.1-E`.
+
 ---
 
 ## Wave 7 — Causal Chains + Director x Combat Intersection (Director Phase 3b + Combat Phase 4)
 
 Wave turn-gate:
-- Wave 7 is `READY` only after Wave 6.1 closeout is `✅`.
-- Reason: causal chains should build on a live-stable director baseline, not on a contract-mismatched checkpoint path.
+- Wave 7 is `READY` only after Wave 6.1.1 closeout is `✅`.
+- Reason: causal chains should build on a live-stable and recoverable director baseline, not on a path with unresolved apply atomicity or status-semantic drift.
 
 ### Sprint D7: Causal Chains + Operational UX (Track D + A + B)
 
@@ -1139,8 +1213,8 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | S7-A (D part: contracts + monitoring) | Wave 6.1 ✅ | Java + C# contract changes |
-| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6.1 ✅ | Parallel with Track D on different files |
+| Track D agent | S7-A (D part: contracts + monitoring) | Wave 6.1.1 ✅ | Java + C# contract changes |
+| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6.1.1 ✅ | Parallel with Track D on different files |
 
 **Step 2 — opens when S7-A ✅**
 

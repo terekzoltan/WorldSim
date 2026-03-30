@@ -1,9 +1,11 @@
 package hu.zoltanterek.worldsim.refinery.planner;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +32,24 @@ public class LlmDirectorPlanner {
     @FunctionalInterface
     interface CompletionGateway {
         String complete(String model, double temperature, int maxTokens, String systemPrompt, String userPrompt) throws Exception;
+    }
+
+    public record ProposalResult(
+            Optional<List<PatchOp>> patch,
+            int completionCount,
+            boolean sanitized,
+            List<String> sanitizeTags
+    ) {
+        static ProposalResult empty() {
+            return new ProposalResult(Optional.empty(), 0, false, List.of());
+        }
+    }
+
+    private record PatchBuildResult(
+            List<PatchOp> patch,
+            boolean sanitized,
+            List<String> sanitizeTags
+    ) {
     }
 
     private final boolean enabled;
@@ -99,12 +119,16 @@ public class LlmDirectorPlanner {
     }
 
     public Optional<List<PatchOp>> propose(PatchRequest request, List<String> feedbackHints) {
+        return proposeDetailed(request, feedbackHints).patch();
+    }
+
+    public ProposalResult proposeDetailed(PatchRequest request, List<String> feedbackHints) {
         if (request.goal() != Goal.SEASON_DIRECTOR_CHECKPOINT || !enabled) {
-            return Optional.empty();
+            return ProposalResult.empty();
         }
         if (apiKey.isBlank() || model.isBlank()) {
             logger.warn("llm director planner disabled due to missing api key or model");
-            return Optional.empty();
+            return ProposalResult.empty();
         }
 
         String outputMode = resolveOutputMode(request);
@@ -123,19 +147,28 @@ public class LlmDirectorPlanner {
             Optional<DirectorCandidateParser.DirectorCandidate> candidate = candidateParser.parse(response);
             if (candidate.isEmpty()) {
                 logger.warn("llm director proposal parse failed responsePreview={}", preview(response));
-                return Optional.empty();
+                return new ProposalResult(Optional.empty(), 1, false, List.of());
             }
 
-            List<PatchOp> patch = toPatchOps(request, candidate.get());
-            logger.info("llm director proposal parsed candidateOps={}", patch.size());
-            return patch.isEmpty() ? Optional.empty() : Optional.of(patch);
+            PatchBuildResult buildResult = toPatchOps(request, candidate.get());
+            logger.info(
+                    "llm director proposal parsed candidateOps={} sanitized={} sanitizeTags={}",
+                    buildResult.patch().size(),
+                    buildResult.sanitized(),
+                    buildResult.sanitizeTags().size()
+            );
+            Optional<List<PatchOp>> patch = buildResult.patch().isEmpty()
+                    ? Optional.empty()
+                    : Optional.of(buildResult.patch());
+            return new ProposalResult(patch, 1, buildResult.sanitized(), buildResult.sanitizeTags());
         } catch (Exception ex) {
             logger.warn("llm director proposal failed: {}", ex.toString());
-            return Optional.empty();
+            return new ProposalResult(Optional.empty(), 0, false, List.of());
         }
     }
 
-    private List<PatchOp> toPatchOps(PatchRequest request, DirectorCandidateParser.DirectorCandidate candidate) {
+    private PatchBuildResult toPatchOps(PatchRequest request, DirectorCandidateParser.DirectorCandidate candidate) {
+        SanitizeStats stats = new SanitizeStats();
         List<PatchOp> ops = new ArrayList<>(2);
 
         DirectorCandidateParser.StoryBeatCandidate story = candidate.storyBeat();
@@ -144,8 +177,14 @@ public class LlmDirectorPlanner {
             String text = trimToNull(story.text());
             if (beatId != null && text != null) {
                 long duration = clamp(story.durationTicks(), DirectorDesign.MIN_STORY_DURATION, DirectorDesign.MAX_STORY_DURATION);
+                if (duration != story.durationTicks()) {
+                    stats.mark("story_duration_clamped");
+                }
                 String severity = normalizeSeverity(story.severity());
-                List<PatchOp.EffectEntry> effects = sanitizeEffects(story.effects(), duration);
+                if (story.severity() != null && severity == null) {
+                    stats.mark("story_severity_normalized");
+                }
+                List<PatchOp.EffectEntry> effects = sanitizeEffects(story.effects(), duration, stats);
                 String storyOpId = DeterministicIds.opId(
                         request.seed(),
                         request.tick(),
@@ -154,6 +193,8 @@ public class LlmDirectorPlanner {
                         beatId + ':' + duration + ':' + (severity == null ? "none" : severity)
                 );
                 ops.add(new PatchOp.AddStoryBeat(storyOpId, beatId, text, duration, severity, effects));
+            } else {
+                stats.mark("story_missing_required");
             }
         }
 
@@ -161,10 +202,16 @@ public class LlmDirectorPlanner {
         if (nudge != null && nudge.enabled()) {
             int colonyCount = readColonyCount(request.snapshot());
             int colonyId = clampInt(nudge.colonyId(), 0, Math.max(0, colonyCount - 1));
+            if (colonyId != nudge.colonyId()) {
+                stats.mark("directive_colony_clamped");
+            }
             String directive = trimToNull(nudge.directive());
             if (directive != null) {
                 long duration = clamp(nudge.durationTicks(), DirectorDesign.MIN_DIRECTIVE_DURATION, DirectorDesign.MAX_DIRECTIVE_DURATION);
-                List<PatchOp.GoalBiasEntry> biases = sanitizeBiases(nudge.biases());
+                if (duration != nudge.durationTicks()) {
+                    stats.mark("directive_duration_clamped");
+                }
+                List<PatchOp.GoalBiasEntry> biases = sanitizeBiases(nudge.biases(), stats);
                 String directiveOpId = DeterministicIds.opId(
                         request.seed(),
                         request.tick(),
@@ -173,15 +220,18 @@ public class LlmDirectorPlanner {
                         colonyId + ":" + directive + ':' + duration
                 );
                 ops.add(new PatchOp.SetColonyDirective(directiveOpId, colonyId, directive, duration, biases));
+            } else {
+                stats.mark("directive_missing_required");
             }
         }
 
-        return List.copyOf(ops);
+        return new PatchBuildResult(List.copyOf(ops), stats.sanitized(), stats.tags());
     }
 
     private static List<PatchOp.EffectEntry> sanitizeEffects(
             List<DirectorCandidateParser.StoryEffectCandidate> effects,
-            long storyDurationTicks
+            long storyDurationTicks,
+            SanitizeStats stats
     ) {
         if (effects == null || effects.isEmpty()) {
             return List.of();
@@ -190,27 +240,39 @@ public class LlmDirectorPlanner {
         List<PatchOp.EffectEntry> sanitized = new ArrayList<>();
         for (DirectorCandidateParser.StoryEffectCandidate effect : effects) {
             if (effect == null) {
+                stats.mark("story_effect_dropped");
                 continue;
             }
             String type = trimToNull(effect.type());
             String domain = trimToNull(effect.domain());
             if (!"domain_modifier".equalsIgnoreCase(type) || domain == null) {
+                stats.mark("story_effect_dropped");
                 continue;
             }
             String normalizedDomain = domain.toLowerCase(Locale.ROOT);
             if (!DirectorDesign.VALID_DOMAINS.contains(normalizedDomain)) {
+                stats.mark("story_effect_domain_dropped");
                 continue;
             }
             double modifier = clampDouble(effect.modifier(), DirectorDesign.MODIFIER_MIN, DirectorDesign.MODIFIER_MAX);
+            if (modifier != effect.modifier()) {
+                stats.mark("story_effect_modifier_clamped");
+            }
+            if (effect.durationTicks() != storyDurationTicks) {
+                stats.mark("story_effect_duration_aligned");
+            }
             sanitized.add(new PatchOp.EffectEntry("domain_modifier", normalizedDomain, modifier, storyDurationTicks));
             if (sanitized.size() >= DirectorDesign.MAX_EFFECTS_PER_BEAT) {
+                if (effects.size() > sanitized.size()) {
+                    stats.mark("story_effect_truncated");
+                }
                 break;
             }
         }
         return List.copyOf(sanitized);
     }
 
-    private static List<PatchOp.GoalBiasEntry> sanitizeBiases(List<DirectorCandidateParser.GoalBiasCandidate> biases) {
+    private static List<PatchOp.GoalBiasEntry> sanitizeBiases(List<DirectorCandidateParser.GoalBiasCandidate> biases, SanitizeStats stats) {
         if (biases == null || biases.isEmpty()) {
             return List.of();
         }
@@ -218,28 +280,60 @@ public class LlmDirectorPlanner {
         List<PatchOp.GoalBiasEntry> sanitized = new ArrayList<>();
         for (DirectorCandidateParser.GoalBiasCandidate bias : biases) {
             if (bias == null) {
+                stats.mark("directive_bias_dropped");
                 continue;
             }
             String type = trimToNull(bias.type());
             String category = trimToNull(bias.goalCategory());
             if (!"goal_bias".equalsIgnoreCase(type) || category == null) {
+                stats.mark("directive_bias_dropped");
                 continue;
             }
             String normalizedCategory = category.toLowerCase(Locale.ROOT);
             if (!DirectorDesign.VALID_GOAL_CATEGORIES.contains(normalizedCategory)) {
+                stats.mark("directive_bias_category_dropped");
                 continue;
             }
             double weight = clampDouble(bias.weight(), DirectorDesign.WEIGHT_MIN, DirectorDesign.WEIGHT_MAX);
+            if (weight != bias.weight()) {
+                stats.mark("directive_bias_weight_clamped");
+            }
             Long duration = bias.durationTicks();
             if (duration != null) {
-                duration = clamp(duration, DirectorDesign.MIN_DIRECTIVE_DURATION, DirectorDesign.MAX_DIRECTIVE_DURATION);
+                long clampedDuration = clamp(duration, DirectorDesign.MIN_DIRECTIVE_DURATION, DirectorDesign.MAX_DIRECTIVE_DURATION);
+                if (clampedDuration != duration) {
+                    stats.mark("directive_bias_duration_clamped");
+                }
+                duration = clampedDuration;
             }
             sanitized.add(new PatchOp.GoalBiasEntry("goal_bias", normalizedCategory, weight, duration));
             if (sanitized.size() >= DirectorDesign.MAX_BIASES_PER_DIRECTIVE) {
+                if (biases.size() > sanitized.size()) {
+                    stats.mark("directive_bias_truncated");
+                }
                 break;
             }
         }
         return List.copyOf(sanitized);
+    }
+
+    private static final class SanitizeStats {
+        private final Set<String> tags = new LinkedHashSet<>();
+
+        void mark(String tag) {
+            if (tag == null || tag.isBlank()) {
+                return;
+            }
+            tags.add(tag);
+        }
+
+        boolean sanitized() {
+            return !tags.isEmpty();
+        }
+
+        List<String> tags() {
+            return List.copyOf(tags);
+        }
     }
 
     private static int readColonyCount(JsonNode snapshot) {

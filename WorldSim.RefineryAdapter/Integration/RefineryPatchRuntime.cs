@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -114,10 +115,9 @@ public sealed class RefineryPatchRuntime
     private async Task RunApplyAsync(SimulationRuntime runtime, long tick)
     {
         var isDirectorGoal = string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal);
-        if (isDirectorGoal)
-            runtime.PrepareDirectorCheckpointBudget(_options.DirectorMaxBudget, tick);
 
         var beforeHash = CanonicalStateSerializer.Sha256(_patchState);
+        var stagedPatchState = _patchState.Clone();
         var context = new DirectorExecutionContext(
             Mode: "unknown",
             Source: "unknown",
@@ -155,21 +155,32 @@ public sealed class RefineryPatchRuntime
                 ResponseReceived = true
             };
 
-            if (isDirectorGoal)
-                runtime.RecordDirectorCheckpointBudgetUsed(context.BudgetUsed, tick);
+            IReadOnlyList<RuntimePatchCommand> commands = Array.Empty<RuntimePatchCommand>();
+            if (_options.ApplyToWorld)
+            {
+                commands = _translator.Translate(response);
+                if (isDirectorGoal)
+                    _executor.ValidateDirectorBatch(runtime, commands);
+            }
 
-            var result = _applier.Apply(_patchState, response, new PatchApplyOptions(_options.StrictMode));
+            var result = _applier.Apply(stagedPatchState, response, new PatchApplyOptions(_options.StrictMode));
 
             if (_options.ApplyToWorld)
             {
-                var commands = _translator.Translate(response);
                 _executor.Execute(runtime, commands);
+            }
+
+            _patchState.CopyFrom(stagedPatchState);
+            if (isDirectorGoal)
+            {
+                runtime.PrepareDirectorCheckpointBudget(_options.DirectorMaxBudget, tick);
+                runtime.RecordDirectorCheckpointBudgetUsed(context.BudgetUsed, tick);
             }
 
             _consecutiveFailures = 0;
             _circuitBreakerUntilUtc = DateTime.MinValue;
 
-            var afterHash = CanonicalStateSerializer.Sha256(_patchState);
+            var afterHash = CanonicalStateSerializer.Sha256(stagedPatchState);
             LastDirectorExecutionStatus = BuildDirectorExecutionStatus(context, applyStatus: "applied");
             runtime.SetDirectorExecutionState(
                 effectiveOutputMode: LastDirectorExecutionStatus.EffectiveOutputMode,
@@ -362,7 +373,47 @@ public sealed class RefineryPatchRuntime
             _circuitBreakerUntilUtc = DateTime.UtcNow.AddSeconds(_options.CircuitBreakerSeconds);
         }
 
-        throw new InvalidOperationException("Live refinery request failed", lastError);
+        throw new InvalidOperationException(DescribeLiveRequestFailure(lastError, maxAttempts), lastError);
+    }
+
+    private static string DescribeLiveRequestFailure(Exception? exception, int attempts)
+    {
+        if (exception is null)
+            return $"Live refinery request failed: kind=request_error, attempts={attempts}, detail=unknown";
+
+        if (exception is OperationCanceledException)
+        {
+            return $"Live refinery request failed: kind=timeout, attempts={attempts}, detail={exception.Message}";
+        }
+
+        if (exception is HttpRequestException httpEx)
+        {
+            if (httpEx.StatusCode.HasValue)
+            {
+                var code = (int)httpEx.StatusCode.Value;
+                return $"Live refinery request failed: kind=http_{code}, attempts={attempts}, detail={httpEx.Message}";
+            }
+
+            if (ContainsSocketError(httpEx, SocketError.ConnectionRefused))
+            {
+                return $"Live refinery request failed: kind=connection_refused, attempts={attempts}, detail={httpEx.Message}";
+            }
+
+            return $"Live refinery request failed: kind=request_error, attempts={attempts}, detail={httpEx.Message}";
+        }
+
+        return $"Live refinery request failed: kind=request_error, attempts={attempts}, detail={exception.Message}";
+    }
+
+    private static bool ContainsSocketError(Exception exception, SocketError target)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SocketException socketEx && socketEx.SocketErrorCode == target)
+                return true;
+        }
+
+        return false;
     }
 
     private static bool IsRetryable(Exception exception)

@@ -49,6 +49,9 @@ class PipelineDirectorRefineryEnabledTest {
         assertTrue(arrayContains(body.path("explain"), "directorStage:refinery-validated"));
         assertTrue(arrayContains(body.path("explain"), "directorOutputMode:both"));
         assertTrue(arrayContains(body.path("explain"), "llmStage:disabled"));
+        assertTrue(arrayContains(body.path("explain"), "llmCompletionCount:0"));
+        assertTrue(arrayContains(body.path("explain"), "llmRetryRounds:0"));
+        assertTrue(arrayContains(body.path("explain"), "llmCandidateSanitized:false"));
     }
 
     private static boolean arrayContains(JsonNode array, String expected) {

@@ -42,6 +42,11 @@ class DirectorTelemetryControllerTest {
         assertTrue(body.has("rejectedCommandCount"));
         assertTrue(body.has("retryAttemptsTotal"));
         assertTrue(body.has("averageRetryCount"));
+        assertTrue(body.has("validationRetryRoundsTotal"));
+        assertTrue(body.has("averageValidationRetryRounds"));
+        assertTrue(body.has("llmCompletionCountTotal"));
+        assertTrue(body.has("averageLlmCompletionCount"));
+        assertTrue(body.has("sanitizedProposalCount"));
         assertTrue(body.has("lastUpdatedUtc"));
         assertTrue(body.has("pipelineVersion"));
     }
@@ -59,12 +64,16 @@ class DirectorTelemetryControllerTest {
         long validatedDelta = after.path("validatedOutputsCount").asLong() - before.path("validatedOutputsCount").asLong();
         long fallbackDelta = after.path("fallbackCount").asLong() - before.path("fallbackCount").asLong();
         long rejectedDelta = after.path("rejectedCommandCount").asLong() - before.path("rejectedCommandCount").asLong();
+        long completionDelta = after.path("llmCompletionCountTotal").asLong() - before.path("llmCompletionCountTotal").asLong();
 
         assertTrue(requestDelta >= 2);
         assertTrue(validatedDelta >= 1);
         assertTrue(fallbackDelta >= 0);
         assertTrue(rejectedDelta >= 0);
+        assertTrue(completionDelta >= 0);
         assertTrue(after.path("averageRetryCount").asDouble() >= 0.0);
+        assertTrue(after.path("averageValidationRetryRounds").asDouble() >= 0.0);
+        assertTrue(after.path("averageLlmCompletionCount").asDouble() >= 0.0);
     }
 
     private JsonNode getTelemetry() throws Exception {

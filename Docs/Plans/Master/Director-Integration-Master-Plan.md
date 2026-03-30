@@ -2291,13 +2291,18 @@ Note:
 Canonical explain markers for Phase 0-1:
 - `directorStage:<mock|refinery-validated|llm|fallback>`
 - `directorOutputMode:<both|story_only|nudge_only|off>`
-- `llmRetries:<n>`
+- `llmCompletionCount:<n>` (actual completion calls)
+- `llmRetryRounds:<n>` (validator retry rounds)
+- `llmRetries:<n>` (legacy alias for retry rounds)
+- `llmCandidateSanitized:<true|false>`
+- `llmCandidateSanitizeTags:<comma-separated-tags>`
 - `budgetUsed:<decimal>`
 - optional repeated `warning:<text>` entries
 
 Wave 6.1 smoke note:
 - The Java `directorStage:*` marker is response-level pipeline truth; local C# apply outcome is tracked separately (`not_triggered|applied|apply_failed|request_failed`).
 - One manual `F6` may consume `1..(maxRetries+1)` LLM completions because iterative correction happens inside a single `/v1/patch` request.
+- Final Wave 6.1.1 regression matrix + operator pass/fail checklist lives in `Docs/Wave3-Director-Smoke-Checklist.md`.
 
 ---
 

@@ -157,6 +157,30 @@ public class SimulationRuntimeDirectorStateTests
     }
 
     [Fact]
+    public void FreshRuntime_DirectorSnapshot_UsesNotTriggeredUnknownDefaults()
+    {
+        var runtime = CreateRuntime();
+
+        var director = runtime.GetSnapshot().Director;
+        Assert.Equal("not_triggered", director.StageMarker);
+        Assert.Equal("unknown", director.OutputMode);
+        Assert.Equal("unknown", director.OutputModeSource);
+        Assert.Equal("not_triggered", director.ApplyStatus);
+    }
+
+    [Fact]
+    public void FreshRuntime_BuildRefinerySnapshot_UsesNotTriggeredUnknownDefaults()
+    {
+        var runtime = CreateRuntime();
+
+        var director = runtime.BuildRefinerySnapshot()["director"]?.AsObject();
+        Assert.NotNull(director);
+        Assert.Equal("not_triggered", director!["stage"]?.GetValue<string>() ?? string.Empty);
+        Assert.Equal("unknown", director["effectiveOutputMode"]?.GetValue<string>() ?? string.Empty);
+        Assert.Equal("unknown", director["effectiveOutputModeSource"]?.GetValue<string>() ?? string.Empty);
+    }
+
+    [Fact]
     public void DirectorBudgetCheckpoint_ResetAndUsageMirror_AppearInSnapshot()
     {
         var runtime = CreateRuntime();
