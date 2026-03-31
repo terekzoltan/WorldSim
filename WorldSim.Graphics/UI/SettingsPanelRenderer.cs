@@ -37,7 +37,7 @@ public sealed class SettingsPanelRenderer
         lineY += 20;
         spriteBatch.DrawString(font, $"PostFx: {postFx} (Ctrl+F3, Ctrl+F4)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
-        spriteBatch.DrawString(font, $"HUD Scale: {hudScale} (Ctrl+F6)", new Vector2(x + 10, lineY), theme.PrimaryText);
+        spriteBatch.DrawString(font, $"HUD Scale: {hudScale} (locked)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
         spriteBatch.DrawString(font, $"Cinematic Route: {cinematic} (Ctrl+F9)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;

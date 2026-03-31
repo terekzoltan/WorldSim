@@ -27,7 +27,7 @@ public class GameHost : Game
         High
     }
 
-    private static readonly float[] HudScales = { 1.0f, 1.15f, 1.3f };
+    private static readonly float[] HudScales = { 1.0f };
     private static readonly float[] SimSpeedPresets = { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 10.0f };
 
     private static readonly (string Name, WorldRenderTheme Theme)[] ThemePresets =
@@ -278,7 +278,7 @@ public class GameHost : Game
             CycleQualityProfile();
 
         if (IsChordPressed(keys, Keys.F6, requireCtrl: true))
-            CycleHudScale();
+            SetToast("HUD scaling disabled");
 
         if (IsChordPressed(keys, Keys.F12, requireCtrl: true))
         {
@@ -781,7 +781,7 @@ public class GameHost : Game
         var simStatus = _simPaused ? $"PAUSED@x{_timeScale:0.##}" : $"x{_timeScale:0.##}";
         var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | Director:{snapshot.Director.OutputMode}({snapshot.Director.OutputModeSource})@{snapshot.Director.StageMarker} | Sim:{simStatus}";
 #if DEBUG
-        plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F6 HUD scale | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
+        plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
         plannerStatus += " [F8 legend: battle ring, siege ring, breach X, magenta=route, cyan=commander, amber=contested]";
 #endif
         if (_showTelemetryHud && !_cleanShotMode && !panelExclusive)
