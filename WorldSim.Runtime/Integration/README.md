@@ -125,7 +125,7 @@ Interpretation rules:
 - `apply`: C# local outcome.
 - `mode/src`: effective output mode and decision source (`response|env|fallback|...`).
 - `budget`: director budget marker mirrored from Java explain if present.
-- Java explain also includes `llmCompletionCount`, `llmRetryRounds`, and `llmCandidateSanitized` markers for director retry/repair observability.
+- Java explain also includes `llmStage`, `llmCompletionCount`, `llmRetryRounds`, and `llmCandidateSanitized` markers for director retry/repair observability.
 
 ## Failure Playbook
 
@@ -137,7 +137,7 @@ Interpretation rules:
 2. **`apply=request_failed`**
    - Request failed before a usable Java response reached apply.
    - Check Java service health, URL, timeout, or API key/network issues.
-   - Status line now includes failure kind (`timeout`, `connection_refused`, `http_<status>`, `request_error`) and attempt count.
+   - Status line now includes failure kind (`timeout`, `connection_refused`, `http_<status>`, `request_error`) and the actual attempt count performed.
    - Budget policy: request failure does not reset or consume checkpoint budget; HUD keeps last committed checkpoint budget values.
 
 3. **`circuit open` / throttled triggers**

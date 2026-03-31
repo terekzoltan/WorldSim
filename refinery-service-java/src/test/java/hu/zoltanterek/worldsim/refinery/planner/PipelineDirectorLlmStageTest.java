@@ -47,11 +47,12 @@ class PipelineDirectorLlmStageTest {
                 .andReturn();
 
         JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
-        assertTrue(arrayContains(body.path("explain"), "llmStage:disabled"));
+        assertTrue(arrayContains(body.path("explain"), "llmStage:missing_config"));
         assertTrue(arrayContains(body.path("explain"), "directorStage:refinery-validated"));
         assertTrue(arrayContains(body.path("explain"), "llmCompletionCount:0"));
         assertTrue(arrayContains(body.path("explain"), "llmRetryRounds:0"));
         assertTrue(arrayContains(body.path("explain"), "llmCandidateSanitized:false"));
+        assertTrue(arrayContains(body.path("warnings"), "LLM missing credentials or model; using mock planner output."));
     }
 
     private static boolean arrayContains(JsonNode array, String expected) {

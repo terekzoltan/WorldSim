@@ -34,14 +34,27 @@ public class LlmDirectorPlanner {
         String complete(String model, double temperature, int maxTokens, String systemPrompt, String userPrompt) throws Exception;
     }
 
+    public enum ProposalStatus {
+        DISABLED,
+        MISSING_CONFIG,
+        CANDIDATE,
+        PARSE_FAILED,
+        REQUEST_FAILED
+    }
+
     public record ProposalResult(
             Optional<List<PatchOp>> patch,
             int completionCount,
             boolean sanitized,
-            List<String> sanitizeTags
+            List<String> sanitizeTags,
+            ProposalStatus status
     ) {
         static ProposalResult empty() {
-            return new ProposalResult(Optional.empty(), 0, false, List.of());
+            return new ProposalResult(Optional.empty(), 0, false, List.of(), ProposalStatus.DISABLED);
+        }
+
+        static ProposalResult missingConfig() {
+            return new ProposalResult(Optional.empty(), 0, false, List.of(), ProposalStatus.MISSING_CONFIG);
         }
     }
 
@@ -128,7 +141,7 @@ public class LlmDirectorPlanner {
         }
         if (apiKey.isBlank() || model.isBlank()) {
             logger.warn("llm director planner disabled due to missing api key or model");
-            return ProposalResult.empty();
+            return ProposalResult.missingConfig();
         }
 
         String outputMode = resolveOutputMode(request);
@@ -147,7 +160,7 @@ public class LlmDirectorPlanner {
             Optional<DirectorCandidateParser.DirectorCandidate> candidate = candidateParser.parse(response);
             if (candidate.isEmpty()) {
                 logger.warn("llm director proposal parse failed responsePreview={}", preview(response));
-                return new ProposalResult(Optional.empty(), 1, false, List.of());
+                return new ProposalResult(Optional.empty(), 1, false, List.of(), ProposalStatus.PARSE_FAILED);
             }
 
             PatchBuildResult buildResult = toPatchOps(request, candidate.get());
@@ -160,10 +173,10 @@ public class LlmDirectorPlanner {
             Optional<List<PatchOp>> patch = buildResult.patch().isEmpty()
                     ? Optional.empty()
                     : Optional.of(buildResult.patch());
-            return new ProposalResult(patch, 1, buildResult.sanitized(), buildResult.sanitizeTags());
+            return new ProposalResult(patch, 1, buildResult.sanitized(), buildResult.sanitizeTags(), ProposalStatus.CANDIDATE);
         } catch (Exception ex) {
             logger.warn("llm director proposal failed: {}", ex.toString());
-            return new ProposalResult(Optional.empty(), 0, false, List.of());
+            return new ProposalResult(Optional.empty(), 0, false, List.of(), ProposalStatus.REQUEST_FAILED);
         }
     }
 

@@ -14,6 +14,7 @@ public class DirectorPipelineTelemetry {
     private final AtomicLong fallbackCount = new AtomicLong();
     private final AtomicLong rejectedCommandCount = new AtomicLong();
     private final AtomicLong retryAttemptsTotal = new AtomicLong();
+    private final AtomicLong validationRetryRoundsTotal = new AtomicLong();
     private final AtomicLong llmCompletionCountTotal = new AtomicLong();
     private final AtomicLong sanitizedProposalCount = new AtomicLong();
 
@@ -26,12 +27,12 @@ public class DirectorPipelineTelemetry {
 
     public void recordValidatedOutput(int retriesUsed) {
         validatedOutputsCount.incrementAndGet();
-        recordRetries(retriesUsed);
+        recordValidationRetryRounds(retriesUsed);
     }
 
     public void recordFallback(int retriesUsed) {
         fallbackCount.incrementAndGet();
-        recordRetries(retriesUsed);
+        recordValidationRetryRounds(retriesUsed);
     }
 
     public void recordRejectedCommands(long rejectedCount) {
@@ -45,6 +46,7 @@ public class DirectorPipelineTelemetry {
     public void recordLlmProposalObservability(int completionCount, boolean sanitized) {
         if (completionCount > 0) {
             llmCompletionCountTotal.addAndGet(completionCount);
+            retryAttemptsTotal.addAndGet(Math.max(0, completionCount - 1));
         }
         if (sanitized) {
             sanitizedProposalCount.incrementAndGet();
@@ -54,19 +56,21 @@ public class DirectorPipelineTelemetry {
 
     public Snapshot snapshot() {
         long requests = directorRequestsCount.get();
-        long retryRounds = retryAttemptsTotal.get();
+        long llmRetryAttempts = retryAttemptsTotal.get();
+        long validationRetryRounds = validationRetryRoundsTotal.get();
         long completionCount = llmCompletionCountTotal.get();
-        double averageRetryCount = requests == 0 ? 0.0 : ((double) retryRounds) / requests;
+        double averageRetryCount = requests == 0 ? 0.0 : ((double) llmRetryAttempts) / requests;
+        double averageValidationRetryRounds = requests == 0 ? 0.0 : ((double) validationRetryRounds) / requests;
         double averageCompletionCount = requests == 0 ? 0.0 : ((double) completionCount) / requests;
         return new Snapshot(
                 directorRequestsCount.get(),
                 validatedOutputsCount.get(),
                 fallbackCount.get(),
                 rejectedCommandCount.get(),
-                retryRounds,
+                llmRetryAttempts,
                 averageRetryCount,
-                retryRounds,
-                averageRetryCount,
+                validationRetryRounds,
+                averageValidationRetryRounds,
                 completionCount,
                 averageCompletionCount,
                 sanitizedProposalCount.get(),
@@ -75,9 +79,9 @@ public class DirectorPipelineTelemetry {
         );
     }
 
-    private void recordRetries(int retriesUsed) {
+    private void recordValidationRetryRounds(int retriesUsed) {
         if (retriesUsed > 0) {
-            retryAttemptsTotal.addAndGet(retriesUsed);
+            validationRetryRoundsTotal.addAndGet(retriesUsed);
         }
         touch();
     }

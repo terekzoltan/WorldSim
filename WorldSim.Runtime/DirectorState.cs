@@ -32,6 +32,9 @@ public readonly record struct DirectorApplyResult(bool Success, string Message)
 
 public sealed class DirectorState
 {
+    public const int MajorBeatCooldownTicks = 20;
+    public const int EpicBeatCooldownTicks = 40;
+
     private readonly Dictionary<string, ActiveBeatMutable> _beats = new(StringComparer.Ordinal);
     private readonly Dictionary<int, ActiveDirectiveMutable> _directives = new();
 
@@ -113,10 +116,10 @@ public sealed class DirectorState
         switch (severity)
         {
             case DirectorBeatSeverity.Major:
-                MajorBeatCooldownRemainingTicks = Math.Max(MajorBeatCooldownRemainingTicks, 20);
+                MajorBeatCooldownRemainingTicks = Math.Max(MajorBeatCooldownRemainingTicks, MajorBeatCooldownTicks);
                 break;
             case DirectorBeatSeverity.Epic:
-                EpicBeatCooldownRemainingTicks = Math.Max(EpicBeatCooldownRemainingTicks, 40);
+                EpicBeatCooldownRemainingTicks = Math.Max(EpicBeatCooldownRemainingTicks, EpicBeatCooldownTicks);
                 break;
         }
 

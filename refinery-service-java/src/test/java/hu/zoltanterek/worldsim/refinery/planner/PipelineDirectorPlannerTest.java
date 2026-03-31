@@ -49,6 +49,7 @@ class PipelineDirectorPlannerTest {
         assertTrue(arrayContains(body.path("explain"), "llmCompletionCount:0"));
         assertTrue(arrayContains(body.path("explain"), "llmRetryRounds:0"));
         assertTrue(arrayContains(body.path("explain"), "llmCandidateSanitized:false"));
+        assertTrue(arrayContains(body.path("warnings"), "LLM disabled; using mock planner output."));
     }
 
     private JsonNode callPatch(String requestBody) throws Exception {

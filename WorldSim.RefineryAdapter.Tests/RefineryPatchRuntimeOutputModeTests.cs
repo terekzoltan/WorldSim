@@ -44,7 +44,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         PumpUntilSettled(patchRuntime);
 
         Assert.Contains("Refinery applied:", patchRuntime.LastStatus, StringComparison.Ordinal);
-        Assert.Contains($"applied={expectedAppliedCount}", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Contains($"patchApplied={expectedAppliedCount}", patchRuntime.LastStatus, StringComparison.Ordinal);
         Assert.Contains($"mode={expectedMode}", patchRuntime.LastStatus, StringComparison.Ordinal);
         Assert.Contains($"source={expectedSource}", patchRuntime.LastStatus, StringComparison.Ordinal);
         Assert.Equal(expectedMode, patchRuntime.LastDirectorExecutionStatus.EffectiveOutputMode);
@@ -94,7 +94,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
 
             Assert.Equal("story_only", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputMode);
             Assert.Equal("response", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputModeSource);
-            Assert.Contains("applied=1", patchRuntime.LastStatus, StringComparison.Ordinal);
+            Assert.Contains("patchApplied=1", patchRuntime.LastStatus, StringComparison.Ordinal);
         }
         finally
         {
@@ -131,7 +131,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
 
             Assert.Equal("both", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputMode);
             Assert.Equal("fallback", patchRuntime.LastDirectorExecutionStatus.EffectiveOutputModeSource);
-            Assert.Contains("applied=2", patchRuntime.LastStatus, StringComparison.Ordinal);
+            Assert.Contains("patchApplied=2", patchRuntime.LastStatus, StringComparison.Ordinal);
             Assert.False(patchRuntime.LastDirectorExecutionStatus.BudgetMarkerPresent);
             Assert.Equal(0d, patchRuntime.LastDirectorExecutionStatus.BudgetUsed, 3);
         }
@@ -416,6 +416,56 @@ public sealed class RefineryPatchRuntimeOutputModeTests
     }
 
     [Fact]
+    public void DirectorGoal_ResponseWithoutDirectorStage_UsesDirectorStageUnknown()
+    {
+        var fixturePath = Path.Combine(Path.GetTempPath(), $"director-fixture-legacy-stage-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            File.WriteAllText(fixturePath, """
+            {
+              "schemaVersion": "v1",
+              "requestId": "temp-director-legacy-stage",
+              "seed": 321,
+              "patch": [],
+              "explain": [
+                "refineryStage:enabled",
+                "directorOutputMode:both"
+              ],
+              "warnings": []
+            }
+            """);
+
+            var runtime = CreateRuntime();
+            var patchRuntime = new RefineryPatchRuntime(new RefineryRuntimeOptions(
+                Mode: RefineryIntegrationMode.Fixture,
+                Goal: DirectorGoals.SeasonDirectorCheckpoint,
+                DirectorOutputMode: "auto",
+                FixtureResponsePath: fixturePath,
+                ServiceBaseUrl: "http://localhost:8091",
+                StrictMode: true,
+                RequestSeed: 123,
+                LiveTimeoutMs: 1000,
+                LiveRetryCount: 0,
+                CircuitBreakerSeconds: 5,
+                ApplyToWorld: false,
+                MinTriggerIntervalMs: 0,
+                DirectorMaxBudget: 5d
+            ));
+
+            patchRuntime.Trigger(runtime, tick: 340);
+            PumpUntilSettled(patchRuntime);
+
+            Assert.Equal("directorStage:unknown", patchRuntime.LastDirectorExecutionStatus.Stage);
+            Assert.Equal("directorStage:unknown", runtime.GetSnapshot().Director.StageMarker);
+        }
+        finally
+        {
+            TryDeleteFile(fixturePath);
+        }
+    }
+
+    [Fact]
     public void BeforeFirstTrigger_AdapterAndRuntimeDirectorStatus_AreCanonicalAndAligned()
     {
         var runtime = CreateRuntime();
@@ -495,7 +545,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
             PumpUntilSettled(patchRuntime);
 
             Assert.StartsWith("Refinery applied:", patchRuntime.LastStatus, StringComparison.Ordinal);
-            Assert.Contains("applied=2", patchRuntime.LastStatus, StringComparison.Ordinal);
+            Assert.Contains("patchApplied=2", patchRuntime.LastStatus, StringComparison.Ordinal);
 
             var successSnapshot = runtime.GetSnapshot().Director;
             Assert.Single(successSnapshot.ActiveBeats);

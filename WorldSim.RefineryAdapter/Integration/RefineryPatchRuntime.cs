@@ -87,6 +87,7 @@ public sealed class RefineryPatchRuntime
         }
 
         _lastTriggerUtc = DateTime.UtcNow;
+        LastStatus = $"Refinery request started: goal={_options.Goal}, mode={_options.Mode.ToString().ToLowerInvariant()}, tick={tick}";
 
         _inFlight = Task.Run(async () => await RunApplyAsync(runtime, tick));
     }
@@ -139,10 +140,7 @@ public sealed class RefineryPatchRuntime
 
             var selectedOutputMode = SelectOutputMode(rawResponse);
             var response = ApplyOutputMode(rawResponse, selectedOutputMode);
-            var stageMarker = response.Explain.FirstOrDefault(item =>
-                                   item.StartsWith("refineryStage:", StringComparison.Ordinal)
-                                   || item.StartsWith("directorStage:", StringComparison.Ordinal))
-                              ?? "refineryStage:unknown";
+            var stageMarker = ReadStageMarker(response, isDirectorGoal);
             var hasBudgetMarker = TryReadBudgetUsed(response, out var budgetUsed);
 
             context = context with
@@ -195,7 +193,7 @@ public sealed class RefineryPatchRuntime
                 ? (context.BudgetMarkerPresent ? context.BudgetUsed.ToString("0.###", CultureInfo.InvariantCulture) : "missing->0")
                 : "n/a";
             LastStatus =
-                $"Refinery applied: applied={result.AppliedCount}, deduped={result.DedupedCount}, noop={result.NoOpCount}, " +
+                $"Refinery applied: patchApplied={result.AppliedCount}, patchDeduped={result.DedupedCount}, patchNoOp={result.NoOpCount}, runtimeCommands={commands.Count}, " +
                 $"techs={_patchState.TechIds.Count}, events={_patchState.EventIds.Count}, " +
                 $"hash={beforeHash[..8]}->{afterHash[..8]}, stage={context.Stage}, mode={context.Mode}, source={context.Source}, budget={budgetLabel}" +
                 (warningHead is null ? string.Empty : $", warn={warningHead}");
@@ -347,10 +345,12 @@ public sealed class RefineryPatchRuntime
         );
 
         Exception? lastError = null;
+        var attemptsPerformed = 0;
         var maxAttempts = Math.Max(1, _options.LiveRetryCount + 1);
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
+            attemptsPerformed = attempt;
             try
             {
                 using var cts = new CancellationTokenSource(_options.LiveTimeoutMs);
@@ -373,7 +373,7 @@ public sealed class RefineryPatchRuntime
             _circuitBreakerUntilUtc = DateTime.UtcNow.AddSeconds(_options.CircuitBreakerSeconds);
         }
 
-        throw new InvalidOperationException(DescribeLiveRequestFailure(lastError, maxAttempts), lastError);
+        throw new InvalidOperationException(DescribeLiveRequestFailure(lastError, attemptsPerformed), lastError);
     }
 
     private static string DescribeLiveRequestFailure(Exception? exception, int attempts)
@@ -403,6 +403,21 @@ public sealed class RefineryPatchRuntime
         }
 
         return $"Live refinery request failed: kind=request_error, attempts={attempts}, detail={exception.Message}";
+    }
+
+    private static string ReadStageMarker(PatchResponse response, bool isDirectorGoal)
+    {
+        if (isDirectorGoal)
+        {
+            return response.Explain.FirstOrDefault(item =>
+                       item.StartsWith("directorStage:", StringComparison.Ordinal))
+                   ?? "directorStage:unknown";
+        }
+
+        return response.Explain.FirstOrDefault(item =>
+                   item.StartsWith("refineryStage:", StringComparison.Ordinal)
+                   || item.StartsWith("directorStage:", StringComparison.Ordinal))
+               ?? "refineryStage:unknown";
     }
 
     private static bool ContainsSocketError(Exception exception, SocketError target)

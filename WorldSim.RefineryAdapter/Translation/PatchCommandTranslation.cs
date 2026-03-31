@@ -143,9 +143,9 @@ public sealed class RuntimePatchCommandExecutor
 
                     activeBeats.Add(storyBeat.BeatId);
                     if (severity == DirectorBeatSeverity.Major)
-                        virtualMajorCooldown = Math.Max(virtualMajorCooldown, 20);
+                        virtualMajorCooldown = Math.Max(virtualMajorCooldown, DirectorState.MajorBeatCooldownTicks);
                     else if (severity == DirectorBeatSeverity.Epic)
-                        virtualEpicCooldown = Math.Max(virtualEpicCooldown, 40);
+                        virtualEpicCooldown = Math.Max(virtualEpicCooldown, DirectorState.EpicBeatCooldownTicks);
                     break;
                 case ApplyColonyDirectiveRuntimeCommand directive:
                     runtime.ValidateColonyDirective(

@@ -110,6 +110,7 @@ For each matrix case collect:
 - HUD director line snapshot (`stage/apply/mode/src/budget`)
 - Top status line (`Refinery applied` or `Refinery apply failed` with outcome)
 - Java explain markers from response (`directorStage`, `llmCompletionCount`, `llmRetryRounds`, `llmCandidateSanitized`, `budgetUsed`)
+- If present, also capture `llmStage` to distinguish disabled config from parse/request failures.
 - Optional Java telemetry snapshot: `curl http://localhost:8091/v1/director/telemetry`
 
 ## Pass/Fail Rules
@@ -129,6 +130,7 @@ For each matrix case collect:
 - One manual `F6` may trigger `1..(PLANNER_DIRECTOR_MAX_RETRIES+1)` OpenRouter completions within a single `/v1/patch` request.
 - This is expected behavior of the iterative correction loop, not duplicate user input.
 - Use Java explain markers to disambiguate usage:
+  - `llmStage:<...>` = disabled vs missing config vs candidate vs parse/request failure state
   - `llmCompletionCount:<n>` = actual completion calls
   - `llmRetryRounds:<n>` = validator retry rounds
   - `llmCandidateSanitized:<true|false>` (+ optional tags) = planner-side repair happened before validation

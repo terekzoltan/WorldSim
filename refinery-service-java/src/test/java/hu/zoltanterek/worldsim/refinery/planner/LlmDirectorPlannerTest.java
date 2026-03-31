@@ -37,8 +37,29 @@ class LlmDirectorPlannerTest {
                 (m, t, tok, s, u) -> "{}"
         );
 
-        Optional<List<PatchOp>> result = planner.propose(directorRequest(), List.of());
-        assertTrue(result.isEmpty());
+        LlmDirectorPlanner.ProposalResult result = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(result.patch().isEmpty());
+        assertEquals(LlmDirectorPlanner.ProposalStatus.DISABLED, result.status());
+    }
+
+    @Test
+    void propose_WhenMissingConfig_ReturnsMissingConfigStatus() {
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> "{}"
+        );
+
+        LlmDirectorPlanner.ProposalResult result = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(result.patch().isEmpty());
+        assertEquals(LlmDirectorPlanner.ProposalStatus.MISSING_CONFIG, result.status());
     }
 
     @Test
@@ -56,8 +77,10 @@ class LlmDirectorPlannerTest {
                 (m, t, tok, s, u) -> "not-json"
         );
 
-        Optional<List<PatchOp>> result = planner.propose(directorRequest(), List.of("INV-02 bad"));
-        assertTrue(result.isEmpty());
+        LlmDirectorPlanner.ProposalResult result = planner.proposeDetailed(directorRequest(), List.of("INV-02 bad"));
+        assertTrue(result.patch().isEmpty());
+        assertEquals(1, result.completionCount());
+        assertEquals(LlmDirectorPlanner.ProposalStatus.PARSE_FAILED, result.status());
     }
 
     @Test
@@ -105,6 +128,7 @@ class LlmDirectorPlannerTest {
         assertEquals(1, detailed.completionCount());
         assertTrue(detailed.sanitized());
         assertFalse(detailed.sanitizeTags().isEmpty());
+        assertEquals(LlmDirectorPlanner.ProposalStatus.CANDIDATE, detailed.status());
         assertTrue(detailed.sanitizeTags().contains("story_duration_clamped"));
         assertTrue(detailed.sanitizeTags().contains("directive_duration_clamped"));
 
@@ -219,6 +243,29 @@ class LlmDirectorPlannerTest {
         assertTrue(prompt.contains("colonyCount=2"));
         assertTrue(prompt.contains("remainingInfluenceBudget=3.750"));
         assertTrue(prompt.contains("effect.durationTicks exactly equal to storyBeat.durationTicks"));
+    }
+
+    @Test
+    void propose_WhenCompletionGatewayFails_ReturnsRequestFailedStatus() {
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "key",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> {
+                    throw new IllegalStateException("gateway offline");
+                }
+        );
+
+        LlmDirectorPlanner.ProposalResult result = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(result.patch().isEmpty());
+        assertEquals(0, result.completionCount());
+        assertEquals(LlmDirectorPlanner.ProposalStatus.REQUEST_FAILED, result.status());
     }
 
     private PatchRequest directorRequest() {

@@ -161,7 +161,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
         List<String> explain = new ArrayList<>();
         explain.add(stage);
         explain.add("directorOutputMode:" + directorOutputMode);
-        explain.add(llmProposal.isPresent() ? "llmStage:candidate" : "llmStage:disabled");
+        explain.add("llmStage:" + toLlmStageLabel(initialProposal.status()));
         explain.add("llmCompletionCount:" + llmCompletionCount[0]);
         explain.add("llmRetryRounds:" + validationResult.retriesUsed());
         explain.add("llmRetries:" + validationResult.retriesUsed());
@@ -170,11 +170,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
             explain.add("llmCandidateSanitizeTags:" + String.join(",", sanitizeTags));
         }
         explain.add("budgetUsed:" + formatBudgetUsed(DirectorInfluenceBudget.calculateBudgetUsed(validatedPatch)));
-        if (llmProposal.isPresent()) {
-            explain.add("LLM planner proposed director candidate patch.");
-        } else {
-            explain.add("LLM planner unavailable for director; deterministic mock candidate used.");
-        }
+        explain.add(describeLlmProposal(initialProposal.status()));
         if (validationResult.fallbackUsed()) {
             explain.add("Director validation exhausted retries; deterministic fallback candidate applied.");
         } else if (validationResult.validated()) {
@@ -185,9 +181,7 @@ public class ComposedPatchPlanner implements PatchPlanner {
 
         List<String> warnings = new ArrayList<>();
         warnings.addAll(validationResult.warnings());
-        if (llmProposal.isEmpty()) {
-            warnings.add("LLM disabled or missing credentials; using mock planner output.");
-        }
+        addLlmProposalWarning(warnings, initialProposal.status());
         if (!validationResult.feedback().isEmpty()) {
             warnings.addAll(validationResult.feedback().stream().map(msg -> "directorFeedback:" + msg).toList());
         }
@@ -243,5 +237,36 @@ public class ComposedPatchPlanner implements PatchPlanner {
 
     private static String formatBudgetUsed(double budgetUsed) {
         return String.format(Locale.ROOT, "%.3f", budgetUsed);
+    }
+
+    private static String toLlmStageLabel(LlmDirectorPlanner.ProposalStatus status) {
+        return switch (status) {
+            case DISABLED -> "disabled";
+            case MISSING_CONFIG -> "missing_config";
+            case CANDIDATE -> "candidate";
+            case PARSE_FAILED -> "parse_failed";
+            case REQUEST_FAILED -> "request_failed";
+        };
+    }
+
+    private static String describeLlmProposal(LlmDirectorPlanner.ProposalStatus status) {
+        return switch (status) {
+            case CANDIDATE -> "LLM planner proposed director candidate patch.";
+            case DISABLED -> "LLM planner disabled for director; deterministic mock candidate used.";
+            case MISSING_CONFIG -> "LLM planner missing credentials/config; deterministic mock candidate used.";
+            case PARSE_FAILED -> "LLM planner response could not be parsed; deterministic mock candidate used.";
+            case REQUEST_FAILED -> "LLM planner request failed; deterministic mock candidate used.";
+        };
+    }
+
+    private static void addLlmProposalWarning(List<String> warnings, LlmDirectorPlanner.ProposalStatus status) {
+        switch (status) {
+            case DISABLED -> warnings.add("LLM disabled; using mock planner output.");
+            case MISSING_CONFIG -> warnings.add("LLM missing credentials or model; using mock planner output.");
+            case PARSE_FAILED -> warnings.add("LLM candidate parse failed; using mock planner output.");
+            case REQUEST_FAILED -> warnings.add("LLM request failed; using mock planner output.");
+            case CANDIDATE -> {
+            }
+        }
     }
 }

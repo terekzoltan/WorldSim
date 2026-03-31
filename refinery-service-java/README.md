@@ -41,6 +41,7 @@ When `PLANNER_MODE=pipeline`, responses include explicit explain markers:
 - `directorStage:<...>` (Season Director pipeline stage)
 - `refineryStage:enabled` / `refineryStage:disabled` (legacy non-director slice)
 - `directorOutputMode:<both|story_only|nudge_only|off>`
+- `llmStage:<disabled|missing_config|candidate|parse_failed|request_failed>`
 - `llmCompletionCount:<n>` (actual OpenRouter completion calls inside this `/v1/patch`)
 - `llmRetryRounds:<n>` (validator feedback/correction rounds)
 - `llmRetries:<n>` (legacy alias, same value as `llmRetryRounds`)
@@ -64,8 +65,12 @@ Important behavior:
 
 - One manual `F6` on the C# side may trigger `1..(PLANNER_DIRECTOR_MAX_RETRIES+1)` OpenRouter completions inside one `/v1/patch` request.
 - This is expected: iterative correction runs inside a single director request lifecycle.
+- `llmStage` should now distinguish disabled configuration from parse/request failures in the LLM path.
 - `llmCompletionCount` tells how many completions actually happened for this request.
 - `llmRetryRounds` tells how many validator retry rounds were used.
+- Java telemetry differentiates:
+- `retryAttemptsTotal` = extra LLM completion attempts beyond the first completion in a request
+- `validationRetryRoundsTotal` = validator retry rounds used by the director refinement loop
 - `llmCandidateSanitized` + `llmCandidateSanitizeTags` show whether Java-side planner normalization repaired the LLM candidate before validation.
 - For quick local observability, query telemetry counters:
 - Final Wave 6.1.1 manual regression matrix + pass/fail rules: `Docs/Wave3-Director-Smoke-Checklist.md`.
