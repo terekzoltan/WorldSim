@@ -87,25 +87,25 @@ class LlmDirectorPlannerTest {
     void propose_WhenValidResponse_MapsToDirectorOps() {
         String response = """
                 {
-                  "storyBeat": {
-                    "enabled": true,
-                    "beatId": " BEAT_LLM_1 ",
-                    "text": " LLM narrative text ",
-                    "durationTicks": 200,
-                    "severity": "major",
-                    "effects": [
-                      {"type":"domain_modifier","domain":"food","modifier":0.9,"durationTicks":200},
-                      {"type":"domain_modifier","domain":"unknown","modifier":0.1,"durationTicks":10}
-                    ]
-                  },
-                  "nudge": {
-                    "enabled": true,
-                    "colonyId": 99,
-                    "directive": " PrioritizeFood ",
-                    "durationTicks": -5,
-                    "biases": [
-                      {"type":"goal_bias","goalCategory":"farming","weight":0.9,"durationTicks":100}
-                    ]
+                  "designatedOutput": {
+                    "storyBeatSlot": {
+                      "beatId": " BEAT_LLM_1 ",
+                      "text": " LLM narrative text ",
+                      "durationTicks": 200,
+                      "severity": "major",
+                      "effects": [
+                        {"kind":"domain_modifier","domain":"food","modifier":0.9,"durationTicks":200},
+                        {"kind":"domain_modifier","domain":"unknown","modifier":0.1,"durationTicks":10}
+                      ]
+                    },
+                    "directiveSlot": {
+                      "colonyId": 99,
+                      "directive": " PrioritizeFood ",
+                      "durationTicks": -5,
+                      "biases": [
+                        {"kind":"goal_bias","goalCategory":"farming","weight":0.9,"durationTicks":100}
+                      ]
+                    }
                   }
                 }
                 """;
@@ -155,13 +155,14 @@ class LlmDirectorPlannerTest {
     void propose_UsesWorldColonyCountInsteadOfDirectorPopulationForDirectiveClamp() {
         String response = """
                 {
-                  "storyBeat": { "enabled": false },
-                  "nudge": {
-                    "enabled": true,
-                    "colonyId": 99,
-                    "directive": "PrioritizeFood",
-                    "durationTicks": 12,
-                    "biases": []
+                  "designatedOutput": {
+                    "storyBeatSlot": null,
+                    "directiveSlot": {
+                      "colonyId": 99,
+                      "directive": "PrioritizeFood",
+                      "durationTicks": 12,
+                      "biases": []
+                    }
                   }
                 }
                 """;
@@ -216,7 +217,7 @@ class LlmDirectorPlannerTest {
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> {
                     capturedUserPrompt.set(u);
-                    return "{\"storyBeat\":{\"enabled\":false},\"nudge\":{\"enabled\":false}}";
+                    return "{\"designatedOutput\":{\"storyBeatSlot\":null,\"directiveSlot\":null}}";
                 }
         );
 
@@ -242,7 +243,36 @@ class LlmDirectorPlannerTest {
         String prompt = capturedUserPrompt.get();
         assertTrue(prompt.contains("colonyCount=2"));
         assertTrue(prompt.contains("remainingInfluenceBudget=3.750"));
+        assertTrue(prompt.contains("designatedOutput"));
         assertTrue(prompt.contains("effect.durationTicks exactly equal to storyBeat.durationTicks"));
+    }
+
+    @Test
+    void propose_WhenLegacyStoryNudgeShapeProvided_ReturnsParseFailedStatus() {
+        String response = """
+                {
+                  "storyBeat": { "enabled": false },
+                  "nudge": { "enabled": false }
+                }
+                """;
+
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "key",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> response
+        );
+
+        LlmDirectorPlanner.ProposalResult result = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(result.patch().isEmpty());
+        assertEquals(1, result.completionCount());
+        assertEquals(LlmDirectorPlanner.ProposalStatus.PARSE_FAILED, result.status());
     }
 
     @Test

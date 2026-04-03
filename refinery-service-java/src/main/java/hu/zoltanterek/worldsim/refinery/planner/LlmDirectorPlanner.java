@@ -19,11 +19,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorBridgeContractMapper;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorDesign;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorOutputAssertions;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorRuntimeFacts;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorSnapshotMapper;
 import hu.zoltanterek.worldsim.refinery.planner.llm.DirectorCandidateParser;
 import hu.zoltanterek.worldsim.refinery.planner.llm.DirectorPromptFactory;
 import hu.zoltanterek.worldsim.refinery.planner.llm.OpenRouterClient;
-import hu.zoltanterek.worldsim.refinery.util.DeterministicIds;
 
 @Component
 public class LlmDirectorPlanner {
@@ -75,6 +78,8 @@ public class LlmDirectorPlanner {
     private final DirectorPromptFactory promptFactory;
     private final DirectorCandidateParser candidateParser;
     private final CompletionGateway completionGateway;
+    private final DirectorSnapshotMapper snapshotMapper = new DirectorSnapshotMapper();
+    private final DirectorBridgeContractMapper bridgeContractMapper = new DirectorBridgeContractMapper();
 
     @Autowired
     public LlmDirectorPlanner(
@@ -145,9 +150,9 @@ public class LlmDirectorPlanner {
         }
 
         String outputMode = resolveOutputMode(request);
-        double remainingInfluenceBudget = resolveRemainingInfluenceBudget(request);
+        DirectorRuntimeFacts runtimeFacts = snapshotMapper.map(request, defaultInfluenceBudget);
         String systemPrompt = promptFactory.systemPrompt();
-        String userPrompt = promptFactory.userPrompt(request.snapshot(), outputMode, remainingInfluenceBudget, feedbackHints);
+        String userPrompt = promptFactory.userPrompt(runtimeFacts, outputMode, feedbackHints);
 
         try {
             logger.info(
@@ -163,7 +168,7 @@ public class LlmDirectorPlanner {
                 return new ProposalResult(Optional.empty(), 1, false, List.of(), ProposalStatus.PARSE_FAILED);
             }
 
-            PatchBuildResult buildResult = toPatchOps(request, candidate.get());
+            PatchBuildResult buildResult = toPatchOps(request, runtimeFacts, candidate.get());
             logger.info(
                     "llm director proposal parsed candidateOps={} sanitized={} sanitizeTags={}",
                     buildResult.patch().size(),
@@ -180,68 +185,87 @@ public class LlmDirectorPlanner {
         }
     }
 
-    private PatchBuildResult toPatchOps(PatchRequest request, DirectorCandidateParser.DirectorCandidate candidate) {
+    private PatchBuildResult toPatchOps(
+            PatchRequest request,
+            DirectorRuntimeFacts runtimeFacts,
+            DirectorCandidateParser.DirectorCandidate candidate
+    ) {
         SanitizeStats stats = new SanitizeStats();
-        List<PatchOp> ops = new ArrayList<>(2);
+        DirectorOutputAssertions assertions = mapToOutputAssertions(candidate, runtimeFacts, stats);
 
-        DirectorCandidateParser.StoryBeatCandidate story = candidate.storyBeat();
-        if (story != null && story.enabled()) {
-            String beatId = trimToNull(story.beatId());
-            String text = trimToNull(story.text());
-            if (beatId != null && text != null) {
-                long duration = clamp(story.durationTicks(), DirectorDesign.MIN_STORY_DURATION, DirectorDesign.MAX_STORY_DURATION);
-                if (duration != story.durationTicks()) {
-                    stats.mark("story_duration_clamped");
-                }
-                String severity = normalizeSeverity(story.severity());
-                if (story.severity() != null && severity == null) {
-                    stats.mark("story_severity_normalized");
-                }
-                List<PatchOp.EffectEntry> effects = sanitizeEffects(story.effects(), duration, stats);
-                String storyOpId = DeterministicIds.opId(
-                        request.seed(),
-                        request.tick(),
-                        request.goal().name(),
-                        "addStoryBeat",
-                        beatId + ':' + duration + ':' + (severity == null ? "none" : severity)
-                );
-                ops.add(new PatchOp.AddStoryBeat(storyOpId, beatId, text, duration, severity, effects));
-            } else {
-                stats.mark("story_missing_required");
-            }
-        }
-
-        DirectorCandidateParser.NudgeCandidate nudge = candidate.nudge();
-        if (nudge != null && nudge.enabled()) {
-            int colonyCount = readColonyCount(request.snapshot());
-            int colonyId = clampInt(nudge.colonyId(), 0, Math.max(0, colonyCount - 1));
-            if (colonyId != nudge.colonyId()) {
-                stats.mark("directive_colony_clamped");
-            }
-            String directive = trimToNull(nudge.directive());
-            if (directive != null) {
-                long duration = clamp(nudge.durationTicks(), DirectorDesign.MIN_DIRECTIVE_DURATION, DirectorDesign.MAX_DIRECTIVE_DURATION);
-                if (duration != nudge.durationTicks()) {
-                    stats.mark("directive_duration_clamped");
-                }
-                List<PatchOp.GoalBiasEntry> biases = sanitizeBiases(nudge.biases(), stats);
-                String directiveOpId = DeterministicIds.opId(
-                        request.seed(),
-                        request.tick(),
-                        request.goal().name(),
-                        "setColonyDirective",
-                        colonyId + ":" + directive + ':' + duration
-                );
-                ops.add(new PatchOp.SetColonyDirective(directiveOpId, colonyId, directive, duration, biases));
-            } else {
-                stats.mark("directive_missing_required");
-            }
-        }
-
+        List<PatchOp> ops = bridgeContractMapper.toPatchOps(request, assertions);
         return new PatchBuildResult(List.copyOf(ops), stats.sanitized(), stats.tags());
     }
 
-    private static List<PatchOp.EffectEntry> sanitizeEffects(
+    private static DirectorOutputAssertions mapToOutputAssertions(
+            DirectorCandidateParser.DirectorCandidate candidate,
+            DirectorRuntimeFacts runtimeFacts,
+            SanitizeStats stats
+    ) {
+        DirectorOutputAssertions.StoryBeatAssertion storyBeatAssertion = mapStoryBeatAssertion(candidate.designatedOutput().storyBeatSlot(), stats);
+        DirectorOutputAssertions.DirectiveAssertion directiveAssertion = mapDirectiveAssertion(candidate.designatedOutput().directiveSlot(), runtimeFacts, stats);
+        return new DirectorOutputAssertions(storyBeatAssertion, directiveAssertion);
+    }
+
+    private static DirectorOutputAssertions.StoryBeatAssertion mapStoryBeatAssertion(
+            DirectorCandidateParser.StoryBeatSlotCandidate story,
+            SanitizeStats stats
+    ) {
+        if (story == null) {
+            return null;
+        }
+
+        String beatId = trimToNull(story.beatId());
+        String text = trimToNull(story.text());
+        if (beatId == null || text == null) {
+            stats.mark("story_missing_required");
+            return null;
+        }
+
+        long duration = clamp(story.durationTicks(), DirectorDesign.MIN_STORY_DURATION, DirectorDesign.MAX_STORY_DURATION);
+        if (duration != story.durationTicks()) {
+            stats.mark("story_duration_clamped");
+        }
+
+        String severity = normalizeSeverity(story.severity());
+        if (story.severity() != null && severity == null) {
+            stats.mark("story_severity_normalized");
+        }
+
+        List<DirectorOutputAssertions.EffectAssertion> effects = sanitizeEffects(story.effects(), duration, stats);
+        return new DirectorOutputAssertions.StoryBeatAssertion(beatId, text, duration, severity, effects);
+    }
+
+    private static DirectorOutputAssertions.DirectiveAssertion mapDirectiveAssertion(
+            DirectorCandidateParser.DirectiveSlotCandidate directiveCandidate,
+            DirectorRuntimeFacts runtimeFacts,
+            SanitizeStats stats
+    ) {
+        if (directiveCandidate == null) {
+            return null;
+        }
+
+        int colonyId = clampInt(directiveCandidate.colonyId(), 0, Math.max(0, runtimeFacts.colonyCount() - 1));
+        if (colonyId != directiveCandidate.colonyId()) {
+            stats.mark("directive_colony_clamped");
+        }
+
+        String directive = trimToNull(directiveCandidate.directive());
+        if (directive == null) {
+            stats.mark("directive_missing_required");
+            return null;
+        }
+
+        long duration = clamp(directiveCandidate.durationTicks(), DirectorDesign.MIN_DIRECTIVE_DURATION, DirectorDesign.MAX_DIRECTIVE_DURATION);
+        if (duration != directiveCandidate.durationTicks()) {
+            stats.mark("directive_duration_clamped");
+        }
+
+        List<DirectorOutputAssertions.BiasAssertion> biases = sanitizeBiases(directiveCandidate.biases(), stats);
+        return new DirectorOutputAssertions.DirectiveAssertion(colonyId, directive, duration, biases);
+    }
+
+    private static List<DirectorOutputAssertions.EffectAssertion> sanitizeEffects(
             List<DirectorCandidateParser.StoryEffectCandidate> effects,
             long storyDurationTicks,
             SanitizeStats stats
@@ -250,7 +274,7 @@ public class LlmDirectorPlanner {
             return List.of();
         }
 
-        List<PatchOp.EffectEntry> sanitized = new ArrayList<>();
+        List<DirectorOutputAssertions.EffectAssertion> sanitized = new ArrayList<>();
         for (DirectorCandidateParser.StoryEffectCandidate effect : effects) {
             if (effect == null) {
                 stats.mark("story_effect_dropped");
@@ -274,7 +298,7 @@ public class LlmDirectorPlanner {
             if (effect.durationTicks() != storyDurationTicks) {
                 stats.mark("story_effect_duration_aligned");
             }
-            sanitized.add(new PatchOp.EffectEntry("domain_modifier", normalizedDomain, modifier, storyDurationTicks));
+            sanitized.add(new DirectorOutputAssertions.EffectAssertion(normalizedDomain, modifier, storyDurationTicks));
             if (sanitized.size() >= DirectorDesign.MAX_EFFECTS_PER_BEAT) {
                 if (effects.size() > sanitized.size()) {
                     stats.mark("story_effect_truncated");
@@ -285,12 +309,12 @@ public class LlmDirectorPlanner {
         return List.copyOf(sanitized);
     }
 
-    private static List<PatchOp.GoalBiasEntry> sanitizeBiases(List<DirectorCandidateParser.GoalBiasCandidate> biases, SanitizeStats stats) {
+    private static List<DirectorOutputAssertions.BiasAssertion> sanitizeBiases(List<DirectorCandidateParser.GoalBiasCandidate> biases, SanitizeStats stats) {
         if (biases == null || biases.isEmpty()) {
             return List.of();
         }
 
-        List<PatchOp.GoalBiasEntry> sanitized = new ArrayList<>();
+        List<DirectorOutputAssertions.BiasAssertion> sanitized = new ArrayList<>();
         for (DirectorCandidateParser.GoalBiasCandidate bias : biases) {
             if (bias == null) {
                 stats.mark("directive_bias_dropped");
@@ -319,7 +343,7 @@ public class LlmDirectorPlanner {
                 }
                 duration = clampedDuration;
             }
-            sanitized.add(new PatchOp.GoalBiasEntry("goal_bias", normalizedCategory, weight, duration));
+            sanitized.add(new DirectorOutputAssertions.BiasAssertion(normalizedCategory, weight, duration));
             if (sanitized.size() >= DirectorDesign.MAX_BIASES_PER_DIRECTIVE) {
                 if (biases.size() > sanitized.size()) {
                     stats.mark("directive_bias_truncated");
@@ -349,26 +373,6 @@ public class LlmDirectorPlanner {
         }
     }
 
-    private static int readColonyCount(JsonNode snapshot) {
-        JsonNode directorCount = snapshot.path("director").path("colonyCount");
-        if (!directorCount.isMissingNode() && !directorCount.isNull()) {
-            return Math.max(1, directorCount.asInt(1));
-        }
-
-        JsonNode worldCount = snapshot.path("world").path("colonyCount");
-        if (!worldCount.isMissingNode() && !worldCount.isNull()) {
-            return Math.max(1, worldCount.asInt(1));
-        }
-
-        JsonNode director = snapshot.path("director");
-        if (!director.path("colonyPopulation").isMissingNode() && !director.path("colonyPopulation").isNull()) {
-            logger.warn("llm director snapshot missing colonyCount; falling back to colonyPopulation for compatibility");
-            return Math.max(1, director.path("colonyPopulation").asInt(1));
-        }
-
-        return 1;
-    }
-
     private String resolveOutputMode(PatchRequest request) {
         JsonNode constraints = request.constraints();
         if (constraints != null && !constraints.isNull()) {
@@ -382,27 +386,6 @@ public class LlmDirectorPlanner {
             }
         }
         return defaultOutputMode;
-    }
-
-    private double resolveRemainingInfluenceBudget(PatchRequest request) {
-        JsonNode constraints = request.constraints();
-        if (constraints != null && !constraints.isNull()) {
-            JsonNode maxBudget = constraints.path("maxBudget");
-            if (!maxBudget.isMissingNode() && !maxBudget.isNull()) {
-                return Math.max(0d, maxBudget.asDouble(defaultInfluenceBudget));
-            }
-            JsonNode nestedMaxBudget = constraints.path("director").path("maxBudget");
-            if (!nestedMaxBudget.isMissingNode() && !nestedMaxBudget.isNull()) {
-                return Math.max(0d, nestedMaxBudget.asDouble(defaultInfluenceBudget));
-            }
-        }
-
-        JsonNode directorBudget = request.snapshot().path("director").path("remainingInfluenceBudget");
-        if (!directorBudget.isMissingNode() && !directorBudget.isNull()) {
-            return Math.max(0d, directorBudget.asDouble(defaultInfluenceBudget));
-        }
-
-        return defaultInfluenceBudget;
     }
 
     private static String normalizeOutputMode(String rawMode) {

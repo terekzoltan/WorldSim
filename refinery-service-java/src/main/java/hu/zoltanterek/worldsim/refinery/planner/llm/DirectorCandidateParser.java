@@ -22,24 +22,34 @@ public final class DirectorCandidateParser {
 
         try {
             JsonNode root = objectMapper.readTree(json);
-            JsonNode storyNode = root.path("storyBeat");
-            JsonNode nudgeNode = root.path("nudge");
+            JsonNode designatedOutputNode = root.path("designatedOutput");
+            if (designatedOutputNode.isMissingNode() || designatedOutputNode.isNull() || !designatedOutputNode.isObject()) {
+                return Optional.empty();
+            }
 
-            StoryBeatCandidate story = parseStory(storyNode);
-            NudgeCandidate nudge = parseNudge(nudgeNode);
-            return Optional.of(new DirectorCandidate(story, nudge));
+            StoryBeatSlotCandidate storyBeatSlot = parseStoryBeatSlot(designatedOutputNode.path("storyBeatSlot"));
+            DirectiveSlotCandidate directiveSlot = parseDirectiveSlot(designatedOutputNode.path("directiveSlot"));
+
+            return Optional.of(new DirectorCandidate(
+                    parseText(root.path("explanation")),
+                    new DesignatedOutputCandidate(storyBeatSlot, directiveSlot)
+            ));
         } catch (Exception ex) {
             return Optional.empty();
         }
     }
 
-    private static StoryBeatCandidate parseStory(JsonNode node) {
+    private static StoryBeatSlotCandidate parseStoryBeatSlot(JsonNode node) {
+        if (node.isMissingNode() || node.isNull() || !node.isObject()) {
+            return null;
+        }
+
         List<StoryEffectCandidate> effects = new ArrayList<>();
         JsonNode effectsNode = node.path("effects");
         if (effectsNode.isArray()) {
             for (JsonNode effectNode : effectsNode) {
                 effects.add(new StoryEffectCandidate(
-                        effectNode.path("type").asText(""),
+                        effectNode.path("kind").asText(""),
                         effectNode.path("domain").asText(""),
                         effectNode.path("modifier").asDouble(0.0),
                         effectNode.path("durationTicks").asLong(0)
@@ -47,8 +57,7 @@ public final class DirectorCandidateParser {
             }
         }
 
-        return new StoryBeatCandidate(
-                node.path("enabled").asBoolean(false),
+        return new StoryBeatSlotCandidate(
                 node.path("beatId").asText(""),
                 node.path("text").asText(""),
                 node.path("durationTicks").asLong(0),
@@ -57,13 +66,17 @@ public final class DirectorCandidateParser {
         );
     }
 
-    private static NudgeCandidate parseNudge(JsonNode node) {
+    private static DirectiveSlotCandidate parseDirectiveSlot(JsonNode node) {
+        if (node.isMissingNode() || node.isNull() || !node.isObject()) {
+            return null;
+        }
+
         List<GoalBiasCandidate> biases = new ArrayList<>();
         JsonNode biasesNode = node.path("biases");
         if (biasesNode.isArray()) {
             for (JsonNode biasNode : biasesNode) {
                 biases.add(new GoalBiasCandidate(
-                        biasNode.path("type").asText(""),
+                        biasNode.path("kind").asText(""),
                         biasNode.path("goalCategory").asText(""),
                         biasNode.path("weight").asDouble(0.0),
                         biasNode.path("durationTicks").isMissingNode() ? null : biasNode.path("durationTicks").asLong()
@@ -71,8 +84,7 @@ public final class DirectorCandidateParser {
             }
         }
 
-        return new NudgeCandidate(
-                node.path("enabled").asBoolean(false),
+        return new DirectiveSlotCandidate(
                 node.path("colonyId").asInt(-1),
                 node.path("directive").asText(""),
                 node.path("durationTicks").asLong(0),
@@ -103,11 +115,24 @@ public final class DirectorCandidateParser {
         return trimmed;
     }
 
-    public record DirectorCandidate(StoryBeatCandidate storyBeat, NudgeCandidate nudge) {
+    private static String parseText(JsonNode node) {
+        if (node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        String value = node.asText(null);
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
-    public record StoryBeatCandidate(
-            boolean enabled,
+    public record DirectorCandidate(String explanation, DesignatedOutputCandidate designatedOutput) {
+    }
+
+    public record DesignatedOutputCandidate(
+            StoryBeatSlotCandidate storyBeatSlot,
+            DirectiveSlotCandidate directiveSlot
+    ) {
+    }
+
+    public record StoryBeatSlotCandidate(
             String beatId,
             String text,
             long durationTicks,
@@ -116,8 +141,7 @@ public final class DirectorCandidateParser {
     ) {
     }
 
-    public record NudgeCandidate(
-            boolean enabled,
+    public record DirectiveSlotCandidate(
             int colonyId,
             String directive,
             long durationTicks,

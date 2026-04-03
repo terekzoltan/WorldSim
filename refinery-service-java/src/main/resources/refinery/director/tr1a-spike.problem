@@ -1,0 +1,17 @@
+class World {
+    contains Directory[1] root
+}
+
+class Entry.
+
+class Directory extends Entry {
+    contains Entry[] children
+}
+
+World(world).
+Directory(root).
+Entry(file1).
+root(world, root).
+children(root, file1).
+
+scope World = 1, Entry = 2.

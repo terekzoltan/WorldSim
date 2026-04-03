@@ -69,7 +69,7 @@ Meaning:
 ### 3.3 Wire contract policy
 
 Decision:
-- The current patch/v2-oriented wire contract may remain temporarily as a **bridge contract**.
+- The current patch wire contract (`v1` today) may remain temporarily as a **bridge contract**.
 
 Internal target:
 - symbolic validated facts first
@@ -192,7 +192,7 @@ Default bias going forward:
 
 ### 6.2 Bridge contract, not end-state contract
 
-The patch/v2 contract may stay temporarily,
+The current patch wire contract (`v1` today) may stay temporarily,
 but planning language should describe it as:
 - bridge contract,
 - transport boundary,
@@ -230,7 +230,7 @@ World snapshot
   -> designated output area assertions
   -> tools.refinery solve/refinement
   -> validated symbolic facts
-  -> bridge mapping to current patch/v2 contract
+  -> bridge mapping to current patch wire contract (`v1` today)
   -> C# adapter translation
   -> runtime commands
 ```
@@ -265,9 +265,16 @@ Tasks:
 - define `common/`, `director/`, `combat/`, `campaign/` split
 - define naming/versioning rules for `.problem` artifacts
 - define which concepts belong to shared vocabulary vs family-local vocabulary
+- add a minimal Java artifact catalog (`family` + `catalog`) for deterministic classpath ownership
+- keep TR1-A spike artifact as historical proof, explicitly separate from canonical family target paths
+
+Scope guardrails:
+- TR1-B is layout/ownership policy only; do not implement director `design/model/runtime/output` artifacts yet
+- keep production director planning flow unchanged in this step
 
 Acceptance:
 - file layout and vocabulary ownership are explicit enough that later tracks do not invent ad hoc incompatible model fragments.
+- at least one repeatable Java test resolves the historical spike artifact through the catalog (not hardcoded path literal)
 
 ### TR1-C: Director problem family skeleton
 
@@ -293,6 +300,8 @@ Tasks:
 - define the structured candidate schema
 - make it assertion-oriented, not patch-oriented
 - define deterministic Java mapping from candidate fields to output-area assertions
+- keep `designatedOutput` canonical and avoid silent legacy candidate-shape tolerance
+- keep runtime-fact authority on normalized mapper output (`DirectorSnapshotMapper` -> `DirectorRuntimeFacts`)
 
 Acceptance:
 - candidate format is close enough to the formal model that it does not become a second hidden domain language.
@@ -300,12 +309,13 @@ Acceptance:
 ### TR1-E: Bridge contract policy
 
 Goal:
-- formally declare the current patch/v2 output as bridge contract only.
+- formally declare the current patch wire output (`v1` today) as bridge contract only.
 
 Tasks:
 - define where symbolic validated facts end and bridge mapping begins
 - define what may stay stable in the C# boundary during migration
 - define what is explicitly transitional in Java today
+- freeze the proposal/internal assertion seam and route bridge DTO creation through explicit mapping boundary
 
 Acceptance:
 - future work no longer treats `PatchResponse` as the primary internal ontology.
@@ -335,7 +345,7 @@ Tasks:
 ### TR2-C: Validated facts -> bridge mapping
 
 Goal:
-- convert solved symbolic facts to the current patch/v2 wire contract.
+- convert solved symbolic facts to the current patch wire contract (`v1` today).
 
 Tasks:
 - extract validated story beat / directive facts
@@ -409,6 +419,6 @@ The right transition is:
 - structured assertion-candidate first,
 - real versioned Refinery artifacts as formal truth,
 - Spring Boot boundary retained,
-- current patch/v2 contract treated as temporary bridge output,
+- current patch wire contract (`v1` today) treated as temporary bridge output,
 - runtime kept deterministic and generic,
 - and future director/combat/campaign modeling built as shared vocabulary plus separate problem families.

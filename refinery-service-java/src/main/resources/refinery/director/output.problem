@@ -1,0 +1,12 @@
+class DirectorOutputLayerAnchor.
+
+class DesignatedOutputArea {
+    DirectorCheckpoint[] checkpoint
+    StoryBeatOutput[] storyBeatSlot
+    ColonyDirectiveOutput[] directiveSlot
+}
+
+class OutputBoundaryRule.
+
+OutputBoundaryRule(output_area_is_editable).
+OutputBoundaryRule(design_model_runtime_layers_read_only).

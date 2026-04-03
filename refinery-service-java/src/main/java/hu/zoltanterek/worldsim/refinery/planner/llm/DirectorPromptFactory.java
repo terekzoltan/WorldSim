@@ -2,9 +2,8 @@ package hu.zoltanterek.worldsim.refinery.planner.llm;
 
 import java.util.List;
 
-import com.fasterxml.jackson.databind.JsonNode;
-
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorDesign;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorRuntimeFacts;
 
 public final class DirectorPromptFactory {
     public String systemPrompt() {
@@ -12,25 +11,20 @@ public final class DirectorPromptFactory {
                 "Do not include markdown, code fences, explanations, or extra keys.";
     }
 
-    public String userPrompt(JsonNode snapshot, String outputMode, double remainingInfluenceBudget, List<String> feedbackHints) {
-        JsonNode director = snapshot.path("director");
-        JsonNode world = snapshot.path("world");
-        int colonyCount = Math.max(
-                1,
-                readIntWithFallback(director, "colonyCount", world, "colonyCount", 1)
-        );
-        long cooldown = Math.max(
-                0L,
-                readLongWithFallback(director, "beatCooldownRemainingTicks", world, "storyBeatCooldownTicks", 0L)
-        );
+    public String userPrompt(DirectorRuntimeFacts facts, String outputMode, List<String> feedbackHints) {
+        int colonyCount = Math.max(1, facts.colonyCount());
+        long cooldown = Math.max(0L, facts.beatCooldownTicks());
+        double remainingInfluenceBudget = Math.max(0d, facts.remainingInfluenceBudget());
 
         StringBuilder sb = new StringBuilder();
-        sb.append("Create a candidate director output with this JSON shape exactly: ");
-        sb.append("{\"storyBeat\":{\"enabled\":bool,\"beatId\":string,\"text\":string,\"durationTicks\":int,");
-        sb.append("\"severity\":\"minor|major|epic\",\"effects\":[{\"type\":\"domain_modifier\",\"domain\":string,");
-        sb.append("\"modifier\":number,\"durationTicks\":int}]},");
-        sb.append("\"nudge\":{\"enabled\":bool,\"colonyId\":int,\"directive\":string,\"durationTicks\":int,");
-        sb.append("\"biases\":[{\"type\":\"goal_bias\",\"goalCategory\":string,\"weight\":number,\"durationTicks\":int}]}}.");
+        sb.append("Fill only the designated output area and output strict JSON with this shape exactly: ");
+        sb.append("{\"explanation\":string,\"designatedOutput\":{");
+        sb.append("\"storyBeatSlot\":{\"beatId\":string,\"text\":string,\"durationTicks\":int,");
+        sb.append("\"severity\":\"minor|major|epic\",\"effects\":[{\"kind\":\"domain_modifier\",\"domain\":string,");
+        sb.append("\"modifier\":number,\"durationTicks\":int}]}|null,");
+        sb.append("\"directiveSlot\":{\"colonyId\":int,\"directive\":string,\"durationTicks\":int,");
+        sb.append("\"biases\":[{\"kind\":\"goal_bias\",\"goalCategory\":string,\"weight\":number,\"durationTicks\":int}] }|null } }.");
+        sb.append(" Do not return patch ops, op types, or opIds.");
         sb.append(" Allowed directives: ").append(String.join(",", DirectorDesign.ALLOWED_DIRECTIVES)).append('.');
         sb.append(" Allowed domains: ").append(String.join(",", DirectorDesign.VALID_DOMAINS)).append('.');
         sb.append(" Allowed goal categories: ").append(String.join(",", DirectorDesign.VALID_GOAL_CATEGORIES)).append('.');
@@ -55,33 +49,5 @@ public final class DirectorPromptFactory {
         }
 
         return sb.toString();
-    }
-
-    private static int readIntWithFallback(
-            JsonNode primary,
-            String primaryField,
-            JsonNode fallback,
-            String fallbackField,
-            int defaultValue
-    ) {
-        JsonNode value = primary.path(primaryField);
-        if (!value.isMissingNode() && !value.isNull()) {
-            return value.asInt(defaultValue);
-        }
-        return fallback.path(fallbackField).asInt(defaultValue);
-    }
-
-    private static long readLongWithFallback(
-            JsonNode primary,
-            String primaryField,
-            JsonNode fallback,
-            String fallbackField,
-            long defaultValue
-    ) {
-        JsonNode value = primary.path(primaryField);
-        if (!value.isMissingNode() && !value.isNull()) {
-            return value.asLong(defaultValue);
-        }
-        return fallback.path(fallbackField).asLong(defaultValue);
     }
 }

@@ -1,0 +1,14 @@
+class DirectorModelLayerAnchor.
+
+class ModelConstraint.
+
+ModelConstraint(inv_storybeat_at_most_one).
+ModelConstraint(inv_story_slot_presence_driven).
+ModelConstraint(inv_one_directive_per_colony).
+ModelConstraint(inv_directive_slot_presence_driven).
+ModelConstraint(inv_effect_duration_aligned_to_story).
+ModelConstraint(inv_domain_modifier_bounds).
+ModelConstraint(inv_goal_bias_weight_bounds).
+ModelConstraint(inv_domain_stack_cap).
+ModelConstraint(inv_budget_cap).
+ModelConstraint(inv_no_contradictory_same_domain_modifiers).

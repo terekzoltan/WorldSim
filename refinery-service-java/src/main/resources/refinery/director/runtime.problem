@@ -1,0 +1,15 @@
+class DirectorRuntimeLayerAnchor.
+
+class RuntimeCheckpointContext {
+    DirectorCheckpoint[] checkpoint
+    contains ActiveBeatFact[] activeBeats
+    contains ActiveDirectiveFact[] activeDirectives
+}
+
+class ActiveBeatFact {
+    Severity[] severity
+}
+
+class ActiveDirectiveFact {
+    DirectiveKind[] directive
+}

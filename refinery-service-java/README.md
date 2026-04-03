@@ -85,6 +85,53 @@ curl http://localhost:8091/v1/director/telemetry
 ./gradlew test
 ```
 
+## TR1-A tools.refinery spike
+
+Wave 6.2 TR1-A adds the first minimal `tools.refinery` proof inside this service codebase.
+
+- Gradle setup now uses `tools.refinery.settings` in `settings.gradle.kts` and `implementation(refinery.generator)` in `build.gradle.kts`.
+- First problem artifact lives at `src/main/resources/refinery/director/tr1a-spike.problem`.
+- Repeatable proof test: `src/test/java/hu/zoltanterek/worldsim/refinery/planner/ToolsRefinerySpikeTest.java`.
+- The proof test loads the `.problem` artifact, runs local generation with `StandaloneRefinery`, and reads relation facts from `Directory::children`.
+
+This is intentionally a minimal spike. It does not replace the production director pipeline yet.
+
+## TR1-B artifact layout policy
+
+Wave 6.2 TR1-B formalizes artifact layout/ownership without changing production flow.
+
+- Canonical root: `src/main/resources/refinery/`
+- Family split: `common/`, `director/`, `combat/`, `campaign/`
+- Historical spike remains: `director/tr1a-spike.problem`
+- Canonical TR1-C targets are reserved only: `director/design.problem`, `director/model.problem`, `director/runtime.problem`, `director/output.problem`
+- Minimal catalog ownership in Java: `RefineryArtifactFamily` + `RefineryArtifactCatalog`
+
+## TR1-C director family skeleton
+
+Wave 6.2 TR1-C materializes the first canonical director artifact family files:
+
+- `src/main/resources/refinery/director/design.problem`
+- `src/main/resources/refinery/director/model.problem`
+- `src/main/resources/refinery/director/runtime.problem`
+- `src/main/resources/refinery/director/output.problem`
+
+These files define layer boundaries and designated output-area ownership.
+Production director planning flow remains unchanged in this step.
+
+## TR1-D structured assertion-candidate ingest
+
+- Canonical LLM candidate shape is assertion-oriented under `designatedOutput` (not patch-op oriented).
+- Canonical slots are `storyBeatSlot` and `directiveSlot` with presence-driven semantics.
+- Runtime-fact authority for candidate normalization is the `DirectorSnapshotMapper` -> `DirectorRuntimeFacts` path.
+- Wire-level patch output (`v1` today) remains a bridge contract in this step.
+
+## TR1-E bridge contract policy
+
+- Java director proposal/assertion handling and bridge DTO mapping now have an explicit seam.
+- Director bridge mapping to wire-level `PatchOp` is isolated in a dedicated mapper.
+- `PatchResponse` stays the transport/output bridge contract for C# consumers, not the primary internal ontology.
+- Transitional note: validator/fallback logic still using `PatchOp` is explicitly transitional in TR1-E.
+
 ## API
 
 ### `GET /health`
@@ -165,9 +212,11 @@ Example response:
   - `addTech`
   - `tweakTech`
   - `addWorldEvent`
+  - `addStoryBeat`
+  - `setColonyDirective`
 - Deterministic behavior means same `goal + seed + tick` produces same output.
 - `tweakTech` is delta-based, so clients must dedupe by `opId` and apply each op at most once.
-- The contract is versioned via `schemaVersion` (`v1`) for forward compatibility.
+- The current wire contract is versioned via `schemaVersion` (`v1`) for forward compatibility.
 
 ## Architecture
 

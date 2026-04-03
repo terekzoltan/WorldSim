@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-03-19
+Last updated: 2026-04-02
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -71,6 +71,37 @@ Turn-gate legend (agent handoff safety):
 - After acceptance + smoke/test gates pass, switch epic status from `🔄` to `✅`.
 - Do not mark another track's epic `✅` without explicit completion signal from that track owner (or coordinator confirmation).
 - For Wave 1 Combat sprint ordering, Track A `P0-D` is blocked until Track B snapshot additions required by P0-D are completed.
+
+---
+
+## Execution Refinement Rules (Wave 7+)
+
+These rules refine future Wave 7+ step planning. They do not retroactively rewrite
+already completed or in-flight waves.
+
+**Dependency classification:**
+
+| Type | Definition |
+|------|------------|
+| `contract-dependent` | Requires a stable schema/interface/boundary, but not full upstream implementation |
+| `execution-dependent` | Requires an upstream implementation artifact or runtime output to exist first |
+| `review-dependent` | Requires a produced artifact for validation/review, not for building upon |
+
+**Parallel launch allowed only when:**
+
+1. Required contract is already stable
+2. No hidden upstream execution dependency
+3. Work does not collide on the same file area, subsystem surface, or ownership boundary
+4. Multiple tracks are not building on an actively moving architectural surface
+
+If these conditions are not met, keep work sequential even if it appears parallelizable.
+
+**Cross-track review steps:**
+
+- Should appear as explicit later steps immediately after the relevant artifacts exist
+- Should depend on concrete artifacts, not only on broad sprint completion
+
+**Optimization target:** Maximum safe concurrency while preserving clean architectural boundaries.
 
 ---
 
@@ -1186,7 +1217,7 @@ Wave 6.1.1 non-goal note:
 
 Purpose:
 - Start the actual migration from the current validator-centric transition state toward versioned `tools.refinery` artifacts as the primary formal truth.
-- Keep the external Spring Boot + patch/v2 boundary stable while the Java internals move to layered Refinery artifacts and solver-backed thinking.
+- Keep the external Spring Boot + current patch wire boundary (`v1` today) stable while the Java internals move to layered Refinery artifacts and solver-backed thinking.
 - Define the designated output area, structured assertion-candidate ingest shape, and bridge-contract policy before later director waves expand capability further.
 - Make `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` the mandatory pre-read for any refinery/model artifact work.
 
@@ -1196,11 +1227,11 @@ Wave turn-gate:
 
 ### Sprint TR1: Tools.Refinery foundation (Track D primary, Track B consult on runtime-fact boundary)
 
-- ⬜ **TR1-A** Java / `tools.refinery` integration spike (Track D)
-- ⬜ **TR1-B** Artifact layout + shared/common vocabulary strategy (Track D)
-- ⬜ **TR1-C** Director problem family skeleton (`design/model/runtime/output`) (Track D, Track B consult)
-- ⬜ **TR1-D** Structured assertion-candidate ingest design (Track D)
-- ⬜ **TR1-E** Bridge contract policy (`validated symbolic facts -> current patch/v2 output`) (Track D)
+- ✅ **TR1-A** Java / `tools.refinery` integration spike (Track D)
+- ✅ **TR1-B** Artifact layout + shared/common vocabulary strategy (Track D)
+- ✅ **TR1-C** Director problem family skeleton (`design/model/runtime/output`) (Track D, Track B consult)
+- ✅ **TR1-D** Structured assertion-candidate ingest design (Track D)
+- ✅ **TR1-E** Bridge contract policy (validated symbolic facts -> current patch wire output, `v1` today) (Track D)
 
 ### Wave 6.2 — Execution Steps
 
@@ -1233,7 +1264,7 @@ Wave turn-gate:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | TR1-E | TR1-D ✅ | Freeze the transition policy: validated symbolic facts inside, current patch/v2 only as bridge output |
+| Track D agent | TR1-E | TR1-D ✅ | Freeze the transition policy: validated symbolic facts inside, current patch wire output (`v1` today) only as bridge output |
 
 Wave 6.2 policy note:
 - Any task in this wave that creates or edits refinery/model artifacts requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
@@ -1274,7 +1305,7 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track D agent | S7-A (D part: contracts + monitoring) | Wave 6.2 ✅ | Java + C# contract changes |
-| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6.2 ✅ | Parallel with Track D on different files |
+| Track B agent | S7-A (B part: condition evaluation runtime) | Wave 6.2 ✅ | Parallel with Track D on different files (contract-dependent only) |
 
 **Step 2 — opens when S7-A ✅**
 
@@ -1303,7 +1334,7 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 | Track B agent | P4-C | P4-A ✅ + P4-B ✅ | Runtime endpoints need the contract and adapter semantics defined first |
 
 **Critical path:** D7 (S7-A → S7-B) → C7 (P4-A → P4-B → {P4-D + P4-C}). Strictly sequential across waves, with only the final C7 step parallelized.
-**Director pipeline is COMPLETE after this wave.**
+**Director Phase 3 roadmap is COMPLETE after this wave. Tools.Refinery migration continues later through the Director sidecar waves (Wave 8.5 / TR2 and Wave 10.5 / TR3).**
 
 ---
 
@@ -1420,6 +1451,66 @@ Proof targets:
 
 ---
 
+## Wave 8.5 — First Solver-Backed Director Slice (Director TR2)
+
+Purpose:
+- Convert the TR1 foundation into the first actual solver/refinement-backed director slice while keeping the current C# bridge contract stable.
+- Lock runtime snapshot -> runtime assertions ownership before solve-path work starts.
+- Preserve live/manual diagnosability while the internal Java path shifts from validator-centric repair toward model-backed refinement.
+
+Wave turn-gate:
+- Wave 8.5 is `READY` only after Wave 7 closeout is `✅` and the TR1-C Track B consult boundary decisions (D1-D5) are locked in a short consult note under `Docs/Plans/Master/`.
+- Reason: the first solver-backed slice should build on post-D7 director semantics and a closed runtime-fact boundary, not on a half-implicit consult checklist.
+
+### Sprint TR2: First solver-backed director slice (Track D primary, Track B consult on runtime assertions handoff)
+
+> Tools-Refinery Migration Plan > Phase TR2
+
+- ⬜ **TR2-A** Runtime snapshot -> runtime assertions mapper (Track D, Track B consult)
+- ⬜ **TR2-B** Solve/refinement path for minimal director output (Track D)
+- ⬜ **TR2-C** Validated facts -> bridge mapping (Track D)
+- ⬜ **TR2-D** Solver-path observability (Track D primary, Track A/B consume as needed)
+
+### Wave 8.5 — Execution Steps
+
+**Sidecar note:** Wave 8.5 is a Director-only migration wave. Once its turn-gate is met, it may run in parallel with Combat Waves 8-10 unless a later explicit cross-track handoff says otherwise.
+
+**Step 1 — runtime assertions boundary first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR2-A | Wave 7 ✅ + TR1-C consult note locked | Normalize checkpoint facts into the runtime assertion layer before solve/refinement work starts |
+
+**Step 2 — opens when TR2-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR2-B | TR2-A ✅ | The first solve/refinement pass should target the finalized runtime-assertion input shape |
+
+**Step 3 — opens when TR2-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR2-C | TR2-B ✅ | Bridge mapping should extract facts from actual solve/refinement output, not a placeholder path |
+
+**Step 4 — opens when TR2-C ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR2-D | TR2-C ✅ | Observability should describe the real solver-backed path and final bridge markers |
+
+Wave 8.5 policy note:
+- Any task in this wave that creates, edits, or reviews refinery/model artifacts or solver semantics requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
+
+Proof targets:
+- Java tests proving runtime assertions feed the solver-backed director slice.
+- Existing C# bridge tests remain green without contract churn.
+- Manual/live director smoke still diagnoses stage/mode/source/apply/budget semantics clearly.
+
+**Critical path:** `TR2-A -> TR2-B -> TR2-C -> TR2-D`.
+
+---
+
 ## Wave 9 — Army Supply + Campaign Start (Combat Phase 5b + 6a)
 
 ### Sprint C9: Army Supply Model (Track B -> C)
@@ -1484,7 +1575,7 @@ Proof targets:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P6-A | P5-F ✅ + P5-I ✅ + P5-G ✅ + P5-H ✅ | Start campaign work only after the supply baseline is usable |
+| Track B agent | P6-A | P5-F ✅ + P5-G ✅ | Start campaign work after defense + navigation runtime ready; P5-H/P5-I are not true execution-dependencies for this step and may proceed in parallel as downstream / non-blocking work |
 
 **Step 8 — opens when P6-A ✅**
 
@@ -1568,7 +1659,7 @@ Proof targets:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P7-A | P6-E ✅ + P6-F ✅ + P6-G ✅ + P6-H ✅ | Start Phase 7 only after the end-to-end campaign loop is complete |
+| Track B agent | P7-A | P6-E ✅ + P6-F ✅ | Start Phase 7 after siege + resolution runtime ready; P6-G/P6-H are not true execution-dependencies for this step and may proceed in parallel as downstream / non-blocking work |
 
 **Step 5 — opens when P7-A ✅**
 
@@ -1593,7 +1684,7 @@ Proof targets:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P7-E | P7-A ✅ + P7-B ✅ + P7-C ✅ + P7-D ✅ | Multi-front and siege-unit follow-ups should build on the completed logistics layer |
+| Track B agent | P7-E | P7-A ✅ + P7-B ✅ | Multi-front and siege-unit work needs supply + bases runtime; P7-C/P7-D are not true execution-dependencies for this step and may proceed in parallel as downstream / non-blocking work |
 
 **Step 9 — opens when P7-E ✅**
 
@@ -1604,6 +1695,53 @@ Proof targets:
 | Track A agent | P7-H | P7-E ✅ | Graphics consume the siege-unit snapshot once the runtime entity set is stable |
 
 **Parallelism:** Wave 10 stays sequential across major phases (`C11 -> C12 -> C13`), but inside each phase the final consumer steps are grouped into the same step whenever cross-track work can proceed in parallel.
+
+---
+
+## Wave 10.5 — Convergence + Family Expansion Prep (Director TR3)
+
+Purpose:
+- Converge the post-TR2 director path by shrinking imperative validator/fallback responsibilities into clearly transitional boundaries.
+- Prepare shared/common vocabulary and future combat/campaign family expansion without reopening the stable C# bridge contract.
+- Keep fallback conservative and operationally explicit while solver-backed behavior becomes the primary migration direction.
+
+Wave turn-gate:
+- Wave 10.5 is `READY` only after Wave 8.5 closeout is `✅` and Wave 10 closeout is `✅`.
+- Reason: convergence work should build on a proven solver-backed slice and the matured late combat/campaign surface before shared-family expansion prep begins.
+
+### Sprint TR3: Convergence + Expansion Prep (Track D primary, Track B/C consult on shared vocabulary touchpoints)
+
+> Tools-Refinery Migration Plan > Phase TR3
+
+- ⬜ **TR3-A** Imperative validator deprecation plan (Track D)
+- ⬜ **TR3-B** Fallback boundary cleanup (Track D)
+- ⬜ **TR3-C** Shared vocabulary + family expansion prep (Track D, Track B/C consult)
+
+### Wave 10.5 — Execution Steps
+
+**Step 1 — audit the transitional Java surface first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR3-A | Wave 8.5 ✅ + Wave 10 ✅ | Audit/classification should happen after the first solver-backed slice and the current combat/campaign surface both stop moving |
+
+**Step 2 — opens when TR3-A ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR3-B | TR3-A ✅ | Fallback cleanup should build on the explicit validator-role classification, not guess at remaining responsibilities |
+
+**Step 3 — opens when TR3-B ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | TR3-C | TR3-B ✅ | Shared/common vocabulary prep should happen after the transitional boundaries and fallback responsibilities are explicit |
+
+Wave 10.5 policy note:
+- Any task in this wave that creates, edits, or reviews refinery/model artifacts or convergence policy requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
+
+**Critical path:** `TR3-A -> TR3-B -> TR3-C`.
+**Parallelism:** Wave 10.5 is intentionally sequential Track D convergence work; the optimization target here is boundary clarity, not concurrency.
 
 ---
 
@@ -1621,10 +1759,12 @@ Proof targets:
 | 7 | D7 (Phase 3 S7) | C7 (Phase 4 S7) | MR-3: sequential |
 | 7.5 | — | LC1 (Low-Cost baseline) | Staged parallel after `LC1-B1` |
 | 8 | — | C8 (Phase 5 S8) | Mostly sequential; final Track A consume |
+| 8.5 | TR2 (Tools.Refinery Phase TR2) | — | Director-only sidecar; sequential inside wave, parallel-eligible with Combat Waves 8-10 once Wave 7 + consult gate hold |
 | 9 | — | C9-C10 (Phase 5-6 S9-10) | Mostly sequential; Track A only at final campaign overlay consume |
 | 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential by phase, parallel consumer steps inside phases |
+| 10.5 | TR3 (Tools.Refinery Phase TR3) | — | Director-only convergence after Wave 10 and Wave 8.5 |
 
-**Totals:** 12 waves, 21 sprints (7 Director + 15 Combat/closeout), ~94 epics.
+**Totals:** 15 wave entries, 27 named sprints/sidecar blocks, ~101 epics.
 
 ---
 
@@ -1637,6 +1777,8 @@ Proof targets:
 | FPS < 60 or Combat Phase 3 reached | Performance Profiling | `Docs/Plans/Session-Perf-Profiling-Plan.md` |
 | Combat Phase 0 end or balance regressions | Balance/QA Agent | `Docs/Plans/Session-Balance-QA-Plan.md` |
 | Wave 7 complete | Low-Cost 2D alignment / Wave 7.5 kickoff | `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` |
+| Wave 7 complete + TR1-C consult note locked | Tools.Refinery TR2 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
+| Wave 10 complete + Wave 8.5 complete | Tools.Refinery TR3 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
 
 ---
 

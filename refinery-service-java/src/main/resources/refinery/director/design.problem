@@ -1,0 +1,29 @@
+class DirectorDesignLayerAnchor.
+
+class DirectorCheckpoint {
+    StoryBeatOutput[] storyBeatSlot
+    ColonyDirectiveOutput[] directiveSlot
+}
+
+class StoryBeatOutput {
+    Severity[] severity
+    contains EffectOutput[] effects
+}
+
+class ColonyDirectiveOutput {
+    DirectiveKind[] directive
+    contains BiasOutput[] biases
+}
+
+class EffectOutput {
+    Domain[] domain
+}
+
+class BiasOutput {
+    GoalCategory[] goalCategory
+}
+
+class Severity.
+class Domain.
+class GoalCategory.
+class DirectiveKind.

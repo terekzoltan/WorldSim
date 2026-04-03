@@ -28,13 +28,7 @@ public final class DirectorSnapshotMapper {
                 : DirectorDesign.DEFAULT_INFLUENCE_BUDGET;
         double remainingInfluenceBudget = Math.max(
                 0d,
-                firstPresentDouble(
-                        constraints,
-                        director,
-                        "maxBudget",
-                        "remainingInfluenceBudget",
-                        fallbackBudget
-                )
+                resolveRemainingInfluenceBudget(constraints, director, fallbackBudget)
         );
 
         List<DirectorRuntimeFacts.ActiveBeatFact> activeBeats = mapActiveBeats(firstPresentNode(
@@ -88,14 +82,14 @@ public final class DirectorSnapshotMapper {
     }
 
     private static int readColonyCount(JsonNode director, JsonNode legacyWorld) {
-        JsonNode directorCount = director.path("colonyCount");
-        if (!directorCount.isMissingNode() && !directorCount.isNull()) {
-            return directorCount.asInt(1);
-        }
-
         JsonNode worldCount = legacyWorld.path("colonyCount");
         if (!worldCount.isMissingNode() && !worldCount.isNull()) {
             return worldCount.asInt(1);
+        }
+
+        JsonNode directorCount = director.path("colonyCount");
+        if (!directorCount.isMissingNode() && !directorCount.isNull()) {
+            return directorCount.asInt(1);
         }
 
         return 1;
@@ -115,23 +109,22 @@ public final class DirectorSnapshotMapper {
         return secondary.path(secondaryField).asLong(defaultValue);
     }
 
-    private static double firstPresentDouble(
-            JsonNode primary,
-            JsonNode secondary,
-            String primaryField,
-            String secondaryField,
-            double defaultValue
-    ) {
-        if (primary != null && !primary.isNull()) {
-            JsonNode first = primary.path(primaryField);
-            if (!first.isMissingNode() && !first.isNull()) {
-                return first.asDouble(defaultValue);
+    private static double resolveRemainingInfluenceBudget(JsonNode constraints, JsonNode director, double defaultValue) {
+        if (constraints != null && !constraints.isNull()) {
+            JsonNode rootBudget = constraints.path("maxBudget");
+            if (!rootBudget.isMissingNode() && !rootBudget.isNull()) {
+                return rootBudget.asDouble(defaultValue);
+            }
+
+            JsonNode nestedBudget = constraints.path("director").path("maxBudget");
+            if (!nestedBudget.isMissingNode() && !nestedBudget.isNull()) {
+                return nestedBudget.asDouble(defaultValue);
             }
         }
 
-        JsonNode second = secondary.path(secondaryField);
-        if (!second.isMissingNode() && !second.isNull()) {
-            return second.asDouble(defaultValue);
+        JsonNode snapshotBudget = director.path("remainingInfluenceBudget");
+        if (!snapshotBudget.isMissingNode() && !snapshotBudget.isNull()) {
+            return snapshotBudget.asDouble(defaultValue);
         }
 
         return defaultValue;

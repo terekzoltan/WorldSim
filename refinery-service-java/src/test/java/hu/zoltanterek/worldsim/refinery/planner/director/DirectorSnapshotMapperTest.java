@@ -127,6 +127,7 @@ class DirectorSnapshotMapperTest {
 
         ObjectNode constraints = objectMapper.createObjectNode();
         constraints.put("maxBudget", 2.5);
+        constraints.putObject("director").put("maxBudget", 1.5);
 
         PatchRequest request = new PatchRequest(
                 "v1",
@@ -140,6 +141,32 @@ class DirectorSnapshotMapperTest {
 
         DirectorRuntimeFacts facts = mapper.map(request, 5.0);
         assertEquals(2.5, facts.remainingInfluenceBudget());
+    }
+
+    @Test
+    void map_NestedConstraintsDirectorMaxBudgetFallsBackWhenRootMissing() {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.putObject("world").put("colonyCount", 2);
+        snapshot.putObject("director")
+                .put("colonyPopulation", 47)
+                .put("beatCooldownRemainingTicks", 0)
+                .put("remainingInfluenceBudget", 4.0);
+
+        ObjectNode constraints = objectMapper.createObjectNode();
+        constraints.putObject("director").put("maxBudget", 1.75);
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-map-nested-budget",
+                21L,
+                100L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                snapshot,
+                constraints
+        );
+
+        DirectorRuntimeFacts facts = mapper.map(request, 5.0);
+        assertEquals(1.75, facts.remainingInfluenceBudget());
     }
 
     @Test
