@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-04-02
+Last updated: 2026-04-04
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -19,6 +19,7 @@ their execution steps are not retroactively documented — see their proof links
 |-------|-----------|
 | **Director Plan** | `Docs/Plans/Master/Director-Integration-Master-Plan.md` |
 | **Combat Plan** | `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md` |
+| **Refinery Live SMR Plan** | `Docs/Plans/Master/Refinery-Live-SMR-Plan.md` |
 
 Epic codes (e.g., `S1-A`, `P0-B`) are unique and greppable in the respective master plan.
 
@@ -1457,6 +1458,7 @@ Purpose:
 - Convert the TR1 foundation into the first actual solver/refinement-backed director slice while keeping the current C# bridge contract stable.
 - Lock runtime snapshot -> runtime assertions ownership before solve-path work starts.
 - Preserve live/manual diagnosability while the internal Java path shifts from validator-centric repair toward model-backed refinement.
+- Establish the first headless refinery evidence lane on top of the real runtime/adapter path without pulling paid live runs into the critical path.
 
 Wave turn-gate:
 - Wave 8.5 is `READY` only after Wave 7 closeout is `✅` and the TR1-C Track B consult boundary decisions (D1-D5) are locked in a short consult note under `Docs/Plans/Master/`.
@@ -1469,7 +1471,7 @@ Wave turn-gate:
 - ⬜ **TR2-A** Runtime snapshot -> runtime assertions mapper (Track D, Track B consult)
 - ⬜ **TR2-B** Solve/refinement path for minimal director output (Track D)
 - ⬜ **TR2-C** Validated facts -> bridge mapping (Track D)
-- ⬜ **TR2-D** Solver-path observability (Track D primary, Track A/B consume as needed)
+- ⬜ **TR2-D** Solver-path observability + headless refinery evidence lane foundation (Track D primary, Track B owns the `ScenarioRunner` lane implementation)
 
 ### Wave 8.5 — Execution Steps
 
@@ -1497,15 +1499,18 @@ Wave turn-gate:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | TR2-D | TR2-C ✅ | Observability should describe the real solver-backed path and final bridge markers |
+| Track D agent | TR2-D (D part: solver markers + evidence semantics) | TR2-C ✅ | Define the solver-path observability contract and operator-facing marker semantics; detailed execution shape lives in the Refinery Live SMR Plan |
+| Track B agent | TR2-D (B part: `ScenarioRunner` refinery fixture + live_mock foundation) | TR2-C ✅ | Build the first headless refinery evidence lane against the stabilized bridge semantics; detailed defaults and guardrails live in the Refinery Live SMR Plan |
 
 Wave 8.5 policy note:
 - Any task in this wave that creates, edits, or reviews refinery/model artifacts or solver semantics requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
+- `Docs/Plans/Master/Refinery-Live-SMR-Plan.md` is the detailed source of truth for refinery headless lane behavior, guardrails, and artifact policy; Combined remains high level.
 
 Proof targets:
 - Java tests proving runtime assertions feed the solver-backed director slice.
 - Existing C# bridge tests remain green without contract churn.
 - Manual/live director smoke still diagnoses stage/mode/source/apply/budget semantics clearly.
+- The first headless refinery evidence slice (`fixture + live_mock`) proves the real runtime/adapter path can be exercised without the app under the detailed plan's guardrails.
 
 **Critical path:** `TR2-A -> TR2-B -> TR2-C -> TR2-D`.
 
@@ -1704,6 +1709,7 @@ Purpose:
 - Converge the post-TR2 director path by shrinking imperative validator/fallback responsibilities into clearly transitional boundaries.
 - Prepare shared/common vocabulary and future combat/campaign family expansion without reopening the stable C# bridge contract.
 - Keep fallback conservative and operationally explicit while solver-backed behavior becomes the primary migration direction.
+- Generalize refinery evidence policy carefully so later families can reuse it without making paid live behavior part of the default critical path.
 
 Wave turn-gate:
 - Wave 10.5 is `READY` only after Wave 8.5 closeout is `✅` and Wave 10 closeout is `✅`.
@@ -1714,8 +1720,8 @@ Wave turn-gate:
 > Tools-Refinery Migration Plan > Phase TR3
 
 - ⬜ **TR3-A** Imperative validator deprecation plan (Track D)
-- ⬜ **TR3-B** Fallback boundary cleanup (Track D)
-- ⬜ **TR3-C** Shared vocabulary + family expansion prep (Track D, Track B/C consult)
+- ⬜ **TR3-B** Fallback boundary cleanup + paid-live guardrail hardening (Track D)
+- ⬜ **TR3-C** Shared vocabulary + family expansion prep + evidence-schema generalization (Track D, Track B/C consult)
 
 ### Wave 10.5 — Execution Steps
 
@@ -1729,16 +1735,17 @@ Wave turn-gate:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | TR3-B | TR3-A ✅ | Fallback cleanup should build on the explicit validator-role classification, not guess at remaining responsibilities |
+| Track D agent | TR3-B | TR3-A ✅ | Fallback cleanup should build on the explicit validator-role classification, tighten paid-live guardrails, and keep operational policy explicit per the Refinery Live SMR Plan |
 
 **Step 3 — opens when TR3-B ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | TR3-C | TR3-B ✅ | Shared/common vocabulary prep should happen after the transitional boundaries and fallback responsibilities are explicit |
+| Track D agent | TR3-C | TR3-B ✅ | Shared/common vocabulary prep should happen after the transitional boundaries and fallback responsibilities are explicit, including how refinery evidence can generalize beyond director-only families |
 
 Wave 10.5 policy note:
 - Any task in this wave that creates, edits, or reviews refinery/model artifacts or convergence policy requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
+- `Docs/Plans/Master/Refinery-Live-SMR-Plan.md` remains the detailed operational source of truth for refinery headless lanes; Combined only records ownership, gates, and wave placement.
 
 **Critical path:** `TR3-A -> TR3-B -> TR3-C`.
 **Parallelism:** Wave 10.5 is intentionally sequential Track D convergence work; the optimization target here is boundary clarity, not concurrency.

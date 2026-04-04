@@ -17,6 +17,97 @@
 
 ---
 
+## Standard Implementation Plan Review Format
+
+Ha egy track reszletes implementacios tervet kuld egy epicre vagy sprint step-re, a Meta Coordinator
+alapertelmezetten ezt az egyseges review formatumot hasznalja, hacsak nincs eros ok elterni tole.
+
+**Cel:**
+
+- konzisztens readiness dontesek
+- scope creep elleni vedelem chat-drift eseten
+- ujrafelhasznalhato, track-fele tovabbitheto handoff formatum
+- kesobbi planning/review automatizalhatoseg javitasa
+
+### Review workflow
+
+1. Ellenorizd az aktiv frontiert a `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` alapjan.
+2. Ellenorizd az ownershipot, guardrail-eket es cross-track policykat az `AGENTS.md` alapjan.
+3. Nezd meg a tervben hivatkozott kod- es docs-surface-eket a tenyleges repo allapotban.
+4. Dontsd el, hogy a terv valoban `READY`, `NOT READY`, vagy `READY with guardrails`.
+5. Azonositsd a scope-, sequencing-, contract-, ownership- es review-riskeket.
+6. Valaszold meg a track altal explicit felvetett nyitott kerdeseket.
+7. Adj rovid, track-fele kozvetlenul tovabbkuldheto summary uzenetet.
+
+**Fontos:**
+
+- mindig a tenyleges fajltartalom legyen a truth source, ne csak a plan allitasai
+- a dirty worktree ervenyes aktualis allapot lehet; ezt csak akkor kell kulon kiemelni, ha a reviewt befolyasolja
+- review kozben ne tagitsd csendben a track scope-jat
+- kozos ownershipu epiceknel mondd ki, melyik resz melyik track/session felelossege
+
+### Default response structure
+
+A preferalt Meta valaszforma:
+
+1. `Review Findings`
+2. `Verdict`
+3. direkt valaszok a nyitott tradeoff / design kerdesekre
+4. `Meta guidance` / guardrail-ek
+5. `Track summary message`
+
+### Default content expectations
+
+`Review Findings`
+
+- findings first, sulyossag szerint rendezve amikor ertelmes
+- konkret fajl- es lehetoseg szerint line-ref hivatkozasokkal
+- fokusz: blokkolo, false-green kockazat, scope creep, contract drift, ownership drift, sequencing hiba
+- ha nincs erdemi finding, ezt explicit mondd ki
+
+`Verdict`
+
+- egyertelmuen egyik ezek kozul:
+  - `READY`
+  - `NOT READY`
+  - `READY with guardrails`
+- ha fontos, nevezd meg a jovahagyott vegrehajtasi sorrendet is
+
+`Open question answers`
+
+- a track explicit valasztasi pontjaira adj rovid, direkt valaszt
+- default a legkisebb oszinte scope legyen, ami megorzi a sequencinget es a boundary-fegyelmet
+- ne vezess be uj surface-t, ha nem szukseges
+
+`Meta guidance`
+
+- rogzitsd a fontos non-goal-okat
+- nevezd meg a kotelezo teszteket vagy negative-path checkeket
+- nevezd meg, mely boundary maradjon additive / transitional / non-canonical
+
+`Track summary message`
+
+- legyen rovid, copy-pasteolhato uzenet a submitting tracknek
+- tartalmazza:
+  - verdict
+  - jovahagyott scope
+  - jovahagyott sorrend
+  - guardrail-ek
+  - test expectation-ok
+
+### Response style rule
+
+Implementacios terv review kozben a Meta legyen tomor, de donteskepes:
+
+- ne ird ujra az egesz tervet, hacsak nem muszaj
+- validald, ami jo
+- csak azt javitsd, aminek tenyleg valtoznia kell
+- a visszakuldott szoveg legyen konnyen tovabbitheto ujraszerkesztes nelkul
+
+Ez a dokumentalt, kanonikus Meta review pattern a Track implementacios terv review-khoz.
+
+---
+
 ## 1. `agents-maintenance`
 
 **Cel:** AGENTS.md naprakeszen tartasa -- a tobbi agens ebbol tajekozodik.

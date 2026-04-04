@@ -356,10 +356,12 @@ Tasks:
 
 Goal:
 - make solver-backed live smoke as diagnosable as the current imperative path.
+- establish the first headless refinery evidence lane on the real runtime/adapter path without changing the stable C# bridge contract.
 
 Tasks:
 - log/telemetry for solve success, unsat/error predicate hits, fallback path, completion counts
 - preserve operator-facing diagnostics in README/checklists/HUD-facing bridge markers
+- ship the first refinery headless evidence slice (`fixture + live_mock`) under the detailed operating rules in `Docs/Plans/Master/Refinery-Live-SMR-Plan.md`
 
 ## Phase TR3 - Convergence and cleanup
 
@@ -381,6 +383,7 @@ Goal:
 Tasks:
 - document solver path vs deterministic fallback responsibilities
 - prevent fallback from becoming an ever-growing hidden second planner
+- harden the paid-live operational guardrails so explicit opt-in/cap policy remains enforceable as the live lane matures
 
 ### TR3-C: Shared vocabulary + family expansion prep
 
@@ -390,6 +393,7 @@ Goal:
 Tasks:
 - factor out shared vocabulary where justified
 - bootstrap `combat/` and `campaign/` families as separate problem families
+- generalize the refinery evidence/schema contract conservatively so later families can reuse it without forcing director-only assumptions forever
 
 ## 9. Acceptance Gates
 
@@ -406,6 +410,7 @@ This migration plan must be reflected in:
 - `Docs/Plans/Master/Director-Integration-Master-Plan.md`
 - `WorldSim.RefineryAdapter/Docs/Plans/Track-D-Season-Director-Plan.md`
 - `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md`
+- `Docs/Plans/Master/Refinery-Live-SMR-Plan.md`
 
 Policy:
 - these plans should use transition-state language after this document lands,
