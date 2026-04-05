@@ -233,7 +233,111 @@ public class LlmDirectorPlanner {
         }
 
         List<DirectorOutputAssertions.EffectAssertion> effects = sanitizeEffects(story.effects(), duration, stats);
-        return new DirectorOutputAssertions.StoryBeatAssertion(beatId, text, duration, severity, effects);
+        DirectorOutputAssertions.CausalChainAssertion causalChain = mapCausalChainAssertion(story.causalChain(), stats);
+        return new DirectorOutputAssertions.StoryBeatAssertion(beatId, text, duration, severity, effects, causalChain);
+    }
+
+    private static DirectorOutputAssertions.CausalChainAssertion mapCausalChainAssertion(
+            DirectorCandidateParser.CausalChainCandidate causalChainCandidate,
+            SanitizeStats stats
+    ) {
+        if (causalChainCandidate == null) {
+            return null;
+        }
+
+        String type = trimToNull(causalChainCandidate.type());
+        if (type == null || !"causal_chain".equalsIgnoreCase(type)) {
+            stats.mark("causal_chain_dropped");
+            return null;
+        }
+
+        DirectorCandidateParser.ConditionCandidate conditionCandidate = causalChainCandidate.condition();
+        if (conditionCandidate == null) {
+            stats.mark("causal_chain_missing_condition");
+            return null;
+        }
+
+        String metric = normalizeMetric(conditionCandidate.metric());
+        if (metric == null) {
+            stats.mark("causal_chain_metric_dropped");
+            return null;
+        }
+
+        String operator = normalizeOperator(conditionCandidate.operator());
+        if (operator == null) {
+            stats.mark("causal_chain_operator_dropped");
+            return null;
+        }
+
+        double threshold = conditionCandidate.threshold();
+        if (Double.isNaN(threshold) || Double.isInfinite(threshold)) {
+            stats.mark("causal_chain_threshold_dropped");
+            return null;
+        }
+        if ("population".equals(metric) && "eq".equals(operator) && Math.rint(threshold) != threshold) {
+            stats.mark("causal_chain_population_eq_non_integer");
+            return null;
+        }
+
+        DirectorCandidateParser.FollowUpBeatCandidate followUpCandidate = causalChainCandidate.followUpBeat();
+        if (followUpCandidate == null) {
+            stats.mark("causal_chain_follow_up_missing");
+            return null;
+        }
+
+        String followUpBeatId = trimToNull(followUpCandidate.beatId());
+        String followUpText = trimToNull(followUpCandidate.text());
+        if (followUpBeatId == null || followUpText == null) {
+            stats.mark("causal_chain_follow_up_missing_required");
+            return null;
+        }
+
+        long followUpDuration = clamp(
+                followUpCandidate.durationTicks(),
+                DirectorDesign.MIN_STORY_DURATION,
+                DirectorDesign.MAX_STORY_DURATION
+        );
+        if (followUpDuration != followUpCandidate.durationTicks()) {
+            stats.mark("causal_chain_follow_up_duration_clamped");
+        }
+
+        String followUpSeverity = normalizeSeverity(followUpCandidate.severity());
+        if (followUpCandidate.severity() != null && followUpSeverity == null) {
+            stats.mark("causal_chain_follow_up_severity_normalized");
+        }
+
+        List<DirectorOutputAssertions.EffectAssertion> followUpEffects = sanitizeEffects(
+                followUpCandidate.effects(),
+                followUpDuration,
+                stats
+        );
+
+        long windowTicks = clamp(
+                causalChainCandidate.windowTicks(),
+                DirectorDesign.MIN_CAUSAL_WINDOW_TICKS,
+                DirectorDesign.MAX_CAUSAL_WINDOW_TICKS
+        );
+        if (windowTicks != causalChainCandidate.windowTicks()) {
+            stats.mark("causal_chain_window_clamped");
+        }
+
+        int maxTriggers = causalChainCandidate.maxTriggers();
+        if (maxTriggers != DirectorDesign.CAUSAL_MAX_TRIGGERS) {
+            stats.mark("causal_chain_max_triggers_forced");
+        }
+
+        return new DirectorOutputAssertions.CausalChainAssertion(
+                new DirectorOutputAssertions.ConditionAssertion(metric, operator, threshold),
+                new DirectorOutputAssertions.FollowUpBeatAssertion(
+                        followUpBeatId,
+                        followUpText,
+                        followUpDuration,
+                        followUpSeverity,
+                        followUpEffects
+                ),
+                windowTicks,
+                DirectorDesign.CAUSAL_MAX_TRIGGERS
+        );
     }
 
     private static DirectorOutputAssertions.DirectiveAssertion mapDirectiveAssertion(
@@ -405,6 +509,24 @@ public class LlmDirectorPlanner {
         }
         normalized = normalized.toLowerCase(Locale.ROOT);
         return DirectorDesign.VALID_SEVERITIES.contains(normalized) ? normalized : null;
+    }
+
+    private static String normalizeMetric(String rawMetric) {
+        String metric = trimToNull(rawMetric);
+        if (metric == null) {
+            return null;
+        }
+        metric = metric.toLowerCase(Locale.ROOT);
+        return DirectorDesign.CAUSAL_ALLOWED_METRICS.contains(metric) ? metric : null;
+    }
+
+    private static String normalizeOperator(String rawOperator) {
+        String operator = trimToNull(rawOperator);
+        if (operator == null) {
+            return null;
+        }
+        operator = operator.toLowerCase(Locale.ROOT);
+        return DirectorDesign.CAUSAL_ALLOWED_OPERATORS.contains(operator) ? operator : null;
     }
 
     private static String trimToNull(String value) {

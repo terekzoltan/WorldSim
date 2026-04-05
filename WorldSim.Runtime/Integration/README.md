@@ -126,6 +126,11 @@ Interpretation rules:
 - `mode/src`: effective output mode and decision source (`response|env|fallback|...`).
 - `budget`: director budget marker mirrored from Java explain if present.
 - Java explain also includes `llmStage`, `llmCompletionCount`, `llmRetryRounds`, and `llmCandidateSanitized` markers for director retry/repair observability.
+- S7-A causal-chain wire/request observability remains marker-based:
+  - `causalChainOps:<n>`
+  - `causalChainMaxTriggers:1`
+  - `causalChainMetrics:food_reserves_pct,morale_avg,population,economy_output`
+  - `causalChainEqPolicy:population_exact;floating_tolerance=0.0001`
 
 ## Failure Playbook
 

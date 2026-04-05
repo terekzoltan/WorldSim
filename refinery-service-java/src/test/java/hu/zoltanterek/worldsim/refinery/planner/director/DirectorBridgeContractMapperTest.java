@@ -25,7 +25,19 @@ class DirectorBridgeContractMapperTest {
                         "Story text",
                         24,
                         "major",
-                        List.of(new DirectorOutputAssertions.EffectAssertion("food", -0.1, 24))
+                        List.of(new DirectorOutputAssertions.EffectAssertion("food", -0.1, 24)),
+                        new DirectorOutputAssertions.CausalChainAssertion(
+                                new DirectorOutputAssertions.ConditionAssertion("food_reserves_pct", "lt", 35d),
+                                new DirectorOutputAssertions.FollowUpBeatAssertion(
+                                        "BEAT_A_FOLLOW",
+                                        "Follow-up story text",
+                                        12,
+                                        "major",
+                                        List.of(new DirectorOutputAssertions.EffectAssertion("morale", -0.08, 12))
+                                ),
+                                20,
+                                1
+                        )
                 ),
                 new DirectorOutputAssertions.DirectiveAssertion(
                         0,
@@ -57,6 +69,10 @@ class DirectorBridgeContractMapperTest {
         assertEquals("major", story.severity());
         assertEquals(1, story.effects().size());
         assertEquals("food", story.effects().get(0).domain());
+        assertEquals("causal_chain", story.causalChain().type());
+        assertEquals("food_reserves_pct", story.causalChain().condition().metric());
+        assertEquals("BEAT_A_FOLLOW", story.causalChain().followUpBeat().beatId());
+        assertEquals(1, story.causalChain().maxTriggers());
 
         PatchOp.SetColonyDirective directive = (PatchOp.SetColonyDirective) patch.get(1);
         assertEquals(0, directive.colonyId());

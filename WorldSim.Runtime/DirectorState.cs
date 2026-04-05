@@ -24,6 +24,42 @@ public readonly record struct ActiveDirectiveState(
     int RemainingTicks,
     int TotalTicks);
 
+public readonly record struct DirectorCausalConditionSpec(
+    string Metric,
+    string Operator,
+    double Threshold);
+
+public readonly record struct DirectorFollowUpBeatSpec(
+    string BeatId,
+    string Text,
+    long DurationTicks,
+    IReadOnlyList<DirectorDomainModifierSpec> Effects);
+
+public readonly record struct DirectorCausalChainSpec(
+    DirectorCausalConditionSpec Condition,
+    DirectorFollowUpBeatSpec FollowUpBeat,
+    int WindowTicks,
+    int MaxTriggers = 1);
+
+public readonly record struct PendingCausalChainState(
+    string ParentBeatId,
+    string Status,
+    string ConditionMetric,
+    string ConditionOperator,
+    double ConditionThreshold,
+    string ConditionSummary,
+    string FollowUpBeatId,
+    string FollowUpSummary,
+    int RemainingWindowTicks,
+    int TriggerCount,
+    int MaxTriggers,
+    long EligibleFromTick,
+    string LastFailureMessage);
+
+public readonly record struct PendingCausalChainTrigger(
+    string ParentBeatId,
+    DirectorFollowUpBeatSpec FollowUpBeat);
+
 public readonly record struct DirectorApplyResult(bool Success, string Message)
 {
     public static DirectorApplyResult Ok(string message) => new(true, message);
@@ -37,6 +73,7 @@ public sealed class DirectorState
 
     private readonly Dictionary<string, ActiveBeatMutable> _beats = new(StringComparer.Ordinal);
     private readonly Dictionary<int, ActiveDirectiveMutable> _directives = new();
+    private readonly Dictionary<string, PendingCausalChainMutable> _pendingCausalChains = new(StringComparer.Ordinal);
 
     public int MajorBeatCooldownRemainingTicks { get; private set; }
     public int EpicBeatCooldownRemainingTicks { get; private set; }
@@ -54,6 +91,11 @@ public sealed class DirectorState
     public IReadOnlyList<ActiveDirectiveState> ActiveDirectives => _directives.Values
         .Select(directive => directive.ToState())
         .OrderBy(directive => directive.ColonyId)
+        .ToList();
+
+    public IReadOnlyList<PendingCausalChainState> PendingCausalChains => _pendingCausalChains.Values
+        .Select(chain => chain.ToState())
+        .OrderBy(chain => chain.ParentBeatId, StringComparer.Ordinal)
         .ToList();
 
     public int BeatCooldownRemainingTicks => Math.Max(MajorBeatCooldownRemainingTicks, EpicBeatCooldownRemainingTicks);
@@ -101,6 +143,74 @@ public sealed class DirectorState
         }
     }
 
+    public void RegisterCausalChain(string parentBeatId, DirectorCausalChainSpec spec, long registrationTick)
+    {
+        var conditionSummary = BuildConditionSummary(spec.Condition);
+        var followUpSummary = BuildFollowUpSummary(spec.FollowUpBeat.Text);
+
+        _pendingCausalChains[parentBeatId] = new PendingCausalChainMutable(
+            parentBeatId: parentBeatId,
+            status: "pending",
+            conditionMetric: spec.Condition.Metric,
+            conditionOperator: spec.Condition.Operator,
+            conditionThreshold: spec.Condition.Threshold,
+            conditionSummary: conditionSummary,
+            followUpBeat: spec.FollowUpBeat,
+            followUpSummary: followUpSummary,
+            remainingWindowTicks: spec.WindowTicks,
+            triggerCount: 0,
+            maxTriggers: spec.MaxTriggers,
+            eligibleFromTick: registrationTick + 1,
+            lastFailureMessage: string.Empty
+        );
+    }
+
+    public IReadOnlyList<PendingCausalChainTrigger> EvaluatePendingCausalChains(
+        long evaluationTick,
+        Func<DirectorCausalConditionSpec, bool> conditionEvaluator)
+    {
+        var triggers = new List<PendingCausalChainTrigger>();
+        foreach (var chain in _pendingCausalChains.Values)
+        {
+            if (chain.IsTerminal)
+                continue;
+
+            if (evaluationTick < chain.EligibleFromTick)
+                continue;
+
+            var conditionMet = conditionEvaluator(new DirectorCausalConditionSpec(
+                chain.ConditionMetric,
+                chain.ConditionOperator,
+                chain.ConditionThreshold));
+
+            if (conditionMet)
+            {
+                chain.TriggerCount++;
+                chain.Status = "triggered";
+                chain.LastFailureMessage = string.Empty;
+                triggers.Add(new PendingCausalChainTrigger(chain.ParentBeatId, chain.FollowUpBeat));
+                continue;
+            }
+
+            chain.RemainingWindowTicks = Math.Max(0, chain.RemainingWindowTicks - 1);
+            if (chain.RemainingWindowTicks == 0)
+            {
+                chain.Status = "expired";
+            }
+        }
+
+        return triggers;
+    }
+
+    public void MarkCausalChainTriggerFailed(string parentBeatId, string reason)
+    {
+        if (!_pendingCausalChains.TryGetValue(parentBeatId, out var chain))
+            return;
+
+        chain.Status = "trigger_failed";
+        chain.LastFailureMessage = reason;
+    }
+
     public DirectorApplyResult ApplyStoryBeat(string beatId, string text, int durationTicks, DirectorBeatSeverity severity)
     {
         if (_beats.ContainsKey(beatId))
@@ -140,6 +250,20 @@ public sealed class DirectorState
         return Math.Max(0d, value);
     }
 
+    private static string BuildConditionSummary(DirectorCausalConditionSpec condition)
+    {
+        return condition.Metric + " " + condition.Operator + " " + condition.Threshold.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static string BuildFollowUpSummary(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        var trimmed = text.Trim();
+        return trimmed.Length <= 96 ? trimmed : trimmed[..96] + "...";
+    }
+
     private sealed class ActiveBeatMutable
     {
         public ActiveBeatMutable(string beatId, string text, DirectorBeatSeverity severity, int remainingTicks, int totalTicks)
@@ -176,5 +300,68 @@ public sealed class DirectorState
         public int TotalTicks { get; }
 
         public ActiveDirectiveState ToState() => new(ColonyId, Directive, RemainingTicks, TotalTicks);
+    }
+
+    private sealed class PendingCausalChainMutable
+    {
+        public PendingCausalChainMutable(
+            string parentBeatId,
+            string status,
+            string conditionMetric,
+            string conditionOperator,
+            double conditionThreshold,
+            string conditionSummary,
+            DirectorFollowUpBeatSpec followUpBeat,
+            string followUpSummary,
+            int remainingWindowTicks,
+            int triggerCount,
+            int maxTriggers,
+            long eligibleFromTick,
+            string lastFailureMessage)
+        {
+            ParentBeatId = parentBeatId;
+            Status = status;
+            ConditionMetric = conditionMetric;
+            ConditionOperator = conditionOperator;
+            ConditionThreshold = conditionThreshold;
+            ConditionSummary = conditionSummary;
+            FollowUpBeat = followUpBeat;
+            FollowUpSummary = followUpSummary;
+            RemainingWindowTicks = remainingWindowTicks;
+            TriggerCount = triggerCount;
+            MaxTriggers = maxTriggers;
+            EligibleFromTick = eligibleFromTick;
+            LastFailureMessage = lastFailureMessage;
+        }
+
+        public string ParentBeatId { get; }
+        public string Status { get; set; }
+        public string ConditionMetric { get; }
+        public string ConditionOperator { get; }
+        public double ConditionThreshold { get; }
+        public string ConditionSummary { get; }
+        public DirectorFollowUpBeatSpec FollowUpBeat { get; }
+        public string FollowUpSummary { get; }
+        public int RemainingWindowTicks { get; set; }
+        public int TriggerCount { get; set; }
+        public int MaxTriggers { get; }
+        public long EligibleFromTick { get; }
+        public string LastFailureMessage { get; set; }
+        public bool IsTerminal => TriggerCount >= MaxTriggers || RemainingWindowTicks <= 0 || string.Equals(Status, "trigger_failed", StringComparison.Ordinal);
+
+        public PendingCausalChainState ToState() => new(
+            ParentBeatId,
+            Status,
+            ConditionMetric,
+            ConditionOperator,
+            ConditionThreshold,
+            ConditionSummary,
+            FollowUpBeat.BeatId,
+            FollowUpSummary,
+            RemainingWindowTicks,
+            TriggerCount,
+            MaxTriggers,
+            EligibleFromTick,
+            LastFailureMessage);
     }
 }

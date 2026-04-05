@@ -49,7 +49,7 @@ public final class DirectorCandidateParser {
         if (effectsNode.isArray()) {
             for (JsonNode effectNode : effectsNode) {
                 effects.add(new StoryEffectCandidate(
-                        effectNode.path("kind").asText(""),
+                        effectNode.path("kind").asText(effectNode.path("type").asText("")),
                         effectNode.path("domain").asText(""),
                         effectNode.path("modifier").asDouble(0.0),
                         effectNode.path("durationTicks").asLong(0)
@@ -62,7 +62,57 @@ public final class DirectorCandidateParser {
                 node.path("text").asText(""),
                 node.path("durationTicks").asLong(0),
                 node.path("severity").asText(""),
-                List.copyOf(effects)
+                List.copyOf(effects),
+                parseCausalChain(node.path("causalChain"))
+        );
+    }
+
+    private static CausalChainCandidate parseCausalChain(JsonNode node) {
+        if (node.isMissingNode() || node.isNull() || !node.isObject()) {
+            return null;
+        }
+
+        JsonNode conditionNode = node.path("condition");
+        ConditionCandidate condition = null;
+        if (!conditionNode.isMissingNode() && !conditionNode.isNull() && conditionNode.isObject()) {
+            condition = new ConditionCandidate(
+                    conditionNode.path("metric").asText(""),
+                    conditionNode.path("operator").asText(""),
+                    conditionNode.path("threshold").asDouble(0.0)
+            );
+        }
+
+        JsonNode followUpNode = node.path("followUpBeat");
+        FollowUpBeatCandidate followUpBeat = null;
+        if (!followUpNode.isMissingNode() && !followUpNode.isNull() && followUpNode.isObject()) {
+            List<StoryEffectCandidate> followUpEffects = new ArrayList<>();
+            JsonNode followUpEffectsNode = followUpNode.path("effects");
+            if (followUpEffectsNode.isArray()) {
+                for (JsonNode effectNode : followUpEffectsNode) {
+                    followUpEffects.add(new StoryEffectCandidate(
+                            effectNode.path("kind").asText(effectNode.path("type").asText("")),
+                            effectNode.path("domain").asText(""),
+                            effectNode.path("modifier").asDouble(0.0),
+                            effectNode.path("durationTicks").asLong(0)
+                    ));
+                }
+            }
+
+            followUpBeat = new FollowUpBeatCandidate(
+                    followUpNode.path("beatId").asText(""),
+                    followUpNode.path("text").asText(""),
+                    followUpNode.path("durationTicks").asLong(0),
+                    followUpNode.path("severity").asText(""),
+                    List.copyOf(followUpEffects)
+            );
+        }
+
+        return new CausalChainCandidate(
+                node.path("type").asText(""),
+                condition,
+                followUpBeat,
+                node.path("windowTicks").asLong(0),
+                node.path("maxTriggers").asInt(0)
         );
     }
 
@@ -76,7 +126,7 @@ public final class DirectorCandidateParser {
         if (biasesNode.isArray()) {
             for (JsonNode biasNode : biasesNode) {
                 biases.add(new GoalBiasCandidate(
-                        biasNode.path("kind").asText(""),
+                        biasNode.path("kind").asText(biasNode.path("type").asText("")),
                         biasNode.path("goalCategory").asText(""),
                         biasNode.path("weight").asDouble(0.0),
                         biasNode.path("durationTicks").isMissingNode() ? null : biasNode.path("durationTicks").asLong()
@@ -133,6 +183,32 @@ public final class DirectorCandidateParser {
     }
 
     public record StoryBeatSlotCandidate(
+            String beatId,
+            String text,
+            long durationTicks,
+            String severity,
+            List<StoryEffectCandidate> effects,
+            CausalChainCandidate causalChain
+    ) {
+    }
+
+    public record CausalChainCandidate(
+            String type,
+            ConditionCandidate condition,
+            FollowUpBeatCandidate followUpBeat,
+            long windowTicks,
+            int maxTriggers
+    ) {
+    }
+
+    public record ConditionCandidate(
+            String metric,
+            String operator,
+            double threshold
+    ) {
+    }
+
+    public record FollowUpBeatCandidate(
             String beatId,
             String text,
             long durationTicks,

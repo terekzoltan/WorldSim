@@ -23,12 +23,26 @@ public final class DirectorInfluenceBudget {
     }
 
     private static double calculateStoryBeatCost(PatchOp.AddStoryBeat storyBeat) {
-        if (storyBeat.effects() == null || storyBeat.effects().isEmpty()) {
+        double total = calculateEffectsCost(storyBeat.effects());
+
+        if (storyBeat.causalChain() != null) {
+            total += DirectorDesign.CAUSAL_CHAIN_BASE_COST;
+            PatchOp.CausalFollowUpBeat followUp = storyBeat.causalChain().followUpBeat();
+            if (followUp != null) {
+                total += calculateEffectsCost(followUp.effects());
+            }
+        }
+
+        return total;
+    }
+
+    private static double calculateEffectsCost(List<PatchOp.EffectEntry> effects) {
+        if (effects == null || effects.isEmpty()) {
             return 0.0d;
         }
 
         double total = 0.0d;
-        for (PatchOp.EffectEntry effect : storyBeat.effects()) {
+        for (PatchOp.EffectEntry effect : effects) {
             if (effect == null) {
                 continue;
             }

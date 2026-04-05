@@ -19,17 +19,12 @@ public sealed class PatchCommandTranslator
                     commands.Add(new UnlockTechRuntimeCommand(addTech.TechId));
                     break;
                 case AddStoryBeatOp addStoryBeat:
-                    var effects = new List<DirectorDomainModifierSpec>();
-                    if (addStoryBeat.Effects != null)
+                    var effects = BuildDomainModifierSpecs(addStoryBeat.Effects, "addStoryBeat");
+
+                    DirectorCausalChainSpec? causalChain = null;
+                    if (addStoryBeat.CausalChain != null)
                     {
-                        foreach (var effect in addStoryBeat.Effects)
-                        {
-                            if (!string.Equals(effect.Type, "domain_modifier", StringComparison.OrdinalIgnoreCase))
-                                throw new InvalidOperationException($"Unsupported effect type '{effect.Type}' in addStoryBeat.");
-                            if (effect.DurationTicks <= 0)
-                                throw new InvalidOperationException("Effect durationTicks must be > 0 in addStoryBeat.");
-                            effects.Add(new DirectorDomainModifierSpec(effect.Domain, effect.Modifier, effect.DurationTicks));
-                        }
+                        causalChain = BuildCausalChainSpec(addStoryBeat.CausalChain, addStoryBeat.BeatId);
                     }
 
                     ValidateSeverityTier(addStoryBeat.Severity, effects.Count);
@@ -38,7 +33,8 @@ public sealed class PatchCommandTranslator
                         addStoryBeat.BeatId,
                         addStoryBeat.Text,
                         addStoryBeat.DurationTicks,
-                        effects
+                        effects,
+                        causalChain
                     ));
                     break;
                 case SetColonyDirectiveOp setColonyDirective:
@@ -104,6 +100,58 @@ public sealed class PatchCommandTranslator
             );
         }
     }
+
+    private static List<DirectorDomainModifierSpec> BuildDomainModifierSpecs(
+        IReadOnlyList<EffectEntry>? effects,
+        string context)
+    {
+        var specs = new List<DirectorDomainModifierSpec>();
+        if (effects == null)
+            return specs;
+
+        foreach (var effect in effects)
+        {
+            if (!string.Equals(effect.Type, "domain_modifier", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Unsupported effect type '{effect.Type}' in {context}.");
+            }
+
+            if (effect.DurationTicks <= 0)
+            {
+                throw new InvalidOperationException($"Effect durationTicks must be > 0 in {context}.");
+            }
+
+            specs.Add(new DirectorDomainModifierSpec(effect.Domain, effect.Modifier, effect.DurationTicks));
+        }
+
+        return specs;
+    }
+
+    private static DirectorCausalChainSpec BuildCausalChainSpec(CausalChainEntry chain, string parentBeatId)
+    {
+        if (!string.Equals(chain.Type, "causal_chain", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported causalChain type '{chain.Type}' in addStoryBeat '{parentBeatId}'."
+            );
+        }
+
+        var followUpEffects = BuildDomainModifierSpecs(chain.FollowUpBeat.Effects, "causalChain.followUpBeat");
+        ValidateSeverityTier(chain.FollowUpBeat.Severity, followUpEffects.Count);
+
+        return new DirectorCausalChainSpec(
+            new DirectorCausalConditionSpec(
+                chain.Condition.Metric,
+                chain.Condition.Operator,
+                chain.Condition.Threshold),
+            new DirectorFollowUpBeatSpec(
+                chain.FollowUpBeat.BeatId,
+                chain.FollowUpBeat.Text,
+                chain.FollowUpBeat.DurationTicks,
+                followUpEffects),
+            chain.WindowTicks,
+            chain.MaxTriggers);
+    }
 }
 
 public sealed class RuntimePatchCommandExecutor
@@ -122,7 +170,7 @@ public sealed class RuntimePatchCommandExecutor
             switch (command)
             {
                 case ApplyStoryBeatRuntimeCommand storyBeat:
-                    runtime.ValidateStoryBeat(storyBeat.BeatId, storyBeat.Text, storyBeat.DurationTicks, storyBeat.Effects);
+                    runtime.ValidateStoryBeat(storyBeat.BeatId, storyBeat.Text, storyBeat.DurationTicks, storyBeat.Effects, storyBeat.CausalChain);
                     if (activeBeats.Contains(storyBeat.BeatId))
                         continue;
 
@@ -185,7 +233,7 @@ public sealed class RuntimePatchCommandExecutor
                     runtime.UnlockTechForPrimaryColony(unlockTech.TechId);
                     break;
                 case ApplyStoryBeatRuntimeCommand storyBeat:
-                    runtime.ApplyStoryBeat(storyBeat.BeatId, storyBeat.Text, storyBeat.DurationTicks, storyBeat.Effects);
+                    runtime.ApplyStoryBeat(storyBeat.BeatId, storyBeat.Text, storyBeat.DurationTicks, storyBeat.Effects, storyBeat.CausalChain);
                     break;
                 case ApplyColonyDirectiveRuntimeCommand directive:
                     runtime.ApplyColonyDirective(

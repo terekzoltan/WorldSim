@@ -51,10 +51,22 @@ public sealed interface PatchOp permits PatchOp.AddTech, PatchOp.TweakTech, Patc
             String text,
             long durationTicks,
             String severity,
-            List<EffectEntry> effects
+            List<EffectEntry> effects,
+            CausalChainEntry causalChain
     ) implements PatchOp {
         public AddStoryBeat(String opId, String beatId, String text, long durationTicks) {
-            this(opId, beatId, text, durationTicks, null, List.of());
+            this(opId, beatId, text, durationTicks, null, List.of(), null);
+        }
+
+        public AddStoryBeat(
+                String opId,
+                String beatId,
+                String text,
+                long durationTicks,
+                String severity,
+                List<EffectEntry> effects
+        ) {
+            this(opId, beatId, text, durationTicks, severity, effects, null);
         }
     }
 
@@ -84,6 +96,31 @@ public sealed interface PatchOp permits PatchOp.AddTech, PatchOp.TweakTech, Patc
             String goalCategory,
             double weight,
             Long durationTicks
+    ) {
+    }
+
+    record CausalChainEntry(
+            String type,
+            CausalCondition condition,
+            CausalFollowUpBeat followUpBeat,
+            long windowTicks,
+            int maxTriggers
+    ) {
+    }
+
+    record CausalCondition(
+            String metric,
+            String operator,
+            double threshold
+    ) {
+    }
+
+    record CausalFollowUpBeat(
+            String beatId,
+            String text,
+            long durationTicks,
+            String severity,
+            List<EffectEntry> effects
     ) {
     }
 }

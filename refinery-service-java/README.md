@@ -48,6 +48,10 @@ When `PLANNER_MODE=pipeline`, responses include explicit explain markers:
 - `llmCandidateSanitized:<true|false>`
 - `llmCandidateSanitizeTags:<comma-separated-tags>`
 - `budgetUsed:<decimal>`
+- `causalChainOps:<n>` (number of `addStoryBeat` ops carrying optional nested `causalChain`)
+- `causalChainMaxTriggers:1`
+- `causalChainMetrics:food_reserves_pct,morale_avg,population,economy_output`
+- `causalChainEqPolicy:population_exact;floating_tolerance=0.0001`
 
 ## Director Live Smoke Notes (Wave 6.1)
 
@@ -131,6 +135,25 @@ Production director planning flow remains unchanged in this step.
 - Director bridge mapping to wire-level `PatchOp` is isolated in a dedicated mapper.
 - `PatchResponse` stays the transport/output bridge contract for C# consumers, not the primary internal ontology.
 - Transitional note: validator/fallback logic still using `PatchOp` is explicitly transitional in TR1-E.
+
+## S7-A causal-chain contract lock
+
+- `causalChain` is an optional nested field on `addStoryBeat` (no new op type).
+- Wire/root envelope remains unchanged (`schemaVersion`, `requestId`, `seed`, `patch`, `explain`, `warnings`).
+- Canonical causal condition metrics in S7-A:
+  - `food_reserves_pct` (0..100)
+  - `morale_avg` (0..100)
+  - `population` (living population count)
+  - `economy_output` (runtime multiplier)
+- `military_strength` is intentionally excluded from S7-A allowlist.
+- `maxTriggers` is frozen to `1` in S7-A.
+- `eq` semantics lock:
+  - `population` uses exact equality (integer threshold expected)
+  - `food_reserves_pct`, `morale_avg`, `economy_output` use tolerance `Math.Abs(actual - threshold) <= 0.0001`
+- Budget policy lock:
+  - no deferred runtime debt in S7-A
+  - causal-chain combined cost is validator/planner-side guarded (`INV-17`)
+  - runtime checkpoint budget mirror semantics stay unchanged
 
 ## API
 

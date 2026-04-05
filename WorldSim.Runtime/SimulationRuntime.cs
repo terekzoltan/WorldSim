@@ -18,6 +18,25 @@ public sealed class SimulationRuntime
         "BoostIndustry"
     };
 
+    private static readonly HashSet<string> KnownCausalConditionMetrics = new(StringComparer.Ordinal)
+    {
+        "food_reserves_pct",
+        "morale_avg",
+        "population",
+        "economy_output"
+    };
+
+    private static readonly HashSet<string> KnownCausalConditionOperators = new(StringComparer.Ordinal)
+    {
+        "lt",
+        "gt",
+        "eq"
+    };
+
+    private const int MinCausalWindowTicks = 10;
+    private const int MaxCausalWindowTicks = 100;
+    private const double FloatingCausalEqTolerance = 0.0001d;
+
     private readonly World _world;
     private readonly double _directorDampeningFactor;
     private readonly Queue<string> _recentAiDecisions = new();
@@ -101,6 +120,7 @@ public sealed class SimulationRuntime
     public void AdvanceTick(float dt)
     {
         _world.Update(dt);
+        EvaluatePendingDirectorCausalChains();
         _directorState.Tick();
         RefreshAiDebugSnapshot();
         Tick++;
@@ -159,6 +179,18 @@ public sealed class SimulationRuntime
             .ThenBy(bias => bias.GoalCategory)
             .ToList();
 
+        var pendingChains = _directorState.PendingCausalChains
+            .Select(chain => new DirectorPendingChainRenderData(
+                chain.ParentBeatId,
+                chain.Status,
+                chain.ConditionSummary,
+                chain.FollowUpBeatId,
+                chain.FollowUpSummary,
+                chain.RemainingWindowTicks,
+                chain.TriggerCount,
+                chain.LastFailureMessage))
+            .ToList();
+
         var stageMarker = _directorExecutionState.Stage;
         var outputMode = _directorExecutionState.EffectiveOutputMode;
         var outputModeSource = _directorExecutionState.EffectiveOutputModeSource;
@@ -178,6 +210,7 @@ public sealed class SimulationRuntime
             HasBudgetData: _directorState.HasBudgetData,
             ActiveBeats: activeBeats,
             ActiveDirectives: activeDirectives,
+            PendingChains: pendingChains,
             ActiveDomainModifiers: activeModifiers,
             ActiveGoalBiases: activeBiases,
             LastActionStatus: LastDirectorActionStatus);
@@ -371,7 +404,8 @@ public sealed class SimulationRuntime
         string beatId,
         string text,
         long durationTicks,
-        IReadOnlyList<DirectorDomainModifierSpec>? effects = null)
+        IReadOnlyList<DirectorDomainModifierSpec>? effects = null,
+        DirectorCausalChainSpec? causalChain = null)
     {
         var (alreadyActive, validatedEffects, severity) = PrepareStoryBeatApplication(beatId, text, durationTicks, effects);
         if (alreadyActive)
@@ -399,6 +433,12 @@ public sealed class SimulationRuntime
 
         _world.AddExternalEvent($"[Director:{severity.ToString().ToUpperInvariant()}] {text}");
 
+        if (causalChain.HasValue)
+        {
+            var validatedChain = ValidateCausalChainSpec(beatId, causalChain.Value);
+            _directorState.RegisterCausalChain(beatId, validatedChain, Tick);
+        }
+
         LastDirectorActionStatus = result.Message;
     }
 
@@ -406,9 +446,12 @@ public sealed class SimulationRuntime
         string beatId,
         string text,
         long durationTicks,
-        IReadOnlyList<DirectorDomainModifierSpec>? effects = null)
+        IReadOnlyList<DirectorDomainModifierSpec>? effects = null,
+        DirectorCausalChainSpec? causalChain = null)
     {
         _ = PrepareStoryBeatApplication(beatId, text, durationTicks, effects);
+        if (causalChain.HasValue)
+            _ = ValidateCausalChainSpec(beatId, causalChain.Value);
     }
 
     private static DirectorBeatSeverity InferBeatSeverity(int effectCount)
@@ -622,17 +665,7 @@ public sealed class SimulationRuntime
 
     private JsonObject BuildDirectorSnapshotJson()
     {
-        int livingPopulation = _world._people.Count(person => person.Health > 0f);
-        int totalFood = _world._colonies.Sum(colony => colony.Stock.GetValueOrDefault(Resource.Food, 0));
-        double foodReservesPct = livingPopulation <= 0
-            ? 0d
-            : Math.Clamp(totalFood / (double)(livingPopulation * 6), 0d, 1d);
-        double moraleAvg = _world._colonies.Count == 0
-            ? 0d
-            : _world._colonies.Average(colony => colony.Morale);
-        double economyOutput = _world._colonies.Count == 0
-            ? 1d
-            : _world._colonies.Average(colony => colony.ColonyWorkMultiplier);
+        var metrics = BuildDirectorConditionMetrics();
 
         var activeBeats = new JsonArray();
         foreach (var beat in _directorState.ActiveBeats)
@@ -689,6 +722,22 @@ public sealed class SimulationRuntime
             }
         }
 
+        var pendingCausalChains = new JsonArray();
+        foreach (var chain in _directorState.PendingCausalChains)
+        {
+            pendingCausalChains.Add(new JsonObject
+            {
+                ["parentBeatId"] = chain.ParentBeatId,
+                ["status"] = chain.Status,
+                ["conditionSummary"] = chain.ConditionSummary,
+                ["followUpBeatId"] = chain.FollowUpBeatId,
+                ["followUpSummary"] = chain.FollowUpSummary,
+                ["remainingWindowTicks"] = chain.RemainingWindowTicks,
+                ["triggerCount"] = chain.TriggerCount,
+                ["lastFailureMessage"] = chain.LastFailureMessage
+            });
+        }
+
         return new JsonObject
         {
             ["currentTick"] = Tick,
@@ -696,12 +745,13 @@ public sealed class SimulationRuntime
             ["effectiveOutputMode"] = _directorExecutionState.EffectiveOutputMode,
             ["effectiveOutputModeSource"] = _directorExecutionState.EffectiveOutputModeSource,
             ["stage"] = _directorExecutionState.Stage,
-            ["colonyPopulation"] = livingPopulation,
-            ["foodReservesPct"] = foodReservesPct,
-            ["moraleAvg"] = moraleAvg,
-            ["economyOutput"] = economyOutput,
+            ["colonyPopulation"] = metrics.LivingPopulation,
+            ["foodReservesPct"] = metrics.FoodReservesPct,
+            ["moraleAvg"] = metrics.MoraleAvg,
+            ["economyOutput"] = metrics.EconomyOutput,
             ["activeBeats"] = activeBeats,
             ["activeDirectives"] = activeDirectives,
+            ["pendingCausalChains"] = pendingCausalChains,
             ["beatCooldownRemainingTicks"] = _directorState.BeatCooldownRemainingTicks,
             ["maxInfluenceBudget"] = _directorState.MaxInfluenceBudget,
             ["remainingInfluenceBudget"] = _directorState.RemainingInfluenceBudget,
@@ -712,6 +762,183 @@ public sealed class SimulationRuntime
             ["activeGoalBiases"] = activeGoalBiases
         };
     }
+
+    private void EvaluatePendingDirectorCausalChains()
+    {
+        var evaluationTick = Tick + 1;
+        var metrics = BuildDirectorConditionMetrics();
+        var followUps = _directorState.EvaluatePendingCausalChains(
+            evaluationTick,
+            condition => EvaluateDirectorCondition(condition, metrics));
+
+        foreach (var trigger in followUps)
+        {
+            try
+            {
+                ApplyStoryBeat(
+                    trigger.FollowUpBeat.BeatId,
+                    trigger.FollowUpBeat.Text,
+                    trigger.FollowUpBeat.DurationTicks,
+                    trigger.FollowUpBeat.Effects,
+                    causalChain: null);
+            }
+            catch (Exception ex)
+            {
+                _directorState.MarkCausalChainTriggerFailed(trigger.ParentBeatId, ex.Message);
+                LastDirectorActionStatus = $"Causal chain trigger failed for '{trigger.ParentBeatId}': {ex.Message}";
+            }
+        }
+    }
+
+    private static bool EvaluateDirectorCondition(DirectorCausalConditionSpec condition, DirectorConditionMetrics metrics)
+    {
+        var observed = condition.Metric switch
+        {
+            "food_reserves_pct" => metrics.FoodReservesPct,
+            "morale_avg" => metrics.MoraleAvg,
+            "population" => metrics.LivingPopulation,
+            "economy_output" => metrics.EconomyOutput,
+            _ => throw new InvalidOperationException($"Unknown causal condition metric '{condition.Metric}'.")
+        };
+
+        return condition.Operator switch
+        {
+            "lt" => observed < condition.Threshold,
+            "gt" => observed > condition.Threshold,
+            "eq" when string.Equals(condition.Metric, "population", StringComparison.Ordinal)
+                => observed == condition.Threshold,
+            "eq" => Math.Abs(observed - condition.Threshold) <= FloatingCausalEqTolerance,
+            _ => throw new InvalidOperationException($"Unknown causal condition operator '{condition.Operator}'.")
+        };
+    }
+
+    private DirectorCausalChainSpec ValidateCausalChainSpec(string parentBeatId, DirectorCausalChainSpec chain)
+    {
+        var metric = NormalizeCausalConditionMetric(chain.Condition.Metric);
+        var op = NormalizeCausalConditionOperator(chain.Condition.Operator);
+
+        if (chain.WindowTicks < MinCausalWindowTicks || chain.WindowTicks > MaxCausalWindowTicks)
+        {
+            throw new InvalidOperationException(
+                $"Cannot apply causal chain for beat '{parentBeatId}': windowTicks must be in [{MinCausalWindowTicks}, {MaxCausalWindowTicks}]."
+            );
+        }
+
+        if (chain.MaxTriggers != 1)
+            throw new InvalidOperationException($"Cannot apply causal chain for beat '{parentBeatId}': maxTriggers must be 1 in S7-A.");
+
+        if (double.IsNaN(chain.Condition.Threshold) || double.IsInfinity(chain.Condition.Threshold))
+            throw new InvalidOperationException($"Cannot apply causal chain for beat '{parentBeatId}': condition threshold must be finite.");
+
+        if (string.Equals(metric, "population", StringComparison.Ordinal)
+            && string.Equals(op, "eq", StringComparison.Ordinal)
+            && Math.Abs(chain.Condition.Threshold - Math.Round(chain.Condition.Threshold)) > FloatingCausalEqTolerance)
+        {
+            throw new InvalidOperationException(
+                $"Cannot apply causal chain for beat '{parentBeatId}': population eq threshold must be an integer value."
+            );
+        }
+
+        var followUpBeat = ValidateFollowUpBeatSpec(parentBeatId, chain.FollowUpBeat);
+        return new DirectorCausalChainSpec(
+            new DirectorCausalConditionSpec(metric, op, chain.Condition.Threshold),
+            followUpBeat,
+            chain.WindowTicks,
+            1);
+    }
+
+    private DirectorFollowUpBeatSpec ValidateFollowUpBeatSpec(string parentBeatId, DirectorFollowUpBeatSpec followUpBeat)
+    {
+        if (string.IsNullOrWhiteSpace(followUpBeat.BeatId))
+            throw new InvalidOperationException($"Cannot apply causal chain for beat '{parentBeatId}': follow-up beatId is required.");
+        if (string.Equals(followUpBeat.BeatId, parentBeatId, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Cannot apply causal chain for beat '{parentBeatId}': follow-up beatId must differ from parent beatId.");
+        if (string.IsNullOrWhiteSpace(followUpBeat.Text))
+            throw new InvalidOperationException($"Cannot apply causal chain for beat '{parentBeatId}': follow-up text is required.");
+        if (followUpBeat.DurationTicks <= 0)
+            throw new InvalidOperationException($"Cannot apply causal chain for beat '{parentBeatId}': follow-up durationTicks must be > 0.");
+
+        var effects = followUpBeat.Effects ?? Array.Empty<DirectorDomainModifierSpec>();
+        if (effects.Count > 3)
+            throw new InvalidOperationException($"Cannot apply causal chain for beat '{parentBeatId}': follow-up effect count {effects.Count} exceeds max 3.");
+
+        foreach (var effect in effects)
+        {
+            if (effect.DurationTicks != (int)followUpBeat.DurationTicks)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot apply causal chain for beat '{parentBeatId}': follow-up effect durationTicks {effect.DurationTicks} must match follow-up durationTicks {(int)followUpBeat.DurationTicks}."
+                );
+            }
+
+            _ = ParseRuntimeDomain(effect.Domain);
+            if (effect.Modifier < -0.30d || effect.Modifier > 0.30d)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot apply causal chain for beat '{parentBeatId}': follow-up modifier {effect.Modifier} out of bounds [-0.30, +0.30] for domain '{effect.Domain}'."
+                );
+            }
+        }
+
+        return new DirectorFollowUpBeatSpec(
+            followUpBeat.BeatId,
+            followUpBeat.Text,
+            followUpBeat.DurationTicks,
+            effects.ToList());
+    }
+
+    private static string NormalizeCausalConditionMetric(string metric)
+    {
+        if (string.IsNullOrWhiteSpace(metric))
+            throw new InvalidOperationException("Causal condition metric is required.");
+
+        var normalized = metric.Trim().ToLowerInvariant();
+        if (!KnownCausalConditionMetrics.Contains(normalized))
+            throw new InvalidOperationException($"Unknown causal condition metric '{metric}'.");
+
+        return normalized;
+    }
+
+    private static string NormalizeCausalConditionOperator(string op)
+    {
+        if (string.IsNullOrWhiteSpace(op))
+            throw new InvalidOperationException("Causal condition operator is required.");
+
+        var normalized = op.Trim().ToLowerInvariant();
+        if (!KnownCausalConditionOperators.Contains(normalized))
+            throw new InvalidOperationException($"Unknown causal condition operator '{op}'.");
+
+        return normalized;
+    }
+
+    private DirectorConditionMetrics BuildDirectorConditionMetrics()
+    {
+        int livingPopulation = _world._people.Count(person => person.Health > 0f);
+        int totalFood = _world._colonies.Sum(colony => colony.Stock.GetValueOrDefault(Resource.Food, 0));
+        double foodReservesPctNormalized = livingPopulation <= 0
+            ? 0d
+            : Math.Clamp(totalFood / (double)(livingPopulation * 6), 0d, 1d);
+        double moraleAvg = _world._colonies.Count == 0
+            ? 0d
+            : _world._colonies.Average(colony => colony.Morale);
+        double economyOutput = _world._colonies.Count == 0
+            ? 1d
+            : _world._colonies.Average(colony => colony.ColonyWorkMultiplier);
+
+        return new DirectorConditionMetrics(
+            LivingPopulation: livingPopulation,
+            FoodReservesPctNormalized: foodReservesPctNormalized,
+            FoodReservesPct: foodReservesPctNormalized * 100d,
+            MoraleAvg: moraleAvg,
+            EconomyOutput: economyOutput);
+    }
+
+    private readonly record struct DirectorConditionMetrics(
+        int LivingPopulation,
+        double FoodReservesPctNormalized,
+        double FoodReservesPct,
+        double MoraleAvg,
+        double EconomyOutput);
 
     private RuntimeNpcBrain CreateBrain(Colony colony, RuntimeAiOptions options)
     {

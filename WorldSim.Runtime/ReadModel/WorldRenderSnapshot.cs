@@ -87,6 +87,7 @@ public sealed record DirectorRenderState(
     bool HasBudgetData,
     IReadOnlyList<DirectorActiveBeatRenderData> ActiveBeats,
     IReadOnlyList<DirectorActiveDirectiveRenderData> ActiveDirectives,
+    IReadOnlyList<DirectorPendingChainRenderData> PendingChains,
     IReadOnlyList<DirectorDomainModifierRenderData> ActiveDomainModifiers,
     IReadOnlyList<DirectorGoalBiasRenderData> ActiveGoalBiases,
     string LastActionStatus)
@@ -106,6 +107,7 @@ public sealed record DirectorRenderState(
         HasBudgetData: false,
         ActiveBeats: Array.Empty<DirectorActiveBeatRenderData>(),
         ActiveDirectives: Array.Empty<DirectorActiveDirectiveRenderData>(),
+        PendingChains: Array.Empty<DirectorPendingChainRenderData>(),
         ActiveDomainModifiers: Array.Empty<DirectorDomainModifierRenderData>(),
         ActiveGoalBiases: Array.Empty<DirectorGoalBiasRenderData>(),
         LastActionStatus: "No director action");
@@ -113,6 +115,15 @@ public sealed record DirectorRenderState(
 
 public sealed record DirectorActiveBeatRenderData(string BeatId, string Text, string Severity, int RemainingTicks, int TotalTicks);
 public sealed record DirectorActiveDirectiveRenderData(int ColonyId, string Directive, int RemainingTicks, int TotalTicks);
+public sealed record DirectorPendingChainRenderData(
+    string ParentBeatId,
+    string Status,
+    string ConditionSummary,
+    string FollowUpBeatId,
+    string FollowUpSummary,
+    int RemainingWindowTicks,
+    int TriggerCount,
+    string LastFailureMessage);
 public sealed record DirectorDomainModifierRenderData(string SourceId, string Domain, double BaseModifier, double EffectiveModifier, int RemainingTicks, int TotalDurationTicks);
 public sealed record DirectorGoalBiasRenderData(int ColonyId, string SourceId, string GoalCategory, double BaseWeight, double EffectiveWeight, int RemainingTicks, int TotalDurationTicks, bool IsBlendActive);
 

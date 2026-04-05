@@ -82,13 +82,22 @@ public final class DirectorModelValidator {
                     );
                 }
 
+                PatchOp.CausalChainEntry causalChain = validateAndSanitizeCausalChain(
+                        storyBeat,
+                        repairedDuration,
+                        explicitSeverity,
+                        effects,
+                        facts
+                );
+
                 repaired.add(new PatchOp.AddStoryBeat(
                         storyBeat.opId(),
                         storyBeat.beatId(),
                         storyBeat.text(),
                         repairedDuration,
                         explicitSeverity,
-                        effects
+                        effects,
+                        causalChain
                 ));
                 storyBeatSeen = true;
                 continue;
@@ -177,17 +186,25 @@ public final class DirectorModelValidator {
                     validateNoContradictoryModifiers(effects);
                     validateDomainStackCap(effects);
                     severity = normalizeOptionalSeverity(storyBeat.severity());
+                    PatchOp.CausalChainEntry causalChain = validateAndSanitizeCausalChain(
+                            storyBeat,
+                            duration,
+                            severity,
+                            effects,
+                            facts
+                    );
+                    filtered.add(new PatchOp.AddStoryBeat(
+                            storyBeat.opId(),
+                            storyBeat.beatId(),
+                            storyBeat.text(),
+                            duration,
+                            severity,
+                            effects,
+                            causalChain
+                    ));
                 } catch (IllegalArgumentException ex) {
                     continue;
                 }
-                filtered.add(new PatchOp.AddStoryBeat(
-                        storyBeat.opId(),
-                        storyBeat.beatId(),
-                        storyBeat.text(),
-                        duration,
-                        severity,
-                        effects
-                ));
                 continue;
             }
             if (op instanceof PatchOp.SetColonyDirective directive) {
@@ -451,6 +468,126 @@ public final class DirectorModelValidator {
                     "Budget cost " + budgetUsed + " exceeds limit " + facts.remainingInfluenceBudget()
             );
         }
+    }
+
+    private static PatchOp.CausalChainEntry validateAndSanitizeCausalChain(
+            PatchOp.AddStoryBeat storyBeat,
+            long repairedDuration,
+            String explicitSeverity,
+            List<PatchOp.EffectEntry> effects,
+            DirectorRuntimeFacts facts
+    ) {
+        PatchOp.CausalChainEntry causalChain = storyBeat.causalChain();
+        if (causalChain == null) {
+            return null;
+        }
+
+        if (isBlank(causalChain.type()) || !"causal_chain".equalsIgnoreCase(causalChain.type())) {
+            throw invalid(DirectorDesign.INV_18, "Unsupported causal chain type: " + causalChain.type());
+        }
+
+        PatchOp.CausalCondition condition = causalChain.condition();
+        if (condition == null) {
+            throw invalid(DirectorDesign.INV_18, "Causal chain condition is required.");
+        }
+
+        String metric = condition.metric() == null ? "" : condition.metric().trim().toLowerCase(Locale.ROOT);
+        if (!DirectorDesign.CAUSAL_ALLOWED_METRICS.contains(metric)) {
+            throw invalid(DirectorDesign.INV_18, "Unknown condition metric '" + condition.metric() + "'.");
+        }
+
+        String operator = condition.operator() == null ? "" : condition.operator().trim().toLowerCase(Locale.ROOT);
+        if (!DirectorDesign.CAUSAL_ALLOWED_OPERATORS.contains(operator)) {
+            throw invalid(DirectorDesign.INV_18, "Unknown condition operator '" + condition.operator() + "'.");
+        }
+
+        double threshold = condition.threshold();
+        if (Double.isNaN(threshold) || Double.isInfinite(threshold)) {
+            throw invalid(DirectorDesign.INV_18, "Condition threshold must be finite.");
+        }
+
+        if ("population".equals(metric) && "eq".equals(operator) && Math.rint(threshold) != threshold) {
+            throw invalid(DirectorDesign.INV_18, "Population eq threshold must be an integer value.");
+        }
+
+        if (causalChain.windowTicks() < DirectorDesign.MIN_CAUSAL_WINDOW_TICKS
+                || causalChain.windowTicks() > DirectorDesign.MAX_CAUSAL_WINDOW_TICKS) {
+            throw invalid(
+                    DirectorDesign.INV_19,
+                    "Chain window " + causalChain.windowTicks() + " out of bounds ["
+                            + DirectorDesign.MIN_CAUSAL_WINDOW_TICKS + ", " + DirectorDesign.MAX_CAUSAL_WINDOW_TICKS + "]"
+            );
+        }
+
+        if (causalChain.maxTriggers() != DirectorDesign.CAUSAL_MAX_TRIGGERS) {
+            throw invalid(
+                    DirectorDesign.INV_19,
+                    "Causal chain maxTriggers must be " + DirectorDesign.CAUSAL_MAX_TRIGGERS
+                            + " in S7-A, got " + causalChain.maxTriggers()
+            );
+        }
+
+        PatchOp.CausalFollowUpBeat followUpBeat = causalChain.followUpBeat();
+        if (followUpBeat == null) {
+            throw invalid(DirectorDesign.INV_16, "Causal chain followUpBeat is required.");
+        }
+        if (isBlank(followUpBeat.beatId()) || isBlank(followUpBeat.text())) {
+            throw invalid(DirectorDesign.INV_16, "Causal follow-up beatId and text are required.");
+        }
+        if (storyBeat.beatId().equals(followUpBeat.beatId())) {
+            throw invalid(DirectorDesign.INV_16, "Causal chain references parent beat, creating loop.");
+        }
+        if (followUpBeat.text().length() > DirectorDesign.MAX_STORY_TEXT_LENGTH) {
+            throw invalid(
+                    DirectorDesign.INV_16,
+                    "Causal follow-up text too long: " + followUpBeat.text().length()
+                            + " (max " + DirectorDesign.MAX_STORY_TEXT_LENGTH + ")"
+            );
+        }
+
+        long followUpDuration = clamp(
+                followUpBeat.durationTicks(),
+                DirectorDesign.MIN_STORY_DURATION,
+                DirectorDesign.MAX_STORY_DURATION
+        );
+        String followUpSeverity = normalizeOptionalSeverity(followUpBeat.severity());
+        List<PatchOp.EffectEntry> followUpEffects = sanitizeEffects(followUpBeat.effects(), followUpDuration);
+        validateNoContradictoryModifiers(followUpEffects);
+        validateDomainStackCap(followUpEffects);
+
+        PatchOp.CausalChainEntry repairedChain = new PatchOp.CausalChainEntry(
+                "causal_chain",
+                new PatchOp.CausalCondition(metric, operator, threshold),
+                new PatchOp.CausalFollowUpBeat(
+                        followUpBeat.beatId(),
+                        followUpBeat.text(),
+                        followUpDuration,
+                        followUpSeverity,
+                        followUpEffects
+                ),
+                causalChain.windowTicks(),
+                DirectorDesign.CAUSAL_MAX_TRIGGERS
+        );
+
+        double storyWithChainBudget = DirectorInfluenceBudget.calculateBudgetUsed(List.of(
+                new PatchOp.AddStoryBeat(
+                        storyBeat.opId(),
+                        storyBeat.beatId(),
+                        storyBeat.text(),
+                        repairedDuration,
+                        explicitSeverity,
+                        effects,
+                        repairedChain
+                )
+        ));
+        if (storyWithChainBudget > facts.remainingInfluenceBudget()) {
+            throw invalid(
+                    DirectorDesign.INV_17,
+                    "Chain total cost " + storyWithChainBudget + " exceeds limit " + facts.remainingInfluenceBudget()
+            );
+        }
+
+        return repairedChain;
     }
 
     private static long clamp(long value, long min, long max) {

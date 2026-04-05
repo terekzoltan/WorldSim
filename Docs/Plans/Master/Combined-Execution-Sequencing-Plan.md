@@ -1284,7 +1284,7 @@ Wave turn-gate:
 
 > Director Plan > Phase 3 Sprint 7
 
-- ⬜ **S7-A** Causal chain layer — v2 contracts, monitoring, condition evaluation (Track D + B)
+- ✅ **S7-A** Causal chain layer — v2 contracts, monitoring, condition evaluation (Track D + B)
 - ⬜ **S7-B** Operational UX — profiles, debug toggles, env var cleanup (Track D + A)
 
 ### Sprint C7: Refinery / Director Integration for Combat (Track D — optional)

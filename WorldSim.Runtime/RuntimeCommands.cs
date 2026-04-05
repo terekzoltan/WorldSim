@@ -29,7 +29,8 @@ public sealed record ApplyStoryBeatRuntimeCommand(
     string BeatId,
     string Text,
     long DurationTicks,
-    IReadOnlyList<DirectorDomainModifierSpec> Effects) : RuntimePatchCommand;
+    IReadOnlyList<DirectorDomainModifierSpec> Effects,
+    DirectorCausalChainSpec? CausalChain = null) : RuntimePatchCommand;
 
 public sealed record ApplyColonyDirectiveRuntimeCommand(
     int ColonyId,

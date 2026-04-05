@@ -21,7 +21,31 @@ public sealed class PatchResponseParserDirectorTests
               "opId": "op_story_1",
               "beatId": "BEAT_SAMPLE_1",
               "text": "The harvest moon rises.",
-              "durationTicks": 24
+              "durationTicks": 24,
+              "causalChain": {
+                "type": "causal_chain",
+                "condition": {
+                  "metric": "food_reserves_pct",
+                  "operator": "lt",
+                  "threshold": 35
+                },
+                "followUpBeat": {
+                  "beatId": "BEAT_SAMPLE_1_FOLLOW",
+                  "text": "Emergency rationing begins.",
+                  "durationTicks": 12,
+                  "severity": "major",
+                  "effects": [
+                    {
+                      "type": "domain_modifier",
+                      "domain": "morale",
+                      "modifier": -0.08,
+                      "durationTicks": 12
+                    }
+                  ]
+                },
+                "windowTicks": 20,
+                "maxTriggers": 1
+              }
             },
             {
               "op": "setColonyDirective",
@@ -41,6 +65,11 @@ public sealed class PatchResponseParserDirectorTests
 
         var story = Assert.IsType<AddStoryBeatOp>(response.Patch[0]);
         Assert.Equal("BEAT_SAMPLE_1", story.BeatId);
+        Assert.NotNull(story.CausalChain);
+        Assert.Equal("causal_chain", story.CausalChain!.Type);
+        Assert.Equal("food_reserves_pct", story.CausalChain.Condition.Metric);
+        Assert.Equal("BEAT_SAMPLE_1_FOLLOW", story.CausalChain.FollowUpBeat.BeatId);
+        Assert.Equal(1, story.CausalChain.MaxTriggers);
         var directive = Assert.IsType<SetColonyDirectiveOp>(response.Patch[1]);
         Assert.Equal("PrioritizeFood", directive.Directive);
     }

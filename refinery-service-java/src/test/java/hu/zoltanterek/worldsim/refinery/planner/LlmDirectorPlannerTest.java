@@ -152,6 +152,118 @@ class LlmDirectorPlannerTest {
     }
 
     @Test
+    void propose_WhenCausalChainPresent_MapsNestedChainToStoryBeatOp() {
+        String response = """
+                {
+                  "designatedOutput": {
+                    "storyBeatSlot": {
+                      "beatId": "BEAT_CHAIN_A",
+                      "text": "Primary chain story",
+                      "durationTicks": 18,
+                      "severity": "major",
+                      "effects": [
+                        {"kind":"domain_modifier","domain":"food","modifier":-0.1,"durationTicks":18}
+                      ],
+                      "causalChain": {
+                        "type": "causal_chain",
+                        "condition": {"metric":"food_reserves_pct","operator":"lt","threshold":35},
+                        "followUpBeat": {
+                          "beatId": "BEAT_CHAIN_A_FOLLOW",
+                          "text": "Follow-up chain story",
+                          "durationTicks": 12,
+                          "severity": "major",
+                          "effects": [
+                            {"kind":"domain_modifier","domain":"morale","modifier":-0.08,"durationTicks":12}
+                          ]
+                        },
+                        "windowTicks": 20,
+                        "maxTriggers": 1
+                      }
+                    },
+                    "directiveSlot": null
+                  }
+                }
+                """;
+
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "key",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> response
+        );
+
+        LlmDirectorPlanner.ProposalResult detailed = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(detailed.patch().isPresent());
+
+        PatchOp.AddStoryBeat story = (PatchOp.AddStoryBeat) detailed.patch().get().get(0);
+        assertTrue(story.causalChain() != null);
+        assertEquals("causal_chain", story.causalChain().type());
+        assertEquals("food_reserves_pct", story.causalChain().condition().metric());
+        assertEquals("BEAT_CHAIN_A_FOLLOW", story.causalChain().followUpBeat().beatId());
+        assertEquals(1, story.causalChain().maxTriggers());
+    }
+
+    @Test
+    void propose_WhenPopulationEqThresholdIsFractional_DropsCausalChain() {
+        String response = """
+                {
+                  "designatedOutput": {
+                    "storyBeatSlot": {
+                      "beatId": "BEAT_CHAIN_B",
+                      "text": "Population check",
+                      "durationTicks": 14,
+                      "severity": "major",
+                      "effects": [
+                        {"kind":"domain_modifier","domain":"food","modifier":-0.05,"durationTicks":14}
+                      ],
+                      "causalChain": {
+                        "type": "causal_chain",
+                        "condition": {"metric":"population","operator":"eq","threshold":24.5},
+                        "followUpBeat": {
+                          "beatId": "BEAT_CHAIN_B_FOLLOW",
+                          "text": "Follow-up chain story",
+                          "durationTicks": 10,
+                          "severity": "major",
+                          "effects": [
+                            {"kind":"domain_modifier","domain":"morale","modifier":-0.08,"durationTicks":10}
+                          ]
+                        },
+                        "windowTicks": 20,
+                        "maxTriggers": 1
+                      }
+                    },
+                    "directiveSlot": null
+                  }
+                }
+                """;
+
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "key",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> response
+        );
+
+        LlmDirectorPlanner.ProposalResult detailed = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(detailed.patch().isPresent());
+        PatchOp.AddStoryBeat story = (PatchOp.AddStoryBeat) detailed.patch().get().get(0);
+        assertTrue(story.causalChain() == null);
+        assertTrue(detailed.sanitizeTags().contains("causal_chain_population_eq_non_integer"));
+    }
+
+    @Test
     void propose_UsesWorldColonyCountInsteadOfDirectorPopulationForDirectiveClamp() {
         String response = """
                 {

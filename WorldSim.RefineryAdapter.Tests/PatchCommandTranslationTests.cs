@@ -64,6 +64,29 @@ public class PatchCommandTranslationTests
                             Modifier = 0.10,
                             DurationTicks = 20
                         }
+                    },
+                    CausalChain = new CausalChainEntry
+                    {
+                        Type = "causal_chain",
+                        Condition = new CausalCondition
+                        {
+                            Metric = "food_reserves_pct",
+                            Operator = "lt",
+                            Threshold = 35
+                        },
+                        FollowUpBeat = new CausalFollowUpBeat
+                        {
+                            BeatId = "BEAT_FOLLOW_1",
+                            Text = "Emergency rationing begins.",
+                            DurationTicks = 12,
+                            Severity = "major",
+                            Effects = new[]
+                            {
+                                BuildEffect("morale", -0.08, 12)
+                            }
+                        },
+                        WindowTicks = 20,
+                        MaxTriggers = 1
                     }
                 },
                 new SetColonyDirectiveOp
@@ -99,6 +122,10 @@ public class PatchCommandTranslationTests
                 Assert.Equal("BEAT_SAMPLE_1", story.BeatId);
                 var effect = Assert.Single(story.Effects);
                 Assert.Equal("economy", effect.Domain);
+                Assert.True(story.CausalChain.HasValue);
+                Assert.Equal("food_reserves_pct", story.CausalChain.Value.Condition.Metric);
+                Assert.Equal("BEAT_FOLLOW_1", story.CausalChain.Value.FollowUpBeat.BeatId);
+                Assert.Equal(20, story.CausalChain.Value.WindowTicks);
             },
             item =>
             {
@@ -268,6 +295,40 @@ public class PatchCommandTranslationTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => executor.Execute(runtime, commands));
         Assert.Contains("unknown directive", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Executor_AppliesStoryBeatCausalChain_EndToEnd()
+    {
+        var runtime = CreateRuntime();
+        var executor = new RuntimePatchCommandExecutor();
+
+        var commands = new List<RuntimePatchCommand>
+        {
+            new ApplyStoryBeatRuntimeCommand(
+                "BEAT_PARENT_EXECUTOR",
+                "Pressure mounts.",
+                14,
+                Array.Empty<DirectorDomainModifierSpec>(),
+                new DirectorCausalChainSpec(
+                    new DirectorCausalConditionSpec("population", "gt", 0),
+                    new DirectorFollowUpBeatSpec(
+                        "BEAT_CHILD_EXECUTOR",
+                        "Follow-up engages.",
+                        12,
+                        Array.Empty<DirectorDomainModifierSpec>()),
+                    WindowTicks: 10,
+                    MaxTriggers: 1))
+        };
+
+        executor.ValidateDirectorBatch(runtime, commands);
+        executor.Execute(runtime, commands);
+
+        runtime.AdvanceTick(0.25f);
+
+        var beats = runtime.BuildRefinerySnapshot()["director"]?["activeBeats"]?.AsArray();
+        Assert.NotNull(beats);
+        Assert.Contains(beats!, item => (item?["beatId"]?.GetValue<string>() ?? string.Empty) == "BEAT_CHILD_EXECUTOR");
     }
 
     [Fact]

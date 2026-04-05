@@ -17,6 +17,7 @@ public class DirectorPipelineTelemetry {
     private final AtomicLong validationRetryRoundsTotal = new AtomicLong();
     private final AtomicLong llmCompletionCountTotal = new AtomicLong();
     private final AtomicLong sanitizedProposalCount = new AtomicLong();
+    private final AtomicLong causalChainOpCountTotal = new AtomicLong();
 
     private volatile Instant lastUpdatedUtc = Instant.EPOCH;
 
@@ -54,6 +55,13 @@ public class DirectorPipelineTelemetry {
         touch();
     }
 
+    public void recordCausalChainOps(int causalChainOps) {
+        if (causalChainOps > 0) {
+            causalChainOpCountTotal.addAndGet(causalChainOps);
+        }
+        touch();
+    }
+
     public Snapshot snapshot() {
         long requests = directorRequestsCount.get();
         long llmRetryAttempts = retryAttemptsTotal.get();
@@ -74,6 +82,7 @@ public class DirectorPipelineTelemetry {
                 completionCount,
                 averageCompletionCount,
                 sanitizedProposalCount.get(),
+                causalChainOpCountTotal.get(),
                 lastUpdatedUtc,
                 PIPELINE_VERSION
         );
@@ -102,6 +111,7 @@ public class DirectorPipelineTelemetry {
             long llmCompletionCountTotal,
             double averageLlmCompletionCount,
             long sanitizedProposalCount,
+            long causalChainOpCountTotal,
             Instant lastUpdatedUtc,
             String pipelineVersion
     ) {

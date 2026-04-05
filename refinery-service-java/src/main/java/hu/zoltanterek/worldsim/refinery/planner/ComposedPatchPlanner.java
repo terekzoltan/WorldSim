@@ -17,6 +17,7 @@ import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorDesign;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorInfluenceBudget;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorPipelineTelemetry;
 
@@ -151,6 +152,8 @@ public class ComposedPatchPlanner implements PatchPlanner {
                 );
         List<PatchOp> validatedPatch = applyDirectorOutputMode(validationResult.patch(), directorOutputMode);
         directorTelemetry.recordLlmProposalObservability(llmCompletionCount[0], sanitized[0]);
+        int causalChainOpCount = countCausalChainOps(validatedPatch);
+        directorTelemetry.recordCausalChainOps(causalChainOpCount);
 
         String stage = validationResult.fallbackUsed()
                 ? "directorStage:fallback-deterministic"
@@ -170,6 +173,10 @@ public class ComposedPatchPlanner implements PatchPlanner {
             explain.add("llmCandidateSanitizeTags:" + String.join(",", sanitizeTags));
         }
         explain.add("budgetUsed:" + formatBudgetUsed(DirectorInfluenceBudget.calculateBudgetUsed(validatedPatch)));
+        explain.add("causalChainOps:" + causalChainOpCount);
+        explain.add("causalChainMaxTriggers:" + DirectorDesign.CAUSAL_MAX_TRIGGERS);
+        explain.add("causalChainMetrics:" + String.join(",", DirectorDesign.CAUSAL_ALLOWED_METRICS));
+        explain.add("causalChainEqPolicy:population_exact;floating_tolerance=" + DirectorDesign.CAUSAL_EQ_TOLERANCE);
         explain.add(describeLlmProposal(initialProposal.status()));
         if (validationResult.fallbackUsed()) {
             explain.add("Director validation exhausted retries; deterministic fallback candidate applied.");
@@ -237,6 +244,16 @@ public class ComposedPatchPlanner implements PatchPlanner {
 
     private static String formatBudgetUsed(double budgetUsed) {
         return String.format(Locale.ROOT, "%.3f", budgetUsed);
+    }
+
+    private static int countCausalChainOps(List<PatchOp> patch) {
+        int count = 0;
+        for (PatchOp op : patch) {
+            if (op instanceof PatchOp.AddStoryBeat storyBeat && storyBeat.causalChain() != null) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static String toLlmStageLabel(LlmDirectorPlanner.ProposalStatus status) {

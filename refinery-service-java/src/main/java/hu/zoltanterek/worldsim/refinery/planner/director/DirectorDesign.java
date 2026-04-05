@@ -33,6 +33,14 @@ public final class DirectorDesign {
 
     public static final Set<String> VALID_SEVERITIES = Set.of("minor", "major", "epic");
 
+    public static final Set<String> CAUSAL_ALLOWED_METRICS = Set.of(
+            "food_reserves_pct",
+            "morale_avg",
+            "population",
+            "economy_output"
+    );
+    public static final Set<String> CAUSAL_ALLOWED_OPERATORS = Set.of("lt", "gt", "eq");
+
     public static final long MIN_STORY_DURATION = 1;
     public static final long MAX_STORY_DURATION = 96;
     public static final long MIN_DIRECTIVE_DURATION = 1;
@@ -41,6 +49,11 @@ public final class DirectorDesign {
     public static final int MAX_OPS_PER_CHECKPOINT = 4;
     public static final int MAX_EFFECTS_PER_BEAT = 3;
     public static final int MAX_BIASES_PER_DIRECTIVE = 3;
+    public static final int MIN_CAUSAL_WINDOW_TICKS = 10;
+    public static final int MAX_CAUSAL_WINDOW_TICKS = 100;
+    public static final int CAUSAL_MAX_TRIGGERS = 1;
+    public static final double CAUSAL_CHAIN_BASE_COST = 2.0;
+    public static final double CAUSAL_EQ_TOLERANCE = 0.0001;
     public static final double MODIFIER_MIN = -0.30;
     public static final double MODIFIER_MAX = 0.30;
     public static final double WEIGHT_MIN = 0.0;
@@ -69,5 +82,9 @@ public final class DirectorDesign {
     public static final String INV_13 = "INV-13"; // deterministic operation ordering
     public static final String INV_14 = "INV-14"; // conservative retry never adds new ops
     public static final String INV_15 = "INV-15"; // total checkpoint cost within influence budget
+    public static final String INV_16 = "INV-16"; // causal chain loop guard
+    public static final String INV_17 = "INV-17"; // causal chain combined budget guard
+    public static final String INV_18 = "INV-18"; // causal condition metric/operator validity
+    public static final String INV_19 = "INV-19"; // causal chain window/maxTriggers bounds
     public static final String INV_20 = "INV-20"; // no contradictory same-domain modifiers
 }

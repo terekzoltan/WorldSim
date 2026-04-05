@@ -47,6 +47,7 @@ class DirectorTelemetryControllerTest {
         assertTrue(body.has("llmCompletionCountTotal"));
         assertTrue(body.has("averageLlmCompletionCount"));
         assertTrue(body.has("sanitizedProposalCount"));
+        assertTrue(body.has("causalChainOpCountTotal"));
         assertTrue(body.has("lastUpdatedUtc"));
         assertTrue(body.has("pipelineVersion"));
     }

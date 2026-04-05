@@ -192,6 +192,159 @@
               },
               "durationTicks": {
                 "type": "integer"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "minor",
+                  "major",
+                  "epic"
+                ]
+              },
+              "effects": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "domain",
+                    "modifier",
+                    "durationTicks"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "const": "domain_modifier"
+                    },
+                    "domain": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "modifier": {
+                      "type": "number"
+                    },
+                    "durationTicks": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "causalChain": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "condition",
+                  "followUpBeat",
+                  "windowTicks",
+                  "maxTriggers"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "causal_chain"
+                  },
+                  "condition": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "metric",
+                      "operator",
+                      "threshold"
+                    ],
+                    "properties": {
+                      "metric": {
+                        "type": "string",
+                        "enum": [
+                          "food_reserves_pct",
+                          "morale_avg",
+                          "population",
+                          "economy_output"
+                        ]
+                      },
+                      "operator": {
+                        "type": "string",
+                        "enum": [
+                          "lt",
+                          "gt",
+                          "eq"
+                        ]
+                      },
+                      "threshold": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "followUpBeat": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "beatId",
+                      "text",
+                      "durationTicks"
+                    ],
+                    "properties": {
+                      "beatId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "durationTicks": {
+                        "type": "integer"
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": [
+                          "minor",
+                          "major",
+                          "epic"
+                        ]
+                      },
+                      "effects": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "type",
+                            "domain",
+                            "modifier",
+                            "durationTicks"
+                          ],
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "domain_modifier"
+                            },
+                            "domain": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "modifier": {
+                              "type": "number"
+                            },
+                            "durationTicks": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "windowTicks": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 100
+                  },
+                  "maxTriggers": {
+                    "type": "integer",
+                    "const": 1
+                  }
+                }
               }
             }
           },

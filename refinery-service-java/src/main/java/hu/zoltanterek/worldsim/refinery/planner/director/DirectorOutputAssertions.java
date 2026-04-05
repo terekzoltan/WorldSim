@@ -11,7 +11,8 @@ public record DirectorOutputAssertions(
             String text,
             long durationTicks,
             String severity,
-            List<EffectAssertion> effects
+            List<EffectAssertion> effects,
+            CausalChainAssertion causalChain
     ) {
     }
 
@@ -34,6 +35,30 @@ public record DirectorOutputAssertions(
             String goalCategory,
             double weight,
             Long durationTicks
+    ) {
+    }
+
+    public record CausalChainAssertion(
+            ConditionAssertion condition,
+            FollowUpBeatAssertion followUpBeat,
+            long windowTicks,
+            int maxTriggers
+    ) {
+    }
+
+    public record ConditionAssertion(
+            String metric,
+            String operator,
+            double threshold
+    ) {
+    }
+
+    public record FollowUpBeatAssertion(
+            String beatId,
+            String text,
+            long durationTicks,
+            String severity,
+            List<EffectAssertion> effects
     ) {
     }
 }
