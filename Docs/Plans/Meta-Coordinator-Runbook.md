@@ -14,6 +14,64 @@
 - Minden workflow outputja vagy AGENTS.md edit, vagy markdown report a felhasznalo szamara.
 - A workflow-k egyenkent is futtathatoak, vagy egyutt (`full-sweep`).
 - Git allapotra **NEM** tamaszkodunk (messy repo); helye: fajlok tenyleges tartalma a lenyeg.
+- A workflow-optimalizalas es a human-in-the-loop tisztasag first-class Meta felelosseg. Ha egy visszatero ketertelmuseg, closeout-res, vagy koordinacios surlodas latszik, a Meta minimalis processz-javitast javasol es - ha a felhasznalo jovahagyja - rogzit a megfelelo dokumentumban.
+- Ha a statusz vagy gate-jelentes ketertelmu, az explicit emberi dontes / lock note erosebb, mint a hallgatolagos kovetkeztetes.
+
+---
+
+## Consult Closeout Semantics
+
+Cross-track consultoknal kulon kell kezelni:
+
+- `consult prep`: checklist, decision baseline, risklista, handoff-feltetelek
+- `decision lock`: explicit rovid closeout note, ami kimondja mely dontesek lettek tenylegesen elfogadva es milyen downstream gate-et oldanak fel
+
+Fontos szabaly:
+
+- a `consult prep` **nem ugyanaz**, mint a `decision lock`
+- downstream prereq/gate csak lockolt consult-dontesre epithet, nem pusztan arra, hogy a checklist mar letezik
+- ha a consult eredmenye eleg kicsi, a lock note lehet rovid `AGENTS.md` bejegyzes is; nem kell minden esetben kulon master doc
+
+### Minimum lock-note tartalom
+
+Ha egy consultot lezartnak tekintunk, a Meta legalabb ezt rogzitse:
+
+1. mely dontesek lettek lockolva
+2. mi marad transitional / compatibility-only
+3. mely downstream step vagy wave gate oldodik fel ezzel
+4. ha kell, melyik track ownership marad ervenyben
+
+Mini-template:
+
+```text
+## Consult Lock Note - [tema] - [datum]
+
+Status: LOCKED
+
+Locked decisions:
+- D1: ...
+- D2: ...
+
+Transitional only:
+- ...
+
+Downstream gate unlocked:
+- Wave / step: ...
+
+Ownership:
+- Track X: ...
+- Track Y: ...
+```
+
+### Meta closeout kimenetek consult eseten
+
+A Meta a consult vegere explicit mondja ki az egyiket:
+
+- `PREP ONLY` - a baseline kesz, de meg nincs lock
+- `LOCKED` - a dontesek elfogadva, downstream gate hasznalhatja
+- `BLOCKED` - hianyzik input, ownership, vagy emberi dontes
+
+Ez a jeloles legyen visszakeresheto a felhasznalonak adott reportban, es amikor hasznos, az `AGENTS.md` vagy a relevans master plan is kapjon rovid nyomot.
 
 ---
 
@@ -38,6 +96,7 @@ alapertelmezetten ezt az egyseges review formatumot hasznalja, hacsak nincs eros
 5. Azonositsd a scope-, sequencing-, contract-, ownership- es review-riskeket.
 6. Valaszold meg a track altal explicit felvetett nyitott kerdeseket.
 7. Adj rovid, track-fele kozvetlenul tovabbkuldheto summary uzenetet.
+8. Ha consult/prep artifactrol van szo, mondd ki explicit, hogy az eredmeny `PREP ONLY`, `LOCKED`, vagy `BLOCKED`.
 
 **Fontos:**
 
@@ -290,6 +349,7 @@ Ha VIOLATION talalhato, uzenofal bejegyzes is kotelezo.
 4. **Closeout osszefoglalo:**
    - Track-enkent: mi keszult el, mi maradt nyitva, mi lett blokkolt.
    - Cross-track: milyen uj fuggosegek merultek fel.
+   - Consult-heavy sprint eseten: mely artifact maradt csak `prep`, es melyik kapott mar explicit `lock` closeoutot.
 5. **Kovetkezo sprint scope javaslat:**
    - Track-enkent: mi a kovetkezo 3-5 legfontosabb feladat.
    - Milyen cross-track koordinacio szukseges.
@@ -381,6 +441,7 @@ Ha VIOLATION talalhato, uzenofal bejegyzes is kotelezo.
    - Lehetseges uj track-ek / session-ok / agens-tipusok felsorolasa
    - Prioritas es fuggosegek
    - Ajanlott idozites
+   - Workflow-optimalizalasi lehetosegek, ha a jelenlegi mukodesben visszatero surlodas vagy ketertelmuseg latszik
 
 **Megjegyzes:** Ez a workflow kreativitast igenylel, nem csak mechanikus auditor. Celja, hogy a projektet
 a felhasznalo aktivan tudja iranyitani, nem csak kezben tartani.

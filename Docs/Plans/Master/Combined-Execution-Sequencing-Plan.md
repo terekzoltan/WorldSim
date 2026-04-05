@@ -1461,7 +1461,7 @@ Purpose:
 - Establish the first headless refinery evidence lane on top of the real runtime/adapter path without pulling paid live runs into the critical path.
 
 Wave turn-gate:
-- Wave 8.5 is `READY` only after Wave 7 closeout is `✅` and the TR1-C Track B consult boundary decisions (D1-D5) are locked in a short consult note under `Docs/Plans/Master/`.
+- Wave 8.5 is `READY` only after Wave 7 closeout is `✅` and the TR1-C Track B consult boundary decisions (D1-D5) are locked in a short consult note (`AGENTS.md` or `Docs/Plans/Master/`).
 - Reason: the first solver-backed slice should build on post-D7 director semantics and a closed runtime-fact boundary, not on a half-implicit consult checklist.
 
 ### Sprint TR2: First solver-backed director slice (Track D primary, Track B consult on runtime assertions handoff)
