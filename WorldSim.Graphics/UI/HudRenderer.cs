@@ -61,6 +61,7 @@ public sealed class HudRenderer
         var visibleEventCount = Math.Min(snapshot.RecentEvents.Count, 8);
         var director = snapshot.Director;
         var hasDirectorData = director.ActiveDirectives.Count > 0
+                              || director.PendingChains.Count > 0
                               || director.ActiveDomainModifiers.Count > 0
                               || director.ActiveGoalBiases.Count > 0
                               || director.BeatCooldownRemainingTicks > 0
@@ -79,6 +80,14 @@ public sealed class HudRenderer
 
         if (showAiDebug && director.HasBudgetData)
             directorExtraLines += 1;
+
+        if (showAiDebug && director.PendingChains.Count > 0)
+        {
+            directorExtraLines += 1 + Math.Min(3, director.PendingChains.Count);
+            directorExtraLines += director.PendingChains
+                .Take(3)
+                .Count(chain => !string.IsNullOrWhiteSpace(chain.LastFailureMessage));
+        }
 
         var baseHeight = 120 + (snapshot.Colonies.Count * 44) + 84 + (visibleEventCount * 26);
         baseHeight += directorExtraLines * 20;
@@ -180,7 +189,60 @@ public sealed class HudRenderer
                 18);
         }
 
+        if (state.PendingChains.Count > 0)
+        {
+            y = TextWrap.DrawWrapped(
+                spriteBatch,
+                font,
+                $"Dir chains: {state.PendingChains.Count}",
+                new Vector2(startX, y),
+                Theme.SecondaryText,
+                maxWidth,
+                18);
+
+            foreach (var chain in state.PendingChains.Take(3))
+            {
+                var parent = CompactId(chain.ParentBeatId, 16);
+                var followUp = CompactId(chain.FollowUpBeatId, 16);
+                y = TextWrap.DrawWrapped(
+                    spriteBatch,
+                    font,
+                    $"Chain: {parent} {chain.Status} win={chain.RemainingWindowTicks} -> {followUp}",
+                    new Vector2(startX, y),
+                    Theme.SecondaryText,
+                    maxWidth,
+                    18);
+
+                if (!string.IsNullOrWhiteSpace(chain.LastFailureMessage))
+                {
+                    y = TextWrap.DrawWrapped(
+                        spriteBatch,
+                        font,
+                        $"Chain fail: {CompactId(chain.LastFailureMessage, 72)}",
+                        new Vector2(startX, y),
+                        Theme.WarningText,
+                        maxWidth,
+                        18);
+                }
+            }
+        }
+
         return y;
+    }
+
+    private static string CompactId(string value, int maxChars)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "n/a";
+
+        var trimmed = value.Trim();
+        if (trimmed.Length <= maxChars)
+            return trimmed;
+
+        if (maxChars <= 3)
+            return trimmed[..maxChars];
+
+        return trimmed[..(maxChars - 3)] + "...";
     }
 
     private int DrawSiegeStatus(

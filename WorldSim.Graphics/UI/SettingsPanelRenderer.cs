@@ -16,10 +16,19 @@ public sealed class SettingsPanelRenderer
         string postFx,
         string hudScale,
         string cinematic,
-        string captureStatus)
+        string captureStatus,
+        string directorProfile,
+        string directorProfileSource,
+        string directorLane,
+        string directorRequestedMode,
+        string directorRequestedSource,
+        string directorEffectiveMode,
+        string directorEffectiveSource,
+        string directorStage,
+        string directorApply)
     {
         int width = Math.Min(520, viewportWidth - 24);
-        int height = 280;
+        int height = 380;
         int x = viewportWidth - width - 12;
         int y = 12;
 
@@ -46,6 +55,18 @@ public sealed class SettingsPanelRenderer
         spriteBatch.DrawString(font, "Panels: Ctrl+F1 diplomacy, Ctrl+F2 campaign, Ctrl+F12 settings", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
         spriteBatch.DrawString(font, "Overlays: Ctrl+F7 territory, Ctrl+F8 combat", new Vector2(x + 10, lineY), theme.SecondaryText);
+        lineY += 20;
+        spriteBatch.DrawString(font, "Debug: F8 AI panel, F6 trigger refinery", new Vector2(x + 10, lineY), theme.SecondaryText);
+        lineY += 20;
+        spriteBatch.DrawString(font, $"Director Profile: {directorProfile} ({directorProfileSource})", new Vector2(x + 10, lineY), theme.PrimaryText);
+        lineY += 20;
+        spriteBatch.DrawString(font, $"Director Lane: {directorLane} | Preset cycle: Ctrl+Shift+F6", new Vector2(x + 10, lineY), theme.PrimaryText);
+        lineY += 20;
+        spriteBatch.DrawString(font, $"Director Req Mode: {directorRequestedMode} ({directorRequestedSource}) | Ctrl+F6", new Vector2(x + 10, lineY), theme.PrimaryText);
+        lineY += 20;
+        spriteBatch.DrawString(font, $"Director Eff Mode: {directorEffectiveMode} ({directorEffectiveSource})  Stage: {directorStage}", new Vector2(x + 10, lineY), theme.SecondaryText);
+        lineY += 20;
+        spriteBatch.DrawString(font, $"Director Apply: {directorApply}", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
         spriteBatch.DrawString(font, $"Capture: {captureStatus}", new Vector2(x + 10, lineY), theme.SuccessText);
     }

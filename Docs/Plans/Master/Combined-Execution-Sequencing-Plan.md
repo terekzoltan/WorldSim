@@ -1285,7 +1285,7 @@ Wave turn-gate:
 > Director Plan > Phase 3 Sprint 7
 
 - ✅ **S7-A** Causal chain layer — v2 contracts, monitoring, condition evaluation (Track D + B)
-- ⬜ **S7-B** Operational UX — profiles, debug toggles, env var cleanup (Track D + A)
+- ✅ **S7-B** Operational UX — profiles, debug toggles, env var cleanup (Track D + A)
 
 ### Sprint C7: Refinery / Director Integration for Combat (Track D — optional)
 
@@ -1314,6 +1314,9 @@ Both sprints expand v2 contracts and runtime command endpoints in overlapping na
 |---------|---------|--------|-------|
 | Track D agent | S7-B (D part) | S7-A ✅ | Profiles/env cleanup build on the causal-chain contract and monitoring shape |
 | Track A agent | S7-B (A part) | S7-A ✅ | In-game debug toggles and consume-side UX build on the same stabilized monitoring shape |
+
+Wave 7 Step 2 progress note:
+- ✅ `S7-B` operator/debug UX closed: restartless operator seam (`Ctrl+F6` mode, `Ctrl+Shift+F6` preset), pending causal-chain HUD consume, settings-overlay director block, smoke helper/docs cleanup, and manual fixture/live_mock/live_director smoke all verified without gameplay-semantics regressions.
 
 **Step 3 — opens when D7 fully ✅ (S7-A + S7-B). C7 is sequential after D7.**
 

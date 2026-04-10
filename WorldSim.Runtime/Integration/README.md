@@ -11,6 +11,7 @@ Use `F6` in-game to trigger requests and validate director behavior from HUD + s
 $env:REFINERY_INTEGRATION_MODE="fixture"
 $env:REFINERY_GOAL="SEASON_DIRECTOR_CHECKPOINT"
 $env:REFINERY_APPLY_TO_WORLD="true"
+$env:REFINERY_OPERATOR_PRESET="fixture_smoke"
 dotnet run --project WorldSim.App/WorldSim.App.csproj
 ```
 
@@ -29,6 +30,7 @@ $env:REFINERY_INTEGRATION_MODE="live"
 $env:REFINERY_BASE_URL="http://localhost:8091"
 $env:REFINERY_GOAL="SEASON_DIRECTOR_CHECKPOINT"
 $env:REFINERY_APPLY_TO_WORLD="true"
+$env:REFINERY_OPERATOR_PRESET="live_mock"
 dotnet run --project WorldSim.App/WorldSim.App.csproj
 ```
 
@@ -48,6 +50,7 @@ $env:REFINERY_INTEGRATION_MODE="live"
 $env:REFINERY_BASE_URL="http://localhost:8091"
 $env:REFINERY_GOAL="SEASON_DIRECTOR_CHECKPOINT"
 $env:REFINERY_APPLY_TO_WORLD="true"
+$env:REFINERY_OPERATOR_PRESET="live_director"
 $env:REFINERY_DIRECTOR_OUTPUT_MODE="auto"
 $env:REFINERY_TIMEOUT_MS="12000"
 $env:REFINERY_RETRY_COUNT="0"
@@ -77,6 +80,8 @@ dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj
 | `REFINERY_REQUEST_SEED` | `123` | Deterministic request seed |
 | `REFINERY_APPLY_TO_WORLD` | `false` | Apply translated runtime commands |
 | `REFINERY_DIRECTOR_OUTPUT_MODE` | `auto` | `auto|both|story_only|nudge_only|off` |
+| `REFINERY_OPERATOR_PROFILE` | auto-resolved | Optional in-app operator profile label shown in Settings/HUD |
+| `REFINERY_OPERATOR_PRESET` | unset | Optional startup preset: `fixture_smoke|live_mock|live_director` |
 | `REFINERY_DIRECTOR_MAX_BUDGET` | `5` | Runtime-side director checkpoint budget cap |
 | `REFINERY_LENIENT` | `false` | Relax extra JSON field checks |
 | `REFINERY_PARITY_TEST` | `false` | Enables fixture-vs-live parity test |
@@ -131,6 +136,23 @@ Interpretation rules:
   - `causalChainMaxTriggers:1`
   - `causalChainMetrics:food_reserves_pct,morale_avg,population,economy_output`
   - `causalChainEqPolicy:population_exact;floating_tolerance=0.0001`
+
+## In-game operator controls (S7-B A-part)
+
+- `F6`: trigger refinery request.
+- `Ctrl+F6`: cycle requested director output mode (`auto -> both -> story_only -> nudge_only -> off -> auto`) without restart.
+- `Ctrl+Shift+F6`: cycle operator preset (`fixture_smoke -> live_mock -> live_director -> ...`) without restart.
+- `Ctrl+F12`: settings overlay now includes director profile/mode/source/stage/apply status.
+
+Operational seam lock for Track A consume:
+- stable profile label: `fixture_smoke|live_mock|live_director`
+- stable requested mode vocabulary: `auto|both|story_only|nudge_only|off`
+- stable requested mode source labels: `env|profile|operator`
+- stable integration lane label: `off|fixture|live`
+
+Smoke lane note:
+- `java_planner_smoke` is the PowerShell helper lane (`run-smoke.ps1` / `check-markers.ps1`) and validates Java response markers only.
+- `full_stack_smoke` is a manual app/runtime lane: run the app, use `F6`, and verify HUD/settings/apply state end-to-end.
 
 ## Failure Playbook
 

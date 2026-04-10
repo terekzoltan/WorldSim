@@ -83,6 +83,25 @@ Important behavior:
 curl http://localhost:8091/v1/director/telemetry
 ```
 
+## Smoke lanes (S7-B)
+
+Use these lane names consistently in operator docs/checklists:
+
+- `java_planner_smoke`: Java-only `/v1/patch` + explain marker verification.
+- `full_stack_smoke`: manual app/runtime (`F6`) + adapter/runtime status verification.
+
+Preset naming alignment (app/operator side):
+
+- `fixture_smoke`
+- `live_mock`
+- `live_director`
+
+Note:
+
+- helper scripts are convenience tooling, not source-of-truth for contract semantics.
+- `run-smoke.ps1` / `check-markers.ps1` validate the Java planner smoke lane only.
+- full-stack smoke still requires running the C# app and verifying HUD/settings/apply state manually.
+
 ## Test
 
 ```bash

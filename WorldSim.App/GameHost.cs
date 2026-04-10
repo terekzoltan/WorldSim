@@ -277,8 +277,16 @@ public class GameHost : Game
         if (IsChordPressed(keys, Keys.F5, requireCtrl: true))
             CycleQualityProfile();
 
-        if (IsChordPressed(keys, Keys.F6, requireCtrl: true))
-            SetToast("HUD scaling disabled");
+        if (IsChordPressed(keys, Keys.F6, requireCtrl: true, requireShift: true))
+        {
+            var nextProfile = _refineryRuntime.CycleOperatorPreset();
+            SetToast($"Director preset: {nextProfile} ({_refineryRuntime.CurrentIntegrationMode})");
+        }
+        else if (IsChordPressed(keys, Keys.F6, requireCtrl: true))
+        {
+            var nextMode = _refineryRuntime.CycleDirectorOutputMode();
+            SetToast($"Director output mode: {nextMode} ({_refineryRuntime.RequestedDirectorOutputModeSource})");
+        }
 
         if (IsChordPressed(keys, Keys.F12, requireCtrl: true))
         {
@@ -779,10 +787,10 @@ public class GameHost : Game
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: Matrix.CreateScale(hudScale, hudScale, 1f));
         var simStatus = _simPaused ? $"PAUSED@x{_timeScale:0.##}" : $"x{_timeScale:0.##}";
-        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | Director:{snapshot.Director.OutputMode}({snapshot.Director.OutputModeSource})@{snapshot.Director.StageMarker} | Sim:{simStatus}";
+        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | Dir eff={snapshot.Director.OutputMode}/{snapshot.Director.ApplyStatus}@{snapshot.Director.StageMarker} req={_refineryRuntime.RequestedDirectorOutputMode} profile={_refineryRuntime.CurrentOperatorProfileName} lane={_refineryRuntime.CurrentIntegrationMode} | Sim:{simStatus}";
 #if DEBUG
-        plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
-        plannerStatus += " [F8 legend: battle ring, siege ring, breach X, magenta=route, cyan=commander, amber=contested]";
+        plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F6 director mode | Ctrl+Shift+F6 director preset | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
+        plannerStatus += " [Combat legend: battle ring, siege ring, breach X, magenta=route, cyan=commander, amber=contested]";
 #endif
         if (_showTelemetryHud && !_cleanShotMode && !panelExclusive)
         {
@@ -824,7 +832,16 @@ public class GameHost : Game
                 _postFxEnabled ? _postFxQuality.ToString() : "OFF",
                 hudScale.ToString("0.00"),
                 _cameraRoutePlayer.IsActive ? "Playing" : "Idle",
-                _lastCaptureStatus);
+                _lastCaptureStatus,
+                _refineryRuntime.CurrentOperatorProfileName,
+                _refineryRuntime.CurrentOperatorProfileSource,
+                _refineryRuntime.CurrentIntegrationMode,
+                _refineryRuntime.RequestedDirectorOutputMode,
+                _refineryRuntime.RequestedDirectorOutputModeSource,
+                snapshot.Director.OutputMode,
+                snapshot.Director.OutputModeSource,
+                snapshot.Director.StageMarker,
+                snapshot.Director.ApplyStatus);
 
             var overlayStatus = $"Diplomacy:{(_showDiplomacyPanel ? "ON" : "off")}  Campaign:{(_showCampaignPanel ? "ON" : "off")}  Territory:{(_worldRenderer.TerritoryOverlayEnabled ? "ON" : "off")}  Combat:{(_worldRenderer.CombatOverlayEnabled ? "ON" : "off")}";
             _spriteBatch.DrawString(_font, overlayStatus, new Vector2(16, GraphicsDevice.Viewport.Height - 34), _hudRenderer.Theme.SecondaryText);

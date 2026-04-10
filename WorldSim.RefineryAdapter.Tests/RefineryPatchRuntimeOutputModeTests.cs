@@ -142,6 +142,125 @@ public sealed class RefineryPatchRuntimeOutputModeTests
     }
 
     [Fact]
+    public void CycleDirectorOutputMode_UpdatesRequestedSourceToOperator()
+    {
+        var options = new RefineryRuntimeOptions(
+            Mode: RefineryIntegrationMode.Fixture,
+            Goal: DirectorGoals.SeasonDirectorCheckpoint,
+            DirectorOutputMode: "auto",
+            FixtureResponsePath: GetDirectorFixturePath(),
+            ServiceBaseUrl: "http://localhost:8091",
+            StrictMode: true,
+            RequestSeed: 123,
+            LiveTimeoutMs: 1000,
+            LiveRetryCount: 0,
+            CircuitBreakerSeconds: 5,
+            ApplyToWorld: false,
+            MinTriggerIntervalMs: 0
+        );
+
+        var patchRuntime = new RefineryPatchRuntime(options);
+        var mode = patchRuntime.CycleDirectorOutputMode();
+
+        Assert.Equal("both", mode);
+        Assert.Equal("both", patchRuntime.RequestedDirectorOutputMode);
+        Assert.Equal("operator", patchRuntime.RequestedDirectorOutputModeSource);
+        Assert.Contains("mode=both", patchRuntime.LastStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CycleDirectorOutputMode_BlocksWhileRequestIsInFlight()
+    {
+        var options = new RefineryRuntimeOptions(
+            Mode: RefineryIntegrationMode.Fixture,
+            Goal: DirectorGoals.SeasonDirectorCheckpoint,
+            DirectorOutputMode: "auto",
+            FixtureResponsePath: GetDirectorFixturePath(),
+            ServiceBaseUrl: "http://localhost:8091",
+            StrictMode: true,
+            RequestSeed: 123,
+            LiveTimeoutMs: 1000,
+            LiveRetryCount: 0,
+            CircuitBreakerSeconds: 5,
+            ApplyToWorld: false,
+            MinTriggerIntervalMs: 0
+        );
+
+        var patchRuntime = new RefineryPatchRuntime(options);
+        SetInFlightTask(patchRuntime, new TaskCompletionSource().Task);
+
+        var mode = patchRuntime.CycleDirectorOutputMode();
+
+        Assert.Equal("auto", mode);
+        Assert.Equal("auto", patchRuntime.RequestedDirectorOutputMode);
+        Assert.Equal("env", patchRuntime.RequestedDirectorOutputModeSource);
+        Assert.Equal("Refinery mode change blocked: request already in progress", patchRuntime.LastStatus);
+    }
+
+    [Fact]
+    public void CycleOperatorPreset_AppliesExpectedProfileAndModeWithoutRestart()
+    {
+        var options = new RefineryRuntimeOptions(
+            Mode: RefineryIntegrationMode.Fixture,
+            Goal: DirectorGoals.SeasonDirectorCheckpoint,
+            DirectorOutputMode: "auto",
+            FixtureResponsePath: GetDirectorFixturePath(),
+            ServiceBaseUrl: "http://localhost:8091",
+            StrictMode: true,
+            RequestSeed: 123,
+            LiveTimeoutMs: 1000,
+            LiveRetryCount: 0,
+            CircuitBreakerSeconds: 5,
+            ApplyToWorld: false,
+            MinTriggerIntervalMs: 0,
+            OperatorProfileName: RefineryRuntimeOptions.ProfileFixtureSmoke
+        );
+
+        var patchRuntime = new RefineryPatchRuntime(options);
+        var preset = patchRuntime.CycleOperatorPreset();
+
+        Assert.Equal(RefineryRuntimeOptions.ProfileLiveMock, preset);
+        Assert.Equal(RefineryRuntimeOptions.ProfileLiveMock, patchRuntime.OperatorProfileName);
+        Assert.Equal("operator", patchRuntime.OperatorProfileSource);
+        Assert.Equal("live", patchRuntime.CurrentIntegrationMode);
+        Assert.Equal("auto", patchRuntime.RequestedDirectorOutputMode);
+        Assert.Equal("profile", patchRuntime.RequestedDirectorOutputModeSource);
+    }
+
+    [Fact]
+    public void CycleOperatorPreset_UsesImmutableBaselineForRoundTrip()
+    {
+        var options = new RefineryRuntimeOptions(
+            Mode: RefineryIntegrationMode.Fixture,
+            Goal: DirectorGoals.SeasonDirectorCheckpoint,
+            DirectorOutputMode: "auto",
+            FixtureResponsePath: GetDirectorFixturePath(),
+            ServiceBaseUrl: "http://localhost:8091",
+            StrictMode: true,
+            RequestSeed: 123,
+            LiveTimeoutMs: 2400,
+            LiveRetryCount: 2,
+            CircuitBreakerSeconds: 5,
+            ApplyToWorld: false,
+            MinTriggerIntervalMs: 0,
+            OperatorProfileName: RefineryRuntimeOptions.ProfileFixtureSmoke
+        );
+
+        var patchRuntime = new RefineryPatchRuntime(options);
+
+        Assert.Equal(RefineryRuntimeOptions.ProfileLiveMock, patchRuntime.CycleOperatorPreset());
+        Assert.Equal(RefineryRuntimeOptions.ProfileLiveDirector, patchRuntime.CycleOperatorPreset());
+        Assert.Equal(RefineryRuntimeOptions.ProfileFixtureSmoke, patchRuntime.CycleOperatorPreset());
+        Assert.Equal(RefineryRuntimeOptions.ProfileLiveMock, patchRuntime.CycleOperatorPreset());
+
+        var activeOptions = GetActiveOptions(patchRuntime);
+        Assert.Equal(2400, activeOptions.LiveTimeoutMs);
+        Assert.Equal(2, activeOptions.LiveRetryCount);
+        Assert.Equal(RefineryIntegrationMode.Live, activeOptions.Mode);
+        Assert.Equal(RefineryRuntimeOptions.ProfileLiveMock, activeOptions.OperatorProfileName);
+    }
+
+    [Fact]
     public void FixtureDirectorOutputMode_MirrorsBudgetUsedMarkerIntoRuntimeState()
     {
         var fixturePath = WriteTempDirectorFixture("both", includeModeMarker: true, includeBudgetMarker: true, budgetUsed: 1.875d);
@@ -794,5 +913,21 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         var result = method!.Invoke(null, new object?[] { exception, attempts });
         Assert.IsType<string>(result);
         return (string)result!;
+    }
+
+    private static void SetInFlightTask(RefineryPatchRuntime patchRuntime, Task task)
+    {
+        var field = typeof(RefineryPatchRuntime).GetField("_inFlight", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(patchRuntime, task);
+    }
+
+    private static RefineryRuntimeOptions GetActiveOptions(RefineryPatchRuntime patchRuntime)
+    {
+        var field = typeof(RefineryPatchRuntime).GetField("_activeOptions", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var value = field!.GetValue(patchRuntime);
+        Assert.IsType<RefineryRuntimeOptions>(value);
+        return (RefineryRuntimeOptions)value!;
     }
 }

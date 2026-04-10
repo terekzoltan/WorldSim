@@ -16,10 +16,22 @@ public sealed record RefineryRuntimeOptions(
     int CircuitBreakerSeconds,
     bool ApplyToWorld,
     int MinTriggerIntervalMs,
-    double DirectorMaxBudget = 5d
+    double DirectorMaxBudget = 5d,
+    string OperatorProfileName = "auto"
 )
 {
-    public static RefineryRuntimeOptions FromEnvironment(string baseDirectory)
+    public const string ProfileFixtureSmoke = "fixture_smoke";
+    public const string ProfileLiveMock = "live_mock";
+    public const string ProfileLiveDirector = "live_director";
+
+    private static readonly string[] OperatorPresetCycle =
+    {
+        ProfileFixtureSmoke,
+        ProfileLiveMock,
+        ProfileLiveDirector
+    };
+
+    public static RefineryRuntimeOptions FromEnvironment(string baseDirectory, bool applyOperatorPreset = true)
     {
         var modeRaw = System.Environment.GetEnvironmentVariable("REFINERY_INTEGRATION_MODE") ?? "off";
         var mode = modeRaw.Trim().ToLowerInvariant() switch
@@ -33,6 +45,8 @@ public sealed record RefineryRuntimeOptions(
         var directorOutputMode = NormalizeDirectorOutputMode(
             System.Environment.GetEnvironmentVariable("REFINERY_DIRECTOR_OUTPUT_MODE")
         );
+        var operatorPresetName = NormalizeOperatorPresetName(System.Environment.GetEnvironmentVariable("REFINERY_OPERATOR_PRESET"));
+        var operatorProfileName = ResolveOperatorProfileName(mode, goal, applyToWorld: string.Equals(System.Environment.GetEnvironmentVariable("REFINERY_APPLY_TO_WORLD"), "true", System.StringComparison.OrdinalIgnoreCase));
         var strictMode = !string.Equals(System.Environment.GetEnvironmentVariable("REFINERY_LENIENT"), "true", System.StringComparison.OrdinalIgnoreCase);
         var serviceBaseUrl = System.Environment.GetEnvironmentVariable("REFINERY_BASE_URL") ?? "http://localhost:8091";
         var requestSeed = ParseLongEnv("REFINERY_REQUEST_SEED", 123L);
@@ -56,7 +70,7 @@ public sealed record RefineryRuntimeOptions(
         );
         var fixtureResponsePath = System.Environment.GetEnvironmentVariable("REFINERY_FIXTURE_RESPONSE") ?? defaultFixture;
 
-        return new RefineryRuntimeOptions(
+        var options = new RefineryRuntimeOptions(
             mode,
             goal,
             directorOutputMode,
@@ -69,8 +83,78 @@ public sealed record RefineryRuntimeOptions(
             breakerSeconds,
             applyToWorld,
             minTriggerIntervalMs,
-            directorMaxBudget
+            directorMaxBudget,
+            operatorProfileName
         );
+
+        if (applyOperatorPreset && operatorPresetName is not null)
+            return ApplyOperatorPreset(options, operatorPresetName);
+
+        return options;
+    }
+
+    public static string? ReadOperatorPresetFromEnvironment()
+    {
+        return NormalizeOperatorPresetName(System.Environment.GetEnvironmentVariable("REFINERY_OPERATOR_PRESET"));
+    }
+
+    public static string NextOperatorPresetName(string currentProfileName)
+    {
+        var current = NormalizeOperatorPresetName(currentProfileName) ?? ProfileFixtureSmoke;
+        var index = Array.FindIndex(OperatorPresetCycle, name => string.Equals(name, current, StringComparison.Ordinal));
+        if (index < 0)
+            return ProfileFixtureSmoke;
+
+        return OperatorPresetCycle[(index + 1) % OperatorPresetCycle.Length];
+    }
+
+    public static string? NormalizeOperatorPresetName(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        var normalized = raw.Trim().ToLowerInvariant().Replace('-', '_');
+        return normalized switch
+        {
+            ProfileFixtureSmoke => ProfileFixtureSmoke,
+            ProfileLiveMock => ProfileLiveMock,
+            ProfileLiveDirector => ProfileLiveDirector,
+            _ => null
+        };
+    }
+
+    public static RefineryRuntimeOptions ApplyOperatorPreset(RefineryRuntimeOptions baseline, string presetName)
+    {
+        return presetName switch
+        {
+            ProfileFixtureSmoke => baseline with
+            {
+                Mode = RefineryIntegrationMode.Fixture,
+                Goal = DirectorGoals.SeasonDirectorCheckpoint,
+                DirectorOutputMode = "auto",
+                ApplyToWorld = true,
+                OperatorProfileName = ProfileFixtureSmoke
+            },
+            ProfileLiveMock => baseline with
+            {
+                Mode = RefineryIntegrationMode.Live,
+                Goal = DirectorGoals.SeasonDirectorCheckpoint,
+                DirectorOutputMode = "auto",
+                ApplyToWorld = true,
+                OperatorProfileName = ProfileLiveMock
+            },
+            ProfileLiveDirector => baseline with
+            {
+                Mode = RefineryIntegrationMode.Live,
+                Goal = DirectorGoals.SeasonDirectorCheckpoint,
+                DirectorOutputMode = "auto",
+                ApplyToWorld = true,
+                LiveTimeoutMs = Math.Max(12000, baseline.LiveTimeoutMs),
+                LiveRetryCount = 0,
+                OperatorProfileName = ProfileLiveDirector
+            },
+            _ => baseline
+        };
     }
 
     private static int ParseIntEnv(string key, int fallback)
@@ -121,5 +205,23 @@ public sealed record RefineryRuntimeOptions(
             "auto" or "both" or "story_only" or "nudge_only" or "off" => normalized,
             _ => "auto"
         };
+    }
+
+    private static string ResolveOperatorProfileName(RefineryIntegrationMode mode, string goal, bool applyToWorld)
+    {
+        var explicitProfile = System.Environment.GetEnvironmentVariable("REFINERY_OPERATOR_PROFILE");
+        if (!string.IsNullOrWhiteSpace(explicitProfile))
+            return explicitProfile.Trim().Replace('-', '_');
+
+        if (mode == RefineryIntegrationMode.Off)
+            return "integration_off";
+
+        if (mode == RefineryIntegrationMode.Fixture)
+            return ProfileFixtureSmoke;
+
+        if (string.Equals(goal, DirectorGoals.SeasonDirectorCheckpoint, System.StringComparison.Ordinal))
+            return ProfileLiveDirector;
+
+        return ProfileLiveMock;
     }
 }

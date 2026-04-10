@@ -20,34 +20,44 @@ namespace WorldSim.RefineryAdapter.Integration;
 
 public sealed class RefineryPatchRuntime
 {
-    private readonly RefineryRuntimeOptions _options;
+    private readonly RefineryRuntimeOptions _baselineOptions;
+    private RefineryRuntimeOptions _activeOptions;
     private readonly PatchResponseParser _parser = new();
     private readonly PatchApplier _applier = new();
     private readonly PatchCommandTranslator _translator = new();
     private readonly RuntimePatchCommandExecutor _executor = new();
     private readonly SimulationPatchState _patchState = SimulationPatchState.CreateBaseline();
-    private readonly RefineryServiceClient? _serviceClient;
-    private readonly HttpClient? _httpClient;
+    private RefineryServiceClient? _serviceClient;
+    private HttpClient? _httpClient;
+    private string _serviceClientBaseUrl = string.Empty;
 
     private Task? _inFlight;
     private DateTime _circuitBreakerUntilUtc = DateTime.MinValue;
     private int _consecutiveFailures;
     private DateTime _lastTriggerUtc = DateTime.MinValue;
+    private string _requestedDirectorOutputMode;
+    private string _requestedDirectorOutputModeSource;
+    private string _operatorProfileSource;
 
     public string LastStatus { get; private set; } = "Refinery integration: not triggered";
     public DirectorExecutionStatus LastDirectorExecutionStatus { get; private set; } = DirectorExecutionStatus.NotTriggered;
+    public string OperatorProfileName => _activeOptions.OperatorProfileName;
+    public string OperatorProfileSource => _operatorProfileSource;
+    public string CurrentIntegrationMode => _activeOptions.Mode.ToString().ToLowerInvariant();
+    public string RequestedDirectorOutputMode => _requestedDirectorOutputMode;
+    public string RequestedDirectorOutputModeSource => _requestedDirectorOutputModeSource;
 
     public RefineryPatchRuntime(RefineryRuntimeOptions options)
     {
-        _options = options;
+        _baselineOptions = options;
+        _activeOptions = options;
+        _requestedDirectorOutputMode = options.DirectorOutputMode;
+        _requestedDirectorOutputModeSource = "env";
+        _operatorProfileSource = "env";
 
-        if (_options.Mode == RefineryIntegrationMode.Live)
-        {
-            _httpClient = new HttpClient { BaseAddress = new Uri(_options.ServiceBaseUrl) };
-            _serviceClient = new RefineryServiceClient(_httpClient);
-        }
+        EnsureLiveClient();
 
-        LastStatus = _options.Mode switch
+        LastStatus = _activeOptions.Mode switch
         {
             RefineryIntegrationMode.Off => "Refinery integration OFF",
             RefineryIntegrationMode.Fixture => "Refinery integration FIXTURE (F6 trigger)",
@@ -58,7 +68,7 @@ public sealed class RefineryPatchRuntime
 
     public void Trigger(SimulationRuntime runtime, long tick)
     {
-        if (_options.Mode == RefineryIntegrationMode.Off)
+        if (_activeOptions.Mode == RefineryIntegrationMode.Off)
         {
             LastStatus = "Refinery integration OFF";
             return;
@@ -79,7 +89,7 @@ public sealed class RefineryPatchRuntime
         if (_lastTriggerUtc != DateTime.MinValue)
         {
             var elapsedMs = (DateTime.UtcNow - _lastTriggerUtc).TotalMilliseconds;
-            if (elapsedMs < _options.MinTriggerIntervalMs)
+            if (elapsedMs < _activeOptions.MinTriggerIntervalMs)
             {
                 LastStatus = $"Refinery trigger throttled ({Math.Round(elapsedMs)}ms since last)";
                 return;
@@ -87,9 +97,10 @@ public sealed class RefineryPatchRuntime
         }
 
         _lastTriggerUtc = DateTime.UtcNow;
-        LastStatus = $"Refinery request started: goal={_options.Goal}, mode={_options.Mode.ToString().ToLowerInvariant()}, tick={tick}";
+        var requestOptions = CaptureRequestOptions();
+        LastStatus = $"Refinery request started: goal={requestOptions.Options.Goal}, mode={requestOptions.Options.Mode.ToString().ToLowerInvariant()}, tick={tick}, output={requestOptions.RequestedDirectorOutputMode}({requestOptions.RequestedDirectorOutputModeSource})";
 
-        _inFlight = Task.Run(async () => await RunApplyAsync(runtime, tick));
+        _inFlight = Task.Run(async () => await RunApplyAsync(runtime, tick, requestOptions));
     }
 
     public void Pump()
@@ -113,9 +124,9 @@ public sealed class RefineryPatchRuntime
         }
     }
 
-    private async Task RunApplyAsync(SimulationRuntime runtime, long tick)
+    private async Task RunApplyAsync(SimulationRuntime runtime, long tick, RuntimeRequestOptions requestOptions)
     {
-        var isDirectorGoal = string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal);
+        var isDirectorGoal = string.Equals(requestOptions.Options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal);
 
         var beforeHash = CanonicalStateSerializer.Sha256(_patchState);
         var stagedPatchState = _patchState.Clone();
@@ -131,14 +142,14 @@ public sealed class RefineryPatchRuntime
 
         try
         {
-            PatchResponse rawResponse = _options.Mode switch
+            PatchResponse rawResponse = requestOptions.Options.Mode switch
             {
-                RefineryIntegrationMode.Fixture => LoadFixtureResponse(),
-                RefineryIntegrationMode.Live => await LoadLiveResponseAsync(runtime, tick),
+                RefineryIntegrationMode.Fixture => LoadFixtureResponse(requestOptions.Options),
+                RefineryIntegrationMode.Live => await LoadLiveResponseAsync(runtime, tick, requestOptions.Options),
                 _ => throw new InvalidOperationException("Integration mode is OFF")
             };
 
-            var selectedOutputMode = SelectOutputMode(rawResponse);
+            var selectedOutputMode = SelectOutputMode(rawResponse, requestOptions);
             var response = ApplyOutputMode(rawResponse, selectedOutputMode);
             var stageMarker = ReadStageMarker(response, isDirectorGoal);
             var hasBudgetMarker = TryReadBudgetUsed(response, out var budgetUsed);
@@ -154,16 +165,16 @@ public sealed class RefineryPatchRuntime
             };
 
             IReadOnlyList<RuntimePatchCommand> commands = Array.Empty<RuntimePatchCommand>();
-            if (_options.ApplyToWorld)
+            if (requestOptions.Options.ApplyToWorld)
             {
                 commands = _translator.Translate(response);
                 if (isDirectorGoal)
                     _executor.ValidateDirectorBatch(runtime, commands);
             }
 
-            var result = _applier.Apply(stagedPatchState, response, new PatchApplyOptions(_options.StrictMode));
+            var result = _applier.Apply(stagedPatchState, response, new PatchApplyOptions(requestOptions.Options.StrictMode));
 
-            if (_options.ApplyToWorld)
+            if (requestOptions.Options.ApplyToWorld)
             {
                 _executor.Execute(runtime, commands);
             }
@@ -171,7 +182,7 @@ public sealed class RefineryPatchRuntime
             _patchState.CopyFrom(stagedPatchState);
             if (isDirectorGoal)
             {
-                runtime.PrepareDirectorCheckpointBudget(_options.DirectorMaxBudget, tick);
+                runtime.PrepareDirectorCheckpointBudget(requestOptions.Options.DirectorMaxBudget, tick);
                 runtime.RecordDirectorCheckpointBudgetUsed(context.BudgetUsed, tick);
             }
 
@@ -220,6 +231,68 @@ public sealed class RefineryPatchRuntime
         }
     }
 
+    public string CycleDirectorOutputMode()
+    {
+        if (_inFlight is { IsCompleted: false })
+        {
+            LastStatus = "Refinery mode change blocked: request already in progress";
+            return _requestedDirectorOutputMode;
+        }
+
+        _requestedDirectorOutputMode = _requestedDirectorOutputMode switch
+        {
+            "auto" => "both",
+            "both" => "story_only",
+            "story_only" => "nudge_only",
+            "nudge_only" => "off",
+            _ => "auto"
+        };
+        _requestedDirectorOutputModeSource = "operator";
+        LastStatus = $"Refinery mode request updated: mode={_requestedDirectorOutputMode}, source={_requestedDirectorOutputModeSource}, profile={OperatorProfileName}";
+
+        return _requestedDirectorOutputMode;
+    }
+
+    public string CycleOperatorPreset()
+    {
+        if (_inFlight is { IsCompleted: false })
+        {
+            LastStatus = "Refinery preset change blocked: request already in progress";
+            return OperatorProfileName;
+        }
+
+        var nextPreset = RefineryRuntimeOptions.NextOperatorPresetName(OperatorProfileName);
+        return ApplyOperatorPreset(nextPreset, "operator");
+    }
+
+    public string ApplyOperatorPreset(string presetName, string source = "operator")
+    {
+        var normalizedPreset = RefineryRuntimeOptions.NormalizeOperatorPresetName(presetName);
+        if (normalizedPreset is null)
+        {
+            LastStatus = $"Refinery preset unchanged: unknown preset '{presetName}'";
+            return OperatorProfileName;
+        }
+
+        if (_inFlight is { IsCompleted: false })
+        {
+            LastStatus = "Refinery preset change blocked: request already in progress";
+            return OperatorProfileName;
+        }
+
+        _activeOptions = RefineryRuntimeOptions.ApplyOperatorPreset(_baselineOptions, normalizedPreset);
+        _operatorProfileSource = source;
+        _requestedDirectorOutputMode = _activeOptions.DirectorOutputMode;
+        _requestedDirectorOutputModeSource = "profile";
+        _lastTriggerUtc = DateTime.MinValue;
+        _consecutiveFailures = 0;
+        _circuitBreakerUntilUtc = DateTime.MinValue;
+        EnsureLiveClient();
+
+        LastStatus = $"Refinery preset applied: profile={OperatorProfileName}, mode={CurrentIntegrationMode}, output={_requestedDirectorOutputMode}, source={_requestedDirectorOutputModeSource}";
+        return OperatorProfileName;
+    }
+
     private static DirectorExecutionStatus BuildDirectorExecutionStatus(DirectorExecutionContext context, string applyStatus)
     {
         return new DirectorExecutionStatus(
@@ -234,16 +307,16 @@ public sealed class RefineryPatchRuntime
         );
     }
 
-    private DirectorOutputModeSelection SelectOutputMode(PatchResponse response)
+    private DirectorOutputModeSelection SelectOutputMode(PatchResponse response, RuntimeRequestOptions requestOptions)
     {
-        if (!string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal))
+        if (!string.Equals(requestOptions.Options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal))
         {
             return new DirectorOutputModeSelection("both", "non_director_goal");
         }
 
-        if (!string.Equals(_options.DirectorOutputMode, "auto", StringComparison.Ordinal))
+        if (!string.Equals(requestOptions.RequestedDirectorOutputMode, "auto", StringComparison.Ordinal))
         {
-            return new DirectorOutputModeSelection(_options.DirectorOutputMode, "env");
+            return new DirectorOutputModeSelection(requestOptions.RequestedDirectorOutputMode, requestOptions.RequestedDirectorOutputModeSource);
         }
 
         var responseMode = TryReadResponseOutputMode(response);
@@ -316,18 +389,18 @@ public sealed class RefineryPatchRuntime
         return null;
     }
 
-    private PatchResponse LoadFixtureResponse()
+    private PatchResponse LoadFixtureResponse(RefineryRuntimeOptions options)
     {
-        if (!File.Exists(_options.FixtureResponsePath))
+        if (!File.Exists(options.FixtureResponsePath))
         {
-            throw new FileNotFoundException("Fixture response file not found", _options.FixtureResponsePath);
+            throw new FileNotFoundException("Fixture response file not found", options.FixtureResponsePath);
         }
 
-        var json = File.ReadAllText(_options.FixtureResponsePath);
-        return _parser.Parse(json, new PatchApplyOptions(_options.StrictMode));
+        var json = File.ReadAllText(options.FixtureResponsePath);
+        return _parser.Parse(json, new PatchApplyOptions(options.StrictMode));
     }
 
-    private async Task<PatchResponse> LoadLiveResponseAsync(SimulationRuntime runtime, long tick)
+    private async Task<PatchResponse> LoadLiveResponseAsync(SimulationRuntime runtime, long tick, RefineryRuntimeOptions options)
     {
         if (_serviceClient is null)
         {
@@ -337,24 +410,24 @@ public sealed class RefineryPatchRuntime
         var request = new PatchRequest(
             "v1",
             Guid.NewGuid().ToString(),
-            _options.RequestSeed,
+            options.RequestSeed,
             tick,
-            _options.Goal,
+            options.Goal,
             runtime.BuildRefinerySnapshot(),
-            BuildRequestConstraints()
+            BuildRequestConstraints(options)
         );
 
         Exception? lastError = null;
         var attemptsPerformed = 0;
-        var maxAttempts = Math.Max(1, _options.LiveRetryCount + 1);
+        var maxAttempts = Math.Max(1, options.LiveRetryCount + 1);
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             attemptsPerformed = attempt;
             try
             {
-                using var cts = new CancellationTokenSource(_options.LiveTimeoutMs);
-                return await _serviceClient.GetPatchAsync(request, new PatchApplyOptions(_options.StrictMode), cts.Token);
+                using var cts = new CancellationTokenSource(options.LiveTimeoutMs);
+                return await _serviceClient.GetPatchAsync(request, new PatchApplyOptions(options.StrictMode), cts.Token);
             }
             catch (Exception ex) when (IsRetryable(ex) && attempt < maxAttempts)
             {
@@ -370,7 +443,7 @@ public sealed class RefineryPatchRuntime
         _consecutiveFailures++;
         if (_consecutiveFailures >= 2)
         {
-            _circuitBreakerUntilUtc = DateTime.UtcNow.AddSeconds(_options.CircuitBreakerSeconds);
+            _circuitBreakerUntilUtc = DateTime.UtcNow.AddSeconds(options.CircuitBreakerSeconds);
         }
 
         throw new InvalidOperationException(DescribeLiveRequestFailure(lastError, attemptsPerformed), lastError);
@@ -452,20 +525,28 @@ public sealed class RefineryPatchRuntime
         return false;
     }
 
-    private JsonObject? BuildRequestConstraints()
+    private JsonObject? BuildRequestConstraints(RefineryRuntimeOptions options)
     {
-        if (!string.Equals(_options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal))
+        if (!string.Equals(options.Goal, DirectorGoals.SeasonDirectorCheckpoint, StringComparison.Ordinal))
             return null;
 
         var constraints = new JsonObject
         {
-            ["maxBudget"] = _options.DirectorMaxBudget
+            ["maxBudget"] = options.DirectorMaxBudget
         };
 
-        if (!string.Equals(_options.DirectorOutputMode, "auto", StringComparison.Ordinal))
-            constraints["outputMode"] = _options.DirectorOutputMode;
+        if (!string.Equals(options.DirectorOutputMode, "auto", StringComparison.Ordinal))
+            constraints["outputMode"] = options.DirectorOutputMode;
 
         return constraints;
+    }
+
+    private RuntimeRequestOptions CaptureRequestOptions()
+    {
+        return new RuntimeRequestOptions(
+            _activeOptions with { DirectorOutputMode = _requestedDirectorOutputMode },
+            _requestedDirectorOutputMode,
+            _requestedDirectorOutputModeSource);
     }
 
     private static bool TryReadBudgetUsed(PatchResponse response, out double budgetUsed)
@@ -490,7 +571,28 @@ public sealed class RefineryPatchRuntime
         return false;
     }
 
+    private void EnsureLiveClient()
+    {
+        if (_activeOptions.Mode != RefineryIntegrationMode.Live)
+            return;
+
+        if (_serviceClient is not null
+            && string.Equals(_serviceClientBaseUrl, _activeOptions.ServiceBaseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _httpClient?.Dispose();
+        _httpClient = new HttpClient { BaseAddress = new Uri(_activeOptions.ServiceBaseUrl) };
+        _serviceClient = new RefineryServiceClient(_httpClient);
+        _serviceClientBaseUrl = _activeOptions.ServiceBaseUrl;
+    }
+
     private sealed record DirectorOutputModeSelection(string Mode, string Source);
+    private sealed record RuntimeRequestOptions(
+        RefineryRuntimeOptions Options,
+        string RequestedDirectorOutputMode,
+        string RequestedDirectorOutputModeSource);
     private sealed record DirectorExecutionContext(
         string Mode,
         string Source,

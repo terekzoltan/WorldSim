@@ -1,8 +1,10 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$ResponsePath,
+    [ValidateSet("java_planner_smoke", "full_stack_smoke")]
+    [string]$Lane = "java_planner_smoke",
     [string]$ExpectedMode = "both",
-    [switch]$RequireProposedLlm,
+    [switch]$RequireLlmCandidate,
     [switch]$AllowFallback
 )
 
@@ -11,7 +13,17 @@ if (-not (Test-Path $ResponsePath)) {
     exit 1
 }
 
+if ($Lane -eq "full_stack_smoke") {
+    Write-Host "FAIL: full_stack_smoke is a manual app/runtime lane; check-markers.ps1 validates Java response markers only." -ForegroundColor Red
+    exit 2
+}
+
 $response = Get-Content $ResponsePath -Raw | ConvertFrom-Json
+
+if (-not $response.explain) {
+    Write-Host "FAIL: response.explain missing" -ForegroundColor Red
+    exit 1
+}
 
 function Get-Marker([string]$prefix) {
     return $response.explain | Where-Object { $_ -like "$prefix*" } | Select-Object -First 1
@@ -24,12 +36,16 @@ $llmStage = Get-Marker "llmStage:"
 $llmRetries = Get-Marker "llmRetries:"
 $llmFallback = Get-Marker "llmFallbackReason:"
 $rawCaptured = Get-Marker "llmRawCaptured:"
+$causalOps = Get-Marker "causalChainOps:"
+$causalEq = Get-Marker "causalChainEqPolicy:"
 
 $ok = $true
-if ($refineryStage -ne "refineryStage:enabled") { $ok = $false }
 if ($directorMode -ne "directorOutputMode:$ExpectedMode") { $ok = $false }
-if ($RequireProposedLlm -and $llmStage -ne "llmStage:proposed") { $ok = $false }
+if ($RequireLlmCandidate -and $llmStage -ne "llmStage:candidate") { $ok = $false }
 if (-not $AllowFallback -and $directorStage -ne "directorStage:refinery-validated") { $ok = $false }
+if ($Lane -eq "java_planner_smoke" -and [string]::IsNullOrWhiteSpace($directorStage)) { $ok = $false }
+if ([string]::IsNullOrWhiteSpace($causalOps)) { $ok = $false }
+if ([string]::IsNullOrWhiteSpace($causalEq)) { $ok = $false }
 
 if ($ok) {
     Write-Host "PASS" -ForegroundColor Green
@@ -44,8 +60,10 @@ Write-Host "llmStage=$llmStage"
 Write-Host "llmRetries=$llmRetries"
 Write-Host "llmFallback=$llmFallback"
 Write-Host "llmRawCaptured=$rawCaptured"
+Write-Host "causalOps=$causalOps"
+Write-Host "causalEq=$causalEq"
 
-if ($response.warnings.Count -gt 0) {
+if ($response.warnings -and $response.warnings.Count -gt 0) {
     Write-Host "warnings:"
     $response.warnings | ForEach-Object { Write-Host " - $_" }
 }
