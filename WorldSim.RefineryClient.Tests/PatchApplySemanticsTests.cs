@@ -192,4 +192,31 @@ public sealed class PatchApplySemanticsTests
         Assert.Contains("op_story_stage_1", liveState.AppliedOpIds);
         Assert.Contains("BEAT_STAGE_1", liveState.StoryBeatIds);
     }
+
+    [Fact]
+    public void StrictApplyPath_RejectsCampaignOpsUntilP4B()
+    {
+        var state = SimulationPatchState.CreateBaseline();
+        var applier = new PatchApplier();
+
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4a-unsupported",
+            321,
+            new List<PatchOp>
+            {
+                new DeclareWarOp
+                {
+                    OpId = "op_war_1",
+                    AttackerFactionId = 1,
+                    DefenderFactionId = 2
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var ex = Assert.Throws<PatchApplyException>(() => applier.Apply(state, response, new PatchApplyOptions(StrictMode: true)));
+        Assert.Contains("Unknown patch op type 'DeclareWarOp'", ex.Message, StringComparison.Ordinal);
+    }
 }

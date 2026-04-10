@@ -1291,7 +1291,7 @@ Wave turn-gate:
 
 > Combat Plan > Phase 4 Sprint 7 (optional)
 
-- ⬜ **P4-A** Contracts v2 for diplomacy/campaign ops — DeclareWar, ProposeTreaty (Track D)
+- ✅ **P4-A** Contracts v2 for diplomacy/campaign ops — DeclareWar, ProposeTreaty (Track D)
 - ⬜ **P4-B** Adapter translation to runtime commands (Track D)
 - ⬜ **P4-C** Runtime command endpoints — DeclareWar, ProposeTreaty, ApplyMilitaryEvent (Track B)
 - ⬜ **P4-D** Java service beats — mock + gated director for war/diplomacy (Track D)
@@ -1323,6 +1323,9 @@ Wave 7 Step 2 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track D agent | P4-A | S7-A ✅ + S7-B ✅ | Expand contracts for combat-facing director/runtime ops first |
+
+Wave 7 Step 3 progress note:
+- ✅ `P4-A` closed: additive C#/Java campaign contract ops (`declareWar`, `proposeTreaty`) wired at bridge/parser/schema level with `schemaVersion=v1` root unchanged, deterministic unsupported full-apply behavior explicitly test-covered until later C7 steps, and stale combat-plan P4-A wording aligned to current scope.
 
 **Step 4 — opens when P4-A ✅**
 

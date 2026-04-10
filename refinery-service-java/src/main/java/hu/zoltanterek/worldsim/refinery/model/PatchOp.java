@@ -13,10 +13,12 @@ import com.fasterxml.jackson.databind.JsonNode;
         @JsonSubTypes.Type(value = PatchOp.TweakTech.class, name = "tweakTech"),
         @JsonSubTypes.Type(value = PatchOp.AddWorldEvent.class, name = "addWorldEvent"),
         @JsonSubTypes.Type(value = PatchOp.AddStoryBeat.class, name = "addStoryBeat"),
-        @JsonSubTypes.Type(value = PatchOp.SetColonyDirective.class, name = "setColonyDirective")
+        @JsonSubTypes.Type(value = PatchOp.SetColonyDirective.class, name = "setColonyDirective"),
+        @JsonSubTypes.Type(value = PatchOp.DeclareWar.class, name = "declareWar"),
+        @JsonSubTypes.Type(value = PatchOp.ProposeTreaty.class, name = "proposeTreaty")
 })
 public sealed interface PatchOp permits PatchOp.AddTech, PatchOp.TweakTech, PatchOp.AddWorldEvent,
-        PatchOp.AddStoryBeat, PatchOp.SetColonyDirective {
+        PatchOp.AddStoryBeat, PatchOp.SetColonyDirective, PatchOp.DeclareWar, PatchOp.ProposeTreaty {
 
     record AddTech(
             String opId,
@@ -81,6 +83,23 @@ public sealed interface PatchOp permits PatchOp.AddTech, PatchOp.TweakTech, Patc
         public SetColonyDirective(String opId, int colonyId, String directive, long durationTicks) {
             this(opId, colonyId, directive, durationTicks, List.of());
         }
+    }
+
+    record DeclareWar(
+            String opId,
+            int attackerFactionId,
+            int defenderFactionId,
+            String reason
+    ) implements PatchOp {
+    }
+
+    record ProposeTreaty(
+            String opId,
+            int proposerFactionId,
+            int receiverFactionId,
+            String treatyKind,
+            String note
+    ) implements PatchOp {
     }
 
     record EffectEntry(

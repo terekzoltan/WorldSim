@@ -267,6 +267,32 @@ public class PatchCommandTranslationTests
     }
 
     [Fact]
+    public void Translator_RejectsCampaignOpsUntilP4B()
+    {
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4a-campaign-op",
+            123,
+            new List<PatchOp>
+            {
+                new DeclareWarOp
+                {
+                    OpId = "op_war_1",
+                    AttackerFactionId = 1,
+                    DefenderFactionId = 2,
+                    Reason = "border pressure"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var translator = new PatchCommandTranslator();
+        var ex = Assert.Throws<NotSupportedException>(() => translator.Translate(response));
+        Assert.Contains("Adapter supports addTech/addStoryBeat/setColonyDirective only", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Executor_RejectsUnknownTechDeterministically()
     {
         var runtime = CreateRuntime();

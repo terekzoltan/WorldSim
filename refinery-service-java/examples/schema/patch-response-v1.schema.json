@@ -406,6 +406,74 @@
                 }
               }
             }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "opId",
+              "attackerFactionId",
+              "defenderFactionId"
+            ],
+            "properties": {
+              "op": {
+                "const": "declareWar"
+              },
+              "opId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "attackerFactionId": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "defenderFactionId": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "op",
+              "opId",
+              "proposerFactionId",
+              "receiverFactionId",
+              "treatyKind"
+            ],
+            "properties": {
+              "op": {
+                "const": "proposeTreaty"
+              },
+              "opId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "proposerFactionId": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "receiverFactionId": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "treatyKind": {
+                "type": "string",
+                "enum": [
+                  "ceasefire",
+                  "peace_talks"
+                ]
+              },
+              "note": {
+                "type": "string"
+              }
+            }
           }
         ]
       }

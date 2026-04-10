@@ -1427,12 +1427,15 @@ Phase goal: allow an optional director to nudge diplomacy/campaign arcs while ke
 
 Tasks:
 
-- Add `WorldSim.Contracts/v2` ops such as:
-  - DeclareWarOp
-  - ProposeTreatyOp
-  - AddStoryBeatOp (war/siege flavored)
-  - SetColonyDirectiveOp (mobilize, fortify, peace_talks)
-- Add strict validation policies and version negotiation.
+- Add `WorldSim.Contracts/v2` ops for campaign/diplomacy bridge contracts:
+  - `DeclareWarOp`
+  - `ProposeTreatyOp`
+- Keep root transport envelope unchanged (`schemaVersion = v1` remains).
+- Keep this slice contracts/parser/schema/bridge only (no runtime endpoint wiring in P4-A).
+- Record faction-ID policy explicitly: campaign ops use faction IDs (stable enum numeric mapping), not colony IDs.
+- Keep treaty payload minimal for P4-A (`treatyKind` + optional note).
+- Note: `AddStoryBeatOp` and `SetColonyDirectiveOp` already exist from director waves and are not new P4-A deliverables.
+- Add strict contract validation while keeping the existing `v1` wire policy unchanged.
 
 Acceptance:
 

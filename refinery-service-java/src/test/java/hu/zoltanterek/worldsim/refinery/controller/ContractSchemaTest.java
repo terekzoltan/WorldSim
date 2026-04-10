@@ -83,6 +83,62 @@ class ContractSchemaTest {
         assertLiveErrorResponseSchema("examples/negative/requests/patch-bad-goal.json");
     }
 
+    @Test
+    void campaignOpsShape_IsSchemaValid() throws Exception {
+        JsonNode payload = OBJECT_MAPPER.readTree("""
+                {
+                  "schemaVersion": "v1",
+                  "requestId": "req-campaign-shape-valid",
+                  "seed": 404,
+                  "patch": [
+                    {
+                      "op": "declareWar",
+                      "opId": "op_war_1",
+                      "attackerFactionId": 1,
+                      "defenderFactionId": 2,
+                      "reason": "border pressure"
+                    },
+                    {
+                      "op": "proposeTreaty",
+                      "opId": "op_treaty_1",
+                      "proposerFactionId": 2,
+                      "receiverFactionId": 1,
+                      "treatyKind": "ceasefire",
+                      "note": "30-tick pause"
+                    }
+                  ],
+                  "explain": [],
+                  "warnings": []
+                }
+                """);
+
+        assertSchemaValid(patchResponseSchema, payload);
+    }
+
+    @Test
+    void campaignOpsShape_InvalidTreatyKind_IsSchemaInvalid() throws Exception {
+        JsonNode payload = OBJECT_MAPPER.readTree("""
+                {
+                  "schemaVersion": "v1",
+                  "requestId": "req-campaign-shape-invalid",
+                  "seed": 405,
+                  "patch": [
+                    {
+                      "op": "proposeTreaty",
+                      "opId": "op_treaty_1",
+                      "proposerFactionId": 2,
+                      "receiverFactionId": 1,
+                      "treatyKind": "alliance"
+                    }
+                  ],
+                  "explain": [],
+                  "warnings": []
+                }
+                """);
+
+        assertSchemaInvalid(patchResponseSchema, payload);
+    }
+
     private void assertLivePatchResponseSchema(String requestFixturePath) throws Exception {
         String requestBody = Files.readString(Path.of(requestFixturePath), StandardCharsets.UTF_8);
         MvcResult result = mockMvc.perform(post("/v1/patch")
