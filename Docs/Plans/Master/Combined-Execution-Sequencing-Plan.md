@@ -1342,6 +1342,64 @@ Wave 7 Step 2 progress note:
 
 ---
 
+## Wave 7.1 — Director Telemetry / Operator UX Cleanup
+
+Purpose:
+- Clean up the Wave 7 operator/debug UX now that the restartless preset/mode seam is proven in manual smoke.
+- Reduce telemetry text density and improve readability without changing gameplay semantics.
+- Add low-cost visual widgets only where they materially improve operator diagnosis.
+
+Wave turn-gate:
+- Wave 7.1 is `READY` only after Wave 7 closeout is `✅`.
+- Wave 7.1 is a small post-wave cleanup slice, not a new major gameplay wave.
+- By default, Wave 7.1 does **not** gate Wave 7.5, Wave 8, or Wave 8.5 unless a coordinator explicitly serializes Track A / D bandwidth around it.
+
+### Sprint TU1: Telemetry Readability + Visual Widgets (Track A + D)
+
+- ⬜ **TU1-A1** Information architecture cleanup -- split always-visible operator summary, debug detail, and failure-only diagnostics (Track A)
+- ⬜ **TU1-D1** Operator wording + failure taxonomy alignment -- keep preset/mode/source labels short, stable, and docs-consistent (Track D)
+- ⬜ **TU1-A2** HUD/settings cleanup -- shorten top status line, restructure director block, and improve failure prominence (Track A)
+- ⬜ **TU1-A3** Tier-1 widgets -- status badges/chips and progress bars for budget/cooldown/pending-chain progress (Track A)
+- ⬜ **TU1-A4** Tier-2 widget experiment (optional) -- tiny sparklines and/or event timeline strip only if Tier-1 smoke still leaves readability gaps (Track A)
+
+### Wave 7.1 — Execution Steps
+
+**Step 1 — Track A/D define the readability contract first**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | TU1-A1 | Wave 7 ✅ | Establish the visibility split before touching specific HUD sections |
+| Track D agent | TU1-D1 | Wave 7 ✅ | Operator wording/taxonomy should settle in parallel with the Track A information split |
+
+**Step 2 — opens when TU1-A1 ✅ + TU1-D1 ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | TU1-A2 | TU1-A1 ✅ + TU1-D1 ✅ | HUD/settings cleanup should implement the finalized wording and visibility tiers |
+
+**Step 3 — opens when TU1-A2 ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | TU1-A3 | TU1-A2 ✅ | Add the cheapest/highest-value visual aids only after the textual layout is stable |
+
+**Step 4 — optional; opens when TU1-A3 ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | TU1-A4 | TU1-A3 ✅ | Only continue if manual smoke still shows real readability gaps after badges/bars land |
+
+Acceptance notes:
+- Operator state is readable at a glance during fixture, `live_mock`, and `live_director` smoke.
+- Failure diagnostics are visually distinct from normal green-path telemetry.
+- At least one low-cost visual aid (badge or bar) improves readability without creating a dashboard-heavy default.
+- Any sparkline/timeline work remains additive, snapshot-driven, and low-cost.
+
+Policy note:
+- `Docs/Plans/Master/Post-Wave7-Telemetry-Operator-UX-Cleanup-Plan.md` is the detailed source of truth for this follow-up slice.
+
+---
+
 ## Wave 7.5 — Low-Cost Visual Systems Baseline
 
 Purpose:
@@ -1767,6 +1825,7 @@ Wave 10.5 policy note:
 | 5.1 | — | C5.1 (Combat closeout) | Track B -> C + A |
 | 6 | D6 (Phase 3 S6) | C6 (Phase 3 S6) | MR-2: tick loop caution |
 | 7 | D7 (Phase 3 S7) | C7 (Phase 4 S7) | MR-3: sequential |
+| 7.1 | TU1 (Telemetry/operator cleanup) | — | Post-Wave7 sidecar cleanup; non-gating by default |
 | 7.5 | — | LC1 (Low-Cost baseline) | Staged parallel after `LC1-B1` |
 | 8 | — | C8 (Phase 5 S8) | Mostly sequential; final Track A consume |
 | 8.5 | TR2 (Tools.Refinery Phase TR2) | — | Director-only sidecar; sequential inside wave, parallel-eligible with Combat Waves 8-10 once Wave 7 + consult gate hold |
@@ -1774,7 +1833,7 @@ Wave 10.5 policy note:
 | 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential by phase, parallel consumer steps inside phases |
 | 10.5 | TR3 (Tools.Refinery Phase TR3) | — | Director-only convergence after Wave 10 and Wave 8.5 |
 
-**Totals:** 15 wave entries, 27 named sprints/sidecar blocks, ~101 epics.
+**Totals:** 16 wave entries, 28 named sprints/sidecar blocks, ~106 epics.
 
 ---
 
@@ -1786,6 +1845,7 @@ Wave 10.5 policy note:
 | Manual app/SMR testing questions, commands, or env setup help | Manual Test Helper | `Docs/Plans/Session-Manual-Test-Helper-Plan.md` |
 | FPS < 60 or Combat Phase 3 reached | Performance Profiling | `Docs/Plans/Session-Perf-Profiling-Plan.md` |
 | Combat Phase 0 end or balance regressions | Balance/QA Agent | `Docs/Plans/Session-Balance-QA-Plan.md` |
+| Wave 7 complete + telemetry/operator readability follow-up desired | Wave 7.1 telemetry/operator cleanup kickoff | `Docs/Plans/Master/Post-Wave7-Telemetry-Operator-UX-Cleanup-Plan.md` |
 | Wave 7 complete | Low-Cost 2D alignment / Wave 7.5 kickoff | `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` |
 | Wave 7 complete + TR1-C consult note locked | Tools.Refinery TR2 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
 | Wave 10 complete + Wave 8.5 complete | Tools.Refinery TR3 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
