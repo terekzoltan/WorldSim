@@ -194,14 +194,14 @@ public sealed class PatchApplySemanticsTests
     }
 
     [Fact]
-    public void StrictApplyPath_RejectsCampaignOpsUntilP4B()
+    public void CampaignOps_AreApplied_WithDeterministicBookkeeping()
     {
         var state = SimulationPatchState.CreateBaseline();
         var applier = new PatchApplier();
 
         var response = new PatchResponse(
             PatchContract.SchemaVersion,
-            "req-p4a-unsupported",
+            "req-p4b-supported",
             321,
             new List<PatchOp>
             {
@@ -209,7 +209,129 @@ public sealed class PatchApplySemanticsTests
                 {
                     OpId = "op_war_1",
                     AttackerFactionId = 1,
-                    DefenderFactionId = 2
+                    DefenderFactionId = 2,
+                    Reason = "border pressure"
+                },
+                new ProposeTreatyOp
+                {
+                    OpId = "op_treaty_1",
+                    ProposerFactionId = 2,
+                    ReceiverFactionId = 1,
+                    TreatyKind = "ceasefire",
+                    Note = "30-tick pause"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var first = applier.Apply(state, response, new PatchApplyOptions(StrictMode: true));
+        var second = applier.Apply(state, response, new PatchApplyOptions(StrictMode: true));
+
+        Assert.Equal(2, first.AppliedCount);
+        Assert.Equal(2, second.DedupedCount);
+        Assert.Contains((1, 2), state.DeclaredWars);
+        Assert.Contains((2, 1, "ceasefire"), state.TreatyProposals);
+    }
+
+    [Fact]
+    public void CampaignWarBookkeeping_NormalizesFactionPair()
+    {
+        var state = SimulationPatchState.CreateBaseline();
+        var applier = new PatchApplier();
+
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-war-normalized",
+            322,
+            new List<PatchOp>
+            {
+                new DeclareWarOp
+                {
+                    OpId = "op_war_2",
+                    AttackerFactionId = 3,
+                    DefenderFactionId = 1
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        applier.Apply(state, response, new PatchApplyOptions(StrictMode: true));
+
+        Assert.Contains((1, 3), state.DeclaredWars);
+    }
+
+    [Fact]
+    public void CampaignTreatyBookkeeping_NormalizesTreatyKind_AndTreatsEquivalentKeysAsNoOp()
+    {
+        var state = SimulationPatchState.CreateBaseline();
+        var applier = new PatchApplier();
+
+        var firstResponse = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-treaty-normalized-1",
+            400,
+            new List<PatchOp>
+            {
+                new ProposeTreatyOp
+                {
+                    OpId = "op_treaty_norm_1",
+                    ProposerFactionId = 2,
+                    ReceiverFactionId = 1,
+                    TreatyKind = " CeaseFire ",
+                    Note = "spacing + case variant"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var secondResponse = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-treaty-normalized-2",
+            401,
+            new List<PatchOp>
+            {
+                new ProposeTreatyOp
+                {
+                    OpId = "op_treaty_norm_2",
+                    ProposerFactionId = 2,
+                    ReceiverFactionId = 1,
+                    TreatyKind = "ceasefire",
+                    Note = "canonical"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var first = applier.Apply(state, firstResponse, new PatchApplyOptions(StrictMode: true));
+        var second = applier.Apply(state, secondResponse, new PatchApplyOptions(StrictMode: true));
+
+        Assert.Equal(1, first.AppliedCount);
+        Assert.Equal(1, second.NoOpCount);
+        Assert.Contains((2, 1, "ceasefire"), state.TreatyProposals);
+        Assert.Single(state.TreatyProposals);
+    }
+
+    [Fact]
+    public void CampaignApplyPath_RejectsInvalidFactionId_Deterministically()
+    {
+        var state = SimulationPatchState.CreateBaseline();
+        var applier = new PatchApplier();
+
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-invalid-faction",
+            402,
+            new List<PatchOp>
+            {
+                new DeclareWarOp
+                {
+                    OpId = "op_war_invalid_1",
+                    AttackerFactionId = 99,
+                    DefenderFactionId = 1
                 }
             },
             Array.Empty<string>(),
@@ -217,6 +339,62 @@ public sealed class PatchApplySemanticsTests
         );
 
         var ex = Assert.Throws<PatchApplyException>(() => applier.Apply(state, response, new PatchApplyOptions(StrictMode: true)));
-        Assert.Contains("Unknown patch op type 'DeclareWarOp'", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("current valid faction ids: 0..3", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignApplyPath_RejectsSelfTargetedTreaty_Deterministically()
+    {
+        var state = SimulationPatchState.CreateBaseline();
+        var applier = new PatchApplier();
+
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-self-target-treaty",
+            403,
+            new List<PatchOp>
+            {
+                new ProposeTreatyOp
+                {
+                    OpId = "op_treaty_self_1",
+                    ProposerFactionId = 2,
+                    ReceiverFactionId = 2,
+                    TreatyKind = "ceasefire"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var ex = Assert.Throws<PatchApplyException>(() => applier.Apply(state, response, new PatchApplyOptions(StrictMode: true)));
+        Assert.Contains("proposerFactionId != receiverFactionId", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CampaignApplyPath_RejectsUnsupportedTreatyKind_Deterministically()
+    {
+        var state = SimulationPatchState.CreateBaseline();
+        var applier = new PatchApplier();
+
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-invalid-kind",
+            404,
+            new List<PatchOp>
+            {
+                new ProposeTreatyOp
+                {
+                    OpId = "op_treaty_invalid_1",
+                    ProposerFactionId = 2,
+                    ReceiverFactionId = 1,
+                    TreatyKind = "alliance"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var ex = Assert.Throws<PatchApplyException>(() => applier.Apply(state, response, new PatchApplyOptions(StrictMode: true)));
+        Assert.Contains("Unsupported proposeTreaty.treatyKind", ex.Message, StringComparison.Ordinal);
     }
 }

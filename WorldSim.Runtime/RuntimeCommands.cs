@@ -1,3 +1,5 @@
+using WorldSim.Simulation;
+
 namespace WorldSim.Runtime;
 
 public readonly record struct RuntimeFeatureFlags(
@@ -37,3 +39,14 @@ public sealed record ApplyColonyDirectiveRuntimeCommand(
     string Directive,
     long DurationTicks,
     IReadOnlyList<DirectorGoalBiasSpec> Biases) : RuntimePatchCommand;
+
+public sealed record DeclareWarRuntimeCommand(
+    Faction Attacker,
+    Faction Defender,
+    string? Reason) : RuntimePatchCommand;
+
+public sealed record ProposeTreatyRuntimeCommand(
+    Faction Proposer,
+    Faction Receiver,
+    string TreatyKind,
+    string? Note) : RuntimePatchCommand;

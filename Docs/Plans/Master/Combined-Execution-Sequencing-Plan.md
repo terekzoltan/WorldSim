@@ -1292,7 +1292,7 @@ Wave turn-gate:
 > Combat Plan > Phase 4 Sprint 7 (optional)
 
 - ✅ **P4-A** Contracts v2 for diplomacy/campaign ops — DeclareWar, ProposeTreaty (Track D)
-- ⬜ **P4-B** Adapter translation to runtime commands (Track D)
+- ✅ **P4-B** Adapter translation to runtime commands (Track D)
 - ⬜ **P4-C** Runtime command endpoints — DeclareWar, ProposeTreaty, ApplyMilitaryEvent (Track B)
 - ⬜ **P4-D** Java service beats — mock + gated director for war/diplomacy (Track D)
 
@@ -1332,6 +1332,9 @@ Wave 7 Step 3 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track D agent | P4-B | P4-A ✅ | Adapter translation depends on the new contract ops existing first |
+
+Wave 7 Step 4 progress note:
+- ✅ `P4-B` closed: adapter translation now maps campaign ops (`declareWar`, `proposeTreaty`) to runtime command shapes with deterministic translator-side validation (faction range/self-target/treaty kind), patch-state/apply path supports additive campaign bookkeeping (war pair normalized, treaty proposal directional), and executor emits explicit P4-C handoff unsupported diagnostics instead of generic unknown-op failures.
 
 **Step 5 — opens when P4-B ✅**
 

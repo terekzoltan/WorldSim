@@ -5,6 +5,15 @@ namespace WorldSimRefineryClient.Apply;
 
 public sealed class PatchApplier
 {
+    private static readonly string[] SupportedTreatyKinds =
+    {
+        "ceasefire",
+        "peace_talks"
+    };
+
+    private const int MinFactionId = 0;
+    private const int MaxFactionId = 3;
+
     public PatchApplyResult Apply(SimulationPatchState state, PatchResponse response, PatchApplyOptions? options = null)
     {
         options ??= new PatchApplyOptions();
@@ -53,6 +62,30 @@ public sealed class PatchApplier
                 case SetColonyDirectiveOp setColonyDirective:
                     changed = state.SetColonyDirective(setColonyDirective.ColonyId, setColonyDirective.Directive);
                     break;
+                case DeclareWarOp declareWar:
+                    ValidateFactionId(declareWar.AttackerFactionId, "declareWar.attackerFactionId");
+                    ValidateFactionId(declareWar.DefenderFactionId, "declareWar.defenderFactionId");
+                    if (declareWar.AttackerFactionId == declareWar.DefenderFactionId)
+                    {
+                        throw new PatchApplyException("declareWar requires attackerFactionId != defenderFactionId.");
+                    }
+
+                    changed = state.RegisterDeclaredWar(declareWar.AttackerFactionId, declareWar.DefenderFactionId);
+                    break;
+                case ProposeTreatyOp proposeTreaty:
+                    ValidateFactionId(proposeTreaty.ProposerFactionId, "proposeTreaty.proposerFactionId");
+                    ValidateFactionId(proposeTreaty.ReceiverFactionId, "proposeTreaty.receiverFactionId");
+                    if (proposeTreaty.ProposerFactionId == proposeTreaty.ReceiverFactionId)
+                    {
+                        throw new PatchApplyException("proposeTreaty requires proposerFactionId != receiverFactionId.");
+                    }
+
+                    var treatyKind = NormalizeTreatyKind(proposeTreaty.TreatyKind);
+                    changed = state.RegisterTreatyProposal(
+                        proposeTreaty.ProposerFactionId,
+                        proposeTreaty.ReceiverFactionId,
+                        treatyKind);
+                    break;
                 default:
                     if (options.StrictMode)
                     {
@@ -73,5 +106,32 @@ public sealed class PatchApplier
         }
 
         return new PatchApplyResult(applied, deduped, noOp);
+    }
+
+    private static void ValidateFactionId(int factionId, string fieldName)
+    {
+        if (factionId < MinFactionId || factionId > MaxFactionId)
+        {
+            throw new PatchApplyException(
+                $"{fieldName} out of range: {factionId} (current valid faction ids: {MinFactionId}..{MaxFactionId}).");
+        }
+    }
+
+    private static string NormalizeTreatyKind(string treatyKindRaw)
+    {
+        var treatyKind = treatyKindRaw?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(treatyKind))
+        {
+            throw new PatchApplyException(
+                "proposeTreaty.treatyKind is required. Expected one of: ceasefire, peace_talks.");
+        }
+
+        if (Array.IndexOf(SupportedTreatyKinds, treatyKind) < 0)
+        {
+            throw new PatchApplyException(
+                $"Unsupported proposeTreaty.treatyKind '{treatyKindRaw}'. Expected one of: ceasefire, peace_talks.");
+        }
+
+        return treatyKind;
     }
 }

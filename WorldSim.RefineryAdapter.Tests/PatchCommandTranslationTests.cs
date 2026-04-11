@@ -263,15 +263,15 @@ public class PatchCommandTranslationTests
 
         var translator = new PatchCommandTranslator();
         var ex = Assert.Throws<NotSupportedException>(() => translator.Translate(response));
-        Assert.Contains("Adapter supports addTech/addStoryBeat/setColonyDirective only", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("Adapter supports addTech/addStoryBeat/setColonyDirective/declareWar/proposeTreaty only", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Translator_RejectsCampaignOpsUntilP4B()
+    public void Translator_ConvertsDeclareWar_ToRuntimeCommand()
     {
         var response = new PatchResponse(
             PatchContract.SchemaVersion,
-            "req-p4a-campaign-op",
+            "req-p4b-campaign-op",
             123,
             new List<PatchOp>
             {
@@ -288,8 +288,115 @@ public class PatchCommandTranslationTests
         );
 
         var translator = new PatchCommandTranslator();
-        var ex = Assert.Throws<NotSupportedException>(() => translator.Translate(response));
-        Assert.Contains("Adapter supports addTech/addStoryBeat/setColonyDirective only", ex.Message, StringComparison.Ordinal);
+        var command = Assert.IsType<DeclareWarRuntimeCommand>(Assert.Single(translator.Translate(response)));
+        Assert.Equal(WorldSim.Simulation.Faction.Obsidari, command.Attacker);
+        Assert.Equal(WorldSim.Simulation.Faction.Aetheri, command.Defender);
+    }
+
+    [Fact]
+    public void Translator_ConvertsProposeTreaty_ToRuntimeCommand()
+    {
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-treaty-op",
+            124,
+            new List<PatchOp>
+            {
+                new ProposeTreatyOp
+                {
+                    OpId = "op_treaty_1",
+                    ProposerFactionId = 2,
+                    ReceiverFactionId = 1,
+                    TreatyKind = "peace_talks",
+                    Note = "third party mediation"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var translator = new PatchCommandTranslator();
+        var command = Assert.IsType<ProposeTreatyRuntimeCommand>(Assert.Single(translator.Translate(response)));
+        Assert.Equal(WorldSim.Simulation.Faction.Aetheri, command.Proposer);
+        Assert.Equal(WorldSim.Simulation.Faction.Obsidari, command.Receiver);
+        Assert.Equal("peace_talks", command.TreatyKind);
+    }
+
+    [Fact]
+    public void Translator_RejectsCampaignOp_WhenFactionIdOutOfRange()
+    {
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-bad-faction",
+            125,
+            new List<PatchOp>
+            {
+                new DeclareWarOp
+                {
+                    OpId = "op_war_bad_1",
+                    AttackerFactionId = 77,
+                    DefenderFactionId = 1
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var translator = new PatchCommandTranslator();
+        var ex = Assert.Throws<InvalidOperationException>(() => translator.Translate(response));
+        Assert.Contains("current valid faction ids: 0..3", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Translator_RejectsCampaignOp_WhenSelfTargeted()
+    {
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-self-target",
+            126,
+            new List<PatchOp>
+            {
+                new ProposeTreatyOp
+                {
+                    OpId = "op_treaty_bad_1",
+                    ProposerFactionId = 1,
+                    ReceiverFactionId = 1,
+                    TreatyKind = "ceasefire"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var translator = new PatchCommandTranslator();
+        var ex = Assert.Throws<InvalidOperationException>(() => translator.Translate(response));
+        Assert.Contains("proposerFactionId != receiverFactionId", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Translator_RejectsCampaignOp_WhenTreatyKindUnsupported()
+    {
+        var response = new PatchResponse(
+            PatchContract.SchemaVersion,
+            "req-p4b-bad-treaty-kind",
+            127,
+            new List<PatchOp>
+            {
+                new ProposeTreatyOp
+                {
+                    OpId = "op_treaty_bad_2",
+                    ProposerFactionId = 1,
+                    ReceiverFactionId = 2,
+                    TreatyKind = "alliance"
+                }
+            },
+            Array.Empty<string>(),
+            Array.Empty<string>()
+        );
+
+        var translator = new PatchCommandTranslator();
+        var ex = Assert.Throws<InvalidOperationException>(() => translator.Translate(response));
+        Assert.Contains("Unsupported proposeTreaty.treatyKind", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -321,6 +428,37 @@ public class PatchCommandTranslationTests
 
         var ex = Assert.Throws<InvalidOperationException>(() => executor.Execute(runtime, commands));
         Assert.Contains("unknown directive", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Executor_RejectsDeclareWarCommand_WithExplicitP4CMessage()
+    {
+        var runtime = CreateRuntime();
+        var executor = new RuntimePatchCommandExecutor();
+
+        var command = new DeclareWarRuntimeCommand(
+            WorldSim.Simulation.Faction.Obsidari,
+            WorldSim.Simulation.Faction.Aetheri,
+            "border pressure");
+
+        var ex = Assert.Throws<NotSupportedException>(() => executor.Execute(runtime, new[] { command }));
+        Assert.Contains("runtime endpoint lands in P4-C", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ValidateDirectorBatch_RejectsTreatyCommand_WithExplicitP4CMessage()
+    {
+        var runtime = CreateRuntime();
+        var executor = new RuntimePatchCommandExecutor();
+
+        var command = new ProposeTreatyRuntimeCommand(
+            WorldSim.Simulation.Faction.Aetheri,
+            WorldSim.Simulation.Faction.Obsidari,
+            "ceasefire",
+            "test");
+
+        var ex = Assert.Throws<NotSupportedException>(() => executor.ValidateDirectorBatch(runtime, new[] { command }));
+        Assert.Contains("runtime endpoint lands in P4-C", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -2,11 +2,20 @@ using System;
 using WorldSim.Contracts.V1;
 using WorldSim.Contracts.V2;
 using WorldSim.Runtime;
+using WorldSim.Simulation;
 
 namespace WorldSim.RefineryAdapter.Translation;
 
 public sealed class PatchCommandTranslator
 {
+    private static readonly string[] SupportedTreatyKinds =
+    {
+        "ceasefire",
+        "peace_talks"
+    };
+
+    private static readonly int MaxFactionId = Enum.GetValues(typeof(Faction)).Length - 1;
+
     public IReadOnlyList<RuntimePatchCommand> Translate(PatchResponse response)
     {
         var commands = new List<RuntimePatchCommand>(response.Patch.Count);
@@ -56,9 +65,32 @@ public sealed class PatchCommandTranslator
                         biases
                     ));
                     break;
+                case DeclareWarOp declareWar:
+                    var attacker = MapFactionId(declareWar.AttackerFactionId, "declareWar.attackerFactionId");
+                    var defender = MapFactionId(declareWar.DefenderFactionId, "declareWar.defenderFactionId");
+                    if (attacker == defender)
+                    {
+                        throw new InvalidOperationException(
+                            "declareWar requires attackerFactionId != defenderFactionId.");
+                    }
+
+                    commands.Add(new DeclareWarRuntimeCommand(attacker, defender, declareWar.Reason));
+                    break;
+                case ProposeTreatyOp proposeTreaty:
+                    var proposer = MapFactionId(proposeTreaty.ProposerFactionId, "proposeTreaty.proposerFactionId");
+                    var receiver = MapFactionId(proposeTreaty.ReceiverFactionId, "proposeTreaty.receiverFactionId");
+                    if (proposer == receiver)
+                    {
+                        throw new InvalidOperationException(
+                            "proposeTreaty requires proposerFactionId != receiverFactionId.");
+                    }
+
+                    var treatyKind = NormalizeTreatyKind(proposeTreaty.TreatyKind);
+                    commands.Add(new ProposeTreatyRuntimeCommand(proposer, receiver, treatyKind, proposeTreaty.Note));
+                    break;
                 default:
                     throw new NotSupportedException(
-                        $"Adapter supports addTech/addStoryBeat/setColonyDirective only. Unsupported op: {op.GetType().Name}"
+                        $"Adapter supports addTech/addStoryBeat/setColonyDirective/declareWar/proposeTreaty only. Unsupported op: {op.GetType().Name}"
                     );
             }
         }
@@ -152,6 +184,35 @@ public sealed class PatchCommandTranslator
             chain.WindowTicks,
             chain.MaxTriggers);
     }
+
+    private static Faction MapFactionId(int factionId, string fieldName)
+    {
+        if (factionId < 0 || factionId > MaxFactionId)
+        {
+            throw new InvalidOperationException(
+                $"{fieldName} out of range: {factionId} (current valid faction ids: 0..{MaxFactionId}).");
+        }
+
+        return (Faction)factionId;
+    }
+
+    private static string NormalizeTreatyKind(string treatyKindRaw)
+    {
+        var treatyKind = treatyKindRaw?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(treatyKind))
+        {
+            throw new InvalidOperationException(
+                "proposeTreaty.treatyKind is required. Expected one of: ceasefire, peace_talks.");
+        }
+
+        if (Array.IndexOf(SupportedTreatyKinds, treatyKind) < 0)
+        {
+            throw new InvalidOperationException(
+                $"Unsupported proposeTreaty.treatyKind '{treatyKindRaw}'. Expected one of: ceasefire, peace_talks.");
+        }
+
+        return treatyKind;
+    }
 }
 
 public sealed class RuntimePatchCommandExecutor
@@ -206,6 +267,12 @@ public sealed class RuntimePatchCommandExecutor
                     throw new InvalidOperationException(
                         "Director batch validation received non-director command 'UnlockTechRuntimeCommand'."
                     );
+                case DeclareWarRuntimeCommand:
+                    throw new NotSupportedException(
+                        "DeclareWarRuntimeCommand translated successfully, but runtime endpoint lands in P4-C.");
+                case ProposeTreatyRuntimeCommand:
+                    throw new NotSupportedException(
+                        "ProposeTreatyRuntimeCommand translated successfully, but runtime endpoint lands in P4-C.");
                 default:
                     throw new NotSupportedException(
                         $"Unsupported runtime patch command: {command.GetType().Name}"
@@ -243,6 +310,12 @@ public sealed class RuntimePatchCommandExecutor
                         directive.Biases
                     );
                     break;
+                case DeclareWarRuntimeCommand:
+                    throw new NotSupportedException(
+                        "DeclareWarRuntimeCommand translated successfully, but runtime endpoint lands in P4-C.");
+                case ProposeTreatyRuntimeCommand:
+                    throw new NotSupportedException(
+                        "ProposeTreatyRuntimeCommand translated successfully, but runtime endpoint lands in P4-C.");
                 default:
                     throw new NotSupportedException(
                         $"Unsupported runtime patch command: {command.GetType().Name}"
