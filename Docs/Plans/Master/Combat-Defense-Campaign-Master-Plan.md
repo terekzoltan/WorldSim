@@ -1460,8 +1460,11 @@ Tasks:
 - Add runtime commands:
   - DeclareWar(factionA, factionB)
   - ProposeTreaty(...)
-  - ApplyMilitaryEvent(...)
-  - SetColonyDirective(...)
+
+Scope note (P4-C):
+
+- `ApplyMilitaryEvent(...)` is out of scope for this slice.
+- `SetColonyDirective(...)` already exists from Director integration and is not a new P4-C deliverable.
 
 Acceptance:
 

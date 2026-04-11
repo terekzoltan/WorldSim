@@ -6,6 +6,10 @@ namespace WorldSim.Simulation.Diplomacy;
 
 public sealed class RelationManager
 {
+    private const double WarThreshold = 120d;
+    private const double HostileThreshold = 55d;
+    private const double MaxPressure = 220d;
+
     private readonly Dictionary<(Faction left, Faction right), double> _pressureScores = new();
     private readonly Dictionary<(Faction left, Faction right), int> _stanceCooldownTicks = new();
 
@@ -45,15 +49,70 @@ public sealed class RelationManager
 
         var key = NormalizePair(attacker, defender);
         var currentScore = _pressureScores.GetValueOrDefault(key, 0d);
-        _pressureScores[key] = Math.Clamp(Math.Max(currentScore, 55d) + pressureBoost, 0d, 220d);
+        _pressureScores[key] = Math.Clamp(Math.Max(currentScore, HostileThreshold) + pressureBoost, 0d, MaxPressure);
         _stanceCooldownTicks[key] = Math.Max(_stanceCooldownTicks.GetValueOrDefault(key, 0), 90);
+    }
+
+    public bool DeclareWar(World world, Faction attacker, Faction defender, out Stance previous, out Stance current)
+    {
+        previous = world.GetFactionStance(attacker, defender);
+        current = previous;
+        if (attacker == defender)
+            return false;
+
+        var key = NormalizePair(attacker, defender);
+        var score = _pressureScores.GetValueOrDefault(key, 0d);
+        _pressureScores[key] = Math.Clamp(Math.Max(score, WarThreshold), 0d, MaxPressure);
+        _stanceCooldownTicks[key] = Math.Max(_stanceCooldownTicks.GetValueOrDefault(key, 0), 120);
+
+        world.SetFactionStance(attacker, defender, Stance.War);
+        current = Stance.War;
+        return previous != current;
+    }
+
+    public bool ProposeTreaty(World world, Faction proposer, Faction receiver, string treatyKind, out Stance previous, out Stance current)
+    {
+        previous = world.GetFactionStance(proposer, receiver);
+        current = previous;
+        if (proposer == receiver)
+            return false;
+
+        var normalizedKind = treatyKind.Trim().ToLowerInvariant();
+        var target = normalizedKind switch
+        {
+            "ceasefire" => previous == Stance.War ? Stance.Hostile : previous,
+            "peace_talks" => previous switch
+            {
+                Stance.War => Stance.Hostile,
+                Stance.Hostile => Stance.Neutral,
+                _ => Stance.Neutral
+            },
+            _ => throw new InvalidOperationException($"Unsupported treaty kind '{treatyKind}'.")
+        };
+
+        if (target == previous)
+            return false;
+
+        var key = NormalizePair(proposer, receiver);
+        var score = _pressureScores.GetValueOrDefault(key, 0d);
+        _pressureScores[key] = target switch
+        {
+            Stance.War => Math.Clamp(Math.Max(score, WarThreshold), 0d, MaxPressure),
+            Stance.Hostile => Math.Clamp(score < HostileThreshold ? 80d : score, HostileThreshold, WarThreshold - 1d),
+            _ => Math.Clamp(Math.Min(score, HostileThreshold - 1d), 0d, MaxPressure)
+        };
+        _stanceCooldownTicks[key] = Math.Max(_stanceCooldownTicks.GetValueOrDefault(key, 0), 120);
+
+        world.SetFactionStance(proposer, receiver, target);
+        current = target;
+        return true;
     }
 
     private static Stance ResolveTargetStance(double score)
     {
-        if (score >= 120d)
+        if (score >= WarThreshold)
             return Stance.War;
-        if (score >= 55d)
+        if (score >= HostileThreshold)
             return Stance.Hostile;
         return Stance.Neutral;
     }

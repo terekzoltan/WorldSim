@@ -1293,8 +1293,8 @@ Wave turn-gate:
 
 - ✅ **P4-A** Contracts v2 for diplomacy/campaign ops — DeclareWar, ProposeTreaty (Track D)
 - ✅ **P4-B** Adapter translation to runtime commands (Track D)
-- ⬜ **P4-C** Runtime command endpoints — DeclareWar, ProposeTreaty, ApplyMilitaryEvent (Track B)
-- ⬜ **P4-D** Java service beats — mock + gated director for war/diplomacy (Track D)
+- ✅ **P4-C** Runtime command endpoints — DeclareWar, ProposeTreaty (Track B)
+- ✅ **P4-D** Java service beats — mock + gated director for war/diplomacy (Track D)
 
 ### Wave 7 — Execution Steps
 
@@ -1342,6 +1342,10 @@ Wave 7 Step 4 progress note:
 |---------|---------|--------|-------|
 | Track D agent | P4-D | P4-B ✅ | Java service beat generation should target the already-mapped adapter contract |
 | Track B agent | P4-C | P4-A ✅ + P4-B ✅ | Runtime endpoints need the contract and adapter semantics defined first |
+
+Wave 7 Step 5 progress note:
+- ✅ `P4-C` closed: runtime endpoints now apply campaign ops (`declareWar`, `proposeTreaty`) via world/relation-manager helpers (no direct runtime-side stance writes), treaty semantics locked to conservative ladder (`ceasefire`: War→Hostile only, `peace_talks`: one-step toward Neutral), and adapter executor validate/execute paths switched from explicit P4-C handoff failures to runtime calls; runtime+adapter test gates and full solution build are green.
+- ✅ `P4-D` closed: Java director campaign emit is now optional and default-OFF (`planner.director.campaignEnabled`), stays on `SEASON_DIRECTOR_CHECKPOINT` + `schemaVersion=v1`, extends assertion-oriented designated output with `campaignSlot`, maps through parser/sanitize/bridge/validator, treats campaign ops as nudge-side output (`nudge_only` keeps directive+campaign), keeps campaign ops budget-neutral, and adds dedicated campaign-enabled fixtures/tests while default fixture/API behavior remains unchanged.
 
 **Critical path:** D7 (S7-A → S7-B) → C7 (P4-A → P4-B → {P4-D + P4-C}). Strictly sequential across waves, with only the final C7 step parallelized.
 **Director Phase 3 roadmap is COMPLETE after this wave. Tools.Refinery migration continues later through the Director sidecar waves (Wave 8.5 / TR2 and Wave 10.5 / TR3).**

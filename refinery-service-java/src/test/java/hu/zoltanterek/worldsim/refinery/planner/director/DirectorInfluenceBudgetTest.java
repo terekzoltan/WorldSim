@@ -39,4 +39,13 @@ class DirectorInfluenceBudgetTest {
         // causal base: 2.0
         assertEquals(4.0d, budget, 0.0001d);
     }
+
+    @Test
+    void calculateBudgetUsed_CampaignOpsAreBudgetNeutral() {
+        PatchOp.DeclareWar declareWar = new PatchOp.DeclareWar("op_war", 1, 2, "pressure");
+        PatchOp.ProposeTreaty treaty = new PatchOp.ProposeTreaty("op_treaty", 2, 1, "ceasefire", "pause");
+
+        double budget = DirectorInfluenceBudget.calculateBudgetUsed(List.of(declareWar, treaty));
+        assertEquals(0.0d, budget, 0.0001d);
+    }
 }

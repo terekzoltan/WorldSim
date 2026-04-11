@@ -75,6 +75,7 @@ public class LlmDirectorPlanner {
     private final int maxTokens;
     private final String defaultOutputMode;
     private final double defaultInfluenceBudget;
+    private final boolean campaignEnabled;
     private final DirectorPromptFactory promptFactory;
     private final DirectorCandidateParser candidateParser;
     private final CompletionGateway completionGateway;
@@ -91,6 +92,7 @@ public class LlmDirectorPlanner {
             @Value("${planner.llm.maxTokens:500}") int maxTokens,
             @Value("${planner.director.outputMode:both}") String defaultOutputMode,
             @Value("${planner.director.budget:5.0}") double defaultInfluenceBudget,
+            @Value("${planner.director.campaignEnabled:false}") boolean campaignEnabled,
             @Value("${planner.llm.baseUrl:https://openrouter.ai/api/v1}") String baseUrl,
             @Value("${planner.llm.httpReferer:https://worldsim.local}") String httpReferer,
             @Value("${planner.llm.appTitle:WorldSim}") String appTitle,
@@ -104,6 +106,7 @@ public class LlmDirectorPlanner {
                 maxTokens,
                 defaultOutputMode,
                 defaultInfluenceBudget,
+                campaignEnabled,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 new OpenRouterClient(objectMapper, baseUrl, apiKey, httpReferer, appTitle, timeoutMs)::chatCompletion
@@ -118,6 +121,7 @@ public class LlmDirectorPlanner {
             int maxTokens,
             String defaultOutputMode,
             double defaultInfluenceBudget,
+            boolean campaignEnabled,
             DirectorPromptFactory promptFactory,
             DirectorCandidateParser candidateParser,
             CompletionGateway completionGateway
@@ -131,6 +135,7 @@ public class LlmDirectorPlanner {
         this.defaultInfluenceBudget = defaultInfluenceBudget > 0d
                 ? defaultInfluenceBudget
                 : DirectorDesign.DEFAULT_INFLUENCE_BUDGET;
+        this.campaignEnabled = campaignEnabled;
         this.promptFactory = promptFactory;
         this.candidateParser = candidateParser;
         this.completionGateway = completionGateway;
@@ -152,7 +157,7 @@ public class LlmDirectorPlanner {
         String outputMode = resolveOutputMode(request);
         DirectorRuntimeFacts runtimeFacts = snapshotMapper.map(request, defaultInfluenceBudget);
         String systemPrompt = promptFactory.systemPrompt();
-        String userPrompt = promptFactory.userPrompt(runtimeFacts, outputMode, feedbackHints);
+        String userPrompt = promptFactory.userPrompt(runtimeFacts, outputMode, campaignEnabled, feedbackHints);
 
         try {
             logger.info(
@@ -191,7 +196,7 @@ public class LlmDirectorPlanner {
             DirectorCandidateParser.DirectorCandidate candidate
     ) {
         SanitizeStats stats = new SanitizeStats();
-        DirectorOutputAssertions assertions = mapToOutputAssertions(candidate, runtimeFacts, stats);
+        DirectorOutputAssertions assertions = mapToOutputAssertions(candidate, runtimeFacts, stats, campaignEnabled);
 
         List<PatchOp> ops = bridgeContractMapper.toPatchOps(request, assertions);
         return new PatchBuildResult(List.copyOf(ops), stats.sanitized(), stats.tags());
@@ -200,11 +205,104 @@ public class LlmDirectorPlanner {
     private static DirectorOutputAssertions mapToOutputAssertions(
             DirectorCandidateParser.DirectorCandidate candidate,
             DirectorRuntimeFacts runtimeFacts,
-            SanitizeStats stats
+            SanitizeStats stats,
+            boolean campaignEnabled
     ) {
         DirectorOutputAssertions.StoryBeatAssertion storyBeatAssertion = mapStoryBeatAssertion(candidate.designatedOutput().storyBeatSlot(), stats);
         DirectorOutputAssertions.DirectiveAssertion directiveAssertion = mapDirectiveAssertion(candidate.designatedOutput().directiveSlot(), runtimeFacts, stats);
-        return new DirectorOutputAssertions(storyBeatAssertion, directiveAssertion);
+        DirectorOutputAssertions.CampaignAssertion campaignAssertion = mapCampaignAssertion(
+                candidate.designatedOutput().campaignSlot(),
+                stats,
+                campaignEnabled
+        );
+        return new DirectorOutputAssertions(storyBeatAssertion, directiveAssertion, campaignAssertion);
+    }
+
+    private static DirectorOutputAssertions.CampaignAssertion mapCampaignAssertion(
+            DirectorCandidateParser.CampaignSlotCandidate campaignCandidate,
+            SanitizeStats stats,
+            boolean campaignEnabled
+    ) {
+        if (campaignCandidate == null) {
+            return null;
+        }
+
+        if (!campaignEnabled) {
+            stats.mark("campaign_slot_dropped_gate_off");
+            return null;
+        }
+
+        String kind = trimToNull(campaignCandidate.kind());
+        if (kind == null) {
+            stats.mark("campaign_missing_required");
+            return null;
+        }
+
+        kind = kind.toLowerCase(Locale.ROOT);
+        if (!DirectorDesign.VALID_CAMPAIGN_KINDS.contains(kind)) {
+            stats.mark("campaign_kind_dropped");
+            return null;
+        }
+
+        if ("declare_war".equals(kind)) {
+            int attacker = campaignCandidate.attackerFactionId();
+            int defender = campaignCandidate.defenderFactionId();
+            if (!isValidFactionId(attacker) || !isValidFactionId(defender)) {
+                stats.mark("campaign_faction_range_dropped");
+                return null;
+            }
+            if (attacker == defender) {
+                stats.mark("campaign_self_target_dropped");
+                return null;
+            }
+            return new DirectorOutputAssertions.CampaignAssertion(
+                    kind,
+                    attacker,
+                    defender,
+                    trimToNull(campaignCandidate.reason()),
+                    null,
+                    null,
+                    null,
+                    null
+            );
+        }
+
+        int proposer = campaignCandidate.proposerFactionId();
+        int receiver = campaignCandidate.receiverFactionId();
+        if (!isValidFactionId(proposer) || !isValidFactionId(receiver)) {
+            stats.mark("campaign_faction_range_dropped");
+            return null;
+        }
+        if (proposer == receiver) {
+            stats.mark("campaign_self_target_dropped");
+            return null;
+        }
+
+        String treatyKind = trimToNull(campaignCandidate.treatyKind());
+        if (treatyKind == null) {
+            stats.mark("campaign_treaty_missing");
+            return null;
+        }
+        treatyKind = treatyKind.toLowerCase(Locale.ROOT);
+        if (!DirectorDesign.VALID_TREATY_KINDS.contains(treatyKind)) {
+            stats.mark("campaign_treaty_dropped");
+            return null;
+        }
+
+        return new DirectorOutputAssertions.CampaignAssertion(
+                kind,
+                null,
+                null,
+                null,
+                proposer,
+                receiver,
+                treatyKind,
+                trimToNull(campaignCandidate.note())
+        );
+    }
+
+    private static boolean isValidFactionId(int factionId) {
+        return factionId >= DirectorDesign.MIN_FACTION_ID && factionId <= DirectorDesign.MAX_FACTION_ID;
     }
 
     private static DirectorOutputAssertions.StoryBeatAssertion mapStoryBeatAssertion(

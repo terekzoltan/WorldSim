@@ -12,6 +12,16 @@ import java.util.Set;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 
 public final class DirectorModelValidator {
+    private final boolean campaignEnabled;
+
+    public DirectorModelValidator() {
+        this(false);
+    }
+
+    public DirectorModelValidator(boolean campaignEnabled) {
+        this.campaignEnabled = campaignEnabled;
+    }
+
     public DirectorValidationOutcome validateAndRepair(List<PatchOp> candidatePatch, DirectorRuntimeFacts facts) {
         List<String> warnings = new ArrayList<>();
         List<String> feedback = new ArrayList<>();
@@ -19,6 +29,7 @@ public final class DirectorModelValidator {
         Map<Integer, String> directivesPerColony = new HashMap<>();
         Set<String> seenOpIds = new HashSet<>();
         boolean storyBeatSeen = false;
+        boolean campaignSeen = false;
         boolean changed = false;
 
         if (candidatePatch.size() > DirectorDesign.MAX_OPS_PER_CHECKPOINT) {
@@ -150,7 +161,60 @@ public final class DirectorModelValidator {
                 continue;
             }
 
-            throw invalid(DirectorDesign.INV_01, "Director checkpoint supports only addStoryBeat/setColonyDirective ops.");
+            if (op instanceof PatchOp.DeclareWar declareWar) {
+                if (!campaignEnabled) {
+                    throw invalid(DirectorDesign.INV_01, "Campaign ops disabled by planner.director.campaignEnabled=false.");
+                }
+                if (isBlank(declareWar.opId())) {
+                    throw invalid(DirectorDesign.INV_11, "Campaign opId is required.");
+                }
+                if (!seenOpIds.add(declareWar.opId())) {
+                    throw invalid(DirectorDesign.INV_11, "Duplicate opId detected: " + declareWar.opId());
+                }
+                if (campaignSeen) {
+                    throw invalid(DirectorDesign.INV_12, "Only one campaign op is allowed per checkpoint.");
+                }
+                validateFactionRange(declareWar.attackerFactionId(), "declareWar.attackerFactionId");
+                validateFactionRange(declareWar.defenderFactionId(), "declareWar.defenderFactionId");
+                if (declareWar.attackerFactionId() == declareWar.defenderFactionId()) {
+                    throw invalid(DirectorDesign.INV_11, "declareWar requires attackerFactionId != defenderFactionId.");
+                }
+                repaired.add(declareWar);
+                campaignSeen = true;
+                continue;
+            }
+
+            if (op instanceof PatchOp.ProposeTreaty treaty) {
+                if (!campaignEnabled) {
+                    throw invalid(DirectorDesign.INV_01, "Campaign ops disabled by planner.director.campaignEnabled=false.");
+                }
+                if (isBlank(treaty.opId())) {
+                    throw invalid(DirectorDesign.INV_11, "Campaign opId is required.");
+                }
+                if (!seenOpIds.add(treaty.opId())) {
+                    throw invalid(DirectorDesign.INV_11, "Duplicate opId detected: " + treaty.opId());
+                }
+                if (campaignSeen) {
+                    throw invalid(DirectorDesign.INV_12, "Only one campaign op is allowed per checkpoint.");
+                }
+                validateFactionRange(treaty.proposerFactionId(), "proposeTreaty.proposerFactionId");
+                validateFactionRange(treaty.receiverFactionId(), "proposeTreaty.receiverFactionId");
+                if (treaty.proposerFactionId() == treaty.receiverFactionId()) {
+                    throw invalid(DirectorDesign.INV_11, "proposeTreaty requires proposerFactionId != receiverFactionId.");
+                }
+                String normalizedTreatyKind = normalizeTreatyKind(treaty.treatyKind());
+                repaired.add(new PatchOp.ProposeTreaty(
+                        treaty.opId(),
+                        treaty.proposerFactionId(),
+                        treaty.receiverFactionId(),
+                        normalizedTreatyKind,
+                        treaty.note()
+                ));
+                campaignSeen = true;
+                continue;
+            }
+
+            throw invalid(DirectorDesign.INV_01, "Director checkpoint supports only addStoryBeat/setColonyDirective/declareWar/proposeTreaty ops.");
         }
 
         validateInfluenceBudget(repaired, facts);
@@ -169,6 +233,7 @@ public final class DirectorModelValidator {
         List<PatchOp> filtered = new ArrayList<>();
         Map<Integer, String> directivesPerColony = new HashMap<>();
         Set<String> seenOpIds = new HashSet<>();
+        boolean campaignSeen = false;
 
         for (PatchOp op : candidatePatch) {
             if (op instanceof PatchOp.AddStoryBeat storyBeat) {
@@ -238,6 +303,63 @@ public final class DirectorModelValidator {
                         duration,
                         biases
                 ));
+                continue;
+            }
+
+            if (op instanceof PatchOp.DeclareWar declareWar) {
+                if (!campaignEnabled) {
+                    continue;
+                }
+                if (isBlank(declareWar.opId())) {
+                    continue;
+                }
+                if (!seenOpIds.add(declareWar.opId())) {
+                    continue;
+                }
+                if (campaignSeen) {
+                    continue;
+                }
+                if (!isValidFactionRange(declareWar.attackerFactionId())
+                        || !isValidFactionRange(declareWar.defenderFactionId())
+                        || declareWar.attackerFactionId() == declareWar.defenderFactionId()) {
+                    continue;
+                }
+                filtered.add(declareWar);
+                campaignSeen = true;
+                continue;
+            }
+
+            if (op instanceof PatchOp.ProposeTreaty treaty) {
+                if (!campaignEnabled) {
+                    continue;
+                }
+                if (isBlank(treaty.opId())) {
+                    continue;
+                }
+                if (!seenOpIds.add(treaty.opId())) {
+                    continue;
+                }
+                if (campaignSeen) {
+                    continue;
+                }
+                if (!isValidFactionRange(treaty.proposerFactionId())
+                        || !isValidFactionRange(treaty.receiverFactionId())
+                        || treaty.proposerFactionId() == treaty.receiverFactionId()) {
+                    continue;
+                }
+                try {
+                    String normalizedTreatyKind = normalizeTreatyKind(treaty.treatyKind());
+                    filtered.add(new PatchOp.ProposeTreaty(
+                            treaty.opId(),
+                            treaty.proposerFactionId(),
+                            treaty.receiverFactionId(),
+                            normalizedTreatyKind,
+                            treaty.note()
+                    ));
+                    campaignSeen = true;
+                } catch (IllegalArgumentException ex) {
+                    continue;
+                }
             }
         }
 
@@ -270,6 +392,9 @@ public final class DirectorModelValidator {
         if (op instanceof PatchOp.SetColonyDirective) {
             return 1;
         }
+        if (op instanceof PatchOp.DeclareWar || op instanceof PatchOp.ProposeTreaty) {
+            return 2;
+        }
         return 99;
     }
 
@@ -280,7 +405,43 @@ public final class DirectorModelValidator {
         if (op instanceof PatchOp.SetColonyDirective directive) {
             return directive.colonyId() + ":" + directive.directive();
         }
+        if (op instanceof PatchOp.DeclareWar declareWar) {
+            return declareWar.attackerFactionId() + ":" + declareWar.defenderFactionId();
+        }
+        if (op instanceof PatchOp.ProposeTreaty treaty) {
+            return treaty.proposerFactionId() + ":" + treaty.receiverFactionId() + ":" + treaty.treatyKind();
+        }
         return op.getClass().getSimpleName();
+    }
+
+    private static void validateFactionRange(int factionId, String fieldName) {
+        if (!isValidFactionRange(factionId)) {
+            throw invalid(
+                    DirectorDesign.INV_11,
+                    fieldName + " out of range: " + factionId + " (expected "
+                            + DirectorDesign.MIN_FACTION_ID + ".." + DirectorDesign.MAX_FACTION_ID + ")"
+            );
+        }
+    }
+
+    private static boolean isValidFactionRange(int factionId) {
+        return factionId >= DirectorDesign.MIN_FACTION_ID && factionId <= DirectorDesign.MAX_FACTION_ID;
+    }
+
+    private static String normalizeTreatyKind(String treatyKindRaw) {
+        if (isBlank(treatyKindRaw)) {
+            throw invalid(DirectorDesign.INV_11, "proposeTreaty.treatyKind is required.");
+        }
+
+        String normalized = treatyKindRaw.trim().toLowerCase(Locale.ROOT);
+        if (!DirectorDesign.VALID_TREATY_KINDS.contains(normalized)) {
+            throw invalid(
+                    DirectorDesign.INV_11,
+                    "Unsupported proposeTreaty.treatyKind '" + treatyKindRaw + "'. Expected one of: ceasefire, peace_talks."
+            );
+        }
+
+        return normalized;
     }
 
     private static boolean hasActiveSeverity(DirectorRuntimeFacts facts, String severity) {

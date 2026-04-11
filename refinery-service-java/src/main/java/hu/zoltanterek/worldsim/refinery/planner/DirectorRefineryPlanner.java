@@ -17,6 +17,7 @@ import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorDesign;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorCampaignOpFactory;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorModelValidator;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorPipelineTelemetry;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorRuntimeFacts;
@@ -31,29 +32,37 @@ public class DirectorRefineryPlanner {
     private final boolean refineryEnabled;
     private final int maxRetries;
     private final double directorBudget;
+    private final boolean campaignEnabled;
     private final DirectorPipelineTelemetry telemetry;
     private final DirectorSnapshotMapper snapshotMapper = new DirectorSnapshotMapper();
-    private final DirectorModelValidator validator = new DirectorModelValidator();
+    private final DirectorModelValidator validator;
 
     @Autowired
     public DirectorRefineryPlanner(
             @Value("${planner.refinery.enabled:false}") boolean refineryEnabled,
             @Value("${planner.director.maxRetries:2}") int maxRetries,
             @Value("${planner.director.budget:5.0}") double directorBudget,
+            @Value("${planner.director.campaignEnabled:false}") boolean campaignEnabled,
             DirectorPipelineTelemetry telemetry
     ) {
         this.refineryEnabled = refineryEnabled;
         this.maxRetries = Math.max(0, maxRetries);
         this.directorBudget = directorBudget > 0d ? directorBudget : DirectorDesign.DEFAULT_INFLUENCE_BUDGET;
+        this.campaignEnabled = campaignEnabled;
         this.telemetry = telemetry;
+        this.validator = new DirectorModelValidator(campaignEnabled);
     }
 
     DirectorRefineryPlanner(boolean refineryEnabled, int maxRetries) {
-        this(refineryEnabled, maxRetries, DirectorDesign.DEFAULT_INFLUENCE_BUDGET, new DirectorPipelineTelemetry());
+        this(refineryEnabled, maxRetries, DirectorDesign.DEFAULT_INFLUENCE_BUDGET, false, new DirectorPipelineTelemetry());
     }
 
     DirectorRefineryPlanner(boolean refineryEnabled, int maxRetries, DirectorPipelineTelemetry telemetry) {
-        this(refineryEnabled, maxRetries, DirectorDesign.DEFAULT_INFLUENCE_BUDGET, telemetry);
+        this(refineryEnabled, maxRetries, DirectorDesign.DEFAULT_INFLUENCE_BUDGET, false, telemetry);
+    }
+
+    DirectorRefineryPlanner(boolean refineryEnabled, int maxRetries, boolean campaignEnabled, DirectorPipelineTelemetry telemetry) {
+        this(refineryEnabled, maxRetries, DirectorDesign.DEFAULT_INFLUENCE_BUDGET, campaignEnabled, telemetry);
     }
 
     public DirectorValidationResult validateAndRepair(PatchRequest request, List<PatchOp> candidatePatch) {
@@ -77,7 +86,6 @@ public class DirectorRefineryPlanner {
 
         int duplicateOpIds = countDuplicateOpIds(candidatePatch);
         if (duplicateOpIds > 0) {
-            telemetry.recordRejectedCommands(duplicateOpIds);
             logger.warn(
                     "director candidate contains duplicate opId entries duplicateCount={} candidateOps={}",
                     duplicateOpIds,
@@ -162,7 +170,7 @@ public class DirectorRefineryPlanner {
             }
         }
 
-        List<PatchOp> fallback = buildDeterministicFallback(request, facts);
+        List<PatchOp> fallback = buildDeterministicFallback(request, facts, campaignEnabled);
         warnings.add("directorFallback deterministic fallback planner output was used.");
         telemetry.recordFallback(maxRetries);
         logger.error(
@@ -196,10 +204,16 @@ public class DirectorRefineryPlanner {
         if (op instanceof PatchOp.SetColonyDirective directive) {
             return directive.opId();
         }
+        if (op instanceof PatchOp.DeclareWar declareWar) {
+            return declareWar.opId();
+        }
+        if (op instanceof PatchOp.ProposeTreaty treaty) {
+            return treaty.opId();
+        }
         return null;
     }
 
-    private static List<PatchOp> buildDeterministicFallback(PatchRequest request, DirectorRuntimeFacts facts) {
+    private static List<PatchOp> buildDeterministicFallback(PatchRequest request, DirectorRuntimeFacts facts, boolean campaignEnabled) {
         List<PatchOp> fallback = new ArrayList<>(2);
 
         if (facts.beatCooldownTicks() <= 0) {
@@ -241,6 +255,8 @@ public class DirectorRefineryPlanner {
                     DirectorDesign.MIN_DIRECTIVE_DURATION + 17
             ));
         }
+
+        DirectorCampaignOpFactory.buildDeterministicCampaignOp(request, campaignEnabled).ifPresent(fallback::add);
 
         return fallback;
     }

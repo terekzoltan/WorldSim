@@ -29,10 +29,11 @@ public final class DirectorCandidateParser {
 
             StoryBeatSlotCandidate storyBeatSlot = parseStoryBeatSlot(designatedOutputNode.path("storyBeatSlot"));
             DirectiveSlotCandidate directiveSlot = parseDirectiveSlot(designatedOutputNode.path("directiveSlot"));
+            CampaignSlotCandidate campaignSlot = parseCampaignSlot(designatedOutputNode.path("campaignSlot"));
 
             return Optional.of(new DirectorCandidate(
                     parseText(root.path("explanation")),
-                    new DesignatedOutputCandidate(storyBeatSlot, directiveSlot)
+                    new DesignatedOutputCandidate(storyBeatSlot, directiveSlot, campaignSlot)
             ));
         } catch (Exception ex) {
             return Optional.empty();
@@ -142,6 +143,23 @@ public final class DirectorCandidateParser {
         );
     }
 
+    private static CampaignSlotCandidate parseCampaignSlot(JsonNode node) {
+        if (node.isMissingNode() || node.isNull() || !node.isObject()) {
+            return null;
+        }
+
+        return new CampaignSlotCandidate(
+                node.path("kind").asText(""),
+                node.path("attackerFactionId").asInt(-1),
+                node.path("defenderFactionId").asInt(-1),
+                parseText(node.path("reason")),
+                node.path("proposerFactionId").asInt(-1),
+                node.path("receiverFactionId").asInt(-1),
+                node.path("treatyKind").asText(""),
+                parseText(node.path("note"))
+        );
+    }
+
     private static String extractJson(String content) {
         if (content == null) {
             return null;
@@ -178,7 +196,20 @@ public final class DirectorCandidateParser {
 
     public record DesignatedOutputCandidate(
             StoryBeatSlotCandidate storyBeatSlot,
-            DirectiveSlotCandidate directiveSlot
+            DirectiveSlotCandidate directiveSlot,
+            CampaignSlotCandidate campaignSlot
+    ) {
+    }
+
+    public record CampaignSlotCandidate(
+            String kind,
+            int attackerFactionId,
+            int defenderFactionId,
+            String reason,
+            int proposerFactionId,
+            int receiverFactionId,
+            String treatyKind,
+            String note
     ) {
     }
 

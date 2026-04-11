@@ -11,7 +11,12 @@ public final class DirectorPromptFactory {
                 "Do not include markdown, code fences, explanations, or extra keys.";
     }
 
-    public String userPrompt(DirectorRuntimeFacts facts, String outputMode, List<String> feedbackHints) {
+    public String userPrompt(
+            DirectorRuntimeFacts facts,
+            String outputMode,
+            boolean campaignEnabled,
+            List<String> feedbackHints
+    ) {
         int colonyCount = Math.max(1, facts.colonyCount());
         long cooldown = Math.max(0L, facts.beatCooldownTicks());
         double remainingInfluenceBudget = Math.max(0d, facts.remainingInfluenceBudget());
@@ -26,7 +31,14 @@ public final class DirectorPromptFactory {
         sb.append("\"followUpBeat\":{\"beatId\":string,\"text\":string,\"durationTicks\":int,\"severity\":\"minor|major|epic\",\"effects\":[{\"kind\":\"domain_modifier\",\"domain\":string,\"modifier\":number,\"durationTicks\":int}]},");
         sb.append("\"windowTicks\":int,\"maxTriggers\":1}|null}|null,");
         sb.append("\"directiveSlot\":{\"colonyId\":int,\"directive\":string,\"durationTicks\":int,");
-        sb.append("\"biases\":[{\"kind\":\"goal_bias\",\"goalCategory\":string,\"weight\":number,\"durationTicks\":int}] }|null } }.");
+        sb.append("\"biases\":[{\"kind\":\"goal_bias\",\"goalCategory\":string,\"weight\":number,\"durationTicks\":int}] }|null");
+        if (campaignEnabled) {
+            sb.append(",\"campaignSlot\":");
+            sb.append("{\"kind\":\"declare_war\",\"attackerFactionId\":int,\"defenderFactionId\":int,\"reason\":string}|{");
+            sb.append("\"kind\":\"propose_treaty\",\"proposerFactionId\":int,\"receiverFactionId\":int,");
+            sb.append("\"treatyKind\":\"ceasefire|peace_talks\",\"note\":string}|null");
+        }
+        sb.append(" } }.");
         sb.append(" Do not return patch ops, op types, or opIds.");
         sb.append(" Allowed directives: ").append(String.join(",", DirectorDesign.ALLOWED_DIRECTIVES)).append('.');
         sb.append(" Allowed domains: ").append(String.join(",", DirectorDesign.VALID_DOMAINS)).append('.');
@@ -45,6 +57,12 @@ public final class DirectorPromptFactory {
         sb.append(" Keep text under 160 chars and durations positive.");
         sb.append(" Do not emit contradictory same-domain modifiers with mixed signs in one checkpoint.");
         sb.append(" Stay within influence budget, otherwise INV-15 will reject the candidate.");
+        if (campaignEnabled) {
+            sb.append(" campaignSlot is optional and budget-neutral in this phase.");
+            sb.append(" campaign kind allowlist: declare_war,propose_treaty.");
+            sb.append(" faction IDs must be in [0,3] and self-target is forbidden.");
+            sb.append(" treatyKind allowlist: ceasefire,peace_talks.");
+        }
 
         if (!feedbackHints.isEmpty()) {
             sb.append(" Previous formal validation feedback: ");

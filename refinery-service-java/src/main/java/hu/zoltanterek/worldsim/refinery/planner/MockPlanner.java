@@ -14,6 +14,7 @@ import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorCampaignOpFactory;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorInfluenceBudget;
 import hu.zoltanterek.worldsim.refinery.util.DeterministicIds;
 
@@ -22,13 +23,16 @@ public class MockPlanner implements PatchPlanner {
     private static final String SCHEMA_VERSION = "v1";
     private final ObjectMapper objectMapper;
     private final String directorOutputMode;
+    private final boolean directorCampaignEnabled;
 
     public MockPlanner(
             ObjectMapper objectMapper,
-            @Value("${planner.director.outputMode:both}") String directorOutputMode
+            @Value("${planner.director.outputMode:both}") String directorOutputMode,
+            @Value("${planner.director.campaignEnabled:false}") boolean directorCampaignEnabled
     ) {
         this.objectMapper = objectMapper;
         this.directorOutputMode = normalizeOutputMode(directorOutputMode);
+        this.directorCampaignEnabled = directorCampaignEnabled;
     }
 
     @Override
@@ -137,7 +141,13 @@ public class MockPlanner implements PatchPlanner {
                 18
         );
 
-        return List.of(storyBeat, directiveOp);
+        List<PatchOp> patch = new java.util.ArrayList<>(3);
+        patch.add(storyBeat);
+        patch.add(directiveOp);
+        DirectorCampaignOpFactory
+                .buildDeterministicCampaignOp(request, directorCampaignEnabled)
+                .ifPresent(patch::add);
+        return List.copyOf(patch);
     }
 
     private static String normalizeOutputMode(String rawMode) {
@@ -151,10 +161,14 @@ public class MockPlanner implements PatchPlanner {
     private static List<PatchOp> applyDirectorOutputMode(List<PatchOp> patch, String outputMode) {
         return switch (outputMode) {
             case "story_only" -> patch.stream().filter(op -> op instanceof PatchOp.AddStoryBeat).toList();
-            case "nudge_only" -> patch.stream().filter(op -> op instanceof PatchOp.SetColonyDirective).toList();
+            case "nudge_only" -> patch.stream().filter(MockPlanner::isNudgeSideDirectorOp).toList();
             case "off" -> List.of();
             default -> patch;
         };
+    }
+
+    private static boolean isNudgeSideDirectorOp(PatchOp op) {
+        return op instanceof PatchOp.SetColonyDirective || DirectorCampaignOpFactory.isCampaignOp(op);
     }
 
     private static String formatBudgetUsed(double budgetUsed) {

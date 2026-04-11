@@ -267,12 +267,12 @@ public sealed class RuntimePatchCommandExecutor
                     throw new InvalidOperationException(
                         "Director batch validation received non-director command 'UnlockTechRuntimeCommand'."
                     );
-                case DeclareWarRuntimeCommand:
-                    throw new NotSupportedException(
-                        "DeclareWarRuntimeCommand translated successfully, but runtime endpoint lands in P4-C.");
-                case ProposeTreatyRuntimeCommand:
-                    throw new NotSupportedException(
-                        "ProposeTreatyRuntimeCommand translated successfully, but runtime endpoint lands in P4-C.");
+                case DeclareWarRuntimeCommand declareWar:
+                    runtime.ValidateDeclareWar(declareWar.Attacker, declareWar.Defender);
+                    break;
+                case ProposeTreatyRuntimeCommand treaty:
+                    runtime.ValidateProposeTreaty(treaty.Proposer, treaty.Receiver, treaty.TreatyKind);
+                    break;
                 default:
                     throw new NotSupportedException(
                         $"Unsupported runtime patch command: {command.GetType().Name}"
@@ -310,12 +310,12 @@ public sealed class RuntimePatchCommandExecutor
                         directive.Biases
                     );
                     break;
-                case DeclareWarRuntimeCommand:
-                    throw new NotSupportedException(
-                        "DeclareWarRuntimeCommand translated successfully, but runtime endpoint lands in P4-C.");
-                case ProposeTreatyRuntimeCommand:
-                    throw new NotSupportedException(
-                        "ProposeTreatyRuntimeCommand translated successfully, but runtime endpoint lands in P4-C.");
+                case DeclareWarRuntimeCommand declareWar:
+                    runtime.DeclareWar(declareWar.Attacker, declareWar.Defender, declareWar.Reason);
+                    break;
+                case ProposeTreatyRuntimeCommand treaty:
+                    runtime.ProposeTreaty(treaty.Proposer, treaty.Receiver, treaty.TreatyKind, treaty.Note);
+                    break;
                 default:
                     throw new NotSupportedException(
                         $"Unsupported runtime patch command: {command.GetType().Name}"

@@ -4,7 +4,8 @@ import java.util.List;
 
 public record DirectorOutputAssertions(
         StoryBeatAssertion storyBeat,
-        DirectiveAssertion directive
+        DirectiveAssertion directive,
+        CampaignAssertion campaign
 ) {
     public record StoryBeatAssertion(
             String beatId,
@@ -35,6 +36,18 @@ public record DirectorOutputAssertions(
             String goalCategory,
             double weight,
             Long durationTicks
+    ) {
+    }
+
+    public record CampaignAssertion(
+            String kind,
+            Integer attackerFactionId,
+            Integer defenderFactionId,
+            String reason,
+            Integer proposerFactionId,
+            Integer receiverFactionId,
+            String treatyKind,
+            String note
     ) {
     }
 

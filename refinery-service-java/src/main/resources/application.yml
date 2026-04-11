@@ -20,6 +20,7 @@ planner:
     maxTokens: ${PLANNER_LLM_MAX_TOKENS:500}
   director:
     outputMode: ${PLANNER_DIRECTOR_OUTPUT_MODE:both}
+    campaignEnabled: ${PLANNER_DIRECTOR_CAMPAIGN_ENABLED:false}
     maxRetries: ${PLANNER_DIRECTOR_MAX_RETRIES:2}
     budget: ${PLANNER_DIRECTOR_BUDGET:5.0}
 

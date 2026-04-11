@@ -11,6 +11,7 @@ import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DirectorBridgeContractMapperTest {
@@ -44,6 +45,16 @@ class DirectorBridgeContractMapperTest {
                         "PrioritizeFood",
                         18,
                         List.of(new DirectorOutputAssertions.BiasAssertion("farming", 0.25, 18L))
+                ),
+                new DirectorOutputAssertions.CampaignAssertion(
+                        "declare_war",
+                        1,
+                        2,
+                        "border pressure",
+                        null,
+                        null,
+                        null,
+                        null
                 )
         );
 
@@ -58,9 +69,10 @@ class DirectorBridgeContractMapperTest {
         );
 
         List<PatchOp> patch = mapper.toPatchOps(request, assertions);
-        assertEquals(2, patch.size());
+        assertEquals(3, patch.size());
         assertTrue(patch.get(0) instanceof PatchOp.AddStoryBeat);
         assertTrue(patch.get(1) instanceof PatchOp.SetColonyDirective);
+        assertTrue(patch.get(2) instanceof PatchOp.DeclareWar);
 
         PatchOp.AddStoryBeat story = (PatchOp.AddStoryBeat) patch.get(0);
         assertEquals("BEAT_A", story.beatId());
@@ -80,5 +92,153 @@ class DirectorBridgeContractMapperTest {
         assertEquals(18, directive.durationTicks());
         assertEquals(1, directive.biases().size());
         assertEquals("farming", directive.biases().get(0).goalCategory());
+
+        PatchOp.DeclareWar campaign = (PatchOp.DeclareWar) patch.get(2);
+        assertEquals(1, campaign.attackerFactionId());
+        assertEquals(2, campaign.defenderFactionId());
+        assertEquals("border pressure", campaign.reason());
+    }
+
+    @Test
+    void mapsProposeTreatyAssertionToBridgePatchOp() {
+        DirectorOutputAssertions assertions = new DirectorOutputAssertions(
+                null,
+                null,
+                new DirectorOutputAssertions.CampaignAssertion(
+                        "propose_treaty",
+                        null,
+                        null,
+                        null,
+                        2,
+                        1,
+                        "peace_talks",
+                        "de-escalate"
+                )
+        );
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-bridge-treaty",
+                123L,
+                456L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                objectMapper.createObjectNode(),
+                null
+        );
+
+        List<PatchOp> patch = mapper.toPatchOps(request, assertions);
+        assertEquals(1, patch.size());
+        assertTrue(patch.get(0) instanceof PatchOp.ProposeTreaty);
+
+        PatchOp.ProposeTreaty campaign = (PatchOp.ProposeTreaty) patch.get(0);
+        assertEquals(2, campaign.proposerFactionId());
+        assertEquals(1, campaign.receiverFactionId());
+        assertEquals("peace_talks", campaign.treatyKind());
+        assertEquals("de-escalate", campaign.note());
+    }
+
+    @Test
+    void rejectsUnsupportedCampaignAssertionKind() {
+        DirectorOutputAssertions assertions = new DirectorOutputAssertions(
+                null,
+                null,
+                new DirectorOutputAssertions.CampaignAssertion(
+                        "invalid_kind",
+                        1,
+                        2,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        );
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-bridge-invalid",
+                123L,
+                456L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                objectMapper.createObjectNode(),
+                null
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> mapper.toPatchOps(request, assertions)
+        );
+
+        assertTrue(ex.getMessage().contains("Unsupported campaign assertion kind"));
+    }
+
+    @Test
+    void rejectsDeclareWarAssertionWhenRequiredFieldsMissing() {
+        DirectorOutputAssertions assertions = new DirectorOutputAssertions(
+                null,
+                null,
+                new DirectorOutputAssertions.CampaignAssertion(
+                        "declare_war",
+                        null,
+                        2,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
+        );
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-bridge-missing-war",
+                123L,
+                456L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                objectMapper.createObjectNode(),
+                null
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> mapper.toPatchOps(request, assertions)
+        );
+
+        assertTrue(ex.getMessage().contains("campaign.attackerFactionId"));
+    }
+
+    @Test
+    void rejectsProposeTreatyAssertionWhenRequiredFieldsMissing() {
+        DirectorOutputAssertions assertions = new DirectorOutputAssertions(
+                null,
+                null,
+                new DirectorOutputAssertions.CampaignAssertion(
+                        "propose_treaty",
+                        null,
+                        null,
+                        null,
+                        2,
+                        1,
+                        null,
+                        null
+                )
+        );
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-bridge-missing-treaty",
+                123L,
+                456L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                objectMapper.createObjectNode(),
+                null
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> mapper.toPatchOps(request, assertions)
+        );
+
+        assertTrue(ex.getMessage().contains("campaign.treatyKind"));
     }
 }

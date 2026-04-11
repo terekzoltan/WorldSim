@@ -947,6 +947,20 @@ namespace WorldSim.Simulation
             _relationManager.RegisterRaidImpact(attacker, defender, pressureBoost);
         }
 
+        public bool DeclareWar(Faction attacker, Faction defender, out Stance previous, out Stance current)
+        {
+            var changed = _relationManager.DeclareWar(this, attacker, defender, out previous, out current);
+            RecomputeMobilizationState();
+            return changed;
+        }
+
+        public bool ProposeTreaty(Faction proposer, Faction receiver, string treatyKind, out Stance previous, out Stance current)
+        {
+            var changed = _relationManager.ProposeTreaty(this, proposer, receiver, treatyKind, out previous, out current);
+            RecomputeMobilizationState();
+            return changed;
+        }
+
         public IReadOnlyList<FactionStanceState> GetFactionStanceMatrix()
             => _factionStances
                 .Where(entry => entry.Key.left <= entry.Key.right)

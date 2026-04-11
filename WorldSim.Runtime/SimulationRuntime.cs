@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using WorldSim.AI;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
 
 namespace WorldSim.Runtime;
@@ -16,6 +17,12 @@ public sealed class SimulationRuntime
         "PrioritizeFood",
         "StabilizeMorale",
         "BoostIndustry"
+    };
+
+    private static readonly HashSet<string> KnownTreatyKinds = new(StringComparer.Ordinal)
+    {
+        "ceasefire",
+        "peace_talks"
     };
 
     private static readonly HashSet<string> KnownCausalConditionMetrics = new(StringComparer.Ordinal)
@@ -496,6 +503,82 @@ public sealed class SimulationRuntime
         IReadOnlyList<DirectorGoalBiasSpec>? biases = null)
     {
         _ = PrepareColonyDirectiveApplication(colonyId, directive, durationTicks, biases);
+    }
+
+    public void DeclareWar(Faction attacker, Faction defender, string? reason = null)
+    {
+        ValidateDeclareWar(attacker, defender);
+
+        var changed = _world.DeclareWar(attacker, defender, out var previous, out var current);
+        var reasonSuffix = string.IsNullOrWhiteSpace(reason) ? string.Empty : $" ({reason.Trim()})";
+        _world.AddExternalEvent($"[Director] DeclareWar: {attacker} -> {defender}{reasonSuffix}");
+        LastDirectorActionStatus = changed
+            ? $"Declared war: {attacker} -> {defender} ({previous} -> {current})"
+            : $"DeclareWar no-op: {attacker} and {defender} already in {current}";
+    }
+
+    public void ValidateDeclareWar(Faction attacker, Faction defender)
+    {
+        ValidateCampaignRuntimeAvailability();
+        ValidateFactionValue(attacker, nameof(attacker));
+        ValidateFactionValue(defender, nameof(defender));
+
+        if (attacker == defender)
+            throw new InvalidOperationException("declareWar requires attackerFactionId != defenderFactionId.");
+    }
+
+    public void ProposeTreaty(Faction proposer, Faction receiver, string treatyKind, string? note = null)
+    {
+        var normalizedKind = ValidateProposeTreaty(proposer, receiver, treatyKind);
+
+        var changed = _world.ProposeTreaty(proposer, receiver, normalizedKind, out var previous, out var current);
+        var noteSuffix = string.IsNullOrWhiteSpace(note) ? string.Empty : $" ({note.Trim()})";
+        _world.AddExternalEvent($"[Director] ProposeTreaty: {normalizedKind} {proposer} -> {receiver}{noteSuffix}");
+        LastDirectorActionStatus = changed
+            ? $"Treaty '{normalizedKind}' applied: {proposer} -> {receiver} ({previous} -> {current})"
+            : $"Treaty '{normalizedKind}' no-op: {proposer} -> {receiver} remains {current}";
+    }
+
+    public string ValidateProposeTreaty(Faction proposer, Faction receiver, string treatyKind)
+    {
+        ValidateCampaignRuntimeAvailability();
+        ValidateFactionValue(proposer, nameof(proposer));
+        ValidateFactionValue(receiver, nameof(receiver));
+
+        if (proposer == receiver)
+            throw new InvalidOperationException("proposeTreaty requires proposerFactionId != receiverFactionId.");
+
+        if (string.IsNullOrWhiteSpace(treatyKind))
+        {
+            throw new InvalidOperationException(
+                "proposeTreaty.treatyKind is required. Expected one of: ceasefire, peace_talks.");
+        }
+
+        var normalized = treatyKind.Trim().ToLowerInvariant();
+        if (!KnownTreatyKinds.Contains(normalized))
+        {
+            throw new InvalidOperationException(
+                $"Unsupported proposeTreaty.treatyKind '{treatyKind}'. Expected one of: ceasefire, peace_talks.");
+        }
+
+        return normalized;
+    }
+
+    private void ValidateCampaignRuntimeAvailability()
+    {
+        if (!_world.EnableDiplomacy || !_world.EnableCombatPrimitives)
+        {
+            throw new InvalidOperationException(
+                "Campaign commands require WORLDSIM_ENABLE_DIPLOMACY=true and WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true.");
+        }
+    }
+
+    private static void ValidateFactionValue(Faction faction, string paramName)
+    {
+        if (!Enum.IsDefined(typeof(Faction), faction))
+        {
+            throw new InvalidOperationException($"Invalid faction value for {paramName}: {(int)faction}.");
+        }
     }
 
     private (bool alreadyActive, List<(RuntimeDomain domain, double modifier)> effects, DirectorBeatSeverity severity) PrepareStoryBeatApplication(

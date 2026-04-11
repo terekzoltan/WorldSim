@@ -11,13 +11,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import hu.zoltanterek.worldsim.refinery.model.Goal;
+import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
 
 class MockPlannerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final MockPlanner mockPlanner = new MockPlanner(objectMapper, "both");
+    private final MockPlanner mockPlanner = new MockPlanner(objectMapper, "both", false);
 
     @Test
     void worldEventPlanningIsDeterministicForSameInputs() {
@@ -66,5 +67,49 @@ class MockPlannerTest {
         assertEquals("directorStage:mock", first.explain().get(0));
         assertEquals("directorOutputMode:both", first.explain().get(1));
         assertTrue(first.explain().stream().anyMatch(item -> item.startsWith("budgetUsed:")));
+    }
+
+    @Test
+    void seasonDirectorCampaignGateOff_KeepsLegacyPatchShape() {
+        PatchResponse response = mockPlanner.plan(directorRequest());
+        assertEquals(2, response.patch().size());
+        assertTrue(response.patch().stream().anyMatch(op -> op instanceof PatchOp.AddStoryBeat));
+        assertTrue(response.patch().stream().anyMatch(op -> op instanceof PatchOp.SetColonyDirective));
+    }
+
+    @Test
+    void seasonDirectorCampaignGateOn_AddsDeterministicCampaignOp() {
+        MockPlanner campaignPlanner = new MockPlanner(objectMapper, "both", true);
+        PatchResponse first = campaignPlanner.plan(directorRequest());
+        PatchResponse second = campaignPlanner.plan(directorRequest());
+
+        assertEquals(first.patch(), second.patch());
+        assertEquals(3, first.patch().size());
+        assertTrue(first.patch().stream().anyMatch(op -> op instanceof PatchOp.DeclareWar || op instanceof PatchOp.ProposeTreaty));
+    }
+
+    @Test
+    void seasonDirectorCampaignGateOn_NudgeOnlyIncludesDirectiveAndCampaign() {
+        MockPlanner campaignPlanner = new MockPlanner(objectMapper, "nudge_only", true);
+        PatchResponse response = campaignPlanner.plan(directorRequest());
+
+        assertEquals(2, response.patch().size());
+        assertTrue(response.patch().stream().allMatch(op ->
+                op instanceof PatchOp.SetColonyDirective || op instanceof PatchOp.DeclareWar || op instanceof PatchOp.ProposeTreaty));
+    }
+
+    private PatchRequest directorRequest() {
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.putObject("world").put("colonyCount", 4);
+
+        return new PatchRequest(
+                "v1",
+                "director-req",
+                321L,
+                128L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                snapshot,
+                null
+        );
     }
 }

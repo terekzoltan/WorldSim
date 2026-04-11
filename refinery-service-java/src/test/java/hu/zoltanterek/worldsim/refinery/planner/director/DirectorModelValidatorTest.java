@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Test;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 
 class DirectorModelValidatorTest {
-    private final DirectorModelValidator validator = new DirectorModelValidator();
+    private final DirectorModelValidator validator = new DirectorModelValidator(true);
+    private final DirectorModelValidator gateOffValidator = new DirectorModelValidator(false);
 
     @Test
     void validateAndRepair_RejectsDuplicateOpId() {
@@ -321,6 +322,94 @@ class DirectorModelValidatorTest {
 
         DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
         assertEquals(1, outcome.patch().size());
+    }
+
+    @Test
+    void validateAndRepair_AcceptsSingleCampaignOp() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.DeclareWar("op_campaign_1", 1, 2, "border pressure")
+        );
+
+        DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
+        assertEquals(1, outcome.patch().size());
+        assertTrue(outcome.patch().get(0) instanceof PatchOp.DeclareWar);
+    }
+
+    @Test
+    void validateAndRepair_RejectsMultipleCampaignOps() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.DeclareWar("op_campaign_1", 1, 2, "border pressure"),
+                new PatchOp.ProposeTreaty("op_campaign_2", 2, 1, "ceasefire", "cooldown")
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains(DirectorDesign.INV_12));
+    }
+
+    @Test
+    void validateAndRepair_RejectsCampaignSelfTarget() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.ProposeTreaty("op_campaign_self", 1, 1, "ceasefire", "invalid")
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains("proposeTreaty requires proposerFactionId != receiverFactionId"));
+    }
+
+    @Test
+    void validateAndRepair_RejectsCampaignOpsWhenGateDisabled() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.DeclareWar("op_campaign_disabled", 1, 2, "blocked")
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> gateOffValidator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains("campaignEnabled=false"));
+    }
+
+    @Test
+    void validateAndRepair_RejectsCampaignFactionOutOfRange() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.DeclareWar("op_campaign_range", -1, 2, "invalid")
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains("out of range"));
+    }
+
+    @Test
+    void validateAndRepair_RejectsCampaignTreatyKindOutsideAllowlist() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.ProposeTreaty("op_campaign_kind", 1, 2, "alliance", "invalid")
+        );
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> validator.validateAndRepair(candidate, facts)
+        );
+
+        assertTrue(ex.getMessage().contains("Unsupported proposeTreaty.treatyKind"));
     }
 
     private static DirectorRuntimeFacts facts(

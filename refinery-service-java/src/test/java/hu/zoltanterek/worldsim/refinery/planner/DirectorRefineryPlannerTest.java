@@ -70,6 +70,22 @@ class DirectorRefineryPlannerTest {
     }
 
     @Test
+    void validateAndRepair_FallbackCanEmitCampaignWhenEnabled() {
+        DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 0, true, telemetry);
+        PatchRequest request = directorRequest(128L, 2, 0);
+
+        List<PatchOp> invalidCandidate = List.of(
+                new PatchOp.SetColonyDirective("op_bad", 99, "UnknownDirective", 5)
+        );
+
+        DirectorRefineryPlanner.DirectorValidationResult result = planner.validateAndRepair(request, invalidCandidate);
+
+        assertTrue(result.fallbackUsed());
+        assertTrue(result.patch().stream().anyMatch(op -> op instanceof PatchOp.DeclareWar || op instanceof PatchOp.ProposeTreaty));
+    }
+
+    @Test
     void validateAndRepair_CountsRejectedDuplicatesWhenCandidateContainsDuplicateOpId() {
         DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
         DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 1, telemetry);
@@ -84,6 +100,39 @@ class DirectorRefineryPlannerTest {
 
         DirectorPipelineTelemetry.Snapshot snapshot = telemetry.snapshot();
         assertTrue(snapshot.rejectedCommandCount() >= 1);
+    }
+
+    @Test
+    void validateAndRepair_CountsRejectedDuplicatesForCampaignOpIdsToo() {
+        DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 1, true, telemetry);
+        PatchRequest request = directorRequest(64L, 1, 0);
+
+        List<PatchOp> duplicateOpIdCandidate = List.of(
+                new PatchOp.DeclareWar("op_campaign_dup", 1, 2, "pressure"),
+                new PatchOp.ProposeTreaty("op_campaign_dup", 2, 1, "ceasefire", "cooldown")
+        );
+
+        planner.validateAndRepair(request, duplicateOpIdCandidate);
+
+        DirectorPipelineTelemetry.Snapshot snapshot = telemetry.snapshot();
+        assertTrue(snapshot.rejectedCommandCount() >= 1);
+    }
+
+    @Test
+    void validateAndRepair_GateOffCampaignCandidateFallsBackSafely() {
+        DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 0, false, telemetry);
+        PatchRequest request = directorRequest(64L, 1, 0);
+
+        List<PatchOp> candidate = List.of(
+                new PatchOp.DeclareWar("op_campaign_blocked", 1, 2, "pressure")
+        );
+
+        DirectorRefineryPlanner.DirectorValidationResult result = planner.validateAndRepair(request, candidate);
+
+        assertTrue(result.fallbackUsed());
+        assertTrue(result.patch().stream().noneMatch(op -> op instanceof PatchOp.DeclareWar || op instanceof PatchOp.ProposeTreaty));
     }
 
     private PatchRequest directorRequest(long tick, int colonyCount, long cooldownTicks) {

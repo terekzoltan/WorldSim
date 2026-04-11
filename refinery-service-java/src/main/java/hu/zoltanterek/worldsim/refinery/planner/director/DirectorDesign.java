@@ -32,6 +32,8 @@ public final class DirectorDesign {
     );
 
     public static final Set<String> VALID_SEVERITIES = Set.of("minor", "major", "epic");
+    public static final Set<String> VALID_CAMPAIGN_KINDS = Set.of("declare_war", "propose_treaty");
+    public static final Set<String> VALID_TREATY_KINDS = Set.of("ceasefire", "peace_talks");
 
     public static final Set<String> CAUSAL_ALLOWED_METRICS = Set.of(
             "food_reserves_pct",
@@ -49,6 +51,7 @@ public final class DirectorDesign {
     public static final int MAX_OPS_PER_CHECKPOINT = 4;
     public static final int MAX_EFFECTS_PER_BEAT = 3;
     public static final int MAX_BIASES_PER_DIRECTIVE = 3;
+    public static final int MAX_CAMPAIGN_OPS_PER_CHECKPOINT = 1;
     public static final int MIN_CAUSAL_WINDOW_TICKS = 10;
     public static final int MAX_CAUSAL_WINDOW_TICKS = 100;
     public static final int CAUSAL_MAX_TRIGGERS = 1;
@@ -62,6 +65,8 @@ public final class DirectorDesign {
     public static final double DEFAULT_INFLUENCE_BUDGET = 5.0;
     public static final double DOMAIN_MODIFIER_COST_FACTOR = 0.5;
     public static final double GOAL_BIAS_COST_FACTOR = 0.3;
+    public static final int MIN_FACTION_ID = 0;
+    public static final int MAX_FACTION_ID = 3;
 
     /**
      * Invariant labels are implementation-level validator codes used in runtime feedback.

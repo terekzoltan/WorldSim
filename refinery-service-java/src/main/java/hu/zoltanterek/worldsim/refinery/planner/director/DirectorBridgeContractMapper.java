@@ -9,7 +9,7 @@ import hu.zoltanterek.worldsim.refinery.util.DeterministicIds;
 
 public final class DirectorBridgeContractMapper {
     public List<PatchOp> toPatchOps(PatchRequest request, DirectorOutputAssertions assertions) {
-        List<PatchOp> ops = new ArrayList<>(2);
+        List<PatchOp> ops = new ArrayList<>(3);
 
         DirectorOutputAssertions.StoryBeatAssertion story = assertions.storyBeat();
         if (story != null) {
@@ -82,6 +82,61 @@ public final class DirectorBridgeContractMapper {
             ));
         }
 
+        DirectorOutputAssertions.CampaignAssertion campaign = assertions.campaign();
+        if (campaign != null) {
+            if ("declare_war".equals(campaign.kind())) {
+                int attackerFactionId = requireCampaignInt(campaign.attackerFactionId(), "campaign.attackerFactionId");
+                int defenderFactionId = requireCampaignInt(campaign.defenderFactionId(), "campaign.defenderFactionId");
+                String campaignOpId = DeterministicIds.opId(
+                        request.seed(),
+                        request.tick(),
+                        request.goal().name(),
+                        "declareWar",
+                        attackerFactionId + ":" + defenderFactionId
+                );
+                ops.add(new PatchOp.DeclareWar(
+                        campaignOpId,
+                        attackerFactionId,
+                        defenderFactionId,
+                        campaign.reason()
+                ));
+            } else if ("propose_treaty".equals(campaign.kind())) {
+                int proposerFactionId = requireCampaignInt(campaign.proposerFactionId(), "campaign.proposerFactionId");
+                int receiverFactionId = requireCampaignInt(campaign.receiverFactionId(), "campaign.receiverFactionId");
+                String treatyKind = requireCampaignText(campaign.treatyKind(), "campaign.treatyKind");
+                String campaignOpId = DeterministicIds.opId(
+                        request.seed(),
+                        request.tick(),
+                        request.goal().name(),
+                        "proposeTreaty",
+                        proposerFactionId + ":" + receiverFactionId + ":" + treatyKind
+                );
+                ops.add(new PatchOp.ProposeTreaty(
+                        campaignOpId,
+                        proposerFactionId,
+                        receiverFactionId,
+                        treatyKind,
+                        campaign.note()
+                ));
+            } else {
+                throw new IllegalArgumentException("Unsupported campaign assertion kind: " + campaign.kind());
+            }
+        }
+
         return List.copyOf(ops);
+    }
+
+    private static int requireCampaignInt(Integer value, String fieldName) {
+        if (value == null) {
+            throw new IllegalArgumentException("Missing required campaign field: " + fieldName);
+        }
+        return value;
+    }
+
+    private static String requireCampaignText(String value, String fieldName) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Missing required campaign field: " + fieldName);
+        }
+        return value;
     }
 }

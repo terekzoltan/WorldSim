@@ -32,6 +32,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> "{}"
@@ -52,6 +53,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> "{}"
@@ -72,6 +74,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> "not-json"
@@ -118,6 +121,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> response
@@ -193,6 +197,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> response
@@ -251,6 +256,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> response
@@ -261,6 +267,117 @@ class LlmDirectorPlannerTest {
         PatchOp.AddStoryBeat story = (PatchOp.AddStoryBeat) detailed.patch().get().get(0);
         assertTrue(story.causalChain() == null);
         assertTrue(detailed.sanitizeTags().contains("causal_chain_population_eq_non_integer"));
+    }
+
+    @Test
+    void propose_WhenCampaignEnabled_MapsCampaignSlotToPatchOp() {
+        String response = """
+                {
+                  "designatedOutput": {
+                    "storyBeatSlot": null,
+                    "directiveSlot": null,
+                    "campaignSlot": {
+                      "kind": "declare_war",
+                      "attackerFactionId": 1,
+                      "defenderFactionId": 2,
+                      "reason": "border pressure"
+                    }
+                  }
+                }
+                """;
+
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "key",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                true,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> response
+        );
+
+        LlmDirectorPlanner.ProposalResult detailed = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(detailed.patch().isPresent());
+        assertEquals(1, detailed.patch().get().size());
+        assertTrue(detailed.patch().get().get(0) instanceof PatchOp.DeclareWar);
+    }
+
+    @Test
+    void propose_WhenCampaignDisabled_DropsCampaignSlot() {
+        String response = """
+                {
+                  "designatedOutput": {
+                    "storyBeatSlot": null,
+                    "directiveSlot": null,
+                    "campaignSlot": {
+                      "kind": "propose_treaty",
+                      "proposerFactionId": 1,
+                      "receiverFactionId": 2,
+                      "treatyKind": "ceasefire",
+                      "note": "hold lines"
+                    }
+                  }
+                }
+                """;
+
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "key",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                false,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> response
+        );
+
+        LlmDirectorPlanner.ProposalResult detailed = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(detailed.patch().isEmpty());
+        assertTrue(detailed.sanitizeTags().contains("campaign_slot_dropped_gate_off"));
+    }
+
+    @Test
+    void propose_WhenCampaignTreatyInvalid_DropsCampaignSlot() {
+        String response = """
+                {
+                  "designatedOutput": {
+                    "storyBeatSlot": null,
+                    "directiveSlot": null,
+                    "campaignSlot": {
+                      "kind": "propose_treaty",
+                      "proposerFactionId": 1,
+                      "receiverFactionId": 1,
+                      "treatyKind": "alliance"
+                    }
+                  }
+                }
+                """;
+
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "key",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                true,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> response
+        );
+
+        LlmDirectorPlanner.ProposalResult detailed = planner.proposeDetailed(directorRequest(), List.of());
+        assertTrue(detailed.patch().isEmpty());
+        assertTrue(detailed.sanitizeTags().contains("campaign_self_target_dropped")
+                || detailed.sanitizeTags().contains("campaign_treaty_dropped"));
     }
 
     @Test
@@ -287,6 +404,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> response
@@ -325,6 +443,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> {
@@ -376,6 +495,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> response
@@ -397,6 +517,7 @@ class LlmDirectorPlannerTest {
                 500,
                 "both",
                 5.0,
+                false,
                 new DirectorPromptFactory(),
                 new DirectorCandidateParser(objectMapper),
                 (m, t, tok, s, u) -> {

@@ -17,6 +17,7 @@ import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorCampaignOpFactory;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorDesign;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorInfluenceBudget;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorPipelineTelemetry;
@@ -236,10 +237,14 @@ public class ComposedPatchPlanner implements PatchPlanner {
     private static List<PatchOp> applyDirectorOutputMode(List<PatchOp> patch, String outputMode) {
         return switch (outputMode) {
             case "story_only" -> patch.stream().filter(op -> op instanceof PatchOp.AddStoryBeat).toList();
-            case "nudge_only" -> patch.stream().filter(op -> op instanceof PatchOp.SetColonyDirective).toList();
+            case "nudge_only" -> patch.stream().filter(ComposedPatchPlanner::isNudgeSideDirectorOp).toList();
             case "off" -> List.of();
             default -> patch;
         };
+    }
+
+    private static boolean isNudgeSideDirectorOp(PatchOp op) {
+        return op instanceof PatchOp.SetColonyDirective || DirectorCampaignOpFactory.isCampaignOp(op);
     }
 
     private static String formatBudgetUsed(double budgetUsed) {

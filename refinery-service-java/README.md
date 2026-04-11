@@ -33,6 +33,7 @@ Planner env profile:
 - `PLANNER_LLM_TEMPERATURE=0.4`
 - `PLANNER_LLM_MAX_TOKENS=500`
 - `PLANNER_DIRECTOR_OUTPUT_MODE=both` (default Java-side director output mode)
+- `PLANNER_DIRECTOR_CAMPAIGN_ENABLED=false` (default OFF gate for campaign emit on `SEASON_DIRECTOR_CHECKPOINT`)
 - `PLANNER_DIRECTOR_MAX_RETRIES=2` (iterative correction retries)
 - `PLANNER_DIRECTOR_BUDGET=5.0` (influence budget limit for director checkpoints)
 
@@ -52,6 +53,13 @@ When `PLANNER_MODE=pipeline`, responses include explicit explain markers:
 - `causalChainMaxTriggers:1`
 - `causalChainMetrics:food_reserves_pct,morale_avg,population,economy_output`
 - `causalChainEqPolicy:population_exact;floating_tolerance=0.0001`
+
+Output mode policy for campaign-enabled checkpoints:
+
+- `both`: story + directive + optional campaign op
+- `story_only`: story only
+- `nudge_only`: directive + optional campaign op
+- `off`: no ops
 
 ## Director Live Smoke Notes (Wave 6.1)
 
@@ -306,7 +314,9 @@ Package root: `hu.zoltanterek.worldsim.refinery`
   - Invariants include known IDs, prereq checks, and deterministic repair for invalid research cost.
 - `SEASON_DIRECTOR_CHECKPOINT` slice:
   - Supports story beats + colony directives with output mode gating.
+  - Optional campaign op emit is gated by `PLANNER_DIRECTOR_CAMPAIGN_ENABLED` (default OFF).
   - Includes budget-aware validation (`budgetUsed` explain marker) and iterative correction loop.
+  - Campaign ops are budget-neutral in this phase.
   - Runtime-safe contract for Wave 6.1 keeps story effect duration aligned to parent beat duration.
 
 For runtime/HUD-side smoke interpretation, see `WorldSim.Runtime/Integration/README.md`.

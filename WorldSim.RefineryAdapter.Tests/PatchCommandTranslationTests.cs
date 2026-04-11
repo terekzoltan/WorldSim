@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Reflection;
 using Xunit;
 using WorldSim.Contracts.V1;
 using WorldSim.Contracts.V2;
@@ -431,9 +432,10 @@ public class PatchCommandTranslationTests
     }
 
     [Fact]
-    public void Executor_RejectsDeclareWarCommand_WithExplicitP4CMessage()
+    public void Executor_ExecutesDeclareWarCommand_AndUpdatesFactionStance()
     {
         var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
         var executor = new RuntimePatchCommandExecutor();
 
         var command = new DeclareWarRuntimeCommand(
@@ -441,14 +443,21 @@ public class PatchCommandTranslationTests
             WorldSim.Simulation.Faction.Aetheri,
             "border pressure");
 
-        var ex = Assert.Throws<NotSupportedException>(() => executor.Execute(runtime, new[] { command }));
-        Assert.Contains("runtime endpoint lands in P4-C", ex.Message, StringComparison.Ordinal);
+        executor.Execute(runtime, new[] { command });
+
+        var stance = runtime.GetSnapshot().FactionStances
+            .FirstOrDefault(s => s.LeftFactionId == (int)WorldSim.Simulation.Faction.Obsidari
+                              && s.RightFactionId == (int)WorldSim.Simulation.Faction.Aetheri);
+
+        Assert.NotNull(stance);
+        Assert.Equal("War", stance!.Stance);
     }
 
     [Fact]
-    public void ValidateDirectorBatch_RejectsTreatyCommand_WithExplicitP4CMessage()
+    public void ValidateDirectorBatch_AcceptsTreatyCommand()
     {
         var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
         var executor = new RuntimePatchCommandExecutor();
 
         var command = new ProposeTreatyRuntimeCommand(
@@ -457,8 +466,52 @@ public class PatchCommandTranslationTests
             "ceasefire",
             "test");
 
-        var ex = Assert.Throws<NotSupportedException>(() => executor.ValidateDirectorBatch(runtime, new[] { command }));
-        Assert.Contains("runtime endpoint lands in P4-C", ex.Message, StringComparison.Ordinal);
+        executor.ValidateDirectorBatch(runtime, new[] { command });
+    }
+
+    [Fact]
+    public void Executor_ExecutesTreatyCommand_WithConservativeLadder()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var executor = new RuntimePatchCommandExecutor();
+
+        executor.Execute(runtime, new RuntimePatchCommand[]
+        {
+            new DeclareWarRuntimeCommand(
+                WorldSim.Simulation.Faction.Aetheri,
+                WorldSim.Simulation.Faction.Obsidari,
+                "setup"),
+            new ProposeTreatyRuntimeCommand(
+                WorldSim.Simulation.Faction.Obsidari,
+                WorldSim.Simulation.Faction.Aetheri,
+                "peace_talks",
+                "step down")
+        });
+
+        var stance = runtime.GetSnapshot().FactionStances
+            .FirstOrDefault(s => s.LeftFactionId == (int)WorldSim.Simulation.Faction.Obsidari
+                              && s.RightFactionId == (int)WorldSim.Simulation.Faction.Aetheri);
+        Assert.NotNull(stance);
+        Assert.Equal("Hostile", stance!.Stance);
+    }
+
+    [Fact]
+    public void ValidateDirectorBatch_RejectsCampaignCommands_WhenRuntimeFlagsDisabled()
+    {
+        var runtime = CreateRuntime();
+        var executor = new RuntimePatchCommandExecutor();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            executor.ValidateDirectorBatch(runtime, new RuntimePatchCommand[]
+            {
+                new DeclareWarRuntimeCommand(
+                    WorldSim.Simulation.Faction.Obsidari,
+                    WorldSim.Simulation.Faction.Aetheri,
+                    "blocked")
+            }));
+
+        Assert.Contains("WORLDSIM_ENABLE_DIPLOMACY=true", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -535,6 +588,16 @@ public class PatchCommandTranslationTests
             Modifier = modifier,
             DurationTicks = durationTicks
         };
+    }
+
+    private static void EnableDiplomacyAndCombat(SimulationRuntime runtime)
+    {
+        var worldField = typeof(SimulationRuntime).GetField("_world", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(worldField);
+        var world = worldField!.GetValue(runtime) as WorldSim.Simulation.World;
+        Assert.NotNull(world);
+        world!.EnableDiplomacy = true;
+        world.EnableCombatPrimitives = true;
     }
 
     private static string FindRepoRoot()
