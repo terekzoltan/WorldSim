@@ -474,8 +474,38 @@ class LlmDirectorPlannerTest {
         String prompt = capturedUserPrompt.get();
         assertTrue(prompt.contains("colonyCount=2"));
         assertTrue(prompt.contains("remainingInfluenceBudget=3.750"));
+        assertTrue(prompt.contains("Influence budget is gameplay cost, not token budget."));
+        assertTrue(prompt.contains("Each causalChain adds base cost 2.0"));
         assertTrue(prompt.contains("designatedOutput"));
         assertTrue(prompt.contains("effect.durationTicks exactly equal to storyBeat.durationTicks"));
+    }
+
+    @Test
+    void propose_WhenBudgetFeedbackPresent_InjectsBudgetRepairHintIntoPrompt() {
+        AtomicReference<String> capturedUserPrompt = new AtomicReference<>();
+        LlmDirectorPlanner planner = new LlmDirectorPlanner(
+                true,
+                "key",
+                "model",
+                0.4,
+                500,
+                "both",
+                5.0,
+                false,
+                new DirectorPromptFactory(),
+                new DirectorCandidateParser(objectMapper),
+                (m, t, tok, s, u) -> {
+                    capturedUserPrompt.set(u);
+                    return "{\"designatedOutput\":{\"storyBeatSlot\":null,\"directiveSlot\":null}}";
+                }
+        );
+
+        planner.propose(directorRequest(), List.of("INV-17 Chain total cost 9.5 exceeds limit 5.0"));
+
+        String prompt = capturedUserPrompt.get();
+        assertTrue(prompt.contains("Budget repair hint: previous candidate exceeded influence budget."));
+        assertTrue(prompt.contains("Remove causalChain first."));
+        assertTrue(prompt.contains("omit optional slots instead of exceeding budget"));
     }
 
     @Test
