@@ -121,6 +121,7 @@ public class Person
     float _lastAiThinkDt = -1f;
     Job _lastAiThinkResult = Job.Idle;
     bool _hasCachedAiThink;
+    float _movementStepCarry;
 
     const int PathCacheHorizon = 12;
     const int PathMaxExpansions = 4096;
@@ -1020,7 +1021,7 @@ public class Person
             _protectFromDissipationThisTick = true;
             _trackNoProgressForCurrentMove = true;
             _noProgressTrackContext = "build";
-            MoveTowards(w, site, (int)_home.MovementSpeedMultiplier);
+            MoveTowards(w, site, 1);
             return true;
         }
 
@@ -2421,7 +2422,7 @@ public class Person
         DebugTargetKey = moveReservationKey;
         _trackNoProgressForCurrentMove = true;
         _noProgressTrackContext = "resource";
-        MoveTowards(w, bestPos.Value, (int)_home.MovementSpeedMultiplier);
+        MoveTowards(w, bestPos.Value, 1);
         return true;
     }
 
@@ -2456,7 +2457,10 @@ public class Person
 
     void MoveTowards(World w, (int x, int y) target, int maxStep)
     {
-        int remaining = Math.Max(1, maxStep);
+        int remaining = ResolveMoveStepBudget(maxStep);
+        if (remaining <= 0)
+            return;
+
         var startPos = Pos;
         int cx = Pos.x, cy = Pos.y;
         var grid = new NavigationGrid(w);
@@ -2572,6 +2576,23 @@ public class Person
         }
     }
 
+    int ResolveMoveStepBudget(int baseStep)
+    {
+        if (baseStep <= 0)
+            return 0;
+
+        var speedMultiplier = Math.Max(0f, _home.MovementSpeedMultiplier);
+        if (speedMultiplier <= 0f)
+            return 0;
+
+        _movementStepCarry += baseStep * speedMultiplier;
+        var resolved = (int)MathF.Floor(_movementStepCarry);
+        if (resolved > 0)
+            _movementStepCarry -= resolved;
+
+        return resolved;
+    }
+
     private bool ShouldTrackNoProgressForCurrentMove()
     {
         if (_trackNoProgressForCurrentMove)
@@ -2634,7 +2655,7 @@ public class Person
 
     void Wander(World w)
     {
-        int moveDistance = Math.Max(4, (int)_home.MovementSpeedMultiplier);
+        int moveDistance = Math.Max(4, (int)MathF.Ceiling(4f * Math.Max(1f, _home.MovementSpeedMultiplier)));
         int tries = 8;
         for (int i = 0; i < tries; i++)
         {
