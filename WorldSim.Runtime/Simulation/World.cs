@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WorldSim.AI;
+using WorldSim.Runtime.Diagnostics;
 using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
@@ -109,7 +110,17 @@ namespace WorldSim.Simulation
         public bool ResourceSharingEnabled { get; set; } = false; // Erőforrás-megosztás engedélyezve (kolóniák között)
         public int IntelligenceBonus { get; set; } = 0; // Intelligencia bónusz (újszülöttek plusz intelligenciát kapnak)
         public int StrengthBonus { get; set; } = 0; // Erő bónusz (újszülöttek plusz erőt kapnak)
-        public float MovementSpeedMultiplier { get; set; } = 1.0f; // Mozgási sebesség szorzó (gyorsabban mozognak)
+        float _movementSpeedMultiplier = 1.0f;
+        public float MovementSpeedMultiplier
+        {
+            get => _movementSpeedMultiplier;
+            set
+            {
+                _movementSpeedMultiplier = Math.Max(0f, value);
+                foreach (var colony in _colonies)
+                    colony.MovementSpeedMultiplier = _movementSpeedMultiplier;
+            }
+        } // Mozgási sebesség szorzó (gyorsabban mozognak)
         public float BirthRateMultiplier { get; set; } = 1.0f; // Születési arány szorzó (gyakoribb születések)
         public bool StoneBuildingsEnabled { get; set; } = false; // Kőből építkezés engedélyezve (lehet kőből építkezni)
         public bool AllowFreeTechUnlocks { get; set; }
@@ -168,12 +179,90 @@ namespace WorldSim.Simulation
         public int ActiveBattleCount => _activeBattles.Count;
         public int ActiveSiegeCount => _activeSieges.Count;
 
+        public ScenarioAiTelemetrySnapshot BuildScenarioAiTelemetrySnapshot()
+        {
+            var trackedDecisions = _people
+                .Select(person => new
+                {
+                    Decision = person.LastAiDecision,
+                    DebugDecisionCause = NormalizeAiValue(person.DebugDecisionCause, "none"),
+                    DebugTargetKey = NormalizeAiValue(person.DebugTargetKey, "none")
+                })
+                .Where(entry => entry.Decision != null)
+                .Select(entry => new
+                {
+                    Decision = entry.Decision!,
+                    entry.DebugDecisionCause,
+                    entry.DebugTargetKey,
+                    TargetKind = ScenarioAiTargetKindClassifier.Normalize(entry.DebugTargetKey)
+                })
+                .ToList();
+
+            if (trackedDecisions.Count == 0)
+                return ScenarioAiTelemetrySnapshot.Empty;
+
+            var goalCounts = BuildScenarioAiCounts(trackedDecisions.Select(entry => NormalizeAiValue(entry.Decision.Trace.SelectedGoal, "None")));
+            var commandCounts = BuildScenarioAiCounts(trackedDecisions.Select(entry => entry.Decision.Job.ToString()));
+            var replanReasonCounts = BuildScenarioAiCounts(trackedDecisions.Select(entry => NormalizeAiValue(entry.Decision.Trace.ReplanReason, "None")));
+            var methodCounts = BuildScenarioAiCounts(trackedDecisions.Select(entry => NormalizeAiValue(entry.Decision.Trace.MethodName, "None")));
+            var debugCauseCounts = BuildScenarioAiCounts(trackedDecisions.Select(entry => entry.DebugDecisionCause));
+            var targetKindCounts = BuildScenarioAiCounts(trackedDecisions.Select(entry => entry.TargetKind));
+
+            var latest = trackedDecisions
+                .OrderByDescending(entry => entry.Decision.WorldTick)
+                .ThenByDescending(entry => entry.Decision.Sequence)
+                .ThenBy(entry => entry.Decision.ActorId)
+                .First();
+
+            return new ScenarioAiTelemetrySnapshot(
+                DecisionCount: trackedDecisions.Count,
+                GoalCounts: goalCounts,
+                CommandCounts: commandCounts,
+                ReplanReasonCounts: replanReasonCounts,
+                MethodCounts: methodCounts,
+                DebugCauseCounts: debugCauseCounts,
+                TargetKindCounts: targetKindCounts,
+                TopGoals: goalCounts.Take(3).ToList(),
+                TopDebugCauses: debugCauseCounts.Take(3).ToList(),
+                LatestDecision: new ScenarioAiLatestDecisionSample(
+                    ActorId: latest.Decision.ActorId,
+                    ColonyId: latest.Decision.ColonyId,
+                    X: latest.Decision.X,
+                    Y: latest.Decision.Y,
+                    SelectedGoal: NormalizeAiValue(latest.Decision.Trace.SelectedGoal, "None"),
+                    NextCommand: latest.Decision.Job.ToString(),
+                    PlanLength: latest.Decision.Trace.PlanLength,
+                    PlanCost: latest.Decision.Trace.PlanCost,
+                    ReplanReason: NormalizeAiValue(latest.Decision.Trace.ReplanReason, "None"),
+                    MethodName: NormalizeAiValue(latest.Decision.Trace.MethodName, "None"),
+                    DebugDecisionCause: latest.DebugDecisionCause,
+                    DebugTargetKey: latest.DebugTargetKey,
+                    TargetKind: latest.TargetKind));
+        }
+
         public bool CanBuildFortifications(Colony colony)
         {
             if (!RequireFortificationTechUnlock)
                 return true;
 
             return colony.FortificationsUnlocked || colony.UnlockedTechs.Contains("fortification");
+        }
+
+        private static List<ScenarioAiCountEntry> BuildScenarioAiCounts(IEnumerable<string> values)
+        {
+            return values
+                .GroupBy(value => value, StringComparer.Ordinal)
+                .Select(group => new ScenarioAiCountEntry(group.Key, group.Count()))
+                .OrderByDescending(entry => entry.Count)
+                .ThenBy(entry => entry.Name, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        private static string NormalizeAiValue(string? value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? fallback
+                : value.Trim();
         }
 
         readonly Random _rng;
@@ -287,7 +376,10 @@ namespace WorldSim.Simulation
                 } while (grounds[ox, oy] == Ground.Water && ++guard < 2048);
                 (int, int) colPos = (ox, oy);
 
-                Colony col = new Colony(ci, colPos);
+                Colony col = new Colony(ci, colPos)
+                {
+                    MovementSpeedMultiplier = _movementSpeedMultiplier
+                };
                 _colonies.Add(col);
                 _colonyDeathStats[col.Id] = new ColonyDeathStats();
                 _colonyWarStates[col.Id] = ColonyWarState.Peace;

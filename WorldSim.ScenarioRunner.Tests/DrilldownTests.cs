@@ -48,6 +48,11 @@ public sealed class DrilldownTests
         Assert.True(firstSample.TryGetProperty("activeCombatGroups", out _));
         Assert.True(firstSample.TryGetProperty("routingPeople", out _));
         Assert.True(firstSample.TryGetProperty("minCombatMorale", out _));
+        Assert.True(firstSample.TryGetProperty("ai", out var aiTelemetry));
+        Assert.True(aiTelemetry.TryGetProperty("topGoal", out _));
+        Assert.True(aiTelemetry.TryGetProperty("topCommand", out _));
+        Assert.True(aiTelemetry.TryGetProperty("topReplanReason", out _));
+        Assert.True(aiTelemetry.TryGetProperty("topDebugCause", out _));
     }
 
     [Fact]
