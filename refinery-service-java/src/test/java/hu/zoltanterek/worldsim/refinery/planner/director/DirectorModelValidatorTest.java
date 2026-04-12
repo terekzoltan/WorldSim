@@ -74,7 +74,14 @@ class DirectorModelValidatorTest {
         );
 
         List<PatchOp> candidate = List.of(
-                new PatchOp.AddStoryBeat("op_story_major", "BEAT_MAJOR_2", "Major weather pressure arrives.", 20)
+                new PatchOp.AddStoryBeat(
+                        "op_story_major",
+                        "BEAT_MAJOR_2",
+                        "Major weather pressure arrives.",
+                        20,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", -0.05, 20))
+                )
         );
 
         IllegalArgumentException ex = assertThrows(
@@ -95,7 +102,14 @@ class DirectorModelValidatorTest {
         );
 
         List<PatchOp> candidate = List.of(
-                new PatchOp.AddStoryBeat("op_story_major", "BEAT_MAJOR_2", "Major weather pressure arrives.", 20)
+                new PatchOp.AddStoryBeat(
+                        "op_story_major",
+                        "BEAT_MAJOR_2",
+                        "Major weather pressure arrives.",
+                        20,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", -0.05, 20))
+                )
         );
 
         DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
@@ -113,7 +127,18 @@ class DirectorModelValidatorTest {
         );
 
         List<PatchOp> candidate = List.of(
-                new PatchOp.AddStoryBeat("op_story_epic", "BEAT_EPIC_2", "Epic pressure builds at all borders.", 24)
+                new PatchOp.AddStoryBeat(
+                        "op_story_epic",
+                        "BEAT_EPIC_2",
+                        "Epic pressure builds at all borders.",
+                        24,
+                        "epic",
+                        List.of(
+                                new PatchOp.EffectEntry("domain_modifier", "food", -0.05, 24),
+                                new PatchOp.EffectEntry("domain_modifier", "morale", -0.05, 24),
+                                new PatchOp.EffectEntry("domain_modifier", "economy", -0.05, 24)
+                        )
+                )
         );
 
         IllegalArgumentException ex = assertThrows(
@@ -134,7 +159,18 @@ class DirectorModelValidatorTest {
         );
 
         List<PatchOp> candidate = List.of(
-                new PatchOp.AddStoryBeat("op_story_epic", "BEAT_EPIC_2", "Epic pressure builds at all borders.", 24)
+                new PatchOp.AddStoryBeat(
+                        "op_story_epic",
+                        "BEAT_EPIC_2",
+                        "Epic pressure builds at all borders.",
+                        24,
+                        "epic",
+                        List.of(
+                                new PatchOp.EffectEntry("domain_modifier", "food", -0.05, 24),
+                                new PatchOp.EffectEntry("domain_modifier", "morale", -0.05, 24),
+                                new PatchOp.EffectEntry("domain_modifier", "economy", -0.05, 24)
+                        )
+                )
         );
 
         DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
@@ -238,6 +274,62 @@ class DirectorModelValidatorTest {
         assertEquals(30, repaired.effects().get(0).durationTicks());
         assertTrue(outcome.repaired());
         assertTrue(outcome.warnings().stream().anyMatch(msg -> msg.contains(DirectorDesign.INV_06)));
+    }
+
+    @Test
+    void validateAndRepair_NormalizesStorySeverityToEffectCount() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_story_severity_fix",
+                        "BEAT_SEVERITY_FIX",
+                        "Story severity normalization sample",
+                        20,
+                        "minor",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", -0.05, 20))
+                )
+        );
+
+        DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
+        PatchOp.AddStoryBeat repaired = (PatchOp.AddStoryBeat) outcome.patch().get(0);
+
+        assertEquals("major", repaired.severity());
+        assertTrue(outcome.repaired());
+        assertTrue(outcome.warnings().stream().anyMatch(msg -> msg.contains("Normalized story beat severity")));
+    }
+
+    @Test
+    void validateAndRepair_NormalizesFollowUpSeverityToEffectCount() {
+        DirectorRuntimeFacts facts = facts(128L, 2, 0L, List.of());
+        List<PatchOp> candidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_story_follow_up_fix",
+                        "BEAT_PARENT",
+                        "Story with follow-up severity normalization",
+                        20,
+                        "minor",
+                        List.of(),
+                        new PatchOp.CausalChainEntry(
+                                "causal_chain",
+                                new PatchOp.CausalCondition("food_reserves_pct", "lt", 35),
+                                new PatchOp.CausalFollowUpBeat(
+                                        "BEAT_CHILD",
+                                        "Follow-up intensity rises.",
+                                        12,
+                                        "minor",
+                                        List.of(new PatchOp.EffectEntry("domain_modifier", "morale", -0.05, 12))
+                                ),
+                                20,
+                                1
+                        )
+                )
+        );
+
+        DirectorValidationOutcome outcome = validator.validateAndRepair(candidate, facts);
+        PatchOp.AddStoryBeat repaired = (PatchOp.AddStoryBeat) outcome.patch().get(0);
+
+        assertEquals("minor", repaired.severity());
+        assertEquals("major", repaired.causalChain().followUpBeat().severity());
     }
 
     @Test

@@ -55,7 +55,14 @@ class DirectorRefineryPlannerIterativeCorrectionTest {
 
         PatchRequest request = directorRequestWithActiveMajorBeat();
         List<PatchOp> invalidCandidate = List.of(
-                new PatchOp.AddStoryBeat("op_story", "BEAT_MAJOR_2", "Major pressure wave arrives.", 20)
+                new PatchOp.AddStoryBeat(
+                        "op_story",
+                        "BEAT_MAJOR_2",
+                        "Major pressure wave arrives.",
+                        20,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", -0.05, 20))
+                )
         );
 
         DirectorRefineryPlanner.DirectorValidationResult result = planner.validateAndRepair(

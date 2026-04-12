@@ -70,7 +70,19 @@ public final class DirectorModelValidator {
 
                 List<PatchOp.EffectEntry> effects = sanitizeEffects(storyBeat.effects(), repairedDuration);
                 String explicitSeverity = normalizeOptionalSeverity(storyBeat.severity());
-                String newBeatSeverity = inferSeverity(storyBeat, effects, explicitSeverity);
+                String newBeatSeverity = inferSeverity(effects);
+                if (explicitSeverity != null && !explicitSeverity.equals(newBeatSeverity)) {
+                    warnings.add(code(
+                            DirectorDesign.INV_01,
+                            "Normalized story beat severity from '" + explicitSeverity + "' to '" + newBeatSeverity
+                                    + "' based on effect count " + effects.size() + "."
+                    ));
+                    feedback.add(code(
+                            DirectorDesign.INV_01,
+                            "Story beat severity must match effect count (minor=0, major=1-2, epic=3)."
+                    ));
+                    changed = true;
+                }
                 if ("major".equals(newBeatSeverity) && hasActiveSeverity(facts, "major")) {
                     throw invalid(DirectorDesign.INV_08, "Major beat already active; cannot emit another major beat.");
                 }
@@ -96,7 +108,7 @@ public final class DirectorModelValidator {
                 PatchOp.CausalChainEntry causalChain = validateAndSanitizeCausalChain(
                         storyBeat,
                         repairedDuration,
-                        explicitSeverity,
+                        newBeatSeverity,
                         effects,
                         facts
                 );
@@ -106,7 +118,7 @@ public final class DirectorModelValidator {
                         storyBeat.beatId(),
                         storyBeat.text(),
                         repairedDuration,
-                        explicitSeverity,
+                        newBeatSeverity,
                         effects,
                         causalChain
                 ));
@@ -250,7 +262,7 @@ public final class DirectorModelValidator {
                     effects = sanitizeEffects(storyBeat.effects(), duration);
                     validateNoContradictoryModifiers(effects);
                     validateDomainStackCap(effects);
-                    severity = normalizeOptionalSeverity(storyBeat.severity());
+                    severity = inferSeverity(effects);
                     PatchOp.CausalChainEntry causalChain = validateAndSanitizeCausalChain(
                             storyBeat,
                             duration,
@@ -450,33 +462,13 @@ public final class DirectorModelValidator {
         );
     }
 
-    private static String inferSeverity(
-            PatchOp.AddStoryBeat storyBeat,
-            List<PatchOp.EffectEntry> effects,
-            String explicitSeverity
-    ) {
-        if (explicitSeverity != null) {
-            return explicitSeverity;
-        }
-        if (!effects.isEmpty()) {
-            return switch (effects.size()) {
-                case 0 -> "minor";
-                case 1, 2 -> "major";
-                default -> "epic";
-            };
-        }
-
-        String source = (storyBeat.beatId() + " " + storyBeat.text()).toLowerCase();
-        if (source.contains("epic")) {
-            return "epic";
-        }
-        if (source.contains("minor")) {
-            return "minor";
-        }
-        if (source.contains("major")) {
-            return "major";
-        }
-        return "major";
+    private static String inferSeverity(List<PatchOp.EffectEntry> effects) {
+        int effectCount = effects == null ? 0 : effects.size();
+        return switch (effectCount) {
+            case 0 -> "minor";
+            case 1, 2 -> "major";
+            default -> "epic";
+        };
     }
 
     private static String normalizeOptionalSeverity(String rawSeverity) {
@@ -711,8 +703,8 @@ public final class DirectorModelValidator {
                 DirectorDesign.MIN_STORY_DURATION,
                 DirectorDesign.MAX_STORY_DURATION
         );
-        String followUpSeverity = normalizeOptionalSeverity(followUpBeat.severity());
         List<PatchOp.EffectEntry> followUpEffects = sanitizeEffects(followUpBeat.effects(), followUpDuration);
+        String followUpSeverity = inferSeverity(followUpEffects);
         validateNoContradictoryModifiers(followUpEffects);
         validateDomainStackCap(followUpEffects);
 
