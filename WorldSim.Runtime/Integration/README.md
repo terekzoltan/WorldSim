@@ -96,7 +96,7 @@ dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj
 | `PLANNER_LLM_ENABLED` | `false` | Enables OpenRouter proposal stage |
 | `PLANNER_LLM_API_KEY` | empty | OpenRouter API key |
 | `PLANNER_LLM_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL |
-| `PLANNER_LLM_MODEL` | `openai/gpt-4o-mini` | LLM model |
+| `PLANNER_LLM_MODEL` | `openai/gpt-5.4-mini` | LLM model |
 | `PLANNER_LLM_TIMEOUT_MS` | `3000` | Single completion timeout |
 | `PLANNER_LLM_HTTP_REFERER` | `https://worldsim.local` | OpenRouter referer header |
 | `PLANNER_LLM_APP_TITLE` | `WorldSim` | OpenRouter app title header |

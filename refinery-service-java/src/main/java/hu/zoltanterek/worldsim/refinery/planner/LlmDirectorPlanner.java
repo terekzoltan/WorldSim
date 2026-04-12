@@ -87,7 +87,7 @@ public class LlmDirectorPlanner {
             ObjectMapper objectMapper,
             @Value("${planner.llm.enabled:false}") boolean enabled,
             @Value("${planner.llm.apiKey:}") String apiKey,
-            @Value("${planner.llm.model:openai/gpt-4o-mini}") String model,
+            @Value("${planner.llm.model:openai/gpt-5.4-mini}") String model,
             @Value("${planner.llm.temperature:0.4}") double temperature,
             @Value("${planner.llm.maxTokens:500}") int maxTokens,
             @Value("${planner.director.outputMode:both}") String defaultOutputMode,

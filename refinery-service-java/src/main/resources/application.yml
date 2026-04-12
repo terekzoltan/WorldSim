@@ -12,7 +12,7 @@ planner:
     enabled: ${PLANNER_LLM_ENABLED:false}
     apiKey: ${PLANNER_LLM_API_KEY:}
     baseUrl: ${PLANNER_LLM_BASE_URL:https://openrouter.ai/api/v1}
-    model: ${PLANNER_LLM_MODEL:openai/gpt-4o-mini}
+    model: ${PLANNER_LLM_MODEL:openai/gpt-5.4-mini}
     timeoutMs: ${PLANNER_LLM_TIMEOUT_MS:3000}
     httpReferer: ${PLANNER_LLM_HTTP_REFERER:https://worldsim.local}
     appTitle: ${PLANNER_LLM_APP_TITLE:WorldSim}

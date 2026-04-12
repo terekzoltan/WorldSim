@@ -26,7 +26,7 @@ Planner env profile:
 - `PLANNER_LLM_ENABLED=false` (default)
 - `PLANNER_LLM_API_KEY=` (required for live LLM calls)
 - `PLANNER_LLM_BASE_URL=https://openrouter.ai/api/v1`
-- `PLANNER_LLM_MODEL=openai/gpt-4o-mini`
+- `PLANNER_LLM_MODEL=openai/gpt-5.4-mini`
 - `PLANNER_LLM_TIMEOUT_MS=3000`
 - `PLANNER_LLM_HTTP_REFERER=https://worldsim.local`
 - `PLANNER_LLM_APP_TITLE=WorldSim`
