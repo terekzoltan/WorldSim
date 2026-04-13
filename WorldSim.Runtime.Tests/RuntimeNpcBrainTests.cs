@@ -331,7 +331,7 @@ public class RuntimeNpcBrainTests
         world.Update(0.25f);
         world.Update(0.25f);
 
-        actor.Pos = (7, 10);
+        actor.Pos = (6, 10);
         var context = RuntimeNpcBrain.CreateContext(actor, world, simulationTimeSeconds: 0f);
 
         Assert.True(context.IsWarStance);

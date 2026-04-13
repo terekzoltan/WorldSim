@@ -122,12 +122,19 @@ public class Person
     Job _lastAiThinkResult = Job.Idle;
     bool _hasCachedAiThink;
     float _movementStepCarry;
+    int _recentHostileContactTick = int.MinValue;
+    int _recentHostileActorId = -1;
+    (int x, int y) _recentHostilePos;
 
     const int PathCacheHorizon = 12;
     const int PathMaxExpansions = 4096;
     const int UnstickSteps = 3;
     const int NoProgressThreshold = 4;
     const int NoProgressBackoffTicks = 4;
+    const int RecentHostileMemoryTicks = 10;
+    const int RecentHostilePursuitRadius = 10;
+    const int EngageChaseRadius = 6;
+    const int RaidContactRadius = 6;
 
     public int NoProgressStreak => _noProgressStreak;
     public int BackoffTicksRemaining => _backoffTicksRemaining;
@@ -1175,28 +1182,11 @@ public class Person
             return;
         }
 
-        var hostilePerson = FindNearestHostilePerson(w, radius: 5);
-        if (hostilePerson != null)
-        {
-            int hostileDist = Math.Abs(hostilePerson.Value.person.Pos.x - Pos.x) + Math.Abs(hostilePerson.Value.person.Pos.y - Pos.y);
-            if (hostileDist > 1)
-            {
-                MoveTowards(w, hostilePerson.Value.person.Pos, 1);
-                return;
-            }
-
-            w.ReportCombatEngagement();
-            var enemy = hostilePerson.Value.person;
-            var myPower = Strength + (Defense / 2f);
-            var enemyPower = enemy.Strength + (enemy.Defense / 2f);
-            var duelWinChance = Math.Clamp(0.40f + ((myPower - enemyPower) / 50f), 0.15f, 0.9f);
-            if (_rng.NextDouble() < duelWinChance)
-                enemy.ApplyCombatDamage(w, ScaleOutgoingCombatDamage(w, Math.Max(2f, Strength * 0.8f)), "FactionCombat");
-            else
-                ApplyCombatDamage(w, enemy.ScaleOutgoingCombatDamage(w, Math.Max(1.5f, enemy.Strength * 0.65f)), "FactionCombat");
-
+        if (TryAttackOrPursueHostilePerson(w, radius: EngageChaseRadius, switchToFight: false, pursuitCause: "fight_chase"))
             return;
-        }
+
+        if (TryPursueRecentHostile(w))
+            return;
 
         Predator? nearest = null;
         int best = int.MaxValue;
@@ -1614,6 +1604,16 @@ public class Person
             return;
         }
 
+        if (TryAttackOrPursueHostilePerson(w, radius: RaidContactRadius, switchToFight: true, pursuitCause: "raid_engage_enemy"))
+            return;
+
+        if (TryPursueRecentHostile(w, debugCause: "raid_pursue_recent_hostile"))
+        {
+            Current = Job.Fight;
+            _doingJob = Math.Max(_doingJob, 1);
+            return;
+        }
+
         var preferTowerTargets = ThreatDecisionPolicy.ShouldPrioritizeSiegeTargeting(threatContext);
 
         var adjacentEnemyStructure = FindNearestEnemyStructure(w, radius: 1, prioritizeSiege: true, preferTowerTargets: preferTowerTargets);
@@ -1909,6 +1909,13 @@ public class Person
 
     private (int x, int y)? FindRaidTarget(World w, bool preferTowerTargets)
     {
+        var enemy = FindNearestHostilePerson(w, radius: 8);
+        if (enemy != null)
+        {
+            RememberHostileContact(w, enemy.Value.person);
+            return enemy.Value.person.Pos;
+        }
+
         var nearestContested = FindNearestContestedTile(w, radius: 12);
         if (nearestContested != null)
         {
@@ -1920,8 +1927,10 @@ public class Person
         var structure = FindNearestEnemyStructure(w, radius: 10, prioritizeSiege: true, preferTowerTargets: preferTowerTargets);
         if (structure != null)
             return structure.Value.structure.Pos;
+        enemy = FindNearestHostilePerson(w, radius: 10);
+        if (enemy != null)
+            RememberHostileContact(w, enemy.Value.person);
 
-        var enemy = FindNearestHostilePerson(w, radius: 10);
         return enemy?.person.Pos;
     }
 
@@ -2040,6 +2049,114 @@ public class Person
             return null;
 
         return (nearest, bestDist);
+    }
+
+    internal bool HasCombatFollowThroughIntent(int currentTick)
+    {
+        return Current is Job.Fight or Job.RaidBorder or Job.AttackStructure
+            || HasRecentCombatIntent(currentTick);
+    }
+
+    internal bool HasRecentCombatIntent(int currentTick)
+    {
+        bool recentHostile = currentTick - _recentHostileContactTick <= RecentHostileMemoryTicks;
+        bool recentCombat = LastCombatTick >= 0 && currentTick - LastCombatTick <= RecentHostileMemoryTicks;
+        return recentHostile || recentCombat;
+    }
+
+    private bool TryAttackOrPursueHostilePerson(World w, int radius, bool switchToFight, string pursuitCause)
+    {
+        var hostilePerson = FindNearestHostilePerson(w, radius);
+        if (hostilePerson == null)
+            return false;
+
+        RememberHostileContact(w, hostilePerson.Value.person);
+        if (switchToFight)
+        {
+            Current = Job.Fight;
+            _doingJob = Math.Max(_doingJob, 1);
+        }
+
+        int hostileDist = hostilePerson.Value.dist;
+        if (hostileDist > 1)
+        {
+            DebugDecisionCause = pursuitCause;
+            DebugTargetKey = $"move:{hostilePerson.Value.person.Pos.x}:{hostilePerson.Value.person.Pos.y}";
+            _trackNoProgressForCurrentMove = true;
+            _noProgressTrackContext = "combat";
+            MoveTowards(w, hostilePerson.Value.person.Pos, 1);
+            return true;
+        }
+
+        EngageHostilePerson(w, hostilePerson.Value.person);
+        return true;
+    }
+
+    private bool TryPursueRecentHostile(World w, string debugCause = "pursue_recent_hostile")
+    {
+        if (!TryGetRecentHostilePursuitTarget(w, out var target))
+            return false;
+
+        DebugDecisionCause = debugCause;
+        DebugTargetKey = $"move:{target.x}:{target.y}";
+        _trackNoProgressForCurrentMove = true;
+        _noProgressTrackContext = "combat";
+        MoveTowards(w, target, 1);
+        return true;
+    }
+
+    private bool TryGetRecentHostilePursuitTarget(World w, out (int x, int y) target)
+    {
+        if (!HasRecentCombatIntent(w.CurrentTick))
+        {
+            target = default;
+            return false;
+        }
+
+        if (_recentHostileActorId > 0)
+        {
+            var actor = w._people.FirstOrDefault(person => person.Id == _recentHostileActorId && person.Health > 0f);
+            if (actor != null && actor.Home != _home && w.GetFactionStance(_home.Faction, actor.Home.Faction) >= WorldSim.Simulation.Diplomacy.Stance.Hostile)
+            {
+                _recentHostilePos = actor.Pos;
+                var actorDistance = Math.Abs(actor.Pos.x - Pos.x) + Math.Abs(actor.Pos.y - Pos.y);
+                if (actorDistance <= RecentHostilePursuitRadius)
+                {
+                    target = actor.Pos;
+                    return true;
+                }
+            }
+        }
+
+        var distance = Math.Abs(_recentHostilePos.x - Pos.x) + Math.Abs(_recentHostilePos.y - Pos.y);
+        if (distance == 0 || distance > RecentHostilePursuitRadius)
+        {
+            target = default;
+            return false;
+        }
+
+        target = _recentHostilePos;
+        return true;
+    }
+
+    private void RememberHostileContact(World w, Person hostile)
+    {
+        _recentHostileActorId = hostile.Id;
+        _recentHostilePos = hostile.Pos;
+        _recentHostileContactTick = w.CurrentTick;
+    }
+
+    private void EngageHostilePerson(World w, Person enemy)
+    {
+        RememberHostileContact(w, enemy);
+        w.ReportCombatEngagement();
+        var myPower = Strength + (Defense / 2f);
+        var enemyPower = enemy.Strength + (enemy.Defense / 2f);
+        var duelWinChance = Math.Clamp(0.40f + ((myPower - enemyPower) / 50f), 0.15f, 0.9f);
+        if (_rng.NextDouble() < duelWinChance)
+            enemy.ApplyCombatDamage(w, ScaleOutgoingCombatDamage(w, Math.Max(2f, Strength * 0.8f)), "FactionCombat");
+        else
+            ApplyCombatDamage(w, enemy.ScaleOutgoingCombatDamage(w, Math.Max(1.5f, enemy.Strength * 0.65f)), "FactionCombat");
     }
 
     private (int x, int y)? FindNearestContestedTile(World w, int radius)

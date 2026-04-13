@@ -1,6 +1,6 @@
 # Post-Wave7 Behavior Diagnosis Decision Note
 
-Status: active non-wave follow-up after Wave 7 closeout
+Status: updated after threat-arbitration and contact-follow-through reruns
 Owner: Meta Coordinator
 Last updated: 2026-04-12
 
@@ -73,29 +73,53 @@ The correct next step is:
 
 Do **not** jump directly to threat/goal weighting changes before rerunning the decision package with a valid perturbation.
 
-## 6. Decision Tree After The Rerun
+## 6. Decision Tree After The Reruns
 
-This decision tree is now resolved.
+This decision tree is now resolved in two stages.
 
-The valid rerun established that fast-move still barely changes the bad lane, so the chosen next fix direction is:
+### 6.1 Threat/arbitration stage
+
+The first valid rerun showed that shared threat/arbitration was a real root cause.
+
+Chosen fix direction:
 
 - shared threat weighting,
 - `DefendSelf` dominance,
 - `Fight` vs `Flee` arbitration,
 - and outward pressure suppression.
 
-Movement/contact speed is no longer the preferred first fix target for this slice.
-
-## 7. Resolution
-
-The rerun has now been completed and interpreted.
-
-Current conclusion:
-
-- the `fastmove` perturbation is now valid,
-- but still does not materially improve the canonical bad lane,
-- so the next engineering step should target threat/defense/arbitration rather than basic move speed.
-
-The implementation source-of-truth for that next fix is:
+That fix landed via:
 
 - `Docs/Plans/Master/Post-Wave7-Threat-Arbitration-Fix-Plan.md`
+
+### 6.2 Contact follow-through stage
+
+After the threat fix, the remaining issue narrowed to residual contact follow-through, especially on the larger standard lane.
+
+Chosen fix direction:
+
+- recent hostile pursue stickiness in `Fight`,
+- raid-to-fight actor conversion,
+- and wider combat-group pairing for recent combat intent.
+
+That fix landed via:
+
+- `Docs/Plans/Master/Post-Wave7-Contact-FollowThrough-Fix-Plan.md`
+
+## 7. Current Resolution
+
+Current conclusion after the latest reruns:
+
+- the Wave 7 wire remains green,
+- the broad threat/arbitration root cause is fixed,
+- the residual contact follow-through slice also improved the bad lane,
+- the previous `standard-default / htn / 101` deathless residual repro is no longer deathless,
+- and both final rerun bundles finished with `exitCode=0`:
+  - `planner-compare-wave7-contact-realization-medium-005`
+  - `planner-compare-wave7-contact-realization-standard-005`
+
+Residual observation:
+
+- the larger standard lane is still more retreat-heavy than the medium lane,
+- and `standard-fastmove / htn / 101` does not improve as strongly as `simple/goap`,
+- but the hard zero-contact/deathless failure mode has been removed.

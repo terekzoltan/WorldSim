@@ -1266,7 +1266,8 @@ namespace WorldSim.Simulation
                             continue;
 
                         var distance = Math.Abs(a.Anchor.x - b.Anchor.x) + Math.Abs(a.Anchor.y - b.Anchor.y);
-                        if (distance > 6 || distance >= bestDistance)
+                        var pairingThreshold = GetCombatPairingDistance(a, b);
+                        if (distance > pairingThreshold || distance >= bestDistance)
                             continue;
 
                         bestDistance = distance;
@@ -1305,6 +1306,7 @@ namespace WorldSim.Simulation
                 .Where(person => person.Health > 0f
                                  && !person.IsRouting
                                  && (person.Current is Job.Fight or Job.RaidBorder or Job.AttackStructure
+                                     || person.HasCombatFollowThroughIntent(CurrentTick)
                                      || HasNearbyHostile(person, radius: 3)))
                 .GroupBy(person => person.Home)
                 .ToList();
@@ -1334,6 +1336,14 @@ namespace WorldSim.Simulation
             }
 
             return groups;
+        }
+
+        private int GetCombatPairingDistance(RuntimeCombatGroup left, RuntimeCombatGroup right)
+        {
+            var hasFollowThroughIntent = left.Members.Any(member => member.HasCombatFollowThroughIntent(CurrentTick))
+                || right.Members.Any(member => member.HasCombatFollowThroughIntent(CurrentTick));
+
+            return hasFollowThroughIntent ? 10 : 6;
         }
 
         private static Formation PickFormation(IReadOnlyList<Person> members, Colony colony)
