@@ -435,6 +435,107 @@ public class DecisionTests
     }
 
     [Fact]
+    public void ThreatNearbyConsideration_AmbientWarPressureWithoutImmediateThreat_ReturnsZero()
+    {
+        var consideration = new ThreatNearbyConsideration(threatCap: 3);
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 2f,
+            Hunger: 24f,
+            Stamina: 70f,
+            HomeWood: 4,
+            HomeStone: 3,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 6,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 88f,
+            Strength: 12,
+            Defense: 10,
+            IsWarStance: true,
+            IsContestedTile: true,
+            IsWarriorRole: true,
+            LocalThreatScore: 0.35f,
+            AmbientThreatScore: 0.35f);
+
+        Assert.Equal(0f, consideration.Evaluate(context));
+    }
+
+    [Fact]
+    public void ThreatDecisionPolicy_AmbientWarPressureWithoutImmediateThreat_DoesNotPrioritizeDefense()
+    {
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 2f,
+            Hunger: 24f,
+            Stamina: 70f,
+            HomeWood: 4,
+            HomeStone: 3,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 8,
+            HomeHouseCount: 1,
+            HouseWoodCost: 50,
+            ColonyPopulation: 6,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: 90f,
+            Strength: 14,
+            Defense: 12,
+            IsWarStance: true,
+            IsContestedTile: true,
+            IsWarriorRole: true,
+            LocalThreatScore: 0.35f,
+            AmbientThreatScore: 0.35f);
+
+        Assert.False(ThreatDecisionPolicy.ShouldPrioritizeDefense(context));
+        Assert.False(ThreatDecisionPolicy.ShouldFight(context));
+    }
+
+    [Fact]
+    public void GoalSelector_AmbientWarPressureWithoutImmediateThreat_DoesNotSelectDefendSelf()
+    {
+        var goals = GoalLibrary.CreateDefaultGoals();
+        var planner = new SimplePlanner();
+        var selector = new GoalSelector();
+        var context = new NpcAiContext(
+            SimulationTimeSeconds: 3f,
+            Hunger: 14f,
+            Stamina: 84f,
+            HomeWood: 6,
+            HomeStone: 6,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 12,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            IsWarStance: true,
+            IsContestedTile: true,
+            IsWarriorRole: true,
+            HomeMilitaryTechCount: 0,
+            LocalThreatScore: 0.35f,
+            AmbientThreatScore: 0.35f);
+
+        var selection = selector.SelectGoal(goals, planner, context);
+
+        Assert.NotNull(selection.SelectedGoal);
+        Assert.NotEqual("DefendSelf", selection.SelectedGoal!.Name);
+        var defendScore = selection.Scores.Single(entry => entry.GoalName == "DefendSelf");
+        Assert.Equal(0f, defendScore.Score);
+    }
+
+    [Fact]
     public void ThreatDecisionPolicy_LowEquipmentHighThreat_AvoidsFight()
     {
         var context = new NpcAiContext(

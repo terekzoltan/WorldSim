@@ -112,6 +112,9 @@ public sealed class RuntimeNpcBrain
     }
 
     private NpcAiContext BuildContext(Person actor, World world)
+        => CreateContext(actor, world, _simulationTimeSeconds);
+
+    internal static NpcAiContext CreateContext(Person actor, World world, float simulationTimeSeconds)
     {
         var hunger = actor.Needs.TryGetValue("Hunger", out var value) ? value : 20f;
         var colonyPopulation = world._people.Count(person => person.Home == actor.Home && person.Health > 0f);
@@ -119,18 +122,21 @@ public sealed class RuntimeNpcBrain
         var warState = world.GetColonyWarState(colonyId);
         var isWarStance = warState == ColonyWarState.War;
         var isHostileStance = warState == ColonyWarState.Tense || isWarStance;
+        var threatSenseRadius = ThreatSenseRadius + actor.Home.ScoutRadiusBonus;
         var isContestedTile = world.IsTileContested(actor.Pos.x, actor.Pos.y);
         var hasContestedTilesNearby = HasContestedTilesNearby(world, actor.Pos, ContestedSenseRadius);
         var nearbyPredators = world._animals.Count(animal =>
             animal is Predator predator
             && predator.IsAlive
-            && Manhattan(actor.Pos, predator.Pos) <= ThreatSenseRadius);
+            && Manhattan(actor.Pos, predator.Pos) <= threatSenseRadius);
         var nearbyHostiles = world._people.Count(other =>
             other != actor
             && other.Health > 0f
             && IsEnemyFaction(world, actor, other)
-            && Manhattan(actor.Pos, other.Pos) <= ThreatSenseRadius);
+            && Manhattan(actor.Pos, other.Pos) <= threatSenseRadius);
         var nearbyEnemies = nearbyHostiles;
+        var hasImmediateThreat = nearbyPredators > 0 || nearbyHostiles > 0 || nearbyEnemies > 0;
+        var hasImmediateFactionThreat = nearbyHostiles > 0 || nearbyEnemies > 0;
         var hostileProximityScore = Math.Clamp(nearbyEnemies / 4f, 0f, 1f);
         var resourceCrowdPressure = ComputeResourceCrowdPressure(world, actor.Pos, radius: 5);
         var buildCrowdPressure = ComputeBuildCrowdPressure(world, actor.Home.Origin, actor.Home.Id);
@@ -145,14 +151,16 @@ public sealed class RuntimeNpcBrain
                 .Select(person => person.CombatMorale)
                 .DefaultIfEmpty(100f)
                 .Average();
-        var localThreatScore = ComputeThreatScore(
+        var directThreatScore = ComputeDirectThreatScore(
             nearbyPredators,
             nearbyHostiles,
-            nearbyEnemies,
+            nearbyEnemies);
+        var ambientThreatScore = ComputeAmbientThreatScore(
             isContestedTile,
             hasContestedTilesNearby,
             isHostileStance,
             isWarStance);
+        var localThreatScore = Math.Clamp(directThreatScore + ambientThreatScore, 0f, 1f);
         var isWarriorRole = IsWarriorRole(world, actor, colonyId, isHostileStance);
         var homeMilitaryTechCount = CountUnlockedTechs(actor.Home, MilitaryTechIds);
         var homeFortificationTechCount = CountUnlockedTechs(actor.Home, FortificationTechIds);
@@ -186,7 +194,7 @@ public sealed class RuntimeNpcBrain
             out var nearbyFriendlyWallCount);
 
         return new NpcAiContext(
-            SimulationTimeSeconds: _simulationTimeSeconds,
+            SimulationTimeSeconds: simulationTimeSeconds,
             Hunger: hunger,
             Stamina: actor.Stamina,
             HomeWood: actor.Home.Stock[Resource.Wood],
@@ -245,7 +253,11 @@ public sealed class RuntimeNpcBrain
             IsSiegeDefenderRole: isSiegeDefenderRole,
             IsRouting: actor.IsRouting,
             RoutingTicksRemaining: actor.RoutingTicksRemaining,
-            BackoffTicksRemaining: actor.BackoffTicksRemaining);
+            BackoffTicksRemaining: actor.BackoffTicksRemaining,
+            DirectThreatScore: directThreatScore,
+            AmbientThreatScore: ambientThreatScore,
+            HasImmediateThreat: hasImmediateThreat,
+            HasImmediateFactionThreat: hasImmediateFactionThreat);
     }
 
     private static int CountUnlockedTechs(Colony colony, IEnumerable<string> techIds)
@@ -341,19 +353,25 @@ public sealed class RuntimeNpcBrain
         return false;
     }
 
-    private static float ComputeThreatScore(
+    private static float ComputeDirectThreatScore(
         int nearbyPredators,
         int nearbyHostiles,
-        int nearbyEnemies,
+        int nearbyEnemies)
+    {
+        var score = 0f;
+        score += Math.Clamp(nearbyPredators / 3f, 0f, 1f) * 0.45f;
+        score += Math.Clamp(nearbyHostiles / 4f, 0f, 1f) * 0.55f;
+        score += Math.Clamp(nearbyEnemies / 4f, 0f, 1f) * 0.35f;
+        return Math.Clamp(score, 0f, 1f);
+    }
+
+    private static float ComputeAmbientThreatScore(
         bool isContestedTile,
         bool hasContestedTilesNearby,
         bool isHostileStance,
         bool isWarStance)
     {
         var score = 0f;
-        score += Math.Clamp(nearbyPredators / 3f, 0f, 1f) * 0.45f;
-        score += Math.Clamp(nearbyHostiles / 4f, 0f, 1f) * 0.55f;
-        score += Math.Clamp(nearbyEnemies / 4f, 0f, 1f) * 0.35f;
         if (hasContestedTilesNearby)
             score += 0.15f;
         if (isContestedTile)

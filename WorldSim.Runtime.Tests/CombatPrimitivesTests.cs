@@ -138,6 +138,7 @@ public class CombatPrimitivesTests
         // Pick one actor from colony 0 and one enemy from colony 1
         var actor = world._people.First(p => p.Home == world._colonies[0]);
         var enemy = world._people.First(p => p.Home == world._colonies[1]);
+        world.SetFactionStance(actor.Home.Faction, enemy.Home.Faction, WorldSim.Simulation.Diplomacy.Stance.Hostile);
 
         // Place them adjacent (Manhattan dist = 1, well within radius 4)
         actor.Pos = (6, 6);

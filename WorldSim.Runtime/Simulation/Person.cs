@@ -1097,7 +1097,7 @@ public class Person
             return false;
         }
 
-        bool hasImmediateThreats = context.NearbyPredators + context.NearbyHostilePeople > 0;
+        bool hasImmediateThreats = ThreatDecisionPolicy.HasImmediateThreat(context);
         bool shouldDefend = ThreatDecisionPolicy.ShouldPrioritizeDefense(context);
         if (!hasImmediateThreats && !shouldDefend)
             return false;
@@ -1111,14 +1111,8 @@ public class Person
                 next = ThreatDecisionPolicy.ShouldFight(context) ? Job.Fight : Job.Flee;
         }
 
-        bool hasFactionThreat =
-            context.NearbyEnemyCount > 0 ||
-            context.NearbyHostilePeople > 0 ||
-            context.IsWarStance ||
-            context.IsHostileStance ||
-            context.IsContestedTile ||
-            context.HasContestedTilesNearby;
-        if (hasFactionThreat && !context.IsWarriorRole)
+        bool hasImmediateFactionThreat = ThreatDecisionPolicy.HasImmediateFactionThreat(context);
+        if (hasImmediateFactionThreat && !context.IsWarriorRole)
             next = Job.Flee;
 
         Current = next;
@@ -1174,14 +1168,8 @@ public class Person
         }
 
         var threatContext = BuildThreatContext(w);
-        bool hasFactionThreat =
-            threatContext.NearbyEnemyCount > 0 ||
-            threatContext.NearbyHostilePeople > 0 ||
-            threatContext.IsWarStance ||
-            threatContext.IsHostileStance ||
-            threatContext.IsContestedTile ||
-            threatContext.HasContestedTilesNearby;
-        if (hasFactionThreat && !threatContext.IsWarriorRole)
+        bool hasImmediateFactionThreat = ThreatDecisionPolicy.HasImmediateFactionThreat(threatContext);
+        if (hasImmediateFactionThreat && !threatContext.IsWarriorRole)
         {
             ExecuteFleeAction(w);
             return;
@@ -1300,13 +1288,8 @@ public class Person
         }
 
         var threatContext = BuildThreatContext(w);
-        bool hasFactionThreat =
-            threatContext.IsHostileStance ||
-            threatContext.IsWarStance ||
-            threatContext.IsContestedTile ||
-            threatContext.HasContestedTilesNearby ||
-            threatContext.NearbyEnemyCount > 0 ||
-            threatContext.NearbyHostilePeople > 0;
+        bool hasFactionThreat = ThreatDecisionPolicy.HasAmbientWarPressure(threatContext)
+            || ThreatDecisionPolicy.HasImmediateFactionThreat(threatContext);
 
         bool useRefugeRing =
             hasFactionThreat &&
@@ -1692,112 +1675,7 @@ public class Person
 
     private NpcAiContext BuildThreatContext(World w)
     {
-        var sensingRadius = 4 + _home.ScoutRadiusBonus;
-        var nearbyPredators = CountNearbyPredators(w, radius: sensingRadius);
-        var nearbyHostiles = CountNearbyHostilePeople(w, radius: sensingRadius);
-        var colonyId = _home.Id;
-        var warState = w.GetColonyWarState(colonyId);
-        var isWarStance = warState == ColonyWarState.War;
-        var isHostileStance = warState == ColonyWarState.Tense || isWarStance;
-        var isContestedTile = w.IsTileContested(Pos.x, Pos.y);
-        var hasContestedTilesNearby = HasContestedTileNearby(w, radius: 2);
-        var nearbyEnemyCount = nearbyHostiles;
-        var hostileProximity = Math.Clamp(nearbyEnemyCount / 4f, 0f, 1f);
-        var homeMilitaryTechCount =
-            (_home.UnlockedTechs.Contains("weaponry") ? 1 : 0)
-            + (_home.UnlockedTechs.Contains("armor_smithing") ? 1 : 0)
-            + (_home.UnlockedTechs.Contains("military_training") ? 1 : 0)
-            + (_home.UnlockedTechs.Contains("war_drums") ? 1 : 0)
-            + (_home.UnlockedTechs.Contains("scouts") ? 1 : 0)
-            + (_home.UnlockedTechs.Contains("advanced_tactics") ? 1 : 0);
-        var homeFortificationTechCount =
-            (_home.UnlockedTechs.Contains("fortification") ? 1 : 0)
-            + (_home.UnlockedTechs.Contains("advanced_fortification") ? 1 : 0)
-            + (_home.UnlockedTechs.Contains("siege_craft") ? 1 : 0);
-        var activeSieges = w.GetActiveSieges();
-        var colonySieges = activeSieges
-            .Where(siege => siege.AttackerColonyId == colonyId || siege.DefenderColonyId == colonyId)
-            .ToList();
-        var nearSieges = colonySieges
-            .Where(siege => Math.Abs(siege.CenterX - Pos.x) + Math.Abs(siege.CenterY - Pos.y) <= 8)
-            .ToList();
-        var isColonyUnderSiege = colonySieges.Any(siege => siege.DefenderColonyId == colonyId);
-        var isNearActiveSiege = nearSieges.Count > 0;
-        var isSiegeAttackerRole = nearSieges.Any(siege => siege.AttackerColonyId == colonyId);
-        var isSiegeDefenderRole = nearSieges.Any(siege => siege.DefenderColonyId == colonyId);
-        var nearbySiegePressure = nearSieges.Count == 0
-            ? 0f
-            : Math.Clamp(nearSieges.Max(siege => siege.ActiveAttackerCount) / 8f, 0f, 1f);
-        var hasRecentBreachNearby = w.GetRecentBreaches().Any(breach =>
-            (breach.AttackerColonyId == colonyId || breach.DefenderColonyId == colonyId)
-            && Math.Abs(breach.X - Pos.x) + Math.Abs(breach.Y - Pos.y) <= 8);
-
-        CountNearbySiegeStructures(
-            w,
-            radius: 6,
-            out var nearbyEnemyDefensiveStructures,
-            out var nearbyEnemyTowerCount,
-            out var nearbyEnemyWallCount,
-            out var nearbyFriendlyTowerCount,
-            out var nearbyFriendlyWallCount);
-
-        var localThreat = Math.Clamp(
-            (nearbyPredators / 3f) * 0.45f +
-            (nearbyHostiles / 4f) * 0.55f +
-            (isContestedTile ? 0.2f : 0f) +
-            (hasContestedTilesNearby ? 0.15f : 0f) +
-            (isHostileStance ? 0.1f : 0f) +
-            (isWarStance ? 0.15f : 0f),
-            0f,
-            1f);
-
-        return new NpcAiContext(
-            SimulationTimeSeconds: 0f,
-            Hunger: Needs.GetValueOrDefault("Hunger", 0f),
-            Stamina: Stamina,
-            HomeWood: _home.Stock[Resource.Wood],
-            HomeStone: _home.Stock[Resource.Stone],
-            HomeIron: _home.Stock[Resource.Iron],
-            HomeGold: _home.Stock[Resource.Gold],
-            HomeFood: _home.Stock[Resource.Food],
-            HomeHouseCount: _home.HouseCount,
-            HouseWoodCost: _home.HouseWoodCost,
-            ColonyPopulation: w._people.Count(p => p.Home == _home && p.Health > 0f),
-            HouseCapacity: w.HouseCapacity,
-            StoneBuildingsEnabled: w.StoneBuildingsEnabled,
-            CanBuildWithStone: _home.CanBuildWithStone,
-            HouseStoneCost: _home.HouseStoneCost,
-            Health: Health,
-            Strength: Strength,
-            Defense: Defense,
-            NearbyPredators: nearbyPredators,
-            NearbyHostilePeople: nearbyHostiles,
-            IsWarStance: isWarStance,
-            IsHostileStance: isHostileStance,
-            IsContestedTile: isContestedTile,
-            HasContestedTilesNearby: hasContestedTilesNearby,
-            IsWarriorRole: IsWarriorRole(w),
-            NearbyEnemyCount: nearbyEnemyCount,
-            HostileProximityScore: hostileProximity,
-            LocalThreatScore: localThreat,
-            HomeWeaponLevel: _home.WeaponLevel,
-            HomeArmorLevel: _home.ArmorLevel,
-            HomeMilitaryTechCount: homeMilitaryTechCount,
-            HomeFortificationTechCount: homeFortificationTechCount,
-            IsColonyUnderSiege: isColonyUnderSiege,
-            IsNearActiveSiege: isNearActiveSiege,
-            HasRecentBreachNearby: hasRecentBreachNearby,
-            NearbyEnemyDefensiveStructures: nearbyEnemyDefensiveStructures,
-            NearbyEnemyTowerCount: nearbyEnemyTowerCount,
-            NearbyEnemyWallCount: nearbyEnemyWallCount,
-            NearbyFriendlyTowerCount: nearbyFriendlyTowerCount,
-            NearbyFriendlyWallCount: nearbyFriendlyWallCount,
-            NearbySiegePressure: nearbySiegePressure,
-            IsSiegeAttackerRole: isSiegeAttackerRole,
-            IsSiegeDefenderRole: isSiegeDefenderRole,
-            IsRouting: IsRouting,
-            RoutingTicksRemaining: RoutingTicksRemaining,
-            BackoffTicksRemaining: _backoffTicksRemaining);
+        return RuntimeNpcBrain.CreateContext(this, w, simulationTimeSeconds: 0f);
     }
 
     private void CountNearbySiegeStructures(

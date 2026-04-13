@@ -75,50 +75,27 @@ Do **not** jump directly to threat/goal weighting changes before rerunning the d
 
 ## 6. Decision Tree After The Rerun
 
-If fast-move now improves contact significantly:
+This decision tree is now resolved.
 
-- focus the next code fix on movement/contact realization,
-- including no-progress/backoff loops, crowd/path pressure, and contact initiation.
+The valid rerun established that fast-move still barely changes the bad lane, so the chosen next fix direction is:
 
-If fast-move still barely changes the bad lane:
-
-- focus the next code fix on shared threat weighting / `DefendSelf` dominance / `Fight` vs `Flee` arbitration,
+- shared threat weighting,
+- `DefendSelf` dominance,
+- `Fight` vs `Flee` arbitration,
 - and outward pressure suppression.
 
-## 7. SMR Analyst Rerun Brief
+Movement/contact speed is no longer the preferred first fix target for this slice.
 
-After the movement multiplier fix lands, rerun the same contact-realization decision package with the upgraded AI telemetry.
+## 7. Resolution
 
-Recommended reruns:
+The rerun has now been completed and interpreted.
 
-- `planner-compare-wave7-contact-realization-medium-002`
-- `planner-compare-wave7-contact-realization-standard-002`
+Current conclusion:
 
-Suggested matrix:
+- the `fastmove` perturbation is now valid,
+- but still does not materially improve the canonical bad lane,
+- so the next engineering step should target threat/defense/arbitration rather than basic move speed.
 
-- seed: `101`
-- planners: `simple,goap,htn`
-- ticks: `2400`
-- mode: `all`
-- drilldown: `true`
-- configs:
-  - `medium-default`
-  - `medium-fastmove`
-  - `standard-default`
-  - `standard-fastmove`
+The implementation source-of-truth for that next fix is:
 
-Primary interpretation fields:
-
-- `combatEngagements`
-- `battleTicks`
-- `ticksWithActiveBattle`
-- `combatDeaths`
-- `noProgressBackoffFlee`
-- `noProgressBackoffCombat`
-- `goalCounts`
-- `commandCounts`
-- `debugCauseCounts`
-- `targetKindCounts`
-- `latestDecision`
-
-The rerun is a decision run, not just another evidence run.
+- `Docs/Plans/Master/Post-Wave7-Threat-Arbitration-Fix-Plan.md`

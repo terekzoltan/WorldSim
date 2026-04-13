@@ -19,9 +19,30 @@ public static class ThreatDecisionPolicy
     public static bool IsCommanderCombatContext(in NpcAiContext context)
         => context.IsCommander && context.ActiveCombatGroupSize >= CommanderGroupMinSize;
 
+    public static bool HasImmediateThreat(in NpcAiContext context)
+        => context.HasImmediateThreat
+            || Math.Max(0, context.NearbyPredators) > 0
+            || Math.Max(0, context.NearbyHostilePeople) > 0
+            || Math.Max(0, context.NearbyEnemyCount) > 0;
+
+    public static bool HasImmediateFactionThreat(in NpcAiContext context)
+        => context.HasImmediateFactionThreat
+            || Math.Max(0, context.NearbyHostilePeople) > 0
+            || Math.Max(0, context.NearbyEnemyCount) > 0;
+
+    public static bool HasAmbientWarPressure(in NpcAiContext context)
+        => context.AmbientThreatScore > 0f
+            || context.IsWarStance
+            || context.IsHostileStance
+            || context.IsContestedTile
+            || context.HasContestedTilesNearby;
+
     public static bool ShouldCommanderInitiateRetreat(in NpcAiContext context)
     {
         if (!IsCommanderCombatContext(context))
+            return false;
+
+        if (!HasImmediateThreat(context) && !context.IsNearActiveSiege)
             return false;
 
         if (context.ActiveGroupAverageMorale <= CommanderRetreatMoraleThreshold)
@@ -60,10 +81,11 @@ public static class ThreatDecisionPolicy
             return true;
         if (context.RoutingTicksRemaining > RoutingReengageThresholdTicks)
             return true;
-        if (context.BackoffTicksRemaining > BackoffReengageThresholdTicks)
+        if (context.BackoffTicksRemaining > BackoffReengageThresholdTicks
+            && (HasImmediateThreat(context) || context.IsNearActiveSiege))
             return true;
 
-        if (context.ActiveCombatGroupSize >= 3)
+        if (context.ActiveCombatGroupSize >= 3 && (HasImmediateThreat(context) || context.IsNearActiveSiege))
         {
             if (context.ActiveGroupAverageMorale < 35f)
                 return true;
@@ -155,11 +177,7 @@ public static class ThreatDecisionPolicy
 
     public static bool IsPeacefulZeroSignal(in NpcAiContext context)
     {
-        if (Math.Max(0, context.NearbyPredators) > 0)
-            return false;
-        if (Math.Max(0, context.NearbyHostilePeople) > 0)
-            return false;
-        if (Math.Max(0, context.NearbyEnemyCount) > 0)
+        if (HasImmediateThreat(context))
             return false;
         if (context.IsWarStance || context.IsHostileStance)
             return false;
@@ -176,13 +194,10 @@ public static class ThreatDecisionPolicy
         if (IsPeacefulZeroSignal(context))
             return false;
 
-        if (Math.Max(0, context.NearbyPredators) > 0)
+        if (ShouldRetreatFromSiege(context) || ShouldSortie(context))
             return true;
 
-        if (context.LocalThreatScore >= 0.25f)
-            return true;
-
-        if ((context.IsWarStance || context.IsHostileStance) && (context.IsContestedTile || context.HasContestedTilesNearby))
+        if (HasImmediateThreat(context))
             return true;
 
         return false;
@@ -202,14 +217,7 @@ public static class ThreatDecisionPolicy
         if (ShouldCommanderInitiateRetreat(context))
             return false;
 
-        var hasFactionThreat =
-            context.NearbyEnemyCount > 0 ||
-            context.NearbyHostilePeople > 0 ||
-            context.IsWarStance ||
-            context.IsHostileStance ||
-            context.IsContestedTile ||
-            context.HasContestedTilesNearby;
-        if (hasFactionThreat && !context.IsWarriorRole)
+        if (HasImmediateFactionThreat(context) && !context.IsWarriorRole)
             return false;
 
         if (context.Health < BaseLowHealthThreshold)

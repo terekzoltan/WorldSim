@@ -238,6 +238,10 @@ public class RuntimeNpcBrainTests
         Assert.True(CapturingBrain.LastContext.Value.ResourceCrowdPressure > 0f);
         Assert.True(CapturingBrain.LastContext.Value.BuildCrowdPressure >= 0f);
         Assert.True(CapturingBrain.LastContext.Value.RetreatCrowdPressure >= 0f);
+        Assert.True(CapturingBrain.LastContext.Value.DirectThreatScore > 0f);
+        Assert.True(CapturingBrain.LastContext.Value.AmbientThreatScore > 0f);
+        Assert.True(CapturingBrain.LastContext.Value.HasImmediateThreat);
+        Assert.True(CapturingBrain.LastContext.Value.HasImmediateFactionThreat);
     }
 
     [Fact]
@@ -288,12 +292,55 @@ public class RuntimeNpcBrainTests
         world.Update(0.2f);
         world.Update(0.2f);
 
+        actor.Pos = (10, 10);
+        hostile.Pos = (11, 10);
+
         var brain = new RuntimeNpcBrain(new CapturingBrain());
         _ = brain.Think(actor, world, dt: 1f);
 
         Assert.NotNull(CapturingBrain.LastContext);
         Assert.True(CapturingBrain.LastContext.Value.IsContestedTile || CapturingBrain.LastContext.Value.HasContestedTilesNearby);
         Assert.True(CapturingBrain.LastContext.Value.LocalThreatScore > 0f);
+        Assert.True(CapturingBrain.LastContext.Value.AmbientThreatScore > 0f);
+    }
+
+    [Fact]
+    public void CreateContext_AmbientWarPressureWithoutImmediateThreat_SetsAmbientButNotImmediateThreat()
+    {
+        var world = new World(24, 24, 16, randomSeed: 77)
+        {
+            EnableCombatPrimitives = true,
+            EnableDiplomacy = true
+        };
+
+        world._animals.Clear();
+        var actor = world._people[0];
+        var hostileFaction = world._colonies.First(colony => colony.Faction != actor.Home.Faction);
+        world.DeclareWar(actor.Home.Faction, hostileFaction.Faction, out _, out _);
+        actor.Pos = (10, 10);
+
+        var allies = world._people.Where(person => person.Home == actor.Home).Take(4).ToList();
+        foreach (var ally in allies)
+            ally.Pos = (10, 10);
+
+        var enemyCluster = world._people.Where(person => person.Home.Faction == hostileFaction.Faction).Take(4).ToList();
+        var positions = new[] { (12, 10), (12, 11), (11, 10), (11, 11) };
+        for (var i = 0; i < enemyCluster.Count; i++)
+            enemyCluster[i].Pos = positions[i];
+
+        world.Update(0.25f);
+        world.Update(0.25f);
+
+        actor.Pos = (7, 10);
+        var context = RuntimeNpcBrain.CreateContext(actor, world, simulationTimeSeconds: 0f);
+
+        Assert.True(context.IsWarStance);
+        Assert.Equal(0, context.NearbyEnemyCount);
+        Assert.False(context.HasImmediateFactionThreat);
+        Assert.False(context.HasImmediateThreat);
+        Assert.Equal(0f, context.DirectThreatScore);
+        Assert.True(context.AmbientThreatScore > 0f);
+        Assert.True(context.LocalThreatScore > 0f);
     }
 
     [Fact]

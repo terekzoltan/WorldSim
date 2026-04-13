@@ -104,9 +104,14 @@ public sealed class ThreatNearbyConsideration : Consideration
 
     public override float Evaluate(in NpcAiContext context)
     {
-        var directThreats = Math.Max(0, context.NearbyPredators) + Math.Max(0, context.NearbyHostilePeople);
-        var directThreatScore = Math.Clamp(directThreats / (float)_threatCap, 0f, 1f);
-        return Math.Max(directThreatScore, Math.Clamp(context.LocalThreatScore, 0f, 1f));
+        var directThreatScore = context.DirectThreatScore;
+        if (directThreatScore <= 0f)
+        {
+            var directThreats = Math.Max(0, context.NearbyPredators) + Math.Max(0, Math.Max(context.NearbyHostilePeople, context.NearbyEnemyCount));
+            directThreatScore = Math.Clamp(directThreats / (float)_threatCap, 0f, 1f);
+        }
+
+        return Math.Clamp(directThreatScore, 0f, 1f);
     }
 }
 

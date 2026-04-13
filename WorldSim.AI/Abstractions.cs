@@ -81,7 +81,11 @@ public readonly record struct NpcAiContext(
     bool IsSiegeDefenderRole = false,
     bool IsRouting = false,
     int RoutingTicksRemaining = 0,
-    int BackoffTicksRemaining = 0);
+    int BackoffTicksRemaining = 0,
+    float DirectThreatScore = 0f,
+    float AmbientThreatScore = 0f,
+    bool HasImmediateThreat = false,
+    bool HasImmediateFactionThreat = false);
 
 public interface IPlanner
 {
