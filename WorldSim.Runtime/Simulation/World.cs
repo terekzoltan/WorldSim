@@ -135,6 +135,7 @@ namespace WorldSim.Simulation
         public float SiegeDamageMultiplier { get; set; } = 1f;
         public bool RequireFortificationTechUnlock { get; set; }
         public int NavigationTopologyVersion => _navigationTopologyVersion;
+        internal bool IsLargeCombatTopology => (Width * Height) >= 18000;
 
         public Season CurrentSeason { get; private set; } = Season.Spring;
         public bool IsDroughtActive { get; private set; }
@@ -178,6 +179,29 @@ namespace WorldSim.Simulation
         public int ActiveCombatGroupCount => _activeCombatGroups.Count;
         public int ActiveBattleCount => _activeBattles.Count;
         public int ActiveSiegeCount => _activeSieges.Count;
+
+        public ScenarioContactTelemetrySnapshot BuildScenarioContactTelemetrySnapshot()
+            => new(
+                HostileSensed: _totalHostileSensed,
+                PursueStarts: _totalPursueStarts,
+                AdjacentContacts: _totalAdjacentContacts,
+                FactionCombatDamageEvents: _totalFactionCombatDamageEvents,
+                FactionCombatDeaths: _totalFactionCombatDeaths,
+                RoutingStarts: _totalRoutingStarts,
+                BattlePairings: _totalBattlePairings,
+                BattleTicksWithDamage: _totalBattleTicksWithDamage,
+                BattleTicksWithDeaths: _totalBattleTicksWithDeaths,
+                RoutingBeforeDamage: _totalRoutingBeforeDamage,
+                FirstHostileSenseTick: _firstHostileSenseTick,
+                FirstPursueTick: _firstPursueTick,
+                FirstAdjacentContactTick: _firstAdjacentContactTick,
+                FirstFactionCombatDamageTick: _firstFactionCombatDamageTick,
+                FirstFactionCombatDeathTick: _firstFactionCombatDeathTick,
+                FirstBattlePairingTick: _firstBattlePairingTick,
+                FirstBattleDamageTick: _firstBattleDamageTick,
+                FirstBattleDeathTick: _firstBattleDeathTick,
+                FirstRoutingTick: _firstRoutingTick,
+                FirstRoutingBeforeDamageTick: _firstRoutingBeforeDamageTick);
 
         public ScenarioAiTelemetrySnapshot BuildScenarioAiTelemetrySnapshot()
         {
@@ -265,6 +289,81 @@ namespace WorldSim.Simulation
                 : value.Trim();
         }
 
+        private void RecordContactFirstTick(ref int? firstTick)
+        {
+            if (!firstTick.HasValue)
+                firstTick = CurrentTick;
+        }
+
+        internal void ReportContactHostileSensed(Person actor)
+        {
+            if (!_contactHostileSensedActorsThisTick.Add(actor.Id))
+                return;
+
+            _totalHostileSensed++;
+            RecordContactFirstTick(ref _firstHostileSenseTick);
+        }
+
+        internal void ReportContactPursueStart(Person actor)
+        {
+            if (!_contactPursueActorsThisTick.Add(actor.Id))
+                return;
+
+            _totalPursueStarts++;
+            RecordContactFirstTick(ref _firstPursueTick);
+        }
+
+        internal void ReportContactAdjacentContact(Person actor)
+        {
+            if (!_contactAdjacentActorsThisTick.Add(actor.Id))
+                return;
+
+            _totalAdjacentContacts++;
+            RecordContactFirstTick(ref _firstAdjacentContactTick);
+        }
+
+        internal void ReportContactFactionCombatDamage()
+        {
+            _totalFactionCombatDamageEvents++;
+            RecordContactFirstTick(ref _firstFactionCombatDamageTick);
+        }
+
+        internal void ReportContactFactionCombatDeath()
+        {
+            _totalFactionCombatDeaths++;
+            RecordContactFirstTick(ref _firstFactionCombatDeathTick);
+        }
+
+        internal void ReportContactRoutingStart()
+        {
+            _totalRoutingStarts++;
+            RecordContactFirstTick(ref _firstRoutingTick);
+        }
+
+        internal void ReportContactBattlePairing()
+        {
+            _totalBattlePairings++;
+            RecordContactFirstTick(ref _firstBattlePairingTick);
+        }
+
+        internal void ReportContactBattleTickWithDamage()
+        {
+            _totalBattleTicksWithDamage++;
+            RecordContactFirstTick(ref _firstBattleDamageTick);
+        }
+
+        internal void ReportContactBattleTickWithDeath()
+        {
+            _totalBattleTicksWithDeaths++;
+            RecordContactFirstTick(ref _firstBattleDeathTick);
+        }
+
+        internal void ReportContactRoutingBeforeDamage()
+        {
+            _totalRoutingBeforeDamage++;
+            RecordContactFirstTick(ref _firstRoutingBeforeDamageTick);
+        }
+
         readonly Random _rng;
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
         readonly List<string> _recentEvents = new();
@@ -286,6 +385,9 @@ namespace WorldSim.Simulation
         readonly List<RuntimeCombatGroup> _activeCombatGroups = new();
         readonly List<RuntimeBattleState> _activeBattles = new();
         readonly List<RuntimeSiegeState> _activeSieges = new();
+        readonly HashSet<int> _contactHostileSensedActorsThisTick = new();
+        readonly HashSet<int> _contactPursueActorsThisTick = new();
+        readonly HashSet<int> _contactAdjacentActorsThisTick = new();
         readonly List<RuntimeBreachState> _recentBreaches = new();
         readonly List<RuntimeSiegePressure> _siegePressureThisTick = new();
         readonly Dictionary<(int attackerColonyId, int defenderColonyId), RuntimeSiegeSession> _siegeSessions = new();
@@ -303,6 +405,26 @@ namespace WorldSim.Simulation
         float _professionRebalanceTimer;
         float _specializedBuildTimer;
         float _foodParityTimer;
+        int _totalHostileSensed;
+        int _totalPursueStarts;
+        int _totalAdjacentContacts;
+        int _totalFactionCombatDamageEvents;
+        int _totalFactionCombatDeaths;
+        int _totalRoutingStarts;
+        int _totalBattlePairings;
+        int _totalBattleTicksWithDamage;
+        int _totalBattleTicksWithDeaths;
+        int _totalRoutingBeforeDamage;
+        int? _firstHostileSenseTick;
+        int? _firstPursueTick;
+        int? _firstAdjacentContactTick;
+        int? _firstFactionCombatDamageTick;
+        int? _firstFactionCombatDeathTick;
+        int? _firstBattlePairingTick;
+        int? _firstBattleDamageTick;
+        int? _firstBattleDeathTick;
+        int? _firstRoutingTick;
+        int? _firstRoutingBeforeDamageTick;
 
         const float SeasonDurationSeconds = 90f;
         const float DroughtDurationSeconds = 35f;
@@ -424,6 +546,9 @@ namespace WorldSim.Simulation
             _tickCounter++;
             _softReservations.Clear();
             _siegePressureThisTick.Clear();
+            _contactHostileSensedActorsThisTick.Clear();
+            _contactPursueActorsThisTick.Clear();
+            _contactAdjacentActorsThisTick.Clear();
             _simulationTimeSeconds += Math.Max(0f, dt);
             _domainModifierEngine.Tick();
             _goalBiasEngine.Tick();
@@ -1286,6 +1411,7 @@ namespace WorldSim.Simulation
                 left.BattleId = battle.BattleId;
                 right.BattleId = battle.BattleId;
                 _activeBattles.Add(battle);
+                ReportContactBattlePairing();
 
                 foreach (var member in left.Members)
                     member.SetCombatAssignment(left.GroupId, battle.BattleId, left.Formation, isCommander: ReferenceEquals(member, left.Commander));
@@ -1444,6 +1570,8 @@ namespace WorldSim.Simulation
                 return;
 
             battle.ElapsedTicks++;
+            battle.HadDamageThisTick = false;
+            battle.HadDeathThisTick = false;
 
             var leftAttack = GroupCombatResolver.ComputeGroupAttackScore(
                 battle.Left.StrengthScore,
@@ -1480,13 +1608,21 @@ namespace WorldSim.Simulation
                 right.MarkCombatPresence(this);
 
                 var leftDamage = GroupCombatResolver.ComputePerHitDamage(_rng, leftAttack, rightDefense, leftMembers.Count, rightMembers.Count);
+                var rightWasAlive = right.Health > 0f;
                 right.ApplyCombatDamage(this, left.ScaleOutgoingCombatDamage(this, leftDamage), "GroupCombat");
+                battle.HadDamageThisTick = true;
+                if (rightWasAlive && right.Health <= 0f)
+                    battle.HadDeathThisTick = true;
                 ReportCombatEngagement();
 
                 if (right.Health > 0f && _rng.NextDouble() < 0.65)
                 {
                     var rightDamage = GroupCombatResolver.ComputePerHitDamage(_rng, rightAttack, leftDefense, rightMembers.Count, leftMembers.Count);
+                    var leftWasAlive = left.Health > 0f;
                     left.ApplyCombatDamage(this, right.ScaleOutgoingCombatDamage(this, rightDamage), "GroupCombat");
+                    battle.HadDamageThisTick = true;
+                    if (leftWasAlive && left.Health <= 0f)
+                        battle.HadDeathThisTick = true;
                     ReportCombatEngagement();
                 }
 
@@ -1505,8 +1641,13 @@ namespace WorldSim.Simulation
             else if (battle.Right.StrengthScore > battle.Left.StrengthScore * 1.8f)
                 ApplyBattleMoraleShift(battle.Left, ownLosses: 1, enemyLosses: 0);
 
-            TryStartRouting(battle.Left);
-            TryStartRouting(battle.Right);
+            if (battle.HadDamageThisTick)
+                ReportContactBattleTickWithDamage();
+            if (battle.HadDeathThisTick)
+                ReportContactBattleTickWithDeath();
+
+            TryStartRouting(battle, battle.Left);
+            TryStartRouting(battle, battle.Right);
         }
 
         private static void ApplyBattleMoraleShift(RuntimeCombatGroup group, int ownLosses, int enemyLosses)
@@ -1526,7 +1667,7 @@ namespace WorldSim.Simulation
             }
         }
 
-        private void TryStartRouting(RuntimeCombatGroup group)
+        private void TryStartRouting(RuntimeBattleState battle, RuntimeCombatGroup group)
         {
             if (group.Members.Count == 0)
                 return;
@@ -1539,7 +1680,12 @@ namespace WorldSim.Simulation
             {
                 if (member.Health <= 0f)
                     continue;
-                member.BeginRouting(6 + _rng.Next(0, 3), origin: group.Anchor);
+                if (!member.BeginRouting(6 + _rng.Next(0, 3), origin: group.Anchor))
+                    continue;
+
+                ReportContactRoutingStart();
+                if (!battle.HadDamageThisTick)
+                    ReportContactRoutingBeforeDamage();
             }
         }
 

@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-04-04
+Last updated: 2026-04-14
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -1417,6 +1417,11 @@ Purpose:
 - Lock the default runtime/render path to a cheap, profile-aware baseline so later campaign growth does not silently assume showcase-only costs.
 - Keep visual polish, post-fx, and cinematic capture additive on top of the baseline instead of redefining it.
 
+Wave 7.5 alignment note:
+- Track A should treat `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md` and `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Sprint3-Execution-Plan.md` as reference inputs for profile naming, terrain/atmosphere direction, HUD/settings surface shape, and additive polish boundaries.
+- Wave 7.5 remains the authority for sequencing and baseline policy: `DevLite` first, `Showcase` additive, `Headless` preserved.
+- If the older Track A Phase 1 docs conflict with Wave 7.5 low-cost constraints or current post-Wave7 Track A reality, Wave 7.5 wins and the older docs must not be executed literally without a later refresh.
+
 ### Sprint LC1: Profiles + Visual Driver Boundary (Track B -> A -> C)
 
 - ⬜ **LC1-B1** Snapshot visual-driver field audit + minimal additive export set for state-driven rendering (Track B)
@@ -1463,6 +1468,7 @@ Acceptance notes:
 Proof targets:
 - Runtime/snapshot docs and tests for the chosen visual-driver fields.
 - Track A smoke checks covering `Showcase`, `DevLite`, and `Headless` profile behavior.
+- Track A smoke/checklist updates should absorb any still-valid checks from `WorldSim.Graphics/Docs/Plans/Phase1-Sprint3-Smoke-Checklist.md`, but only after updating hotkeys and expectations to the post-Wave7 baseline.
 - Perf/QA evidence showing the default path stays cheap enough for multi-instance/dev workflows.
 
 **Parallelism:** `LC1-B1` is the gate. After that, `LC1-B2` and `LC1-A1` run in parallel. After `LC1-B2 + LC1-A1`, `LC1-A2` and `LC1-C1` can run in parallel, and `LC1-A3` closes the wave after the final Track A baseline is stable.
@@ -1858,7 +1864,13 @@ Wave 10.5 policy note:
 | Wave 7 complete + telemetry/operator readability follow-up desired | Wave 7.1 telemetry/operator cleanup kickoff | `Docs/Plans/Master/Post-Wave7-Telemetry-Operator-UX-Cleanup-Plan.md` |
 | Wave 7 complete | Low-Cost 2D alignment / Wave 7.5 kickoff | `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` |
 | Wave 7 complete + TR1-C consult note locked | Tools.Refinery TR2 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
+| Wave 10 complete + Track A polish bandwidth available | Track A visual overhaul refresh triage | `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md` |
 | Wave 10 complete + Wave 8.5 complete | Tools.Refinery TR3 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
+
+Track A deferred-reference note:
+- The Wave 10 visual-overhaul trigger is a refresh/triage point, not approval to execute the old Track A Phase 1 docs as-is.
+- When this trigger is used, also read `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Sprint3-Execution-Plan.md` and `WorldSim.Graphics/Docs/Plans/Phase1-Sprint3-Smoke-Checklist.md`.
+- Those docs should be treated as reference-only until refreshed against the completed Wave 7.5 baseline and the post-Wave10 combat/campaign Track A surface.
 
 ---
 

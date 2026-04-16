@@ -234,6 +234,7 @@ static ScenarioRunResult BuildRunResult(
     var perfMaxTickMs = 0d;
     var perfP99TickMs = 0d;
     var perfPeakEntities = 0L;
+    var contactTelemetry = world.BuildScenarioContactTelemetrySnapshot();
     var aiTelemetry = world.BuildScenarioAiTelemetrySnapshot();
     if (tickTimesMs is { Count: > 0 })
     {
@@ -295,6 +296,7 @@ static ScenarioRunResult BuildRunResult(
         AiResearchTechDecisions: world.TotalAiResearchTechDecisions,
         DenseNeighborhoodTicks: world.DenseNeighborhoodTicks,
         LastTickDenseActors: world.LastTickDenseActors,
+        Contact: contactTelemetry,
         Ai: aiTelemetry,
         PerfAvgTickMs: perfAvgTickMs,
         PerfMaxTickMs: perfMaxTickMs,
@@ -1183,6 +1185,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
         .Select(person => person.CombatMorale)
         .DefaultIfEmpty(100f)
         .Min();
+    var contactTelemetry = world.BuildScenarioContactTelemetrySnapshot().ToTimelineSnapshot();
     var aiTelemetry = world.BuildScenarioAiTelemetrySnapshot().ToTimelineSnapshot();
 
     return new ScenarioTimelineSample(
@@ -1204,6 +1207,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
         AiNoPlanDecisions: world.TotalAiNoPlanDecisions,
         AiReplanBackoffDecisions: world.TotalAiReplanBackoffDecisions,
         AiResearchTechDecisions: world.TotalAiResearchTechDecisions,
+        Contact: contactTelemetry,
         Ai: aiTelemetry,
         PerfTickMs: perfTickMs);
 }
@@ -1516,6 +1520,7 @@ sealed record ScenarioRunResult(
     int AiResearchTechDecisions,
     int DenseNeighborhoodTicks,
     int LastTickDenseActors,
+    ScenarioContactTelemetrySnapshot Contact,
     ScenarioAiTelemetrySnapshot Ai,
     double PerfAvgTickMs,
     double PerfMaxTickMs,
@@ -1694,6 +1699,7 @@ sealed record ScenarioTimelineSample(
     int AiNoPlanDecisions,
     int AiReplanBackoffDecisions,
     int AiResearchTechDecisions,
+    ScenarioContactTimelineSnapshot Contact,
     ScenarioAiTimelineSnapshot Ai,
     double PerfTickMs);
 

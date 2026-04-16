@@ -1182,7 +1182,7 @@ public class Person
             return;
         }
 
-        if (TryAttackOrPursueHostilePerson(w, radius: EngageChaseRadius, switchToFight: false, pursuitCause: "fight_chase"))
+        if (TryAttackOrPursueHostilePerson(w, radius: GetCombatChaseRadius(w, EngageChaseRadius), switchToFight: false, pursuitCause: "fight_chase"))
             return;
 
         if (TryPursueRecentHostile(w))
@@ -1604,7 +1604,7 @@ public class Person
             return;
         }
 
-        if (TryAttackOrPursueHostilePerson(w, radius: RaidContactRadius, switchToFight: true, pursuitCause: "raid_engage_enemy"))
+        if (TryAttackOrPursueHostilePerson(w, radius: GetCombatChaseRadius(w, RaidContactRadius), switchToFight: true, pursuitCause: "raid_engage_enemy"))
             return;
 
         if (TryPursueRecentHostile(w, debugCause: "raid_pursue_recent_hostile"))
@@ -2064,12 +2064,19 @@ public class Person
         return recentHostile || recentCombat;
     }
 
+    private static int GetCombatChaseRadius(World world, int baseRadius)
+        => baseRadius + (world.IsLargeCombatTopology ? 2 : 0);
+
+    private static int GetRecentHostilePursuitRadius(World world)
+        => RecentHostilePursuitRadius + (world.IsLargeCombatTopology ? 2 : 0);
+
     private bool TryAttackOrPursueHostilePerson(World w, int radius, bool switchToFight, string pursuitCause)
     {
         var hostilePerson = FindNearestHostilePerson(w, radius);
         if (hostilePerson == null)
             return false;
 
+        w.ReportContactHostileSensed(this);
         RememberHostileContact(w, hostilePerson.Value.person);
         if (switchToFight)
         {
@@ -2080,6 +2087,7 @@ public class Person
         int hostileDist = hostilePerson.Value.dist;
         if (hostileDist > 1)
         {
+            w.ReportContactPursueStart(this);
             DebugDecisionCause = pursuitCause;
             DebugTargetKey = $"move:{hostilePerson.Value.person.Pos.x}:{hostilePerson.Value.person.Pos.y}";
             _trackNoProgressForCurrentMove = true;
@@ -2088,6 +2096,7 @@ public class Person
             return true;
         }
 
+        w.ReportContactAdjacentContact(this);
         EngageHostilePerson(w, hostilePerson.Value.person);
         return true;
     }
@@ -2120,7 +2129,7 @@ public class Person
             {
                 _recentHostilePos = actor.Pos;
                 var actorDistance = Math.Abs(actor.Pos.x - Pos.x) + Math.Abs(actor.Pos.y - Pos.y);
-                if (actorDistance <= RecentHostilePursuitRadius)
+                if (actorDistance <= GetRecentHostilePursuitRadius(w))
                 {
                     target = actor.Pos;
                     return true;
@@ -2129,7 +2138,7 @@ public class Person
         }
 
         var distance = Math.Abs(_recentHostilePos.x - Pos.x) + Math.Abs(_recentHostilePos.y - Pos.y);
-        if (distance == 0 || distance > RecentHostilePursuitRadius)
+        if (distance == 0 || distance > GetRecentHostilePursuitRadius(w))
         {
             target = default;
             return false;
@@ -2247,12 +2256,19 @@ public class Person
         if (amount <= 0f || Health <= 0f)
             return;
 
+        bool isFactionCombat = string.Equals(source, "FactionCombat", StringComparison.Ordinal);
         float adjusted = amount * GetIncomingCombatDamageMultiplier(world);
         Health -= adjusted;
         EnterCombat(world);
         ApplyMoraleDelta(-(adjusted * 0.08f));
+        if (isFactionCombat)
+            world.ReportContactFactionCombatDamage();
         if (Health <= 0f)
+        {
             LastDeathReason = PersonDeathReason.Combat;
+            if (isFactionCombat)
+                world.ReportContactFactionCombatDeath();
+        }
     }
 
     private void EnterCombat(World? world)
@@ -2291,8 +2307,9 @@ public class Person
         CombatMorale = Math.Clamp(CombatMorale + adjusted, 0f, 100f);
     }
 
-    public void BeginRouting(int ticks, (int x, int y)? origin = null)
+    public bool BeginRouting(int ticks, (int x, int y)? origin = null)
     {
+        bool wasRouting = IsRouting;
         RoutingTicksRemaining = Math.Max(RoutingTicksRemaining, ticks);
         IsRouting = RoutingTicksRemaining > 0;
         _routingOrigin = origin;
@@ -2300,6 +2317,7 @@ public class Person
             Current = Job.Flee;
 
         SetCombatAssignment(null, null, AssignedFormation, isCommander: false);
+        return !wasRouting && IsRouting;
     }
 
     public void MarkCombatPresence(World world)

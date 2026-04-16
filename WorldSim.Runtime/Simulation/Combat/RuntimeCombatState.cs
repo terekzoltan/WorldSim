@@ -66,6 +66,8 @@ internal sealed class RuntimeBattleState
     public RuntimeCombatGroup Right { get; }
     public int ElapsedTicks { get; set; }
     public int Intensity { get; set; }
+    public bool HadDamageThisTick { get; set; }
+    public bool HadDeathThisTick { get; set; }
 
     public int Radius
     {

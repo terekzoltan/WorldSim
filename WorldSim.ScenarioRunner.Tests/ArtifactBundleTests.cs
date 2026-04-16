@@ -51,6 +51,9 @@ public sealed class ArtifactBundleTests
             Assert.True(runDoc.RootElement.TryGetProperty("aiNoPlanDecisions", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("aiReplanBackoffDecisions", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("aiResearchTechDecisions", out _));
+            Assert.True(runDoc.RootElement.TryGetProperty("contact", out var contactTelemetry));
+            Assert.True(contactTelemetry.TryGetProperty("hostileSensed", out _));
+            Assert.True(contactTelemetry.TryGetProperty("routingBeforeDamage", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("ai", out var aiTelemetry));
             Assert.True(aiTelemetry.TryGetProperty("goalCounts", out _));
             Assert.True(aiTelemetry.TryGetProperty("targetKindCounts", out _));

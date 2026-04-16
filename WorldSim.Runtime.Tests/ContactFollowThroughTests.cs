@@ -89,9 +89,79 @@ public sealed class ContactFollowThroughTests
         Assert.True(world.TotalBattleTicks > 0, "Expected combat groups with follow-through intent to pair into a battle.");
     }
 
-    private static World CreateCombatWorld(int seed)
+    [Fact]
+    public void LargeTopology_FightAction_PursuesHostileAtExtendedDistance()
     {
-        var world = new World(width: 32, height: 20, initialPop: 24, randomSeed: seed)
+        var world = CreateCombatWorld(width: 192, height: 108, initialPop: 24, seed: 9304);
+        var fighter = world._people.First(person => person.Home == world._colonies[0]);
+        var enemy = world._people.First(person => person.Home == world._colonies[1]);
+
+        fighter.Profession = Profession.Hunter;
+        fighter.Pos = (10, 10);
+        enemy.Pos = (18, 10);
+        FreezeNonParticipants(world, fighter, enemy);
+
+        SetJobTicks(fighter, Job.Fight, 1);
+        SetJobTicks(enemy, Job.Rest, 50);
+        world.Update(0.25f);
+
+        var telemetry = world.BuildScenarioContactTelemetrySnapshot();
+        Assert.Equal(1, telemetry.HostileSensed);
+        Assert.Equal(1, telemetry.PursueStarts);
+    }
+
+    [Fact]
+    public void MediumTopology_FightAction_DoesNotUseExtendedChaseRadius()
+    {
+        var world = CreateCombatWorld(width: 128, height: 72, initialPop: 24, seed: 9305);
+        var fighter = world._people.First(person => person.Home == world._colonies[0]);
+        var enemy = world._people.First(person => person.Home == world._colonies[1]);
+
+        fighter.Profession = Profession.Hunter;
+        fighter.Pos = (10, 10);
+        enemy.Pos = (18, 10);
+        FreezeNonParticipants(world, fighter, enemy);
+
+        SetJobTicks(fighter, Job.Fight, 1);
+        SetJobTicks(enemy, Job.Rest, 50);
+        world.Update(0.25f);
+
+        var telemetry = world.BuildScenarioContactTelemetrySnapshot();
+        Assert.Equal(0, telemetry.HostileSensed);
+        Assert.Equal(0, telemetry.PursueStarts);
+    }
+
+    [Fact]
+    public void LargeTopology_PursuesRecentHostileAcrossExtendedMemoryRadius()
+    {
+        var world = CreateCombatWorld(width: 192, height: 108, initialPop: 24, seed: 9306);
+        var fighter = world._people.First(person => person.Home == world._colonies[0]);
+        var enemy = world._people.First(person => person.Home == world._colonies[1]);
+
+        fighter.Profession = Profession.Hunter;
+        fighter.Pos = (10, 10);
+        enemy.Pos = (16, 10);
+        FreezeNonParticipants(world, fighter, enemy);
+
+        SetJobTicks(fighter, Job.Fight, 1);
+        SetJobTicks(enemy, Job.Rest, 50);
+        world.Update(0.25f);
+
+        enemy.Pos = (23, 10);
+        SetJobTicks(fighter, Job.Fight, 1);
+        SetJobTicks(enemy, Job.Rest, 50);
+        var beforeSecond = fighter.Pos;
+        world.Update(0.25f);
+
+        Assert.True(fighter.Pos.x > beforeSecond.x, $"Expected pursue of recent hostile across extended large-topology radius. before={beforeSecond} after={fighter.Pos}");
+    }
+
+    private static World CreateCombatWorld(int seed)
+        => CreateCombatWorld(width: 32, height: 20, initialPop: 24, seed);
+
+    private static World CreateCombatWorld(int width, int height, int initialPop, int seed)
+    {
+        var world = new World(width: width, height: height, initialPop: initialPop, randomSeed: seed)
         {
             EnableCombatPrimitives = true,
             EnableDiplomacy = false
@@ -122,4 +192,5 @@ public sealed class ContactFollowThroughTests
         Assert.NotNull(field);
         field!.SetValue(person, ticks);
     }
+
 }
