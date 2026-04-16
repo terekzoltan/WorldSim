@@ -33,6 +33,7 @@ public sealed class HudRenderer
         SpriteFont font,
         WorldRenderSnapshot snapshot,
         string operatorSummary,
+        string operatorProfile,
         string operatorDebugDetail,
         string operatorFailureDetail,
         string plannerStatus,
@@ -71,9 +72,6 @@ public sealed class HudRenderer
 
         var directorExtraLines = 0;
         if (hasDirectorData)
-            directorExtraLines += 1;
-
-        if (!string.IsNullOrWhiteSpace(operatorFailureDetail))
             directorExtraLines += 1;
 
         if (showAiDebug)
@@ -119,9 +117,10 @@ public sealed class HudRenderer
         y = _colonyPanel.Draw(spriteBatch, font, snapshot.Colonies, leftX, y, contentWidth, Theme);
         y = _ecologyPanel.Draw(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, Theme);
         y = DrawSiegeStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth);
-        y = DrawDirectorStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, showAiDebug, operatorFailureDetail);
+        y = DrawDirectorStatus(spriteBatch, pixel, font, snapshot, leftX, y + 4, contentWidth, showAiDebug, operatorFailureDetail);
         y = _eventFeed.Draw(spriteBatch, font, snapshot.RecentEvents.Take(visibleEventCount).ToList(), leftX, y + 4, contentWidth, Theme);
         y = TextWrap.DrawWrapped(spriteBatch, font, operatorSummary, new Vector2(leftX, y + 10), Theme.StatusText, contentWidth, 20);
+        y = DrawOperatorStatusChips(spriteBatch, pixel, font, snapshot.Director, operatorProfile, leftX, y + 2, contentWidth);
 
         if (showAiDebug && !string.IsNullOrWhiteSpace(operatorDebugDetail))
             y = TextWrap.DrawWrapped(spriteBatch, font, operatorDebugDetail, new Vector2(leftX, y), Theme.SecondaryText, contentWidth, 20);
@@ -139,8 +138,98 @@ public sealed class HudRenderer
             _aiDebugPanel.Draw(spriteBatch, font, aiDebug, snapshot, viewportWidth, Theme, aiDebugCompact, aiScoreOffset, aiHistoryOffset);
     }
 
+    private int DrawOperatorStatusChips(
+        SpriteBatch spriteBatch,
+        Texture2D pixel,
+        SpriteFont font,
+        DirectorRenderState state,
+        string operatorProfile,
+        int startX,
+        int startY,
+        int maxWidth)
+    {
+        var chips = new[]
+        {
+            ($"apply:{state.ApplyStatus}", GetApplyChipColor(state.ApplyStatus)),
+            ($"mode:{state.OutputMode}", Theme.DirectorEventText),
+            ($"profile:{CompactId(operatorProfile, 18)}", Theme.PanelBorder)
+        };
+
+        var x = startX;
+        var y = startY;
+        var lineHeight = 20;
+        var rightEdge = startX + maxWidth;
+
+        foreach (var (label, color) in chips)
+        {
+            var chipWidth = Math.Max(42, (int)font.MeasureString(label).X + 12);
+            if (x + chipWidth > rightEdge)
+            {
+                x = startX;
+                y += lineHeight;
+            }
+
+            var rect = new Rectangle(x, y + 2, chipWidth, 16);
+            var background = color * 0.22f;
+            spriteBatch.Draw(pixel, rect, background);
+            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, rect.Width, 1), color);
+            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1), color);
+            spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, 1, rect.Height), color);
+            spriteBatch.Draw(pixel, new Rectangle(rect.Right - 1, rect.Y, 1, rect.Height), color);
+            spriteBatch.DrawString(font, label, new Vector2(x + 6, y), Color.White);
+
+            x += chipWidth + 6;
+        }
+
+        return y + lineHeight;
+    }
+
+    private int DrawProgressBar(
+        SpriteBatch spriteBatch,
+        Texture2D pixel,
+        SpriteFont font,
+        string label,
+        float ratio,
+        Color fill,
+        int startX,
+        int startY,
+        int maxWidth)
+    {
+        var clampedRatio = Math.Clamp(ratio, 0f, 1f);
+        var y = TextWrap.DrawWrapped(spriteBatch, font, label, new Vector2(startX, startY), Theme.SecondaryText, maxWidth, 18);
+
+        const int barHeight = 8;
+        var barY = y + 2;
+        var barWidth = Math.Min(240, Math.Max(120, maxWidth - 10));
+        var rect = new Rectangle(startX, barY, barWidth, barHeight);
+        spriteBatch.Draw(pixel, rect, Theme.PanelBorder * 0.25f);
+
+        var fillWidth = Math.Clamp((int)Math.Round(barWidth * clampedRatio), 0, barWidth);
+        if (fillWidth > 0)
+            spriteBatch.Draw(pixel, new Rectangle(startX, barY, fillWidth, barHeight), fill);
+
+        spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, rect.Width, 1), Theme.PanelBorder);
+        spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Bottom - 1, rect.Width, 1), Theme.PanelBorder);
+        spriteBatch.Draw(pixel, new Rectangle(rect.X, rect.Y, 1, rect.Height), Theme.PanelBorder);
+        spriteBatch.Draw(pixel, new Rectangle(rect.Right - 1, rect.Y, 1, rect.Height), Theme.PanelBorder);
+
+        return barY + barHeight + 6;
+    }
+
+    private Color GetApplyChipColor(string applyStatus)
+    {
+        return applyStatus switch
+        {
+            "applied" => Theme.SuccessText,
+            "apply_failed" => Theme.WarningText,
+            "request_failed" => Theme.WarningText,
+            _ => Theme.StatusText
+        };
+    }
+
     private int DrawDirectorStatus(
         SpriteBatch spriteBatch,
+        Texture2D pixel,
         SpriteFont font,
         WorldRenderSnapshot snapshot,
         int startX,
@@ -163,6 +252,21 @@ public sealed class HudRenderer
             Theme.SecondaryText,
             maxWidth,
             18);
+
+        if (directive != null && directive.TotalTicks > 0)
+        {
+            var directiveRatio = directive.RemainingTicks / (float)Math.Max(1, directive.TotalTicks);
+            y = DrawProgressBar(
+                spriteBatch,
+                pixel,
+                font,
+                $"Directive remaining: {directive.RemainingTicks}/{directive.TotalTicks}t",
+                directiveRatio,
+                Theme.DirectorEventText,
+                startX,
+                y,
+                maxWidth);
+        }
 
         if (!string.IsNullOrWhiteSpace(operatorFailureDetail))
         {
@@ -225,10 +329,23 @@ public sealed class HudRenderer
             var usedPct = state.MaxInfluenceBudget > 0d
                 ? (state.LastCheckpointBudgetUsed / state.MaxInfluenceBudget) * 100d
                 : 0d;
+            var budgetRatio = state.MaxInfluenceBudget > 0d
+                ? (float)(state.LastCheckpointBudgetUsed / state.MaxInfluenceBudget)
+                : 0f;
+            y = DrawProgressBar(
+                spriteBatch,
+                pixel,
+                font,
+                $"Budget used: {state.LastCheckpointBudgetUsed:0.###}/{state.MaxInfluenceBudget:0.###} ({usedPct:0.#}%) checkpoint={checkpointTickLabel}",
+                budgetRatio,
+                Theme.WarningText,
+                startX,
+                y,
+                maxWidth);
             y = TextWrap.DrawWrapped(
                 spriteBatch,
                 font,
-                $"Dir budget/cd: checkpoint={checkpointTickLabel} cd={state.BeatCooldownRemainingTicks}t remaining={state.RemainingInfluenceBudget:0.###} used={state.LastCheckpointBudgetUsed:0.###} ({usedPct:0.#}%)",
+                $"Dir budget/cd: cd={state.BeatCooldownRemainingTicks}t remaining={state.RemainingInfluenceBudget:0.###}",
                 new Vector2(startX, y),
                 Theme.SecondaryText,
                 maxWidth,

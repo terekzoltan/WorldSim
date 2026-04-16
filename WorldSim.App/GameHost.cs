@@ -803,6 +803,7 @@ public class GameHost : Game
                 _font,
                 snapshot,
                 operatorSummary,
+                _refineryRuntime.CurrentOperatorProfileName,
                 operatorDebugDetail,
                 operatorFailureDetail,
                 plannerStatus,
@@ -846,6 +847,9 @@ public class GameHost : Game
                 snapshot.Director.OutputModeSource,
                 snapshot.Director.StageMarker,
                 snapshot.Director.ApplyStatus,
+                snapshot.Director.HasBudgetData,
+                snapshot.Director.MaxInfluenceBudget,
+                snapshot.Director.LastCheckpointBudgetUsed,
                 operatorFailureDetail);
 
             var overlayStatus = $"Diplomacy:{(_showDiplomacyPanel ? "ON" : "off")}  Campaign:{(_showCampaignPanel ? "ON" : "off")}  Territory:{(_worldRenderer.TerritoryOverlayEnabled ? "ON" : "off")}  Combat:{(_worldRenderer.CombatOverlayEnabled ? "ON" : "off")}";
