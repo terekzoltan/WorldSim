@@ -49,7 +49,7 @@ Terminology lock (TU1-D1):
 - `requested` = operator requested output mode state
 - `mode` = effective output mode on response/apply status lines
 
-- Always-visible operator summary should read like: `Dir: eff=<mode> <apply> | req=<requested> | profile=<profile> | lane=<lane>`.
+- Always-visible operator summary should read like: `Dir: eff=<mode> <apply> | requested=<requested> | profile=<profile> | lane=<lane>`.
 - Debug-visible operator detail should expose: `stage`, `effSrc`, `reqSrc`, `profileSrc`.
 - HUD director detail block includes: `mode=<...> apply=<...>` plus debug-only `stage/src/cd` detail.
 - For Season Director live path, `stage` should be `directorStage:*` (not the legacy `refineryStage:*` marker family).
@@ -78,7 +78,7 @@ Terminology lock (TU1-D1):
 ### Case A - Success
 - Trigger: valid response, valid apply path.
 - Expected:
-  - Summary: `eff=<mode> applied | req=<...> | profile=<...> | lane=<...>`
+  - Summary: `eff=<mode> applied | requested=<...> | profile=<...> | lane=<...>`
   - Debug detail: `stage=directorStage:*`, `mode/src` consistent
   - budget reflects current checkpoint commit
 

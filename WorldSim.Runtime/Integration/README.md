@@ -117,7 +117,7 @@ Terminology lock (TU1-D1):
 
 Always-visible operator summary (`GameHost` / Step 1 consume):
 ```text
-Dir: eff=<mode> <apply> | req=<requested mode> | profile=<profile> | lane=<off|fixture|live>
+Dir: eff=<mode> <apply> | requested=<requested mode> | profile=<profile> | lane=<off|fixture|live>
 ```
 
 Debug-only operator detail:

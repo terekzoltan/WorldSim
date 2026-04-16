@@ -787,8 +787,8 @@ public class GameHost : Game
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: Matrix.CreateScale(hudScale, hudScale, 1f));
         var simStatus = _simPaused ? $"PAUSED@x{_timeScale:0.##}" : $"x{_timeScale:0.##}";
-        var operatorSummary = $"Dir: eff={snapshot.Director.OutputMode} {snapshot.Director.ApplyStatus} | req={_refineryRuntime.RequestedDirectorOutputMode} | profile={_refineryRuntime.CurrentOperatorProfileName} | lane={_refineryRuntime.CurrentIntegrationMode}";
-        var operatorDebugDetail = $"Dir debug: stage={snapshot.Director.StageMarker} effSrc={snapshot.Director.OutputModeSource} reqSrc={_refineryRuntime.RequestedDirectorOutputModeSource} profileSrc={_refineryRuntime.CurrentOperatorProfileSource}";
+        var operatorSummary = $"Dir: eff={snapshot.Director.OutputMode} {snapshot.Director.ApplyStatus} | requested={_refineryRuntime.RequestedDirectorOutputMode} | profile={_refineryRuntime.CurrentOperatorProfileName} | lane={_refineryRuntime.CurrentIntegrationMode}";
+        var operatorDebugDetail = $"Dir debug: stage={snapshot.Director.StageMarker} effSrc={snapshot.Director.OutputModeSource} requestedSrc={_refineryRuntime.RequestedDirectorOutputModeSource} profileSrc={_refineryRuntime.CurrentOperatorProfileSource}";
         var operatorFailureDetail = BuildOperatorFailureDetail(snapshot.Director.ApplyStatus);
         var plannerStatus = $"AI: {_runtime.PlannerMode}/{_runtime.PolicyMode} | Sim:{simStatus} | PostFx:{(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile}";
 #if DEBUG

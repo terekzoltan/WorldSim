@@ -124,7 +124,7 @@ Target:
 Suggested shape:
 
 ```text
-Dir: eff=both applied | req=auto | profile=live_director | lane=live
+Dir: eff=both applied | requested=auto | profile=live_director | lane=live
 ```
 
 Do not include large debug detail here.

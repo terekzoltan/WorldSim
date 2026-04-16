@@ -71,24 +71,28 @@ public sealed class HudRenderer
 
         var directorExtraLines = 0;
         if (hasDirectorData)
-        {
-            directorExtraLines += 2;
-            if (showAiDebug)
-            {
-                directorExtraLines += Math.Min(2, director.ActiveDomainModifiers.Count > 0 ? 1 : 0);
-                directorExtraLines += Math.Min(2, director.ActiveGoalBiases.Count > 0 ? 1 : 0);
-            }
-        }
-
-        if (showAiDebug && director.HasBudgetData)
             directorExtraLines += 1;
 
-        if (showAiDebug && director.PendingChains.Count > 0)
+        if (!string.IsNullOrWhiteSpace(operatorFailureDetail))
+            directorExtraLines += 1;
+
+        if (showAiDebug)
         {
-            directorExtraLines += 1 + Math.Min(3, director.PendingChains.Count);
-            directorExtraLines += director.PendingChains
-                .Take(3)
-                .Count(chain => !string.IsNullOrWhiteSpace(chain.LastFailureMessage));
+            directorExtraLines += 1;
+
+            if (director.PendingChains.Count > 0)
+            {
+                directorExtraLines += 1 + Math.Min(3, director.PendingChains.Count);
+                directorExtraLines += director.PendingChains
+                    .Take(3)
+                    .Count(chain => !string.IsNullOrWhiteSpace(chain.LastFailureMessage));
+            }
+
+            if (director.HasBudgetData)
+                directorExtraLines += 1;
+
+            directorExtraLines += Math.Min(2, director.ActiveDomainModifiers.Count > 0 ? 1 : 0);
+            directorExtraLines += Math.Min(2, director.ActiveGoalBiases.Count > 0 ? 1 : 0);
         }
 
         if (!string.IsNullOrWhiteSpace(operatorSummary))
@@ -115,15 +119,12 @@ public sealed class HudRenderer
         y = _colonyPanel.Draw(spriteBatch, font, snapshot.Colonies, leftX, y, contentWidth, Theme);
         y = _ecologyPanel.Draw(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, Theme);
         y = DrawSiegeStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth);
-        y = DrawDirectorStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, showAiDebug);
+        y = DrawDirectorStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, showAiDebug, operatorFailureDetail);
         y = _eventFeed.Draw(spriteBatch, font, snapshot.RecentEvents.Take(visibleEventCount).ToList(), leftX, y + 4, contentWidth, Theme);
         y = TextWrap.DrawWrapped(spriteBatch, font, operatorSummary, new Vector2(leftX, y + 10), Theme.StatusText, contentWidth, 20);
 
         if (showAiDebug && !string.IsNullOrWhiteSpace(operatorDebugDetail))
             y = TextWrap.DrawWrapped(spriteBatch, font, operatorDebugDetail, new Vector2(leftX, y), Theme.SecondaryText, contentWidth, 20);
-
-        if (!string.IsNullOrWhiteSpace(operatorFailureDetail))
-            y = TextWrap.DrawWrapped(spriteBatch, font, operatorFailureDetail, new Vector2(leftX, y), Theme.WarningText, contentWidth, 20);
 
         if (showAiDebug && !string.IsNullOrWhiteSpace(plannerStatus))
             y = TextWrap.DrawWrapped(spriteBatch, font, plannerStatus, new Vector2(leftX, y), Theme.StatusText, contentWidth, 20);
@@ -145,80 +146,38 @@ public sealed class HudRenderer
         int startX,
         int startY,
         int maxWidth,
-        bool showDebug)
+        bool showDebug,
+        string operatorFailureDetail)
     {
         var state = snapshot.Director;
         var directive = state.ActiveDirectives.FirstOrDefault();
         var directiveLabel = directive == null
             ? "none"
             : $"{directive.Directive} C{directive.ColonyId} ({directive.RemainingTicks}/{directive.TotalTicks}t)";
-        var budgetLabel = state.HasBudgetData
-            ? $"{state.RemainingInfluenceBudget:0.###}/{state.MaxInfluenceBudget:0.###} used={state.LastCheckpointBudgetUsed:0.###}"
-            : "n/a";
 
         int y = TextWrap.DrawWrapped(
             spriteBatch,
             font,
-            $"Director: mode={state.OutputMode} apply={state.ApplyStatus}",
-            new Vector2(startX, startY),
-            Theme.DirectorEventText,
-            maxWidth,
-            18);
-
-        if (!showDebug)
-            return y;
-
-        y = TextWrap.DrawWrapped(
-            spriteBatch,
-            font,
-            $"Dir detail: stage={state.StageMarker} src={state.OutputModeSource} cd={state.BeatCooldownRemainingTicks}t",
-            new Vector2(startX, y),
-            Theme.SecondaryText,
-            maxWidth,
-            18);
-
-        y = TextWrap.DrawWrapped(
-            spriteBatch,
-            font,
             $"Directive: {directiveLabel}",
-            new Vector2(startX, y),
+            new Vector2(startX, startY),
             Theme.SecondaryText,
             maxWidth,
             18);
 
-        if (state.ActiveDomainModifiers.Count > 0)
+        if (!string.IsNullOrWhiteSpace(operatorFailureDetail))
         {
-            var mods = string.Join(", ", state.ActiveDomainModifiers
-                .Take(3)
-                .Select(mod => $"{mod.Domain}:{mod.EffectiveModifier:+0.00;-0.00}({mod.RemainingTicks}t)"));
-            y = TextWrap.DrawWrapped(spriteBatch, font, $"Dir mods: {mods}", new Vector2(startX, y), Theme.SecondaryText, maxWidth, 18);
-        }
-
-        if (state.ActiveGoalBiases.Count > 0)
-        {
-            var biases = string.Join(", ", state.ActiveGoalBiases
-                .Take(3)
-                .Select(bias => $"C{bias.ColonyId}.{bias.GoalCategory}:{bias.EffectiveWeight:0.00}"));
-            y = TextWrap.DrawWrapped(spriteBatch, font, $"Dir bias: {biases}", new Vector2(startX, y), Theme.SecondaryText, maxWidth, 18);
-        }
-
-        if (state.HasBudgetData)
-        {
-            var checkpointTickLabel = state.LastBudgetCheckpointTick >= 0
-                ? state.LastBudgetCheckpointTick.ToString()
-                : "n/a";
-            var usedPct = state.MaxInfluenceBudget > 0d
-                ? (state.LastCheckpointBudgetUsed / state.MaxInfluenceBudget) * 100d
-                : 0d;
             y = TextWrap.DrawWrapped(
                 spriteBatch,
                 font,
-                $"Dir budget: checkpoint={checkpointTickLabel} remaining={state.RemainingInfluenceBudget:0.###} used={state.LastCheckpointBudgetUsed:0.###} ({usedPct:0.#}%)",
+                operatorFailureDetail,
                 new Vector2(startX, y),
-                Theme.SecondaryText,
+                Theme.WarningText,
                 maxWidth,
                 18);
         }
+
+        if (!showDebug)
+            return y;
 
         if (state.PendingChains.Count > 0)
         {
@@ -256,6 +215,49 @@ public sealed class HudRenderer
                         18);
                 }
             }
+        }
+
+        if (state.HasBudgetData)
+        {
+            var checkpointTickLabel = state.LastBudgetCheckpointTick >= 0
+                ? state.LastBudgetCheckpointTick.ToString()
+                : "n/a";
+            var usedPct = state.MaxInfluenceBudget > 0d
+                ? (state.LastCheckpointBudgetUsed / state.MaxInfluenceBudget) * 100d
+                : 0d;
+            y = TextWrap.DrawWrapped(
+                spriteBatch,
+                font,
+                $"Dir budget/cd: checkpoint={checkpointTickLabel} cd={state.BeatCooldownRemainingTicks}t remaining={state.RemainingInfluenceBudget:0.###} used={state.LastCheckpointBudgetUsed:0.###} ({usedPct:0.#}%)",
+                new Vector2(startX, y),
+                Theme.SecondaryText,
+                maxWidth,
+                18);
+        }
+
+        y = TextWrap.DrawWrapped(
+            spriteBatch,
+            font,
+            $"Dir detail: stage={state.StageMarker} src={state.OutputModeSource}",
+            new Vector2(startX, y),
+            Theme.SecondaryText,
+            maxWidth,
+            18);
+
+        if (state.ActiveDomainModifiers.Count > 0)
+        {
+            var mods = string.Join(", ", state.ActiveDomainModifiers
+                .Take(3)
+                .Select(mod => $"{mod.Domain}:{mod.EffectiveModifier:+0.00;-0.00}({mod.RemainingTicks}t)"));
+            y = TextWrap.DrawWrapped(spriteBatch, font, $"Dir mods: {mods}", new Vector2(startX, y), Theme.SecondaryText, maxWidth, 18);
+        }
+
+        if (state.ActiveGoalBiases.Count > 0)
+        {
+            var biases = string.Join(", ", state.ActiveGoalBiases
+                .Take(3)
+                .Select(bias => $"C{bias.ColonyId}.{bias.GoalCategory}:{bias.EffectiveWeight:0.00}"));
+            y = TextWrap.DrawWrapped(spriteBatch, font, $"Dir bias: {biases}", new Vector2(startX, y), Theme.SecondaryText, maxWidth, 18);
         }
 
         return y;

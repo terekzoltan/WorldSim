@@ -1368,7 +1368,7 @@ Wave turn-gate:
 
 - ✅ **TU1-A1** Information architecture cleanup -- split always-visible operator summary, debug detail, and failure-only diagnostics (Track A)
 - ✅ **TU1-D1** Operator wording + failure taxonomy alignment -- keep preset/mode/source labels short, stable, and docs-consistent (Track D)
-- ⬜ **TU1-A2** HUD/settings cleanup -- shorten top status line, restructure director block, and improve failure prominence (Track A)
+- ✅ **TU1-A2** HUD/settings cleanup -- shorten top status line, restructure director block, and improve failure prominence (Track A)
 - ⬜ **TU1-A3** Tier-1 widgets -- status badges/chips and progress bars for budget/cooldown/pending-chain progress (Track A)
 - ⬜ **TU1-A4** Tier-2 widget experiment (optional) -- tiny sparklines and/or event timeline strip only if Tier-1 smoke still leaves readability gaps (Track A)
 
@@ -1390,6 +1390,9 @@ Wave 7.1 Step 1 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track A agent | TU1-A2 | TU1-A1 ✅ + TU1-D1 ✅ | HUD/settings cleanup should implement the finalized wording and visibility tiers |
+
+Wave 7.1 Step 2 progress note:
+- ✅ `TU1-A2` closed: top operator summary wording locked to `requested=` and remains the sole always-visible summary, director block shifted to contextual directive/chain/budget/detail consume (no duplicate mode/apply summary row), failure diagnostics kept taxonomy-preserving and visually prominent, and settings overlay readability upgraded with grouped sections + wrapped long rows while hiding green-path failure `none` noise.
 
 **Step 3 — opens when TU1-A2 ✅**
 
