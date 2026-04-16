@@ -25,10 +25,11 @@ public sealed class SettingsPanelRenderer
         string directorEffectiveMode,
         string directorEffectiveSource,
         string directorStage,
-        string directorApply)
+        string directorApply,
+        string directorFailureDetail)
     {
         int width = Math.Min(520, viewportWidth - 24);
-        int height = 380;
+        int height = 420;
         int x = viewportWidth - width - 12;
         int y = 12;
 
@@ -42,6 +43,8 @@ public sealed class SettingsPanelRenderer
         int lineY = y + 10;
         spriteBatch.DrawString(font, "Settings Overlay", new Vector2(x + 10, lineY), theme.AccentText);
         lineY += 26;
+        spriteBatch.DrawString(font, "General", new Vector2(x + 10, lineY), theme.AccentText);
+        lineY += 20;
         spriteBatch.DrawString(font, $"Quality Profile: {quality} (Ctrl+F5)", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
         spriteBatch.DrawString(font, $"PostFx: {postFx} (Ctrl+F3, Ctrl+F4)", new Vector2(x + 10, lineY), theme.PrimaryText);
@@ -58,16 +61,30 @@ public sealed class SettingsPanelRenderer
         lineY += 20;
         spriteBatch.DrawString(font, "Debug: F8 AI panel, F6 trigger refinery", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
+
+        spriteBatch.DrawString(font, "Director Control State", new Vector2(x + 10, lineY), theme.AccentText);
+        lineY += 20;
         spriteBatch.DrawString(font, $"Director Profile: {directorProfile} ({directorProfileSource})", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
         spriteBatch.DrawString(font, $"Director Lane: {directorLane} | Preset cycle: Ctrl+Shift+F6", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
         spriteBatch.DrawString(font, $"Director Req Mode: {directorRequestedMode} ({directorRequestedSource}) | Ctrl+F6", new Vector2(x + 10, lineY), theme.PrimaryText);
         lineY += 20;
+
+        spriteBatch.DrawString(font, "Director Effective State", new Vector2(x + 10, lineY), theme.AccentText);
+        lineY += 20;
         spriteBatch.DrawString(font, $"Director Eff Mode: {directorEffectiveMode} ({directorEffectiveSource})  Stage: {directorStage}", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
         spriteBatch.DrawString(font, $"Director Apply: {directorApply}", new Vector2(x + 10, lineY), theme.SecondaryText);
         lineY += 20;
+
+        spriteBatch.DrawString(font, "Failure / Diagnostics", new Vector2(x + 10, lineY), theme.AccentText);
+        lineY += 20;
+        var failureLine = string.IsNullOrWhiteSpace(directorFailureDetail) ? "none" : directorFailureDetail;
+        var failureColor = string.IsNullOrWhiteSpace(directorFailureDetail) ? theme.SecondaryText : theme.WarningText;
+        spriteBatch.DrawString(font, $"Director Failure: {failureLine}", new Vector2(x + 10, lineY), failureColor);
+        lineY += 20;
+
         spriteBatch.DrawString(font, $"Capture: {captureStatus}", new Vector2(x + 10, lineY), theme.SuccessText);
     }
 }

@@ -787,10 +787,12 @@ public class GameHost : Game
 
         _spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: Matrix.CreateScale(hudScale, hudScale, 1f));
         var simStatus = _simPaused ? $"PAUSED@x{_timeScale:0.##}" : $"x{_timeScale:0.##}";
-        var plannerStatus = $"AI Planner: {_runtime.PlannerMode} | Policy: {_runtime.PolicyMode} | HUD: {(_showTelemetryHud ? "ON" : "OFF")} (T) | PostFx: {(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile} | Dir eff={snapshot.Director.OutputMode}/{snapshot.Director.ApplyStatus}@{snapshot.Director.StageMarker} req={_refineryRuntime.RequestedDirectorOutputMode} profile={_refineryRuntime.CurrentOperatorProfileName} lane={_refineryRuntime.CurrentIntegrationMode} | Sim:{simStatus}";
+        var operatorSummary = $"Dir: eff={snapshot.Director.OutputMode} {snapshot.Director.ApplyStatus} | req={_refineryRuntime.RequestedDirectorOutputMode} | profile={_refineryRuntime.CurrentOperatorProfileName} | lane={_refineryRuntime.CurrentIntegrationMode}";
+        var operatorDebugDetail = $"Dir debug: stage={snapshot.Director.StageMarker} effSrc={snapshot.Director.OutputModeSource} reqSrc={_refineryRuntime.RequestedDirectorOutputModeSource} profileSrc={_refineryRuntime.CurrentOperatorProfileSource}";
+        var operatorFailureDetail = BuildOperatorFailureDetail(snapshot.Director.ApplyStatus);
+        var plannerStatus = $"AI: {_runtime.PlannerMode}/{_runtime.PolicyMode} | Sim:{simStatus} | PostFx:{(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile}";
 #if DEBUG
-        plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 tracked focus | Ctrl+F1/F2 panels | Ctrl+F3/F4 postfx | Ctrl+F5 quality | Ctrl+F6 director mode | Ctrl+Shift+F6 director preset | Ctrl+F7/F8 overlays | Ctrl+F9 route | Ctrl+F10 screenshot | Ctrl+F12 settings)";
-        plannerStatus += " [Combat legend: battle ring, siege ring, breach X, magenta=route, cyan=commander, amber=contested]";
+        plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 focus | Ctrl+F6 mode | Ctrl+Shift+F6 preset | Ctrl+F12 settings)";
 #endif
         if (_showTelemetryHud && !_cleanShotMode && !panelExclusive)
         {
@@ -800,7 +802,9 @@ public class GameHost : Game
                 _textures.Pixel,
                 _font,
                 snapshot,
-                $"{_refineryRuntime.LastStatus} | {_runtime.LastDirectorActionStatus} | {_runtime.LastTechActionStatus} | Theme: {ThemePresets[_themeIndex].Name}",
+                operatorSummary,
+                operatorDebugDetail,
+                operatorFailureDetail,
                 plannerStatus,
                 techMenu,
                 aiDebug,
@@ -841,7 +845,8 @@ public class GameHost : Game
                 snapshot.Director.OutputMode,
                 snapshot.Director.OutputModeSource,
                 snapshot.Director.StageMarker,
-                snapshot.Director.ApplyStatus);
+                snapshot.Director.ApplyStatus,
+                operatorFailureDetail);
 
             var overlayStatus = $"Diplomacy:{(_showDiplomacyPanel ? "ON" : "off")}  Campaign:{(_showCampaignPanel ? "ON" : "off")}  Territory:{(_worldRenderer.TerritoryOverlayEnabled ? "ON" : "off")}  Combat:{(_worldRenderer.CombatOverlayEnabled ? "ON" : "off")}";
             _spriteBatch.DrawString(_font, overlayStatus, new Vector2(16, GraphicsDevice.Viewport.Height - 34), _hudRenderer.Theme.SecondaryText);
@@ -879,5 +884,30 @@ public class GameHost : Game
             CaptureScreenshot();
 
         base.Draw(gameTime);
+    }
+
+    private string BuildOperatorFailureDetail(string applyStatus)
+    {
+        if (!string.Equals(applyStatus, "apply_failed", StringComparison.Ordinal)
+            && !string.Equals(applyStatus, "request_failed", StringComparison.Ordinal))
+            return string.Empty;
+
+        var adapterStatus = _refineryRuntime.LastStatus?.Trim() ?? string.Empty;
+        var runtimeStatus = _runtime.LastDirectorActionStatus?.Trim() ?? string.Empty;
+
+        var detail = adapterStatus;
+        if (!string.IsNullOrWhiteSpace(runtimeStatus)
+            && !string.Equals(runtimeStatus, "No director action", StringComparison.Ordinal)
+            && !adapterStatus.Contains(runtimeStatus, StringComparison.Ordinal))
+        {
+            detail = string.IsNullOrWhiteSpace(detail)
+                ? runtimeStatus
+                : $"{detail} | runtime={runtimeStatus}";
+        }
+
+        if (string.IsNullOrWhiteSpace(detail))
+            detail = $"runtime={runtimeStatus}";
+
+        return $"Director failure ({applyStatus}): {detail}";
     }
 }

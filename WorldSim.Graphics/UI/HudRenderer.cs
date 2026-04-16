@@ -32,7 +32,9 @@ public sealed class HudRenderer
         Texture2D pixel,
         SpriteFont font,
         WorldRenderSnapshot snapshot,
-        string refineryStatus,
+        string operatorSummary,
+        string operatorDebugDetail,
+        string operatorFailureDetail,
         string plannerStatus,
         TechMenuView? techMenu,
         AiDebugSnapshot aiDebug,
@@ -89,6 +91,18 @@ public sealed class HudRenderer
                 .Count(chain => !string.IsNullOrWhiteSpace(chain.LastFailureMessage));
         }
 
+        if (!string.IsNullOrWhiteSpace(operatorSummary))
+            directorExtraLines += 1;
+
+        if (showAiDebug && !string.IsNullOrWhiteSpace(operatorDebugDetail))
+            directorExtraLines += 1;
+
+        if (!string.IsNullOrWhiteSpace(operatorFailureDetail))
+            directorExtraLines += 1;
+
+        if (showAiDebug && !string.IsNullOrWhiteSpace(plannerStatus))
+            directorExtraLines += 1;
+
         var baseHeight = 120 + (snapshot.Colonies.Count * 44) + 84 + (visibleEventCount * 26);
         baseHeight += directorExtraLines * 20;
         if (renderStats != null)
@@ -103,8 +117,16 @@ public sealed class HudRenderer
         y = DrawSiegeStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth);
         y = DrawDirectorStatus(spriteBatch, font, snapshot, leftX, y + 4, contentWidth, showAiDebug);
         y = _eventFeed.Draw(spriteBatch, font, snapshot.RecentEvents.Take(visibleEventCount).ToList(), leftX, y + 4, contentWidth, Theme);
-        y = TextWrap.DrawWrapped(spriteBatch, font, refineryStatus, new Vector2(leftX, y + 10), Theme.StatusText, contentWidth, 20);
-        y = TextWrap.DrawWrapped(spriteBatch, font, plannerStatus, new Vector2(leftX, y), Theme.StatusText, contentWidth, 20);
+        y = TextWrap.DrawWrapped(spriteBatch, font, operatorSummary, new Vector2(leftX, y + 10), Theme.StatusText, contentWidth, 20);
+
+        if (showAiDebug && !string.IsNullOrWhiteSpace(operatorDebugDetail))
+            y = TextWrap.DrawWrapped(spriteBatch, font, operatorDebugDetail, new Vector2(leftX, y), Theme.SecondaryText, contentWidth, 20);
+
+        if (!string.IsNullOrWhiteSpace(operatorFailureDetail))
+            y = TextWrap.DrawWrapped(spriteBatch, font, operatorFailureDetail, new Vector2(leftX, y), Theme.WarningText, contentWidth, 20);
+
+        if (showAiDebug && !string.IsNullOrWhiteSpace(plannerStatus))
+            y = TextWrap.DrawWrapped(spriteBatch, font, plannerStatus, new Vector2(leftX, y), Theme.StatusText, contentWidth, 20);
 
         if (renderStats != null)
         {
@@ -137,9 +159,21 @@ public sealed class HudRenderer
         int y = TextWrap.DrawWrapped(
             spriteBatch,
             font,
-            $"Director: stage={state.StageMarker} apply={state.ApplyStatus} mode={state.OutputMode} src={state.OutputModeSource} cd={state.BeatCooldownRemainingTicks}t budget={budgetLabel}",
+            $"Director: mode={state.OutputMode} apply={state.ApplyStatus}",
             new Vector2(startX, startY),
             Theme.DirectorEventText,
+            maxWidth,
+            18);
+
+        if (!showDebug)
+            return y;
+
+        y = TextWrap.DrawWrapped(
+            spriteBatch,
+            font,
+            $"Dir detail: stage={state.StageMarker} src={state.OutputModeSource} cd={state.BeatCooldownRemainingTicks}t",
+            new Vector2(startX, y),
+            Theme.SecondaryText,
             maxWidth,
             18);
 
@@ -151,9 +185,6 @@ public sealed class HudRenderer
             Theme.SecondaryText,
             maxWidth,
             18);
-
-        if (!showDebug)
-            return y;
 
         if (state.ActiveDomainModifiers.Count > 0)
         {

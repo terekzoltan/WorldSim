@@ -42,11 +42,21 @@ dotnet run --project WorldSim.App/WorldSim.App.csproj
 
 ## Expected Marker Semantics
 
-- HUD director line includes: `stage=<...> apply=<...> mode=<...> src=<...> budget=<...>`.
+Terminology lock (TU1-D1):
+- `preset` = named control action bundle (hotkey cycle)
+- `profile` = currently active operator-facing label
+- `lane` = integration transport lane (`off|fixture|live`)
+- `requested` = operator requested output mode state
+- `mode` = effective output mode on response/apply status lines
+
+- Always-visible operator summary should read like: `Dir: eff=<mode> <apply> | req=<requested> | profile=<profile> | lane=<lane>`.
+- Debug-visible operator detail should expose: `stage`, `effSrc`, `reqSrc`, `profileSrc`.
+- HUD director detail block includes: `mode=<...> apply=<...>` plus debug-only `stage/src/cd` detail.
 - For Season Director live path, `stage` should be `directorStage:*` (not the legacy `refineryStage:*` marker family).
-- Top status line starts with either:
-  - `Refinery applied: ...`
-  - `Refinery apply failed: outcome=<apply_failed|request_failed>, ...`
+- Raw adapter status text is no longer the default green-path HUD line.
+- On failure, diagnostics should surface `Refinery apply failed: outcome=<apply_failed|request_failed>, ...` and preserve request-failure kind taxonomy.
+- Trigger-start status line uses disambiguated control-state wording:
+  - `Refinery request started: ... lane=<...>, ... requested=<...>(<...>)`
 
 `apply` meanings:
 - `applied`: response arrived and C# apply completed.
@@ -57,34 +67,34 @@ dotnet run --project WorldSim.App/WorldSim.App.csproj
 ## Core Manual Smoke
 
 1. Press `F6` once.
-2. Verify director HUD updates (`stage`, `apply`, `mode`, `src`, `budget`).
-3. Verify status line updates with `Refinery applied:` or `Refinery apply failed:` outcome payload.
-4. If `apply=applied`, verify at least one gameplay-visible director effect (story beat feed or directive).
-5. Verify trigger throttling/cooldown still prevents rapid accidental retriggers.
+2. Verify always-visible operator summary updates (`eff`, `apply`, `req`, `profile`, `lane`).
+3. Verify debug-visible director detail updates (`stage`, `src`, `cd`, budget/detail block when applicable).
+4. On failure, verify diagnostics preserve `Refinery apply failed: outcome=...` payload and request-failure kind detail.
+5. If `apply=applied`, verify at least one gameplay-visible director effect (story beat feed or directive).
+6. Verify trigger throttling/cooldown still prevents rapid accidental retriggers.
 
 ## Regression Matrix
 
 ### Case A - Success
 - Trigger: valid response, valid apply path.
 - Expected:
-  - HUD: `apply=applied`
-  - Status: `Refinery applied:`
-  - `stage=directorStage:*`, `mode/src` consistent
+  - Summary: `eff=<mode> applied | req=<...> | profile=<...> | lane=<...>`
+  - Debug detail: `stage=directorStage:*`, `mode/src` consistent
   - budget reflects current checkpoint commit
 
 ### Case B - Apply failure after response
 - Trigger: response arrives but C# apply fails (e.g. invalid runtime command target).
 - Expected:
-  - HUD: `apply=apply_failed`
-  - Status: `Refinery apply failed: outcome=apply_failed, ...`
+  - Summary/HUD: `apply=apply_failed`
+  - Failure diagnostics: `Refinery apply failed: outcome=apply_failed, ...`
   - `stage/mode/src/budget` still reflect response-level truth
   - budget remains last committed checkpoint state (no new commit on apply failure)
 
 ### Case C - Request failure before response
 - Trigger: timeout / refused connection / HTTP error before usable response.
 - Expected:
-  - HUD: `apply=request_failed`
-  - Status: `Refinery apply failed: outcome=request_failed, ...`
+  - Summary/HUD: `apply=request_failed`
+  - Failure diagnostics: `Refinery apply failed: outcome=request_failed, ...`
   - `error` detail includes `kind=timeout|connection_refused|http_<status>|request_error` and attempts
   - stage may remain `not_triggered/unknown`
   - budget remains last committed checkpoint state (no reset/consume)

@@ -39,7 +39,7 @@ public sealed class RefineryPatchRuntime
     private string _requestedDirectorOutputModeSource;
     private string _operatorProfileSource;
 
-    public string LastStatus { get; private set; } = "Refinery integration: not triggered";
+    public string LastStatus { get; private set; } = "Refinery status: not_triggered";
     public DirectorExecutionStatus LastDirectorExecutionStatus { get; private set; } = DirectorExecutionStatus.NotTriggered;
     public string OperatorProfileName => _activeOptions.OperatorProfileName;
     public string OperatorProfileSource => _operatorProfileSource;
@@ -59,9 +59,9 @@ public sealed class RefineryPatchRuntime
 
         LastStatus = _activeOptions.Mode switch
         {
-            RefineryIntegrationMode.Off => "Refinery integration OFF",
-            RefineryIntegrationMode.Fixture => "Refinery integration FIXTURE (F6 trigger)",
-            RefineryIntegrationMode.Live => "Refinery integration LIVE (F6 trigger)",
+            RefineryIntegrationMode.Off => "Refinery lane=off",
+            RefineryIntegrationMode.Fixture => "Refinery lane=fixture (F6 trigger)",
+            RefineryIntegrationMode.Live => "Refinery lane=live (F6 trigger)",
             _ => LastStatus
         };
     }
@@ -70,7 +70,7 @@ public sealed class RefineryPatchRuntime
     {
         if (_activeOptions.Mode == RefineryIntegrationMode.Off)
         {
-            LastStatus = "Refinery integration OFF";
+            LastStatus = "Refinery lane=off";
             return;
         }
 
@@ -98,7 +98,7 @@ public sealed class RefineryPatchRuntime
 
         _lastTriggerUtc = DateTime.UtcNow;
         var requestOptions = CaptureRequestOptions();
-        LastStatus = $"Refinery request started: goal={requestOptions.Options.Goal}, mode={requestOptions.Options.Mode.ToString().ToLowerInvariant()}, tick={tick}, output={requestOptions.RequestedDirectorOutputMode}({requestOptions.RequestedDirectorOutputModeSource})";
+        LastStatus = $"Refinery request started: goal={requestOptions.Options.Goal}, lane={requestOptions.Options.Mode.ToString().ToLowerInvariant()}, tick={tick}, requested={requestOptions.RequestedDirectorOutputMode}({requestOptions.RequestedDirectorOutputModeSource})";
 
         _inFlight = Task.Run(async () => await RunApplyAsync(runtime, tick, requestOptions));
     }
@@ -235,7 +235,7 @@ public sealed class RefineryPatchRuntime
     {
         if (_inFlight is { IsCompleted: false })
         {
-            LastStatus = "Refinery mode change blocked: request already in progress";
+            LastStatus = "Refinery requested mode change blocked: request already in progress";
             return _requestedDirectorOutputMode;
         }
 
@@ -248,7 +248,7 @@ public sealed class RefineryPatchRuntime
             _ => "auto"
         };
         _requestedDirectorOutputModeSource = "operator";
-        LastStatus = $"Refinery mode request updated: mode={_requestedDirectorOutputMode}, source={_requestedDirectorOutputModeSource}, profile={OperatorProfileName}";
+        LastStatus = $"Refinery requested mode updated: requested={_requestedDirectorOutputMode}, source={_requestedDirectorOutputModeSource}, profile={OperatorProfileName}, lane={CurrentIntegrationMode}";
 
         return _requestedDirectorOutputMode;
     }
@@ -289,7 +289,7 @@ public sealed class RefineryPatchRuntime
         _circuitBreakerUntilUtc = DateTime.MinValue;
         EnsureLiveClient();
 
-        LastStatus = $"Refinery preset applied: profile={OperatorProfileName}, mode={CurrentIntegrationMode}, output={_requestedDirectorOutputMode}, source={_requestedDirectorOutputModeSource}";
+        LastStatus = $"Refinery preset applied: profile={OperatorProfileName}, lane={CurrentIntegrationMode}, requested={_requestedDirectorOutputMode}, source={_requestedDirectorOutputModeSource}";
         return OperatorProfileName;
     }
 

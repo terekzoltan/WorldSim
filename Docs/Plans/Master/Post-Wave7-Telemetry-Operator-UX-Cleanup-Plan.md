@@ -55,6 +55,25 @@ The cleanup must respect project-level constraints:
 - visuals should remain deterministic and profile-aware,
 - the default developer view should stay lightweight, not dashboard-heavy.
 
+## 5.1 TU1-D1 wording guardrail
+
+Before layout cleanup (`TU1-A2`), Track D freezes terminology + status semantics only:
+
+- `preset` = named control action bundle
+- `profile` = currently active operator-facing label
+- `lane` = integration transport lane (`off|fixture|live`)
+- `requested mode` = operator control-state output mode
+- `effective mode` = response/apply output mode
+
+Mode ambiguity cleanup target:
+- use `lane=` only for `off|fixture|live`
+- use `requested=` only for operator requested output mode
+- use `mode=` only for effective output mode on outcome lines
+
+Scope guardrail:
+- TU1-D1 does not pre-implement future TU1-A2 visual layout contracts.
+- TU1-D1 updates wording/taxonomy and Track D-owned status copy only.
+
 ## 6. Recommended Information Architecture
 
 Split refinery/director telemetry into 3 visibility levels.

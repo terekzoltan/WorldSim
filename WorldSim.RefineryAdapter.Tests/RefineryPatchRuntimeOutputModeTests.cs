@@ -165,7 +165,8 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         Assert.Equal("both", mode);
         Assert.Equal("both", patchRuntime.RequestedDirectorOutputMode);
         Assert.Equal("operator", patchRuntime.RequestedDirectorOutputModeSource);
-        Assert.Contains("mode=both", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Contains("requested=both", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Contains("lane=fixture", patchRuntime.LastStatus, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -194,7 +195,7 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         Assert.Equal("auto", mode);
         Assert.Equal("auto", patchRuntime.RequestedDirectorOutputMode);
         Assert.Equal("env", patchRuntime.RequestedDirectorOutputModeSource);
-        Assert.Equal("Refinery mode change blocked: request already in progress", patchRuntime.LastStatus);
+        Assert.Equal("Refinery requested mode change blocked: request already in progress", patchRuntime.LastStatus);
     }
 
     [Fact]
@@ -225,6 +226,38 @@ public sealed class RefineryPatchRuntimeOutputModeTests
         Assert.Equal("live", patchRuntime.CurrentIntegrationMode);
         Assert.Equal("auto", patchRuntime.RequestedDirectorOutputMode);
         Assert.Equal("profile", patchRuntime.RequestedDirectorOutputModeSource);
+        Assert.Contains("profile=live_mock", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Contains("lane=live", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Contains("requested=auto", patchRuntime.LastStatus, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Trigger_StartStatus_UsesLaneAndRequestedModeLabels()
+    {
+        var runtime = CreateRuntime();
+        var options = new RefineryRuntimeOptions(
+            Mode: RefineryIntegrationMode.Fixture,
+            Goal: DirectorGoals.SeasonDirectorCheckpoint,
+            DirectorOutputMode: "auto",
+            FixtureResponsePath: GetDirectorFixturePath(),
+            ServiceBaseUrl: "http://localhost:8091",
+            StrictMode: true,
+            RequestSeed: 123,
+            LiveTimeoutMs: 1000,
+            LiveRetryCount: 0,
+            CircuitBreakerSeconds: 5,
+            ApplyToWorld: false,
+            MinTriggerIntervalMs: 0
+        );
+
+        var patchRuntime = new RefineryPatchRuntime(options);
+        patchRuntime.Trigger(runtime, tick: 123);
+
+        Assert.StartsWith("Refinery request started:", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Contains("lane=fixture", patchRuntime.LastStatus, StringComparison.Ordinal);
+        Assert.Contains("requested=auto(env)", patchRuntime.LastStatus, StringComparison.Ordinal);
+
+        PumpUntilSettled(patchRuntime);
     }
 
     [Fact]

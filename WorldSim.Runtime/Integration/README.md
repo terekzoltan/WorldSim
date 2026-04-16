@@ -108,18 +108,42 @@ dotnet test WorldSim.RefineryClient.Tests/WorldSim.RefineryClient.Tests.csproj
 
 ## HUD + Status Semantics (D6.1)
 
-Director HUD line:
+Terminology lock (TU1-D1):
+- `preset`: named control action bundle (`Ctrl+Shift+F6` cycle)
+- `profile`: currently active operator-facing state label
+- `lane`: integration transport lane (`off|fixture|live`)
+- `requested mode`: operator control-state output mode
+- `effective mode`: response/apply result output mode
+
+Always-visible operator summary (`GameHost` / Step 1 consume):
 ```text
-Director: stage=<directorStage:*> apply=<not_triggered|applied|apply_failed|request_failed> mode=<...> src=<...> cd=<...> budget=<...>
+Dir: eff=<mode> <apply> | req=<requested mode> | profile=<profile> | lane=<off|fixture|live>
 ```
 
-Top status line (`GameHost`):
+Debug-only operator detail:
+```text
+Dir debug: stage=<directorStage:*> effSrc=<...> reqSrc=<...> profileSrc=<...>
+```
+
+Director HUD line (debug-visible director detail block):
+```text
+Director: mode=<...> apply=<not_triggered|applied|apply_failed|request_failed>
+Dir detail: stage=<directorStage:*> src=<...> cd=<...>
+```
+
+Underlying adapter status strings (`RefineryPatchRuntime.LastStatus`, not always shown directly on the green path):
 ```text
 Refinery applied: ...
 Refinery apply failed: outcome=<apply_failed|request_failed>, stage=..., mode=..., source=..., budget=..., error=...
+Refinery request started: goal=..., lane=<off|fixture|live>, tick=..., requested=<auto|both|story_only|nudge_only|off>(<env|profile|operator>)
 ```
 
-`request_failed` error taxonomy (top status line `error=...`):
+Failure-only diagnostics (`GameHost` / Step 1 consume):
+```text
+Director failure (<apply status>): Refinery apply failed: outcome=<...>, stage=..., mode=..., source=..., budget=..., error=... | runtime=<LastDirectorActionStatus>
+```
+
+`request_failed` error taxonomy (adapter failure payload `error=...`):
 - `kind=timeout`
 - `kind=connection_refused`
 - `kind=http_<status>`
@@ -129,6 +153,10 @@ Interpretation rules:
 - `stage`: Java response-level stage marker for season director (`directorStage:*`).
 - `apply`: C# local outcome.
 - `mode/src`: effective output mode and decision source (`response|env|fallback|...`).
+- `lane`: transport integration path (`off|fixture|live`).
+- `requested`: operator-side requested output mode and requested-mode source (`env|profile|operator`).
+- green path UI shows the compact operator summary + debug detail instead of the raw adapter status strings.
+- failure diagnostics preserve the richer adapter failure taxonomy and may append `runtime=<LastDirectorActionStatus>` when runtime-side detail adds extra context.
 - `budget`: director budget marker mirrored from Java explain if present.
 - Java explain also includes `llmStage`, `llmCompletionCount`, `llmRetryRounds`, and `llmCandidateSanitized` markers for director retry/repair observability.
 - S7-A causal-chain wire/request observability remains marker-based:

@@ -104,6 +104,11 @@ Preset naming alignment (app/operator side):
 - `live_mock`
 - `live_director`
 
+Operator terminology alignment (TU1-D1):
+- `preset` = named control action bundle (`Ctrl+Shift+F6` cycle on app side)
+- `profile` = currently active operator-facing label shown by the app
+- `lane` = integration transport lane (`off|fixture|live`)
+
 Note:
 
 - helper scripts are convenience tooling, not source-of-truth for contract semantics.

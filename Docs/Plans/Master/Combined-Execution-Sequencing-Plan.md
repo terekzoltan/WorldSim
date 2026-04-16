@@ -1366,8 +1366,8 @@ Wave turn-gate:
 
 ### Sprint TU1: Telemetry Readability + Visual Widgets (Track A + D)
 
-- ⬜ **TU1-A1** Information architecture cleanup -- split always-visible operator summary, debug detail, and failure-only diagnostics (Track A)
-- ⬜ **TU1-D1** Operator wording + failure taxonomy alignment -- keep preset/mode/source labels short, stable, and docs-consistent (Track D)
+- ✅ **TU1-A1** Information architecture cleanup -- split always-visible operator summary, debug detail, and failure-only diagnostics (Track A)
+- ✅ **TU1-D1** Operator wording + failure taxonomy alignment -- keep preset/mode/source labels short, stable, and docs-consistent (Track D)
 - ⬜ **TU1-A2** HUD/settings cleanup -- shorten top status line, restructure director block, and improve failure prominence (Track A)
 - ⬜ **TU1-A3** Tier-1 widgets -- status badges/chips and progress bars for budget/cooldown/pending-chain progress (Track A)
 - ⬜ **TU1-A4** Tier-2 widget experiment (optional) -- tiny sparklines and/or event timeline strip only if Tier-1 smoke still leaves readability gaps (Track A)
@@ -1380,6 +1380,10 @@ Wave turn-gate:
 |---------|---------|--------|-------|
 | Track A agent | TU1-A1 | Wave 7 ✅ | Establish the visibility split before touching specific HUD sections |
 | Track D agent | TU1-D1 | Wave 7 ✅ | Operator wording/taxonomy should settle in parallel with the Track A information split |
+
+Wave 7.1 Step 1 progress note:
+- ✅ `TU1-A1` closed: Track A locked the visibility split in code (always-visible operator summary vs debug-only detail vs failure-only diagnostics), kept pending causal chains in debug-only consume (max 3 rows), and introduced settings-overlay section grouping contract without final taxonomy freeze or widget/polish expansion.
+- ✅ `TU1-D1` closed: Track D froze terminology (`preset/profile/lane/requested mode/effective mode/apply/request failure kind`), normalized adapter status copy so control-state lines use `lane=` + `requested=` while outcome lines keep `mode=`, and aligned runtime/smoke/operator docs without pre-writing TU1-A2 layout semantics.
 
 **Step 2 — opens when TU1-A1 ✅ + TU1-D1 ✅**
 
