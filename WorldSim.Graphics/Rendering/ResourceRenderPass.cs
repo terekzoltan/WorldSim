@@ -16,9 +16,13 @@ public sealed class ResourceRenderPass : IRenderPass
         var textures = context.Textures;
         var settings = context.Settings;
         var theme = context.Theme;
+        var visibleTiles = context.VisibleTileBounds;
 
         foreach (var tile in snapshot.Tiles)
         {
+            if (!visibleTiles.Contains(tile.X, tile.Y))
+                continue;
+
             if (tile.NodeAmount <= 0)
                 continue;
 

@@ -1,3 +1,5 @@
+using System;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using WorldSim.Graphics.Assets;
 using WorldSim.Graphics.Camera;
@@ -16,6 +18,8 @@ public sealed class WorldRenderer
     public WorldRenderSettings Settings { get; }
     public WorldRenderTheme Theme { get; private set; }
     public RenderStats LastRenderStats => _renderStats;
+    public string RequestedVisualLane { get; private set; } = "DevLite";
+    public PostFxSettings CurrentPostFxSettings { get; private set; } = new(false, PostFxQuality.Low);
     public bool TerritoryOverlayEnabled { get; set; }
     public bool CombatOverlayEnabled { get; set; }
 
@@ -37,12 +41,19 @@ public sealed class WorldRenderer
         Theme = theme;
     }
 
+    public void SetRequestedVisualLane(string lane)
+    {
+        RequestedVisualLane = string.IsNullOrWhiteSpace(lane) ? "DevLite" : lane;
+    }
+
     public void SetPostFxEnabled(bool enabled)
     {
+        CurrentPostFxSettings = CurrentPostFxSettings with { Enabled = enabled };
     }
 
     public void SetPostFxQuality(PostFxQuality quality)
     {
+        CurrentPostFxSettings = CurrentPostFxSettings with { Quality = quality };
     }
 
     public void Draw(SpriteBatch spriteBatch, WorldRenderSnapshot snapshot, Camera2D camera, TextureCatalog textures)
@@ -50,10 +61,13 @@ public sealed class WorldRenderer
         _renderStats.BeginFrame();
         spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: camera.BuildMatrix());
 
+        var viewport = spriteBatch.GraphicsDevice.Viewport;
+        var visibleTileBounds = ComputeVisibleTileBounds(snapshot, camera, viewport, Settings.TileSize);
+
         _territoryOverlayPass.Enabled = TerritoryOverlayEnabled;
         _combatOverlayPass.Enabled = CombatOverlayEnabled;
 
-        var context = new RenderFrameContext(spriteBatch, snapshot, textures, Settings, Theme, _renderStats);
+        var context = new RenderFrameContext(spriteBatch, snapshot, textures, Settings, Theme, _renderStats, visibleTileBounds);
         foreach (var pass in _passes)
         {
             var started = _renderStats.BeginPass();
@@ -71,5 +85,28 @@ public sealed class WorldRenderer
 
         spriteBatch.End();
         _renderStats.EndFrame();
+    }
+
+    private static TileBounds ComputeVisibleTileBounds(
+        WorldRenderSnapshot snapshot,
+        Camera2D camera,
+        Viewport viewport,
+        int tileSize)
+    {
+        var worldTopLeft = camera.ScreenToWorld(Vector2.Zero);
+        var worldBottomRight = camera.ScreenToWorld(new Vector2(viewport.Width, viewport.Height));
+
+        var minWorldX = MathF.Min(worldTopLeft.X, worldBottomRight.X);
+        var maxWorldX = MathF.Max(worldTopLeft.X, worldBottomRight.X);
+        var minWorldY = MathF.Min(worldTopLeft.Y, worldBottomRight.Y);
+        var maxWorldY = MathF.Max(worldTopLeft.Y, worldBottomRight.Y);
+
+        const int paddingTiles = 2;
+        var minTileX = Math.Max(0, (int)MathF.Floor(minWorldX / tileSize) - paddingTiles);
+        var minTileY = Math.Max(0, (int)MathF.Floor(minWorldY / tileSize) - paddingTiles);
+        var maxTileX = Math.Min(snapshot.Width - 1, (int)MathF.Floor(maxWorldX / tileSize) + paddingTiles);
+        var maxTileY = Math.Min(snapshot.Height - 1, (int)MathF.Floor(maxWorldY / tileSize) + paddingTiles);
+
+        return new TileBounds(minTileX, minTileY, maxTileX, maxTileY);
     }
 }

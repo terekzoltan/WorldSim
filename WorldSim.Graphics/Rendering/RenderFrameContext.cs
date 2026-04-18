@@ -10,5 +10,11 @@ public readonly record struct RenderFrameContext(
     TextureCatalog Textures,
     WorldRenderSettings Settings,
     WorldRenderTheme Theme,
-    RenderStats Stats
+    RenderStats Stats,
+    TileBounds VisibleTileBounds
 );
+
+public readonly record struct TileBounds(int MinX, int MinY, int MaxX, int MaxY)
+{
+    public bool Contains(int x, int y) => x >= MinX && x <= MaxX && y >= MinY && y <= MaxY;
+}

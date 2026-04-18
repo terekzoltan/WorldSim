@@ -50,6 +50,7 @@ public sealed class ComparisonTests
         startInfo.Environment["WORLDSIM_SCENARIO_COMPARE"] = "true";
         startInfo.Environment["WORLDSIM_SCENARIO_BASELINE_PATH"] = missingBaseline;
         startInfo.Environment["WORLDSIM_SCENARIO_OUTPUT"] = "json";
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
         using var process = Process.Start(startInfo);
         Assert.NotNull(process);
@@ -96,6 +97,40 @@ public sealed class ComparisonTests
         Assert.True(File.Exists(compareJsonPath));
         var compareDoc = ReadJson(compareJsonPath);
         Assert.Equal(1, compareDoc.RootElement.GetProperty("matchedRunCount").GetInt32());
+    }
+
+    [Fact]
+    public void Compare_DifferentVisualLanes_DoNotMatchBaselineRuns()
+    {
+        var baselineArtifactDir = CreateArtifactDir();
+        RunScenarioRunner(
+            baselineArtifactDir,
+            expectedExitCode: 0,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "399",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json"
+            });
+
+        var compareArtifactDir = CreateArtifactDir();
+        RunScenarioRunner(
+            compareArtifactDir,
+            expectedExitCode: 0,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "399",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_COMPARE"] = "true",
+                ["WORLDSIM_SCENARIO_BASELINE_PATH"] = Path.Combine(baselineArtifactDir, "summary.json"),
+                ["WORLDSIM_VISUAL_PROFILE"] = "showcase"
+            });
+
+        var compareDoc = ReadJson(Path.Combine(compareArtifactDir, "compare.json"));
+        Assert.Equal(0, compareDoc.RootElement.GetProperty("matchedRunCount").GetInt32());
+        Assert.Equal(1, compareDoc.RootElement.GetProperty("currentOnlyRunKeys").GetArrayLength());
+        Assert.Equal(1, compareDoc.RootElement.GetProperty("baselineOnlyRunKeys").GetArrayLength());
     }
 
     [Fact]
@@ -256,6 +291,7 @@ public sealed class ComparisonTests
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_COMPARE");
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_DELTA_FAIL");
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_BASELINE_PATH");
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
         foreach (var pair in env)
             startInfo.Environment[pair.Key] = pair.Value;

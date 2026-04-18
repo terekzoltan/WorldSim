@@ -51,7 +51,7 @@ public sealed class SettingsPanelRenderer
 
         spriteBatch.DrawString(font, "General", new Vector2(contentX, lineY), theme.AccentText);
         lineY += 20;
-        lineY = TextWrap.DrawWrapped(spriteBatch, font, $"Quality profile: {quality} (Ctrl+F5)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
+        lineY = TextWrap.DrawWrapped(spriteBatch, font, $"Requested visual lane: {quality} (Ctrl+F5)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"PostFx: {postFx} (Ctrl+F3, Ctrl+F4)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"HUD scale: {hudScale} (locked)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"Cinematic route: {cinematic} (Ctrl+F9)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);

@@ -240,6 +240,7 @@ public sealed class PerfModeTests
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_PERF_FAIL");
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_DELTA_FAIL");
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_BASELINE_PATH");
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
         foreach (var pair in env)
             startInfo.Environment[pair.Key] = pair.Value;

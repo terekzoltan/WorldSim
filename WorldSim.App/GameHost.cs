@@ -12,6 +12,7 @@ using WorldSim.Graphics.Rendering.PostFx;
 using WorldSim.Graphics.UI;
 using WorldSim.Graphics.UI.Panels;
 using WorldSim.RefineryAdapter;
+using WorldSim.Runtime.Profiles;
 using WorldSim.Runtime;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
@@ -20,13 +21,6 @@ namespace WorldSim;
 
 public class GameHost : Game
 {
-    private enum VisualQualityProfile
-    {
-        Low,
-        Medium,
-        High
-    }
-
     private static readonly float[] HudScales = { 1.0f };
     private static readonly float[] SimSpeedPresets = { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 10.0f };
 
@@ -80,7 +74,7 @@ public class GameHost : Game
     private bool _showSettingsOverlay;
     private bool _showDiplomacyPanel;
     private bool _showCampaignPanel;
-    private VisualQualityProfile _qualityProfile = VisualQualityProfile.Medium;
+    private LowCostProfileLane _visualLane = LowCostProfileLane.DevLite;
     private int _hudScaleIndex;
     private float _hudOpacity = 1f;
     private bool _cleanShotMode;
@@ -109,7 +103,10 @@ public class GameHost : Game
         _refineryRuntime = new RefineryTriggerAdapter(AppDomain.CurrentDomain.BaseDirectory);
         _hudRenderer.SetTheme(HudTheme.FromWorldTheme(_worldRenderer.Theme));
         _timeScale = SimSpeedPresets[_simSpeedIndex];
-        ApplyQualityProfile(_qualityProfile);
+        var profileResolution = LowCostProfileResolver.ResolveForApp(Environment.GetEnvironmentVariable("WORLDSIM_VISUAL_PROFILE"));
+        _visualLane = profileResolution.Effective;
+        _worldRenderer.SetRequestedVisualLane(_visualLane.ToString());
+        ApplyVisualLane(_visualLane);
     }
 
     protected override void Initialize()
@@ -275,7 +272,7 @@ public class GameHost : Game
             CycleTheme(1);
 
         if (IsChordPressed(keys, Keys.F5, requireCtrl: true))
-            CycleQualityProfile();
+            CycleVisualLane();
 
         if (IsChordPressed(keys, Keys.F6, requireCtrl: true, requireShift: true))
         {
@@ -634,39 +631,39 @@ public class GameHost : Game
         _hudRenderer.SetTheme(HudTheme.FromWorldTheme(_worldRenderer.Theme));
     }
 
-    private void CycleQualityProfile()
+    private void CycleVisualLane()
     {
-        _qualityProfile = _qualityProfile switch
+        _visualLane = _visualLane switch
         {
-            VisualQualityProfile.Low => VisualQualityProfile.Medium,
-            VisualQualityProfile.Medium => VisualQualityProfile.High,
-            _ => VisualQualityProfile.Low
+            LowCostProfileLane.DevLite => LowCostProfileLane.Showcase,
+            _ => LowCostProfileLane.DevLite
         };
-        ApplyQualityProfile(_qualityProfile);
+        _worldRenderer.SetRequestedVisualLane(_visualLane.ToString());
+        ApplyVisualLane(_visualLane);
     }
 
-    private void ApplyQualityProfile(VisualQualityProfile profile)
+    private void ApplyVisualLane(LowCostProfileLane lane)
     {
-        switch (profile)
+        switch (lane)
         {
-            case VisualQualityProfile.Low:
+            case LowCostProfileLane.DevLite:
                 _postFxEnabled = false;
                 _postFxQuality = PostFxQuality.Low;
                 break;
-            case VisualQualityProfile.High:
+            case LowCostProfileLane.Showcase:
                 _postFxEnabled = true;
                 _postFxQuality = PostFxQuality.High;
                 break;
             default:
-                _postFxEnabled = true;
-                _postFxQuality = PostFxQuality.Medium;
+                _postFxEnabled = false;
+                _postFxQuality = PostFxQuality.Low;
                 break;
         }
 
         _worldRenderer.SetPostFxEnabled(_postFxEnabled);
         _worldRenderer.SetPostFxQuality(_postFxQuality);
 
-        SetToast($"Quality profile: {profile}");
+        SetToast($"Requested visual lane: {lane}");
     }
 
     private void CycleHudScale()
@@ -790,7 +787,7 @@ public class GameHost : Game
         var operatorSummary = $"Dir: eff={snapshot.Director.OutputMode} {snapshot.Director.ApplyStatus} | requested={_refineryRuntime.RequestedDirectorOutputMode} | profile={_refineryRuntime.CurrentOperatorProfileName} | lane={_refineryRuntime.CurrentIntegrationMode}";
         var operatorDebugDetail = $"Dir debug: stage={snapshot.Director.StageMarker} effSrc={snapshot.Director.OutputModeSource} requestedSrc={_refineryRuntime.RequestedDirectorOutputModeSource} profileSrc={_refineryRuntime.CurrentOperatorProfileSource}";
         var operatorFailureDetail = BuildOperatorFailureDetail(snapshot.Director.ApplyStatus);
-        var plannerStatus = $"AI: {_runtime.PlannerMode}/{_runtime.PolicyMode} | Sim:{simStatus} | PostFx:{(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Q:{_qualityProfile}";
+        var plannerStatus = $"AI: {_runtime.PlannerMode}/{_runtime.PolicyMode} | Sim:{simStatus} | PostFx:{(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | ReqLane:{_visualLane}";
 #if DEBUG
         plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 focus | Ctrl+F6 mode | Ctrl+Shift+F6 preset | Ctrl+F12 settings)";
 #endif
@@ -826,14 +823,14 @@ public class GameHost : Game
         if (_showSettingsOverlay)
         {
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            _settingsPanelRenderer.Draw(
+                _settingsPanelRenderer.Draw(
                 _spriteBatch,
                 _textures.Pixel,
                 _font,
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height,
                 _hudRenderer.Theme,
-                _qualityProfile.ToString(),
+                _visualLane.ToString(),
                 _postFxEnabled ? _postFxQuality.ToString() : "OFF",
                 hudScale.ToString("0.00"),
                 _cameraRoutePlayer.IsActive ? "Playing" : "Idle",

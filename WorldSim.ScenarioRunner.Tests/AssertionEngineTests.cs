@@ -215,6 +215,7 @@ public sealed class AssertionEngineTests
         startInfo.Environment["WORLDSIM_SCENARIO_PLANNERS"] = "simple";
         startInfo.Environment["WORLDSIM_SCENARIO_OUTPUT"] = "json";
         startInfo.Environment["WORLDSIM_SCENARIO_CONFIGS_JSON"] = "{not valid json";
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
         using var process = Process.Start(startInfo);
         Assert.NotNull(process);
@@ -262,6 +263,7 @@ public sealed class AssertionEngineTests
 
         startInfo.Environment["WORLDSIM_SCENARIO_TICKS"] = "8";
         startInfo.Environment["WORLDSIM_SCENARIO_ARTIFACT_DIR"] = artifactDir;
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
         foreach (var pair in env)
             startInfo.Environment[pair.Key] = pair.Value;
 

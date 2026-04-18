@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using WorldSim.Runtime.Diagnostics;
+using WorldSim.Runtime.Profiles;
 using WorldSim.Simulation;
 
 var outputMode = ParseOutputMode(Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_OUTPUT"));
@@ -44,6 +45,7 @@ var drilldownSampleEvery = ParseIntClamped(Environment.GetEnvironmentVariable("W
 var baselinePath = Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_BASELINE_PATH");
 var rawConfigsJson = Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_CONFIGS_JSON");
 var parsedConfigs = ParseScenarioConfigs(rawConfigsJson);
+var visualLaneResolution = LowCostProfileResolver.ResolveForScenarioRunner(Environment.GetEnvironmentVariable("WORLDSIM_VISUAL_PROFILE"));
 foreach (var warning in parsedConfigs.Warnings)
     LogWarning(warning);
 var configs = parsedConfigs.Configs;
@@ -152,6 +154,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 config,
                 planner,
                 seed,
+                visualLaneResolution.Effective,
                 tickTimesMs,
                 peakEntities,
                 peakActiveBattles,
@@ -207,7 +210,16 @@ WriteEvaluationOutput(evaluation, outputMode, LogLine, LogBufferOnly);
 Environment.ExitCode = evaluation.ExitCode;
 if (!string.IsNullOrWhiteSpace(artifactDir))
 {
-    WriteArtifactBundle(envelope, evaluation, artifactDir, runLogBuffer.ToString(), drilldownEnabled, drilldownTopN, drilldownSampleEvery, runTimelines);
+    WriteArtifactBundle(
+        envelope,
+        evaluation,
+        visualLaneResolution,
+        artifactDir,
+        runLogBuffer.ToString(),
+        drilldownEnabled,
+        drilldownTopN,
+        drilldownSampleEvery,
+        runTimelines);
 }
 
 return Environment.ExitCode;
@@ -217,6 +229,7 @@ static ScenarioRunResult BuildRunResult(
     ScenarioConfig config,
     NpcPlannerMode planner,
     int seed,
+    LowCostProfileLane visualLane,
     List<double>? tickTimesMs,
     long peakEntities,
     int peakActiveBattles,
@@ -252,6 +265,7 @@ static ScenarioRunResult BuildRunResult(
         ConfigName: config.Name,
         PlannerMode: planner.ToString(),
         Seed: seed,
+        VisualLane: visualLane.ToString(),
         Width: config.Width,
         Height: config.Height,
         InitialPop: config.InitialPop,
@@ -334,7 +348,7 @@ static void WriteOutput(
             foreach (var run in envelope.Runs)
             {
                 logLine(
-                    $"config={run.ConfigName} planner={run.PlannerMode} seed={run.Seed} livingCols={run.LivingColonies} people={run.People} food={run.Food} avgFpp={run.AverageFoodPerPerson:0.00} " +
+                    $"config={run.ConfigName} planner={run.PlannerMode} seed={run.Seed} lane={run.VisualLane} livingCols={run.LivingColonies} people={run.People} food={run.Food} avgFpp={run.AverageFoodPerPerson:0.00} " +
                     $"cluster(overlap/dissipate/denseTicks/lastDense)={run.OverlapResolveMoves}/{run.CrowdDissipationMoves}/{run.DenseNeighborhoodTicks}/{run.LastTickDenseActors} " +
                     $"birthFallback(occupied/parent)={run.BirthFallbackToOccupied}/{run.BirthFallbackToParent} " +
                     $"buildSiteResets={run.BuildSiteResets} " +
@@ -347,6 +361,7 @@ static void WriteOutput(
 static void WriteArtifactBundle(
     ScenarioRunEnvelope envelope,
     ScenarioEvaluation evaluation,
+    LowCostProfileResolution visualLaneResolution,
     string artifactDirRaw,
     string runLog,
     bool drilldownEnabled,
@@ -411,6 +426,8 @@ static void WriteArtifactBundle(
         PerfRunCount: evaluation.PerfSummary.PerfRunCount,
         PerfRedCount: evaluation.PerfSummary.PerfRedCount,
         PerfYellowCount: evaluation.PerfSummary.PerfYellowCount,
+        EffectiveVisualLane: visualLaneResolution.Effective.ToString(),
+        VisualLaneSource: visualLaneResolution.Source,
         DrilldownEnabled: drilldownSummary.Enabled,
         DrilldownSelectedRuns: drilldownSummary.SelectedRuns,
         DrilldownTopN: drilldownSummary.TopN,
@@ -1157,10 +1174,10 @@ static void WriteEvaluationOutput(
 }
 
 static string BuildRunKey(ScenarioRunResult run)
-    => $"{BuildStableKeyPart(run.ConfigName)}_{BuildStableKeyPart(run.PlannerMode)}_{run.Seed}";
+    => $"{BuildStableKeyPart(run.ConfigName)}_{BuildStableKeyPart(run.PlannerMode)}_{BuildStableKeyPart(run.VisualLane)}_{run.Seed}";
 
 static string BuildPerfRunKey(ScenarioRunResult run)
-    => $"{run.ConfigName}/{run.PlannerMode}/{run.Seed}";
+    => $"{run.ConfigName}/{run.PlannerMode}/{run.VisualLane}/{run.Seed}";
 
 static string BuildStableKeyPart(string value)
     => $"{ToFileSafeToken(value)}_{ComputeStableHash(value)}";
@@ -1476,6 +1493,7 @@ sealed record ScenarioRunResult(
     string ConfigName,
     string PlannerMode,
     int Seed,
+    string VisualLane,
     int Width,
     int Height,
     int InitialPop,
@@ -1556,6 +1574,8 @@ sealed record ScenarioArtifactManifest(
     int PerfRunCount,
     int PerfRedCount,
     int PerfYellowCount,
+    string EffectiveVisualLane,
+    string VisualLaneSource,
     bool DrilldownEnabled,
     int DrilldownSelectedRuns,
     int DrilldownTopN,

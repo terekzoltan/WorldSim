@@ -1435,8 +1435,8 @@ Wave 7.5 alignment note:
 ### Sprint LC1: Profiles + Visual Driver Boundary (Track B -> A -> C)
 
 - ✅ **LC1-B1** Snapshot visual-driver field audit + minimal additive export set for state-driven rendering (Track B)
-- ⬜ **LC1-B2** Runtime/profile plumbing for `Showcase`, `DevLite`, and `Headless` defaults (Track B)
-- ⬜ **LC1-A1** Terrain state-driven variation baseline -- palette/tint/noise/culling-friendly rendering (Track A)
+- ✅ **LC1-B2** Runtime/profile plumbing for `Showcase`, `DevLite`, and `Headless` defaults (Track B)
+- ✅ **LC1-A1** Terrain state-driven variation baseline -- palette/tint/noise/culling-friendly rendering (Track A)
 - ⬜ **LC1-A2** Atmosphere + ambient-life baseline under explicit quality gates (Track A)
 - ⬜ **LC1-A3** Settings/HUD/profile visibility + low-cost regression smoke checklist updates (Track A)
 - ⬜ **LC1-C1** AI/planner telemetry + profile-compatibility audit for headless/devlite determinism (Track C, additive only)
@@ -1458,6 +1458,12 @@ Wave 7.5 Step 1 progress note:
 |---------|---------|--------|-------|
 | Track B agent | LC1-B2 | LC1-B1 ✅ | Profile plumbing builds on the agreed snapshot/visual-driver boundary |
 | Track A agent | LC1-A1 | LC1-B1 ✅ | Terrain/state-driven variation can start once the snapshot driver contract is stable |
+
+Wave 7.5 Step 2 progress note:
+- ✅ `LC1-B2` closed: Track B introduced a minimal canonical visual-lane plumbing seam (`Showcase` / `DevLite` / `Headless`) with requested/effective/source resolution, locked `Headless` as runner-only default (no app-side fake headless), switched app interactive lane defaults/cycle to `DevLite` ↔ `Showcase`, and exported effective lane metadata on ScenarioRunner run/summary/manifest artifacts; scope remained plumbing-only (no render-pass logic or future render-knob package), runtime+adapter tests, targeted ScenarioRunner artifact tests, and full solution build are green.
+
+Wave 7.5 Step 2 progress note:
+- ✅ `LC1-A1` closed as strict minimal Track A slice: render context now carries centralized visible tile bounds from camera+viewport, `TerrainRenderPass` consumes `OwnershipStrength` + `FoodRegrowthProgress` with deterministic CPU-side tile variation (no time animation, no neighbor scan), and terrain/resource passes are now culling-aware on the shared bounds seam. No runtime/read-model changes, no profile/UI wording scope, no atmosphere layer, and no resource-side regrowth marker were added. This is terrain/resource culling baseline only (not full renderer-culling closure).
 
 **Step 3 — opens when LC1-B2 ✅ + LC1-A1 ✅**
 

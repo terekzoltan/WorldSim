@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -16,6 +17,8 @@ public sealed class ArtifactBundleTests
         Assert.Equal(2, manifest.RootElement.GetProperty("totalRuns").GetInt32());
         Assert.Equal(0, manifest.RootElement.GetProperty("exitCode").GetInt32());
         Assert.Equal("ok", manifest.RootElement.GetProperty("exitReason").GetString());
+        Assert.Equal("Headless", manifest.RootElement.GetProperty("effectiveVisualLane").GetString());
+        Assert.Equal("default", manifest.RootElement.GetProperty("visualLaneSource").GetString());
 
         var runId = manifest.RootElement.GetProperty("runId").GetString();
         Assert.True(Guid.TryParse(runId, out _));
@@ -48,6 +51,7 @@ public sealed class ArtifactBundleTests
         {
             var runDoc = ReadJson(Path.Combine(runsDir, file!));
             Assert.Equal("default", runDoc.RootElement.GetProperty("configName").GetString());
+            Assert.Equal("Headless", runDoc.RootElement.GetProperty("visualLane").GetString());
             Assert.True(runDoc.RootElement.TryGetProperty("aiNoPlanDecisions", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("aiReplanBackoffDecisions", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("aiResearchTechDecisions", out _));
@@ -121,6 +125,29 @@ public sealed class ArtifactBundleTests
     }
 
     [Fact]
+    public void ArtifactBundle_VisualLaneOverride_IsPersisted()
+    {
+        var artifactDir = CreateArtifactDir();
+        RunScenarioRunner(
+            artifactDir,
+            "77",
+            "simple",
+            output: "json",
+            extraEnv: new Dictionary<string, string>
+            {
+                ["WORLDSIM_VISUAL_PROFILE"] = "showcase"
+            });
+
+        var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("Showcase", manifest.RootElement.GetProperty("effectiveVisualLane").GetString());
+        Assert.Equal("env", manifest.RootElement.GetProperty("visualLaneSource").GetString());
+
+        var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var firstRun = summary.RootElement.GetProperty("runs")[0];
+        Assert.Equal("Showcase", firstRun.GetProperty("visualLane").GetString());
+    }
+
+    [Fact]
     public void ArtifactBundle_DistinctConfigNames_DoNotCollideAfterSanitization()
     {
         var artifactDir = CreateArtifactDir();
@@ -141,6 +168,7 @@ public sealed class ArtifactBundleTests
         startInfo.Environment["WORLDSIM_SCENARIO_OUTPUT"] = "json";
         startInfo.Environment["WORLDSIM_SCENARIO_ARTIFACT_DIR"] = artifactDir;
         startInfo.Environment["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson;
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
         using var process = Process.Start(startInfo);
         Assert.NotNull(process);
@@ -173,7 +201,12 @@ public sealed class ArtifactBundleTests
         return JsonDocument.Parse(json);
     }
 
-    private static void RunScenarioRunner(string? artifactDir, string seeds, string planners, string output)
+    private static void RunScenarioRunner(
+        string? artifactDir,
+        string seeds,
+        string planners,
+        string output,
+        IReadOnlyDictionary<string, string>? extraEnv = null)
     {
         var repoRoot = FindRepoRoot();
         var projectPath = Path.Combine(repoRoot, "WorldSim.ScenarioRunner", "WorldSim.ScenarioRunner.csproj");
@@ -189,11 +222,18 @@ public sealed class ArtifactBundleTests
         startInfo.Environment["WORLDSIM_SCENARIO_PLANNERS"] = planners;
         startInfo.Environment["WORLDSIM_SCENARIO_TICKS"] = "8";
         startInfo.Environment["WORLDSIM_SCENARIO_OUTPUT"] = output;
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
         if (artifactDir is not null)
             startInfo.Environment["WORLDSIM_SCENARIO_ARTIFACT_DIR"] = artifactDir;
         else
             startInfo.Environment.Remove("WORLDSIM_SCENARIO_ARTIFACT_DIR");
+
+        if (extraEnv is not null)
+        {
+            foreach (var (key, value) in extraEnv)
+                startInfo.Environment[key] = value;
+        }
 
         using var process = Process.Start(startInfo);
         Assert.NotNull(process);

@@ -133,6 +133,7 @@ public sealed class ContactFunnelArtifactTests
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_DRILLDOWN");
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_DRILLDOWN_TOP");
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_SAMPLE_EVERY");
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
         foreach (var pair in env)
             startInfo.Environment[pair.Key] = pair.Value;
