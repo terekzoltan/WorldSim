@@ -134,7 +134,9 @@ public sealed record TileRenderData(
     ResourceView NodeType,
     int NodeAmount,
     int OwnerFactionId,
-    bool IsContested);
+    bool IsContested,
+    float OwnershipStrength,
+    float FoodRegrowthProgress);
 
 public sealed record HouseRenderData(int X, int Y, int ColonyId);
 

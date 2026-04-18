@@ -373,6 +373,8 @@ namespace WorldSim.Simulation
         readonly Queue<float> _recentStarvationDeaths = new();
         readonly int[,] _tileOwnerColonyIds;
         readonly bool[,] _tileContested;
+        readonly float[,] _tileOwnershipStrength;
+        readonly Dictionary<(int x, int y), float> _foodRegrowthProgress = new();
         readonly Dictionary<int, ColonyWarState> _colonyWarStates = new();
         readonly Dictionary<int, int> _colonyWarriorCounts = new();
         readonly DomainModifierEngine _domainModifierEngine = new();
@@ -432,6 +434,7 @@ namespace WorldSim.Simulation
         const float SpecializedBuildPeriod = 14f;
         const float FoodParityPeriod = 6f;
         const int TerritoryRecomputeIntervalTicks = 5;
+        const double TerritoryContestedThreshold = 2.2d;
         const int CrowdDissipationNeighborRadius = 2;
         const int CrowdDissipationSearchRadius = 4;
         const int CrowdDissipationThreshold = 4;
@@ -449,6 +452,7 @@ namespace WorldSim.Simulation
             _map = new Tile[width, height];
             _tileOwnerColonyIds = new int[width, height];
             _tileContested = new bool[width, height];
+            _tileOwnershipStrength = new float[width, height];
 
             // 1) Biomes (Grass/Dirt/Water) via cheap seeded region growing
             Ground[,] grounds = GenerateBiomes();
@@ -1093,6 +1097,22 @@ namespace WorldSim.Simulation
         {
             var pair = NormalizeFactionPair(left, right);
             return _contestedTilesByFactionPair.GetValueOrDefault(pair, 0);
+        }
+
+        public float GetTileOwnershipStrength(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= Width || y >= Height)
+                return 0f;
+
+            return _tileOwnershipStrength[x, y];
+        }
+
+        public float GetFoodRegrowthProgress(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= Width || y >= Height)
+                return 0f;
+
+            return _foodRegrowthProgress.GetValueOrDefault((x, y), 0f);
         }
 
         public ColonyWarState GetColonyWarState(int colonyId)
@@ -2063,6 +2083,7 @@ namespace WorldSim.Simulation
                     {
                         _tileOwnerColonyIds[x, y] = -1;
                         _tileContested[x, y] = false;
+                        _tileOwnershipStrength[x, y] = 0f;
                         continue;
                     }
 
@@ -2099,8 +2120,10 @@ namespace WorldSim.Simulation
 
                     _tileOwnerColonyIds[x, y] = bestId;
 
-                    bool contested = secondId >= 0 && (bestScore - secondScore) <= 2.2d;
+                    bool contested = secondId >= 0 && (bestScore - secondScore) <= TerritoryContestedThreshold;
                     _tileContested[x, y] = contested;
+
+                    _tileOwnershipStrength[x, y] = ComputeTileOwnershipStrength(bestId, secondId, bestScore, secondScore);
 
                     if (!contested)
                         continue;
@@ -2118,6 +2141,18 @@ namespace WorldSim.Simulation
 
         private static (Faction left, Faction right) NormalizeFactionPair(Faction left, Faction right)
             => left <= right ? (left, right) : (right, left);
+
+        private static float ComputeTileOwnershipStrength(int bestId, int secondId, double bestScore, double secondScore)
+        {
+            if (bestId < 0)
+                return 0f;
+
+            if (secondId < 0)
+                return 1f;
+
+            var margin = Math.Max(0d, bestScore - secondScore);
+            return (float)Math.Clamp(margin / TerritoryContestedThreshold, 0d, 1d);
+        }
 
         private void RecomputeMobilizationState()
         {
@@ -2351,6 +2386,7 @@ namespace WorldSim.Simulation
                 return;
 
             _foodRegrowth.Add((x, y, 0f, 24f + (float)_rng.NextDouble() * 24f));
+            _foodRegrowthProgress[(x, y)] = 0f;
         }
 
         void UpdateFoodRegrowth(float dt)
@@ -2365,8 +2401,11 @@ namespace WorldSim.Simulation
                     if (_map[spot.x, spot.y].Ground != Ground.Water)
                         _map[spot.x, spot.y].ReplaceNode(new ResourceNode(Resource.Food, _rng.Next(2, 7)));
                     _foodRegrowth.RemoveAt(i);
+                    _foodRegrowthProgress.Remove((spot.x, spot.y));
                     continue;
                 }
+
+                _foodRegrowthProgress[(spot.x, spot.y)] = Math.Clamp(spot.timer / Math.Max(0.0001f, spot.target), 0f, 1f);
                 _foodRegrowth[i] = spot;
             }
         }

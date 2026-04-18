@@ -1434,7 +1434,7 @@ Wave 7.5 alignment note:
 
 ### Sprint LC1: Profiles + Visual Driver Boundary (Track B -> A -> C)
 
-- ⬜ **LC1-B1** Snapshot visual-driver field audit + minimal additive export set for state-driven rendering (Track B)
+- ✅ **LC1-B1** Snapshot visual-driver field audit + minimal additive export set for state-driven rendering (Track B)
 - ⬜ **LC1-B2** Runtime/profile plumbing for `Showcase`, `DevLite`, and `Headless` defaults (Track B)
 - ⬜ **LC1-A1** Terrain state-driven variation baseline -- palette/tint/noise/culling-friendly rendering (Track A)
 - ⬜ **LC1-A2** Atmosphere + ambient-life baseline under explicit quality gates (Track A)
@@ -1448,6 +1448,9 @@ Wave 7.5 alignment note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | LC1-B1 | Wave 7 ✅ | Define the visual-driver boundary before any profile or rendering follow-up starts |
+
+Wave 7.5 Step 1 progress note:
+- ✅ `LC1-B1` closed: Track B locked a minimal visual-driver contract (`OwnershipStrength`, `FoodRegrowthProgress`) with explicit fallback/range policy (including `secondId < 0` ownership fallback) in `Docs/Plans/Master/Wave7.5-LC1-B1-Track-B-Visual-Driver-Contract.md`, implemented runtime-owned caches/accessors and additive `TileRenderData` export without new top-level snapshot blocks or Graphics-side changes, and added controlled runtime tests (range/default, determinism, regrowth progression, ownership ordering); runtime+adapter test gates and full solution build are green.
 
 **Step 2 — opens when LC1-B1 ✅**
 

@@ -42,7 +42,9 @@ public static class WorldSnapshotBuilder
                     MapResource(nodeType),
                     nodeAmount,
                     ownerFactionId,
-                    world.IsTileContested(x, y)));
+                    world.IsTileContested(x, y),
+                    world.GetTileOwnershipStrength(x, y),
+                    world.GetFoodRegrowthProgress(x, y)));
             }
         }
 
