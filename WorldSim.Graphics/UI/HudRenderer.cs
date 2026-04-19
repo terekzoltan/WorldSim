@@ -102,7 +102,7 @@ public sealed class HudRenderer
         if (!string.IsNullOrWhiteSpace(operatorFailureDetail))
             directorExtraLines += 1;
 
-        if (showAiDebug && !string.IsNullOrWhiteSpace(plannerStatus))
+        if (!string.IsNullOrWhiteSpace(plannerStatus))
             directorExtraLines += 1;
 
         var baseHeight = 120 + (snapshot.Colonies.Count * 44) + 84 + (visibleEventCount * 26);
@@ -125,7 +125,7 @@ public sealed class HudRenderer
         if (showAiDebug && !string.IsNullOrWhiteSpace(operatorDebugDetail))
             y = TextWrap.DrawWrapped(spriteBatch, font, operatorDebugDetail, new Vector2(leftX, y), Theme.SecondaryText, contentWidth, 20);
 
-        if (showAiDebug && !string.IsNullOrWhiteSpace(plannerStatus))
+        if (!string.IsNullOrWhiteSpace(plannerStatus))
             y = TextWrap.DrawWrapped(spriteBatch, font, plannerStatus, new Vector2(leftX, y), Theme.StatusText, contentWidth, 20);
 
         if (renderStats != null)

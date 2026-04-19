@@ -12,7 +12,9 @@ public sealed class SettingsPanelRenderer
         int viewportWidth,
         int viewportHeight,
         HudTheme theme,
-        string quality,
+        string visualLaneRequested,
+        string visualLaneEffective,
+        string visualLaneSource,
         string postFx,
         string hudScale,
         string cinematic,
@@ -51,7 +53,8 @@ public sealed class SettingsPanelRenderer
 
         spriteBatch.DrawString(font, "General", new Vector2(contentX, lineY), theme.AccentText);
         lineY += 20;
-        lineY = TextWrap.DrawWrapped(spriteBatch, font, $"Requested visual lane: {quality} (Ctrl+F5)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
+        lineY = TextWrap.DrawWrapped(spriteBatch, font, $"Lane req/eff/src: {visualLaneRequested} -> {visualLaneEffective} ({visualLaneSource})", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
+        lineY = TextWrap.DrawWrapped(spriteBatch, font, "Lane cycle: Ctrl+F5 DevLite <-> Showcase | Headless: ScenarioRunner / batch only", new Vector2(contentX, lineY), theme.SecondaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"PostFx: {postFx} (Ctrl+F3, Ctrl+F4)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"HUD scale: {hudScale} (locked)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"Cinematic route: {cinematic} (Ctrl+F9)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);

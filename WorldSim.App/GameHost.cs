@@ -74,6 +74,7 @@ public class GameHost : Game
     private bool _showSettingsOverlay;
     private bool _showDiplomacyPanel;
     private bool _showCampaignPanel;
+    private LowCostProfileResolution _visualLaneResolution = new("default", LowCostProfileLane.DevLite, "default");
     private LowCostProfileLane _visualLane = LowCostProfileLane.DevLite;
     private int _hudScaleIndex;
     private float _hudOpacity = 1f;
@@ -103,8 +104,8 @@ public class GameHost : Game
         _refineryRuntime = new RefineryTriggerAdapter(AppDomain.CurrentDomain.BaseDirectory);
         _hudRenderer.SetTheme(HudTheme.FromWorldTheme(_worldRenderer.Theme));
         _timeScale = SimSpeedPresets[_simSpeedIndex];
-        var profileResolution = LowCostProfileResolver.ResolveForApp(Environment.GetEnvironmentVariable("WORLDSIM_VISUAL_PROFILE"));
-        _visualLane = profileResolution.Effective;
+        _visualLaneResolution = LowCostProfileResolver.ResolveForApp(Environment.GetEnvironmentVariable("WORLDSIM_VISUAL_PROFILE"));
+        _visualLane = _visualLaneResolution.Effective;
         _worldRenderer.SetRequestedVisualLane(_visualLane.ToString());
         ApplyVisualLane(_visualLane);
     }
@@ -638,6 +639,9 @@ public class GameHost : Game
             LowCostProfileLane.DevLite => LowCostProfileLane.Showcase,
             _ => LowCostProfileLane.DevLite
         };
+
+        var requested = _visualLane == LowCostProfileLane.Showcase ? "showcase" : "devlite";
+        _visualLaneResolution = new LowCostProfileResolution(requested, _visualLane, "hotkey_ctrl_f5");
         _worldRenderer.SetRequestedVisualLane(_visualLane.ToString());
         ApplyVisualLane(_visualLane);
     }
@@ -787,10 +791,7 @@ public class GameHost : Game
         var operatorSummary = $"Dir: eff={snapshot.Director.OutputMode} {snapshot.Director.ApplyStatus} | requested={_refineryRuntime.RequestedDirectorOutputMode} | profile={_refineryRuntime.CurrentOperatorProfileName} | lane={_refineryRuntime.CurrentIntegrationMode}";
         var operatorDebugDetail = $"Dir debug: stage={snapshot.Director.StageMarker} effSrc={snapshot.Director.OutputModeSource} requestedSrc={_refineryRuntime.RequestedDirectorOutputModeSource} profileSrc={_refineryRuntime.CurrentOperatorProfileSource}";
         var operatorFailureDetail = BuildOperatorFailureDetail(snapshot.Director.ApplyStatus);
-        var plannerStatus = $"AI: {_runtime.PlannerMode}/{_runtime.PolicyMode} | Sim:{simStatus} | PostFx:{(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | ReqLane:{_visualLane}";
-#if DEBUG
-        plannerStatus += " (Ctrl+P pause | Ctrl+-/+ speed | Ctrl+. step | F2 focus | Ctrl+F6 mode | Ctrl+Shift+F6 preset | Ctrl+F12 settings)";
-#endif
+        var plannerStatus = $"AI: {_runtime.PlannerMode}/{_runtime.PolicyMode} | Sim:{simStatus} | PostFx:{(_postFxEnabled ? _postFxQuality.ToString() : "OFF")} | Lane:{_visualLaneResolution.Effective}";
         if (_showTelemetryHud && !_cleanShotMode && !panelExclusive)
         {
             var aiDebug = _runtime.GetAiDebugSnapshot();
@@ -830,7 +831,9 @@ public class GameHost : Game
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height,
                 _hudRenderer.Theme,
-                _visualLane.ToString(),
+                _visualLaneResolution.Requested,
+                _visualLaneResolution.Effective.ToString(),
+                _visualLaneResolution.Source,
                 _postFxEnabled ? _postFxQuality.ToString() : "OFF",
                 hudScale.ToString("0.00"),
                 _cameraRoutePlayer.IsActive ? "Playing" : "Idle",

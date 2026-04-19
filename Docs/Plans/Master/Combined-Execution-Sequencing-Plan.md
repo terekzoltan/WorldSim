@@ -1438,7 +1438,7 @@ Wave 7.5 alignment note:
 - ✅ **LC1-B2** Runtime/profile plumbing for `Showcase`, `DevLite`, and `Headless` defaults (Track B)
 - ✅ **LC1-A1** Terrain state-driven variation baseline -- palette/tint/noise/culling-friendly rendering (Track A)
 - ✅ **LC1-A2** Atmosphere + ambient-life baseline under explicit quality gates (Track A)
-- ⬜ **LC1-A3** Settings/HUD/profile visibility + low-cost regression smoke checklist updates (Track A)
+- ✅ **LC1-A3** Settings/HUD/profile visibility + low-cost regression smoke checklist updates (Track A)
 - ✅ **LC1-C1** AI/planner telemetry + profile-compatibility audit for headless/devlite determinism (Track C, additive only)
 
 ### Wave 7.5 — Execution Steps
@@ -1481,6 +1481,9 @@ Wave 7.5 Step 3 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track A agent | LC1-A3 | LC1-B2 ✅ + LC1-A2 ✅ | Settings/HUD/profile visibility and checklist updates should document the final baseline, not an intermediate one |
+
+Wave 7.5 Step 4 progress note:
+- ✅ `LC1-A3` closed as a strict Track A visibility/documentation slice: `GameHost` now preserves full app-side visual lane resolution (`requested/effective/source`) without changing shared runtime resolver taxonomy, HUD keeps minimal lane visibility (`Lane:<effective>`) on the main status line, and settings overlay now documents the final low-cost policy (`requested/effective/source` + `Headless` as `ScenarioRunner/batch only`) while keeping app cycle locked to `DevLite <-> Showcase`. `WorldSim.Graphics/Docs/Plans/Phase1-Sprint3-Smoke-Checklist.md` was updated to current core `Ctrl+...` hotkeys (including operator controls), explicit HUD lane-label verification, and three-lane policy proof (`DevLite`/`Showcase` app smoke + `Headless` ScenarioRunner artifact verification). Scope stayed guarded: no runtime/read-model export changes, no renderer behavior expansion, and no app-side interactive headless mode.
 
 Acceptance notes:
 - `DevLite` becomes the default development baseline; `Showcase` is explicit/opt-in and `Headless` remains available for SMR and batch runs.
