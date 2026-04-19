@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-04-14
+Last updated: 2026-04-19
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -1437,9 +1437,9 @@ Wave 7.5 alignment note:
 - ✅ **LC1-B1** Snapshot visual-driver field audit + minimal additive export set for state-driven rendering (Track B)
 - ✅ **LC1-B2** Runtime/profile plumbing for `Showcase`, `DevLite`, and `Headless` defaults (Track B)
 - ✅ **LC1-A1** Terrain state-driven variation baseline -- palette/tint/noise/culling-friendly rendering (Track A)
-- ⬜ **LC1-A2** Atmosphere + ambient-life baseline under explicit quality gates (Track A)
+- ✅ **LC1-A2** Atmosphere + ambient-life baseline under explicit quality gates (Track A)
 - ⬜ **LC1-A3** Settings/HUD/profile visibility + low-cost regression smoke checklist updates (Track A)
-- ⬜ **LC1-C1** AI/planner telemetry + profile-compatibility audit for headless/devlite determinism (Track C, additive only)
+- ✅ **LC1-C1** AI/planner telemetry + profile-compatibility audit for headless/devlite determinism (Track C, additive only)
 
 ### Wave 7.5 — Execution Steps
 
@@ -1470,7 +1470,11 @@ Wave 7.5 Step 2 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track A agent | LC1-A2 | LC1-B2 ✅ + LC1-A1 ✅ | Atmosphere/ambient-life tuning should respect the finalized low-cost profile wiring |
-| Track C agent | LC1-C1 | LC1-B2 ✅ | Only additive telemetry/guardrails; no renderer scope or profile-owned game logic |
+| Track C agent | LC1-C1 | LC1-B2 ✅ + LC1-A1 ✅ | Only additive telemetry/guardrails; no renderer scope or profile-owned game logic |
+
+Wave 7.5 Step 3 progress note:
+- ✅ `LC1-A2` closed as a strict render-behavior Track A slice: `WorldRenderer` now applies an internal lane-aware visual policy from `RequestedVisualLane` (not from postfx state), the existing `FogHazeRenderPass` is reused and wired directly after terrain (`Terrain -> FogHaze -> Resources -> Structures -> Actors`) with deterministic season/drought intensity gating, and `TerrainRenderPass` received a small CPU-side lane-aware ambient modulation tune. Scope remained guarded: no `GameHost`/UI wording work, no runtime/read-model export changes, no particle/weather system, and no separate ambient-life pass.
+- ✅ `LC1-C1` closed as a strict Track C additive audit slice: alignment note documented low-cost compatibility guardrails (`Docs/Plans/Master/Wave7.5-LC1-C1-Track-C-Alignment-Note.md`), and focused ScenarioRunner compatibility tests now verify `Headless` vs `DevLite` lane metadata may differ while AI/planner/contact evidence remains exact-match deterministic across `simple`/`goap`/`htn` planners under a nontrivial combat-enabled config (`EnableCombatPrimitives=true`, `EnableDiplomacy=true`, `EnableSiege=true`, `Ticks=300`) with exit-code-`0` enforcement (`WorldSim.ScenarioRunner.Tests/LowCostProfileCompatibilityTests.cs`). Scope stayed guarded (no renderer scope, no compare-mode identity changes, no profile-owned gameplay logic).
 
 **Step 4 — opens when LC1-A2 ✅**
 

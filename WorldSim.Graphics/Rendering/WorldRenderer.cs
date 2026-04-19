@@ -30,6 +30,7 @@ public sealed class WorldRenderer
         _passes = new IRenderPass[]
         {
             new TerrainRenderPass(),
+            new FogHazeRenderPass(),
             new ResourceRenderPass(),
             new StructureRenderPass(),
             new ActorRenderPass()
@@ -63,11 +64,12 @@ public sealed class WorldRenderer
 
         var viewport = spriteBatch.GraphicsDevice.Viewport;
         var visibleTileBounds = ComputeVisibleTileBounds(snapshot, camera, viewport, Settings.TileSize);
+        var visualPolicy = ResolveVisualPolicy(RequestedVisualLane);
 
         _territoryOverlayPass.Enabled = TerritoryOverlayEnabled;
         _combatOverlayPass.Enabled = CombatOverlayEnabled;
 
-        var context = new RenderFrameContext(spriteBatch, snapshot, textures, Settings, Theme, _renderStats, visibleTileBounds);
+        var context = new RenderFrameContext(spriteBatch, snapshot, textures, Settings, Theme, _renderStats, visibleTileBounds, visualPolicy);
         foreach (var pass in _passes)
         {
             var started = _renderStats.BeginPass();
@@ -108,5 +110,16 @@ public sealed class WorldRenderer
         var maxTileY = Math.Min(snapshot.Height - 1, (int)MathF.Floor(maxWorldY / tileSize) + paddingTiles);
 
         return new TileBounds(minTileX, minTileY, maxTileX, maxTileY);
+    }
+
+    private static LowCostVisualPolicy ResolveVisualPolicy(string requestedLane)
+    {
+        var normalizedLane = requestedLane?.Trim().ToLowerInvariant() ?? "devlite";
+        return normalizedLane switch
+        {
+            "showcase" => new LowCostVisualPolicy(HazeEnabled: true, HazeIntensityMultiplier: 1f, TerrainAmbientMultiplier: 1f),
+            "headless" => new LowCostVisualPolicy(HazeEnabled: false, HazeIntensityMultiplier: 0f, TerrainAmbientMultiplier: 0f),
+            _ => new LowCostVisualPolicy(HazeEnabled: true, HazeIntensityMultiplier: 0.55f, TerrainAmbientMultiplier: 0.6f)
+        };
     }
 }

@@ -17,6 +17,7 @@ public sealed class TerrainRenderPass : IRenderPass
         var settings = context.Settings;
         var theme = context.Theme;
         var visibleTiles = context.VisibleTileBounds;
+        var visualPolicy = context.VisualPolicy;
 
         foreach (var tile in snapshot.Tiles)
         {
@@ -30,7 +31,7 @@ public sealed class TerrainRenderPass : IRenderPass
                 _ => theme.Dirt
             };
 
-            var color = ApplyLowCostVariation(baseColor, tile, theme);
+            var color = ApplyLowCostVariation(baseColor, tile, theme, visualPolicy);
 
             var x = tile.X * settings.TileSize;
             var y = tile.Y * settings.TileSize;
@@ -38,10 +39,16 @@ public sealed class TerrainRenderPass : IRenderPass
         }
     }
 
-    private static Color ApplyLowCostVariation(Color baseColor, TileRenderData tile, WorldRenderTheme theme)
+    private static Color ApplyLowCostVariation(
+        Color baseColor,
+        TileRenderData tile,
+        WorldRenderTheme theme,
+        LowCostVisualPolicy visualPolicy)
     {
+        var ambientMultiplier = Math.Clamp(visualPolicy.TerrainAmbientMultiplier, 0f, 1.25f);
         var variationNoise = Hash01(tile.X, tile.Y) * 2f - 1f;
-        var variationFactor = 1f + (variationNoise * 0.055f);
+        var variationAmplitude = 0.028f + (0.03f * ambientMultiplier);
+        var variationFactor = 1f + (variationNoise * variationAmplitude);
         var result = ScaleRgb(baseColor, variationFactor);
 
         if (tile.OwnerFactionId >= 0 && tile.OwnershipStrength > 0f)
@@ -49,13 +56,13 @@ public sealed class TerrainRenderPass : IRenderPass
             var ownershipTint = tile.IsContested
                 ? Color.Lerp(theme.Warning, theme.Highlight, 0.35f)
                 : theme.Highlight;
-            var ownershipWeight = 0.04f + (tile.OwnershipStrength * 0.16f);
+            var ownershipWeight = 0.032f + (tile.OwnershipStrength * (0.11f + (0.05f * ambientMultiplier)));
             result = Color.Lerp(result, ownershipTint, Math.Clamp(ownershipWeight, 0f, 0.2f));
         }
 
         if (tile.NodeType == ResourceView.Food && tile.NodeAmount <= 0 && tile.FoodRegrowthProgress > 0f)
         {
-            var recoveryWeight = Math.Clamp(tile.FoodRegrowthProgress * 0.14f, 0f, 0.14f);
+            var recoveryWeight = Math.Clamp(tile.FoodRegrowthProgress * (0.095f + (0.055f * ambientMultiplier)), 0f, 0.16f);
             result = Color.Lerp(result, theme.Success, recoveryWeight);
         }
 

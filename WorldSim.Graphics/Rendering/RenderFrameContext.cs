@@ -11,7 +11,14 @@ public readonly record struct RenderFrameContext(
     WorldRenderSettings Settings,
     WorldRenderTheme Theme,
     RenderStats Stats,
-    TileBounds VisibleTileBounds
+    TileBounds VisibleTileBounds,
+    LowCostVisualPolicy VisualPolicy
+);
+
+public readonly record struct LowCostVisualPolicy(
+    bool HazeEnabled,
+    float HazeIntensityMultiplier,
+    float TerrainAmbientMultiplier
 );
 
 public readonly record struct TileBounds(int MinX, int MinY, int MaxX, int MaxY)
