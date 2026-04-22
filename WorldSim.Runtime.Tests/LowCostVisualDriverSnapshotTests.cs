@@ -122,6 +122,35 @@ public sealed class LowCostVisualDriverSnapshotTests
             $"Expected stable ownership strength > contested (stable={stable.OwnershipStrength}, contested={contested.OwnershipStrength}).");
     }
 
+    [Fact]
+    public void SameFactionRunnerUp_DoesNotLowerFactionOwnershipStrengthOrContested()
+    {
+        var world = new World(width: 52, height: 30, initialPop: 0, randomSeed: 905);
+
+        // Keep two factions in world, but add one extra same-faction colony near the winner.
+        while (world._colonies.Count > 2)
+            world._colonies.RemoveAt(world._colonies.Count - 1);
+
+        var sameFactionColony = new Colony(4, (0, 0));
+        world._colonies.Add(sameFactionColony);
+
+        var winnerOrigin = FindNearestLand(world, (14, 15));
+        var sameFactionRunnerUpOrigin = FindNearestLand(world, (16, 15));
+        var opposingOrigin = FindNearestLand(world, (38, 15));
+
+        world._colonies[0].Origin = winnerOrigin;
+        world._colonies[1].Origin = opposingOrigin;
+        sameFactionColony.Origin = sameFactionRunnerUpOrigin;
+
+        AdvanceTicks(world, 6);
+        var snapshot = WorldSnapshotBuilder.Build(world);
+
+        var tile = snapshot.Tiles.First(t => t.X == winnerOrigin.x && t.Y == winnerOrigin.y);
+        Assert.Equal((int)Faction.Sylvars, tile.OwnerFactionId);
+        Assert.False(tile.IsContested);
+        Assert.Equal(1f, tile.OwnershipStrength);
+    }
+
     private static List<(int x, int y, int ownerFactionId, bool contested, float ownershipStrength, float foodRegrowthProgress)> BuildVisualDriverSnapshot(int seed)
     {
         var world = new World(width: 36, height: 24, initialPop: 0, randomSeed: seed);

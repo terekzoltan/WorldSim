@@ -20,7 +20,7 @@ For each mode verify:
 
 - Camera pan/zoom works and clamps correctly.
 - HUD layout remains readable and does not clip unexpectedly.
-- PostFx toggle and quality changes do not crash.
+- PostFx control toggles (`Ctrl+F3/F4`) update control-state text and do not crash.
 
 ## Hotkey verification checklist
 
@@ -33,8 +33,8 @@ General:
 Debug/graphics controls:
 
 - `F3`: render stats on/off.
-- `Ctrl+F3`: postfx on/off.
-- `Ctrl+F4`: postfx quality cycle.
+- `Ctrl+F3`: postfx control on/off toggle.
+- `Ctrl+F4`: postfx control quality cycle.
 - `Ctrl+F5`: visual lane cycle (`DevLite <-> Showcase`).
 
 Cinematic/capture:
@@ -65,6 +65,7 @@ Operator controls (visible in-app):
 - `Lane:<effective>` updates correctly when cycling `Ctrl+F5` between `DevLite` and `Showcase`.
 - Settings overlay shows lane requested/effective/source fields.
 - Settings overlay explicitly states `Headless` is `ScenarioRunner / batch only` (not app-side interactive lane).
+- PostFx control-state wording is visible in HUD/settings (`PostFxCtl` / `PostFx control state`) and is treated as control-surface verification in this checklist.
 
 Headless policy verification (runner-side, not app-side):
 
@@ -81,7 +82,7 @@ Headless policy verification (runner-side, not app-side):
   - rolling p99
   - per-pass timings
 - `DevLite` remains the cheap default path; `Showcase` is explicit/opt-in.
-- Large map traversal should not hard-stutter during rapid pan (terrain/resource culling path).
+- Terrain/resource draw-skip culling path remains stable during rapid pan (actor/structure full culling is out of this baseline checklist).
 - Fog/haze and resource rendering should still appear correct after quality/profile changes.
 
 ## Capture validation

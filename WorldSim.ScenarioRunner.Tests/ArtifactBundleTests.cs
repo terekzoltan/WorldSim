@@ -148,6 +148,55 @@ public sealed class ArtifactBundleTests
     }
 
     [Fact]
+    public void ArtifactBundle_InvalidVisualProfile_FallsBackToHeadlessWithFallbackSource()
+    {
+        var artifactDir = CreateArtifactDir();
+        RunScenarioRunner(
+            artifactDir,
+            "79",
+            "simple",
+            output: "json",
+            extraEnv: new Dictionary<string, string>
+            {
+                ["WORLDSIM_VISUAL_PROFILE"] = "invalid-lane"
+            });
+
+        var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("Headless", manifest.RootElement.GetProperty("effectiveVisualLane").GetString());
+        Assert.Equal("fallback_invalid", manifest.RootElement.GetProperty("visualLaneSource").GetString());
+
+        var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var firstRun = summary.RootElement.GetProperty("runs")[0];
+        Assert.Equal("Headless", firstRun.GetProperty("visualLane").GetString());
+    }
+
+    [Theory]
+    [InlineData("dev_lite", "DevLite")]
+    [InlineData("low", "DevLite")]
+    [InlineData("medium", "Showcase")]
+    public void ArtifactBundle_VisualProfileAliases_ArePersistedWithEnvSource(string aliasValue, string expectedLane)
+    {
+        var artifactDir = CreateArtifactDir();
+        RunScenarioRunner(
+            artifactDir,
+            "80",
+            "simple",
+            output: "json",
+            extraEnv: new Dictionary<string, string>
+            {
+                ["WORLDSIM_VISUAL_PROFILE"] = aliasValue
+            });
+
+        var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal(expectedLane, manifest.RootElement.GetProperty("effectiveVisualLane").GetString());
+        Assert.Equal("env", manifest.RootElement.GetProperty("visualLaneSource").GetString());
+
+        var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var firstRun = summary.RootElement.GetProperty("runs")[0];
+        Assert.Equal(expectedLane, firstRun.GetProperty("visualLane").GetString());
+    }
+
+    [Fact]
     public void ArtifactBundle_DistinctConfigNames_DoNotCollideAfterSanitization()
     {
         var artifactDir = CreateArtifactDir();

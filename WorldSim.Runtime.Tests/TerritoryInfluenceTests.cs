@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
@@ -87,6 +88,35 @@ public class TerritoryInfluenceTests
         }
 
         Assert.True(sum >= 0);
+    }
+
+    [Fact]
+    public void SameFactionCompetition_DoesNotCreateContestedPairCounts()
+    {
+        var world = new World(width: 40, height: 26, initialPop: 0, randomSeed: 304);
+
+        while (world._colonies.Count > 1)
+            world._colonies.RemoveAt(world._colonies.Count - 1);
+
+        var sameFactionColony = new Colony(4, (0, 0));
+        world._colonies.Add(sameFactionColony);
+
+        world._colonies[0].Origin = FindBuildableTile(world);
+        sameFactionColony.Origin = (
+            Math.Min(world.Width - 1, world._colonies[0].Origin.x + 2),
+            world._colonies[0].Origin.y);
+
+        for (int i = 0; i < 6; i++)
+            world.Update(0.25f);
+
+        for (int left = 0; left <= (int)Faction.Chirita; left++)
+        {
+            for (int right = left + 1; right <= (int)Faction.Chirita; right++)
+            {
+                var count = world.GetContestedTilesForFactionPair((Faction)left, (Faction)right);
+                Assert.Equal(0, count);
+            }
+        }
     }
 
     private static (int x, int y) FindBuildableTile(World world)

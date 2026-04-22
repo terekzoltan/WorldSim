@@ -33,8 +33,13 @@ Runtime-owned normalization. Builder consumes world accessor only.
   - `margin = max(0, bestScore - secondScore)`
   - `OwnershipStrength = clamp(margin / TerritoryContestedThreshold, 0, 1)`
 
+Runner-up semantics lock:
+- `secondId` means strongest **opposing-faction** competitor against the winning owner faction for rendering confidence/contested export.
+- Same-faction colonies must not reduce `OwnershipStrength` and must not mark tile contested.
+
 Important:
 - Existing contested threshold semantics stay unchanged.
+- Contested tile export and contested faction-pair bookkeeping use the same opposing-faction runner-up policy.
 - This field is read-model confidence/intensity only; no gameplay branching depends on it.
 
 ## FoodRegrowthProgress policy

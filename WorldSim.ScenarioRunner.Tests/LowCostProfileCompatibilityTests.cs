@@ -36,6 +36,8 @@ public sealed class LowCostProfileCompatibilityTests
             headlessRun.GetProperty("aiResearchTechDecisions").GetInt32(),
             devLiteRun.GetProperty("aiResearchTechDecisions").GetInt32());
 
+        AssertEqualCombatAdjacentRunMetrics(headlessRun, devLiteRun);
+
         AssertContactTelemetryIsNonTrivial(headlessRun.GetProperty("contact"));
         AssertContactTelemetryIsNonTrivial(devLiteRun.GetProperty("contact"));
     }
@@ -98,6 +100,31 @@ public sealed class LowCostProfileCompatibilityTests
         Assert.True(
             adjacentContacts > 0 || factionDamageEvents > 0 || battlePairings > 0,
             "Expected non-trivial contact/combat activity in compatibility config.");
+    }
+
+    private static void AssertEqualCombatAdjacentRunMetrics(JsonElement headlessRun, JsonElement devLiteRun)
+    {
+        Assert.Equal(
+            headlessRun.GetProperty("combatEngagements").GetInt32(),
+            devLiteRun.GetProperty("combatEngagements").GetInt32());
+        Assert.Equal(
+            headlessRun.GetProperty("combatDeaths").GetInt32(),
+            devLiteRun.GetProperty("combatDeaths").GetInt32());
+        Assert.Equal(
+            headlessRun.GetProperty("battleTicks").GetInt32(),
+            devLiteRun.GetProperty("battleTicks").GetInt32());
+        Assert.Equal(
+            headlessRun.GetProperty("peakActiveBattles").GetInt32(),
+            devLiteRun.GetProperty("peakActiveBattles").GetInt32());
+        Assert.Equal(
+            headlessRun.GetProperty("peakActiveCombatGroups").GetInt32(),
+            devLiteRun.GetProperty("peakActiveCombatGroups").GetInt32());
+        Assert.Equal(
+            headlessRun.GetProperty("peakRoutingPeople").GetInt32(),
+            devLiteRun.GetProperty("peakRoutingPeople").GetInt32());
+        Assert.Equal(
+            headlessRun.GetProperty("ticksWithActiveBattle").GetInt32(),
+            devLiteRun.GetProperty("ticksWithActiveBattle").GetInt32());
     }
 
     private static int RunScenarioRunner(

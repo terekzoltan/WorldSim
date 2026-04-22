@@ -64,6 +64,7 @@ Proof shape used by this closeout:
 2. Compatibility pair uses a nontrivial combat-enabled config (`EnableCombatPrimitives=true`, `EnableDiplomacy=true`, `EnableSiege=true`, `Ticks=300`) so contact telemetry is exercised.
 3. Compatibility runs require ScenarioRunner exit code `0` (no assertion/anomaly fail acceptance).
 4. Allowed difference is lane metadata only (`Headless` vs `DevLite`); `ai` and `contact` artifact blocks are exact-equality guarded.
+5. Additional combat-adjacent run-level allowlist equality is guarded: `combatEngagements`, `combatDeaths`, `battleTicks`, `peakActiveBattles`, `peakActiveCombatGroups`, `peakRoutingPeople`, `ticksWithActiveBattle`.
 
 ## Closeout Checklist
 

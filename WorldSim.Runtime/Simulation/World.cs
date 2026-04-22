@@ -2088,9 +2088,7 @@ namespace WorldSim.Simulation
                     }
 
                     int bestId = -1;
-                    int secondId = -1;
                     double bestScore = double.MinValue;
-                    double secondScore = double.MinValue;
 
                     foreach (var colony in _colonies)
                     {
@@ -2106,37 +2104,75 @@ namespace WorldSim.Simulation
 
                         if (score > bestScore || (Math.Abs(score - bestScore) < 0.0001d && colony.Id < bestId))
                         {
-                            secondScore = bestScore;
-                            secondId = bestId;
                             bestScore = score;
                             bestId = colony.Id;
-                        }
-                        else if (score > secondScore || (Math.Abs(score - secondScore) < 0.0001d && colony.Id < secondId))
-                        {
-                            secondScore = score;
-                            secondId = colony.Id;
                         }
                     }
 
                     _tileOwnerColonyIds[x, y] = bestId;
 
-                    bool contested = secondId >= 0 && (bestScore - secondScore) <= TerritoryContestedThreshold;
+                    var bestColony = _colonies.FirstOrDefault(colony => colony.Id == bestId);
+                    if (bestColony == null)
+                    {
+                        _tileContested[x, y] = false;
+                        _tileOwnershipStrength[x, y] = 0f;
+                        continue;
+                    }
+
+                    var (opponentId, opponentScore) = FindBestOpposingFactionRunnerUp(bestColony, x, y, livingByColony, housesByColony, specializedByColony);
+
+                    bool contested = opponentId >= 0 && (bestScore - opponentScore) <= TerritoryContestedThreshold;
                     _tileContested[x, y] = contested;
 
-                    _tileOwnershipStrength[x, y] = ComputeTileOwnershipStrength(bestId, secondId, bestScore, secondScore);
+                    _tileOwnershipStrength[x, y] = ComputeTileOwnershipStrength(bestId, opponentId, bestScore, opponentScore);
 
                     if (!contested)
                         continue;
 
-                    var bestColony = _colonies.FirstOrDefault(colony => colony.Id == bestId);
-                    var secondColony = _colonies.FirstOrDefault(colony => colony.Id == secondId);
-                    if (bestColony == null || secondColony == null || bestColony.Faction == secondColony.Faction)
+                    var opponentColony = _colonies.FirstOrDefault(colony => colony.Id == opponentId);
+                    if (opponentColony == null)
                         continue;
 
-                    var pair = NormalizeFactionPair(bestColony.Faction, secondColony.Faction);
+                    var pair = NormalizeFactionPair(bestColony.Faction, opponentColony.Faction);
                     _contestedTilesByFactionPair[pair] = _contestedTilesByFactionPair.GetValueOrDefault(pair, 0) + 1;
                 }
             }
+        }
+
+        private (int OpponentId, double OpponentScore) FindBestOpposingFactionRunnerUp(
+            Colony winner,
+            int x,
+            int y,
+            IReadOnlyDictionary<int, int> livingByColony,
+            IReadOnlyDictionary<int, int> housesByColony,
+            IReadOnlyDictionary<int, int> specializedByColony)
+        {
+            int bestOpponentId = -1;
+            double bestOpponentScore = double.MinValue;
+
+            foreach (var colony in _colonies)
+            {
+                if (colony.Faction == winner.Faction)
+                    continue;
+
+                int distance = Math.Abs(x - colony.Origin.x) + Math.Abs(y - colony.Origin.y);
+                int living = livingByColony.GetValueOrDefault(colony.Id, 0);
+                int houseCount = housesByColony.GetValueOrDefault(colony.Id, 0);
+                int specializedCount = specializedByColony.GetValueOrDefault(colony.Id, 0);
+
+                double score = (24d / (1d + distance))
+                             + (living * 0.12d)
+                             + (houseCount * 0.35d)
+                             + (specializedCount * 0.45d);
+
+                if (score > bestOpponentScore || (Math.Abs(score - bestOpponentScore) < 0.0001d && colony.Id < bestOpponentId))
+                {
+                    bestOpponentScore = score;
+                    bestOpponentId = colony.Id;
+                }
+            }
+
+            return (bestOpponentId, bestOpponentScore);
         }
 
         private static (Faction left, Faction right) NormalizeFactionPair(Faction left, Faction right)

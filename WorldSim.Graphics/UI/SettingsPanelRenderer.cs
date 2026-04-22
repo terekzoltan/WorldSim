@@ -55,7 +55,7 @@ public sealed class SettingsPanelRenderer
         lineY += 20;
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"Lane req/eff/src: {visualLaneRequested} -> {visualLaneEffective} ({visualLaneSource})", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, "Lane cycle: Ctrl+F5 DevLite <-> Showcase | Headless: ScenarioRunner / batch only", new Vector2(contentX, lineY), theme.SecondaryText, contentWidth, 18);
-        lineY = TextWrap.DrawWrapped(spriteBatch, font, $"PostFx: {postFx} (Ctrl+F3, Ctrl+F4)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
+        lineY = TextWrap.DrawWrapped(spriteBatch, font, $"PostFx control state: {postFx} (Ctrl+F3, Ctrl+F4)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"HUD scale: {hudScale} (locked)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, $"Cinematic route: {cinematic} (Ctrl+F9)", new Vector2(contentX, lineY), theme.PrimaryText, contentWidth, 18);
         lineY = TextWrap.DrawWrapped(spriteBatch, font, "Screenshot: Ctrl+F10 | CleanShot: F12", new Vector2(contentX, lineY), theme.SecondaryText, contentWidth, 18);
