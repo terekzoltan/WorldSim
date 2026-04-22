@@ -67,7 +67,8 @@ if (configs.Count == 0 && string.IsNullOrWhiteSpace(rawConfigsJson))
         EnableSiege: true,
         StoneBuildingsEnabled: false,
         BirthRateMultiplier: 1f,
-        MovementSpeedMultiplier: 1f));
+        MovementSpeedMultiplier: 1f,
+        EnablePredatorHumanAttacks: false));
 }
 
 var runs = new List<ScenarioRunResult>(configs.Count * planners.Count * seeds.Length);
@@ -88,6 +89,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 EnableCombatPrimitives = config.EnableCombatPrimitives,
                 EnableDiplomacy = config.EnableDiplomacy,
                 EnableSiege = config.EnableSiege,
+                EnablePredatorHumanAttacks = config.EnablePredatorHumanAttacks,
                 StoneBuildingsEnabled = config.StoneBuildingsEnabled,
                 BirthRateMultiplier = config.BirthRateMultiplier,
                 MovementSpeedMultiplier = config.MovementSpeedMultiplier
@@ -317,7 +319,8 @@ static ScenarioRunResult BuildRunResult(
         PerfMaxTickMs: perfMaxTickMs,
         PerfP99TickMs: perfP99TickMs,
         PerfPeakEntities: perfPeakEntities,
-        Ecology: ecologyTelemetry);
+        Ecology: ecologyTelemetry,
+        EnablePredatorHumanAttacks: world.EnablePredatorHumanAttacks);
 }
 
 static void WriteOutput(
@@ -1491,7 +1494,8 @@ sealed record ScenarioConfig(
     bool StoneBuildingsEnabled,
     float BirthRateMultiplier,
     float MovementSpeedMultiplier,
-    bool EnableSiege = true);
+    bool EnableSiege = true,
+    bool EnablePredatorHumanAttacks = false);
 
 sealed record ScenarioRunResult(
     string ConfigName,
@@ -1548,7 +1552,8 @@ sealed record ScenarioRunResult(
     double PerfMaxTickMs,
     double PerfP99TickMs,
     long PerfPeakEntities,
-    ScenarioEcologyTelemetrySnapshot? Ecology = null);
+    ScenarioEcologyTelemetrySnapshot? Ecology = null,
+    bool EnablePredatorHumanAttacks = false);
 
 sealed record ScenarioRunEnvelope(
     DateTime GeneratedAtUtc,

@@ -67,6 +67,7 @@ public sealed class ArtifactBundleTests
             Assert.True(ecologyTelemetry.TryGetProperty("predators", out _));
             Assert.True(ecologyTelemetry.TryGetProperty("activeFoodNodes", out _));
             Assert.True(ecologyTelemetry.TryGetProperty("depletedFoodNodes", out _));
+            Assert.True(runDoc.RootElement.TryGetProperty("enablePredatorHumanAttacks", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("combatDeaths", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("predatorKillsByHumans", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("battleTicks", out _));
@@ -240,6 +241,43 @@ public sealed class ArtifactBundleTests
 
         Assert.Equal(2, files.Length);
         Assert.NotEqual(files[0], files[1]);
+    }
+
+    [Fact]
+    public void ArtifactBundle_ConfigJsonPredatorHumanToggle_IsPersistedPerRun()
+    {
+        var artifactDir = CreateArtifactDir();
+        var repoRoot = FindRepoRoot();
+        var projectPath = Path.Combine(repoRoot, "WorldSim.ScenarioRunner", "WorldSim.ScenarioRunner.csproj");
+        var configJson = "[{\"Name\":\"predator-toggle\",\"Width\":32,\"Height\":20,\"InitialPop\":12,\"Ticks\":8,\"Dt\":0.25,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0,\"EnableSiege\":true,\"EnablePredatorHumanAttacks\":true}]";
+
+        var startInfo = new ProcessStartInfo("dotnet", $"run --project \"{projectPath}\"")
+        {
+            WorkingDirectory = repoRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+
+        startInfo.Environment["WORLDSIM_SCENARIO_SEEDS"] = "902";
+        startInfo.Environment["WORLDSIM_SCENARIO_PLANNERS"] = "simple";
+        startInfo.Environment["WORLDSIM_SCENARIO_OUTPUT"] = "json";
+        startInfo.Environment["WORLDSIM_SCENARIO_ARTIFACT_DIR"] = artifactDir;
+        startInfo.Environment["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson;
+        startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
+
+        using var process = Process.Start(startInfo);
+        Assert.NotNull(process);
+
+        var stdout = process.StandardOutput.ReadToEnd();
+        var stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        Assert.True(process.ExitCode == 0, $"ScenarioRunner failed. Exit={process.ExitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+
+        var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var run = summary.RootElement.GetProperty("runs")[0];
+        Assert.True(run.GetProperty("enablePredatorHumanAttacks").GetBoolean());
     }
 
     private static string CreateArtifactDir()

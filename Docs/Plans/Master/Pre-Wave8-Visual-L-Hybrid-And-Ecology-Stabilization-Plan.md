@@ -224,6 +224,7 @@ Tuning loop during `PW8-B2`:
 
 Important:
 - the recently requested `2x` initial predator default is valid as a stress lane input, but should not be treated as the only ecology baseline if it makes prey-stability conclusions misleading.
+- ScenarioRunner config may also explicitly toggle `EnablePredatorHumanAttacks` for dedicated predator-pressure evidence lanes; keep it deliberate and lane-specific rather than silently broadening the default baseline matrix.
 
 ## Proof Targets
 
