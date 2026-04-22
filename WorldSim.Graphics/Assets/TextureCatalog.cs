@@ -1,6 +1,7 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
+using WorldSim.Runtime.ReadModel;
 
 namespace WorldSim.Graphics.Assets;
 
@@ -19,6 +20,12 @@ public sealed class TextureCatalog
     public Texture2D ObsidariHouse { get; }
     public Texture2D AetheriHouse { get; }
     public Texture2D ChiritaHouse { get; }
+    public Texture2D? Predator { get; }
+    public Texture2D? Herbivore { get; }
+    public Texture2D? Food { get; }
+    public Texture2D? FarmPlot { get; }
+    public Texture2D? Workshop { get; }
+    public Texture2D? Storehouse { get; }
     public Texture2D MissingTexture { get; }
 
     public TextureCatalog(GraphicsDevice graphicsDevice, ContentManager content)
@@ -47,6 +54,13 @@ public sealed class TextureCatalog
         ObsidariHouse = LoadOrFallback(content, "ObsidiariHouse");
         AetheriHouse = LoadOrFallback(content, "AetheriHouse");
         ChiritaHouse = LoadOrFallback(content, "ChiritaHouse");
+
+        Predator = LoadOptional(content, "predator");
+        Herbivore = LoadOptional(content, "herbivore");
+        Food = LoadOptional(content, "food");
+        FarmPlot = LoadOptional(content, "farmplot");
+        Workshop = LoadOptional(content, "workshop");
+        Storehouse = LoadOptional(content, "storehouse");
     }
 
     private Texture2D LoadOrFallback(ContentManager content, string assetName)
@@ -58,6 +72,18 @@ public sealed class TextureCatalog
         catch
         {
             return MissingTexture;
+        }
+    }
+
+    private static Texture2D? LoadOptional(ContentManager content, string assetName)
+    {
+        try
+        {
+            return content.Load<Texture2D>(assetName);
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -81,6 +107,27 @@ public sealed class TextureCatalog
             1 => ObsidariHouse,
             2 => AetheriHouse,
             3 => ChiritaHouse,
+            _ => null
+        };
+    }
+
+    public Texture2D? GetAnimalIcon(AnimalKindView kind)
+    {
+        return kind switch
+        {
+            AnimalKindView.Predator => Predator,
+            AnimalKindView.Herbivore => Herbivore,
+            _ => null
+        };
+    }
+
+    public Texture2D? GetSpecializedBuildingIcon(SpecializedBuildingKindView kind)
+    {
+        return kind switch
+        {
+            SpecializedBuildingKindView.FarmPlot => FarmPlot,
+            SpecializedBuildingKindView.Workshop => Workshop,
+            SpecializedBuildingKindView.Storehouse => Storehouse,
             _ => null
         };
     }

@@ -1501,6 +1501,60 @@ Proof targets:
 
 ---
 
+## Pre-Wave8 Coordinator Addendum - Visual-L Hybrid + Ecology Stabilization
+
+Purpose:
+- Resolve the two known pre-Wave8 gaps that are not covered by the current Wave 8 inventory plan:
+  - a broader Track A visual readability/overhaul slice on top of the Wave 7.5 low-cost baseline
+  - an ecology observability-first then stabilization pass for the current plant/herbivore/predator model
+- Make Wave 8 inventory work start on a cleaner visual baseline and a better-measured ecology baseline.
+
+Source of truth:
+- `Docs/Plans/Master/Pre-Wave8-Visual-L-Hybrid-And-Ecology-Stabilization-Plan.md`
+
+Wave 8 turn-gate:
+- Wave 8 is `NOT READY` until `PW8-A1`, `PW8-B1`, and `PW8-B2` are all `✅` and the `SMR Analyst` evidence steps after `PW8-B1` and `PW8-B2` are complete.
+- Reason: inventory/supply work should not begin while major visual readability debt and ecology-balance blind spots are still intentionally queued ahead of it.
+
+Approved slices:
+- ✅ **PW8-A1** Visual-L Hybrid readability/overhaul pass (Track A)
+- ✅ **PW8-B1** Ecology observability for ScenarioRunner/SMR (Track B)
+- ⬜ **PW8-B2** Ecology stabilization on the current model (Track B primary, SMR Analyst evidence)
+
+### Pre-Wave8 - Execution Steps
+
+**Step 1 - parallel kickoff after Wave 7.5**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | PW8-A1 | Wave 7.5 ✅ | Visual-L Hybrid pass may start immediately on top of the low-cost baseline |
+| Track B agent | PW8-B1 | Wave 7.5 ✅ | Observability must land before ecology tuning starts |
+
+**Step 2 - ecology baseline evidence**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | PW8-B1 evidence | PW8-B1 ✅ | Run baseline + drilldown package and confirm the ecology artifact surface is sufficient for tuning |
+
+**Step 3 - ecology stabilization**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | PW8-B2 | PW8-B1 ✅ + PW8-B1 evidence ✅ | Stabilize the current model only; do not pre-implement the later true closed-loop redesign |
+
+**Step 4 - stabilization verification**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | PW8-B2 evidence | PW8-B2 ✅ | Validate the tuned state across the agreed matrix before Wave 8 starts |
+
+Parallelism:
+- `PW8-A1` may run in parallel with `PW8-B1` and does not need to wait for ecology evidence.
+- `PW8-B2` is blocked on `PW8-B1` and the first SMR evidence pass.
+- Wave 8 remains blocked until the full pre-wave addendum closes.
+
+---
+
 ## Wave 8 — Supply & Inventory (Combat Phase 5a)
 
 ### Sprint C8: Personal Inventory + Storage (Track B -> C -> A)
@@ -1519,7 +1573,7 @@ Proof targets:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P5-A | Wave 7.5 ✅ | Inventory data model is the base for storage, consumption, tech hooks, and UI |
+| Track B agent | P5-A | Pre-Wave8 addendum ✅ | Inventory data model is the base for storage, consumption, tech hooks, and UI |
 
 **Step 2 — opens when P5-A ✅**
 

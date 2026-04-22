@@ -249,6 +249,7 @@ static ScenarioRunResult BuildRunResult(
     var perfPeakEntities = 0L;
     var contactTelemetry = world.BuildScenarioContactTelemetrySnapshot();
     var aiTelemetry = world.BuildScenarioAiTelemetrySnapshot();
+    var ecologyTelemetry = world.BuildScenarioEcologyTelemetrySnapshot();
     if (tickTimesMs is { Count: > 0 })
     {
         perfAvgTickMs = tickTimesMs.Average();
@@ -315,7 +316,8 @@ static ScenarioRunResult BuildRunResult(
         PerfAvgTickMs: perfAvgTickMs,
         PerfMaxTickMs: perfMaxTickMs,
         PerfP99TickMs: perfP99TickMs,
-        PerfPeakEntities: perfPeakEntities);
+        PerfPeakEntities: perfPeakEntities,
+        Ecology: ecologyTelemetry);
 }
 
 static void WriteOutput(
@@ -1204,6 +1206,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
         .Min();
     var contactTelemetry = world.BuildScenarioContactTelemetrySnapshot().ToTimelineSnapshot();
     var aiTelemetry = world.BuildScenarioAiTelemetrySnapshot().ToTimelineSnapshot();
+    var ecologyTelemetry = world.BuildScenarioEcologyTelemetrySnapshot().ToTimelineSnapshot();
 
     return new ScenarioTimelineSample(
         Tick: tick,
@@ -1226,6 +1229,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
         AiResearchTechDecisions: world.TotalAiResearchTechDecisions,
         Contact: contactTelemetry,
         Ai: aiTelemetry,
+        Ecology: ecologyTelemetry,
         PerfTickMs: perfTickMs);
 }
 
@@ -1543,7 +1547,8 @@ sealed record ScenarioRunResult(
     double PerfAvgTickMs,
     double PerfMaxTickMs,
     double PerfP99TickMs,
-    long PerfPeakEntities);
+    long PerfPeakEntities,
+    ScenarioEcologyTelemetrySnapshot? Ecology = null);
 
 sealed record ScenarioRunEnvelope(
     DateTime GeneratedAtUtc,
@@ -1721,6 +1726,7 @@ sealed record ScenarioTimelineSample(
     int AiResearchTechDecisions,
     ScenarioContactTimelineSnapshot Contact,
     ScenarioAiTimelineSnapshot Ai,
+    ScenarioEcologyTimelineSnapshot? Ecology,
     double PerfTickMs);
 
 sealed record ScenarioDrilldownSummary(

@@ -62,6 +62,11 @@ public sealed class ArtifactBundleTests
             Assert.True(aiTelemetry.TryGetProperty("goalCounts", out _));
             Assert.True(aiTelemetry.TryGetProperty("targetKindCounts", out _));
             Assert.True(aiTelemetry.TryGetProperty("latestDecision", out _));
+            Assert.True(runDoc.RootElement.TryGetProperty("ecology", out var ecologyTelemetry));
+            Assert.True(ecologyTelemetry.TryGetProperty("herbivores", out _));
+            Assert.True(ecologyTelemetry.TryGetProperty("predators", out _));
+            Assert.True(ecologyTelemetry.TryGetProperty("activeFoodNodes", out _));
+            Assert.True(ecologyTelemetry.TryGetProperty("depletedFoodNodes", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("combatDeaths", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("predatorKillsByHumans", out _));
             Assert.True(runDoc.RootElement.TryGetProperty("battleTicks", out _));

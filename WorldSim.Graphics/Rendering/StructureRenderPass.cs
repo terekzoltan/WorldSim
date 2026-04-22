@@ -17,33 +17,47 @@ public sealed class StructureRenderPass : IRenderPass
         var snapshot = context.Snapshot;
         var textures = context.Textures;
         var settings = context.Settings;
+        var visibleTiles = context.VisibleTileBounds;
 
         foreach (var house in snapshot.Houses)
         {
-            var hx = house.X * settings.TileSize;
-            var hy = house.Y * settings.TileSize;
-
-            var baseX = hx + (settings.TileSize - 3) / 2;
-            var baseY = hy + (settings.TileSize - 3) / 2;
-            spriteBatch.Draw(textures.Pixel, new Rectangle(baseX, baseY, 3, 3), Color.White);
-
-            var icon = textures.GetHouseIcon(house.ColonyId);
-            if (icon == null)
+            if (!RenderLayout.IsVisible(visibleTiles, house.X, house.Y))
                 continue;
 
-            var iconSize = settings.TileSize * settings.HouseIconTiles * 2;
-            var iconX = hx + (settings.TileSize - iconSize) / 2;
-            var iconY = hy + (settings.TileSize - iconSize) / 2;
-            spriteBatch.Draw(icon, new Rectangle(iconX, iconY, iconSize, iconSize), Color.White);
+            var footprint = RenderLayout.CenteredInTile(house.X, house.Y, settings.TileSize, 0.95f);
+            var houseRect = RenderLayout.BottomAnchoredInTile(house.X, house.Y, settings.TileSize, settings.HouseScale);
+            RenderLayout.DrawGroundShadow(spriteBatch, textures.Pixel, footprint, settings.StructureShadowAlpha);
+
+            var icon = textures.GetHouseIcon(house.ColonyId);
+            if (icon != null)
+            {
+                spriteBatch.Draw(icon, houseRect, Color.White);
+            }
+            else
+            {
+                spriteBatch.Draw(textures.Pixel, houseRect, new Color(202, 196, 168));
+                spriteBatch.Draw(textures.Pixel, new Rectangle(houseRect.X, houseRect.Y, houseRect.Width, Math.Max(1, houseRect.Height / 4)), new Color(150, 112, 83));
+            }
         }
 
         foreach (var building in snapshot.SpecializedBuildings)
         {
-            var bx = building.X * settings.TileSize;
-            var by = building.Y * settings.TileSize;
-            var size = Math.Max(3, settings.TileSize / 2);
-            var cx = bx + (settings.TileSize - size) / 2;
-            var cy = by + (settings.TileSize - size) / 2;
+            if (!RenderLayout.IsVisible(visibleTiles, building.X, building.Y))
+                continue;
+
+            var iconRect = RenderLayout.BottomAnchoredInTile(building.X, building.Y, settings.TileSize, settings.SpecializedBuildingScale);
+            RenderLayout.DrawGroundShadow(spriteBatch, textures.Pixel, iconRect, settings.StructureShadowAlpha * 0.8f);
+
+            var icon = textures.GetSpecializedBuildingIcon(building.Kind);
+            if (icon != null)
+            {
+                spriteBatch.Draw(icon, iconRect, Color.White);
+                continue;
+            }
+
+            int size = Math.Max(3, iconRect.Width);
+            int cx = iconRect.Center.X - (size / 2);
+            int cy = iconRect.Center.Y - (size / 2);
 
             switch (building.Kind)
             {
@@ -59,21 +73,27 @@ public sealed class StructureRenderPass : IRenderPass
             }
         }
 
-        DrawDefensiveStructures(spriteBatch, snapshot, textures, settings);
-        DrawTowerProjectiles(spriteBatch, snapshot, textures, settings);
+        DrawDefensiveStructures(spriteBatch, snapshot, textures, settings, visibleTiles);
+        DrawTowerProjectiles(spriteBatch, snapshot, textures, settings, visibleTiles);
     }
 
     private static void DrawDefensiveStructures(
         SpriteBatch spriteBatch,
         WorldRenderSnapshot snapshot,
         TextureCatalog textures,
-        WorldRenderSettings settings)
+        WorldRenderSettings settings,
+        in TileBounds visibleTiles)
     {
         foreach (var structure in snapshot.DefensiveStructures)
         {
+            if (!RenderLayout.IsVisible(visibleTiles, structure.X, structure.Y))
+                continue;
+
             int tileX = structure.X * settings.TileSize;
             int tileY = structure.Y * settings.TileSize;
             var tileRect = new Rectangle(tileX, tileY, settings.TileSize, settings.TileSize);
+            if (settings.DefensiveStructureScale < 0.999f)
+                tileRect = RenderLayout.CenteredInTile(structure.X, structure.Y, settings.TileSize, settings.DefensiveStructureScale);
 
             switch (structure.Kind)
             {
@@ -230,7 +250,8 @@ public sealed class StructureRenderPass : IRenderPass
         SpriteBatch spriteBatch,
         WorldRenderSnapshot snapshot,
         TextureCatalog textures,
-        WorldRenderSettings settings)
+        WorldRenderSettings settings,
+        in TileBounds visibleTiles)
     {
         var towerEvents = snapshot.RecentEvents
             .Where(evt => evt.Contains("watchtower fired", StringComparison.OrdinalIgnoreCase)
@@ -263,6 +284,8 @@ public sealed class StructureRenderPass : IRenderPass
                 .Where(s => s.ColonyId == colony.Id && IsMatchingTowerKind(s.Kind, catapultShot, arrowTowerShot))
                 .FirstOrDefault();
             if (sourceTower == null)
+                continue;
+            if (!RenderLayout.IsVisible(visibleTiles, sourceTower.X, sourceTower.Y))
                 continue;
 
             var source = TileCenter(sourceTower.X, sourceTower.Y, settings.TileSize);

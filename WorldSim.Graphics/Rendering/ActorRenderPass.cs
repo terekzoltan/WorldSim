@@ -18,32 +18,36 @@ public sealed class ActorRenderPass : IRenderPass
         var textures = context.Textures;
         var settings = context.Settings;
         var theme = context.Theme;
+        var visibleTiles = context.VisibleTileBounds;
 
-        DrawPeople(spriteBatch, snapshot, textures, settings, theme);
-        DrawAnimals(spriteBatch, snapshot, textures, settings, theme);
+        DrawPeople(spriteBatch, snapshot, textures, settings, theme, visibleTiles);
+        DrawAnimals(spriteBatch, snapshot, textures, settings, theme, visibleTiles);
     }
 
-    private static void DrawPeople(SpriteBatch spriteBatch, WorldRenderSnapshot snapshot, TextureCatalog textures, WorldRenderSettings settings, WorldRenderTheme theme)
+    private static void DrawPeople(
+        SpriteBatch spriteBatch,
+        WorldRenderSnapshot snapshot,
+        TextureCatalog textures,
+        WorldRenderSettings settings,
+        WorldRenderTheme theme,
+        TileBounds visibleTiles)
     {
         foreach (var person in snapshot.People)
         {
-            var dx = person.X * settings.TileSize;
-            var dy = person.Y * settings.TileSize;
+            if (!RenderLayout.IsVisible(visibleTiles, person.X, person.Y))
+                continue;
+
             var icon = textures.GetPersonIcon(person.ColonyId);
-            Rectangle bounds;
+            var bounds = RenderLayout.BottomAnchoredInTile(person.X, person.Y, settings.TileSize, settings.PersonScale);
+            RenderLayout.DrawGroundShadow(spriteBatch, textures.Pixel, bounds, settings.ActorShadowAlpha);
 
             if (icon != null)
             {
-                var iconSize = (int)MathF.Round(settings.TileSize * settings.IconScale);
-                var iconX = dx + (settings.TileSize - iconSize) / 2;
-                var iconY = dy + (settings.TileSize - iconSize) / 2;
-                bounds = new Rectangle(iconX, iconY, iconSize, iconSize);
                 spriteBatch.Draw(icon, bounds, Color.White);
             }
             else
             {
-                bounds = new Rectangle(dx, dy, settings.TileSize, settings.TileSize);
-                spriteBatch.Draw(textures.Pixel, bounds, Color.White);
+                spriteBatch.Draw(textures.Pixel, bounds, Color.White * 0.92f);
             }
 
             DrawHealthBar(spriteBatch, textures, person, bounds, settings, theme);
@@ -51,17 +55,19 @@ public sealed class ActorRenderPass : IRenderPass
             DrawBattleMarkers(spriteBatch, textures, person, bounds, settings, theme);
         }
 
-        DrawStackDebugMarkers(spriteBatch, textures, snapshot, settings);
+        DrawStackDebugMarkers(spriteBatch, textures, snapshot, settings, visibleTiles);
     }
 
     private static void DrawStackDebugMarkers(
         SpriteBatch spriteBatch,
         TextureCatalog textures,
         WorldRenderSnapshot snapshot,
-        WorldRenderSettings settings)
+        WorldRenderSettings settings,
+        TileBounds visibleTiles)
     {
         var stacks = snapshot.People
             .GroupBy(person => (person.X, person.Y))
+            .Where(group => RenderLayout.IsVisible(visibleTiles, group.Key.X, group.Key.Y))
             .Where(group => group.Count() > 1)
             .OrderBy(group => group.Key.Y)
             .ThenBy(group => group.Key.X);
@@ -215,15 +221,64 @@ public sealed class ActorRenderPass : IRenderPass
         }
     }
 
-    private static void DrawAnimals(SpriteBatch spriteBatch, WorldRenderSnapshot snapshot, TextureCatalog textures, WorldRenderSettings settings, WorldRenderTheme theme)
+    private static void DrawAnimals(
+        SpriteBatch spriteBatch,
+        WorldRenderSnapshot snapshot,
+        TextureCatalog textures,
+        WorldRenderSettings settings,
+        WorldRenderTheme theme,
+        TileBounds visibleTiles)
     {
         foreach (var animal in snapshot.Animals)
         {
+            if (!RenderLayout.IsVisible(visibleTiles, animal.X, animal.Y))
+                continue;
+
             var color = animal.Kind == AnimalKindView.Predator ? theme.Predator : theme.Herbivore;
-            spriteBatch.Draw(
-                textures.Pixel,
-                new Rectangle(animal.X * settings.TileSize, animal.Y * settings.TileSize, settings.TileSize, settings.TileSize),
-                color);
+            var bounds = RenderLayout.BottomAnchoredInTile(animal.X, animal.Y, settings.TileSize, settings.AnimalScale);
+            RenderLayout.DrawGroundShadow(spriteBatch, textures.Pixel, bounds, settings.ActorShadowAlpha * 0.9f);
+
+            var icon = textures.GetAnimalIcon(animal.Kind);
+            if (icon != null)
+            {
+                spriteBatch.Draw(icon, bounds, Color.White);
+                continue;
+            }
+
+            DrawAnimalFallback(spriteBatch, textures.Pixel, bounds, color, animal.Kind == AnimalKindView.Predator);
         }
+    }
+
+    private static void DrawAnimalFallback(
+        SpriteBatch spriteBatch,
+        Texture2D pixel,
+        Rectangle bounds,
+        Color baseColor,
+        bool isPredator)
+    {
+        var body = Shrink(bounds, isPredator ? 0.9f : 0.84f, isPredator ? 0.72f : 0.78f, yBias: 0.08f);
+        spriteBatch.Draw(pixel, body, baseColor);
+
+        if (isPredator)
+        {
+            var head = Shrink(bounds, 0.46f, 0.4f, yBias: -0.08f);
+            spriteBatch.Draw(pixel, head, Color.Lerp(baseColor, Color.Black, 0.25f));
+            spriteBatch.Draw(pixel, new Rectangle(head.Right - 1, head.Y, 1, 1), new Color(255, 232, 214));
+        }
+        else
+        {
+            var ear = Shrink(bounds, 0.36f, 0.3f, yBias: -0.12f);
+            spriteBatch.Draw(pixel, ear, Color.Lerp(baseColor, Color.White, 0.12f));
+            spriteBatch.Draw(pixel, new Rectangle(ear.X, ear.Y, 1, 1), Color.White * 0.45f);
+        }
+    }
+
+    private static Rectangle Shrink(Rectangle rect, float widthFactor, float heightFactor, float yBias = 0f)
+    {
+        int width = Math.Max(1, (int)MathF.Round(rect.Width * widthFactor));
+        int height = Math.Max(1, (int)MathF.Round(rect.Height * heightFactor));
+        int x = rect.Center.X - (width / 2);
+        int y = rect.Center.Y - (height / 2) + (int)MathF.Round(rect.Height * yBias);
+        return new Rectangle(x, y, width, height);
     }
 }

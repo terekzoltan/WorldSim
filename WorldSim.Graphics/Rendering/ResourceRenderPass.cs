@@ -1,6 +1,7 @@
 using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using WorldSim.Graphics.Assets;
 using WorldSim.Runtime.ReadModel;
 
 namespace WorldSim.Graphics.Rendering;
@@ -26,12 +27,8 @@ public sealed class ResourceRenderPass : IRenderPass
             if (tile.NodeAmount <= 0)
                 continue;
 
-            var bx = tile.X * settings.TileSize;
-            var by = tile.Y * settings.TileSize;
-            var iconSize = (int)MathF.Round(settings.TileSize * settings.IconScale);
-            var iconX = bx + (settings.TileSize - iconSize) / 2;
-            var iconY = by + (settings.TileSize - iconSize) / 2;
-            var iconRect = new Rectangle(iconX, iconY, iconSize, iconSize);
+            var iconRect = RenderLayout.BottomAnchoredInTile(tile.X, tile.Y, settings.TileSize, settings.ResourceScale);
+            RenderLayout.DrawGroundShadow(spriteBatch, textures.Pixel, iconRect, settings.StructureShadowAlpha * 0.7f);
 
             if (tile.NodeType == ResourceView.Wood)
                 spriteBatch.Draw(textures.Tree, iconRect, Color.White);
@@ -42,7 +39,35 @@ public sealed class ResourceRenderPass : IRenderPass
             else if (tile.NodeType == ResourceView.Gold)
                 spriteBatch.Draw(textures.Gold, iconRect, Color.White);
             else if (tile.NodeType == ResourceView.Food)
-                spriteBatch.Draw(textures.Pixel, iconRect, theme.FoodNode);
+                DrawFoodNode(spriteBatch, textures, theme, iconRect);
         }
+    }
+
+    private static void DrawFoodNode(
+        SpriteBatch spriteBatch,
+        TextureCatalog textures,
+        WorldRenderTheme theme,
+        Rectangle iconRect)
+    {
+        if (textures.Food != null)
+        {
+            spriteBatch.Draw(textures.Food, iconRect, Color.White);
+            return;
+        }
+
+        var clump = Shrink(iconRect, 0.64f);
+        var stem = Shrink(iconRect, 0.42f);
+        spriteBatch.Draw(textures.Pixel, clump, theme.FoodNode);
+        spriteBatch.Draw(textures.Pixel, stem, Color.Lerp(theme.FoodNode, theme.Success, 0.35f));
+        spriteBatch.Draw(textures.Pixel, new Rectangle(clump.X, clump.Y, Math.Max(1, clump.Width / 3), Math.Max(1, clump.Height / 3)), Color.White * 0.5f);
+    }
+
+    private static Rectangle Shrink(Rectangle rect, float factor)
+    {
+        int width = Math.Max(1, (int)MathF.Round(rect.Width * factor));
+        int height = Math.Max(1, (int)MathF.Round(rect.Height * factor));
+        int x = rect.Center.X - (width / 2);
+        int y = rect.Center.Y - (height / 2);
+        return new Rectangle(x, y, width, height);
     }
 }

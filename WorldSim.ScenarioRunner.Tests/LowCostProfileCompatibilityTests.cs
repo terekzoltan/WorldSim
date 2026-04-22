@@ -27,6 +27,10 @@ public sealed class LowCostProfileCompatibilityTests
             devLiteRun.GetProperty("contact").GetRawText());
 
         Assert.Equal(
+            headlessRun.GetProperty("ecology").GetRawText(),
+            devLiteRun.GetProperty("ecology").GetRawText());
+
+        Assert.Equal(
             headlessRun.GetProperty("aiNoPlanDecisions").GetInt32(),
             devLiteRun.GetProperty("aiNoPlanDecisions").GetInt32());
         Assert.Equal(

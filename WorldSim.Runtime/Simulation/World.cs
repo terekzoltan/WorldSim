@@ -174,6 +174,12 @@ namespace WorldSim.Simulation
         public int TotalAiNoPlanDecisions { get; private set; }
         public int TotalAiReplanBackoffDecisions { get; private set; }
         public int TotalAiResearchTechDecisions { get; private set; }
+        public int TotalHerbivoreReplenishmentSpawns { get; private set; }
+        public int TotalPredatorReplenishmentSpawns { get; private set; }
+        public int TicksWithZeroHerbivores { get; private set; }
+        public int TicksWithZeroPredators { get; private set; }
+        public int? FirstZeroHerbivoreTick { get; private set; }
+        public int? FirstZeroPredatorTick { get; private set; }
         public int DenseNeighborhoodTicks { get; private set; }
         public int LastTickDenseActors { get; private set; }
         public int ActiveCombatGroupCount => _activeCombatGroups.Count;
@@ -262,6 +268,27 @@ namespace WorldSim.Simulation
                     DebugDecisionCause: latest.DebugDecisionCause,
                     DebugTargetKey: latest.DebugTargetKey,
                     TargetKind: latest.TargetKind));
+        }
+
+        public ScenarioEcologyTelemetrySnapshot BuildScenarioEcologyTelemetrySnapshot()
+        {
+            var (activeFoodNodes, depletedFoodNodes) = CountFoodNodes();
+            var herbivores = _animals.Count(a => a is Herbivore && a.IsAlive);
+            var predators = _animals.Count(a => a is Predator && a.IsAlive);
+
+            return new ScenarioEcologyTelemetrySnapshot(
+                Herbivores: herbivores,
+                Predators: predators,
+                ActiveFoodNodes: activeFoodNodes,
+                DepletedFoodNodes: depletedFoodNodes,
+                HerbivoreReplenishmentSpawns: TotalHerbivoreReplenishmentSpawns,
+                PredatorReplenishmentSpawns: TotalPredatorReplenishmentSpawns,
+                TicksWithZeroHerbivores: TicksWithZeroHerbivores,
+                TicksWithZeroPredators: TicksWithZeroPredators,
+                FirstZeroHerbivoreTick: FirstZeroHerbivoreTick,
+                FirstZeroPredatorTick: FirstZeroPredatorTick,
+                PredatorDeaths: TotalPredatorDeaths,
+                PredatorHumanHits: TotalPredatorHumanHits);
         }
 
         public bool CanBuildFortifications(Colony colony)
@@ -609,6 +636,7 @@ namespace WorldSim.Simulation
                     _animals.RemoveAt(i);
             }
 
+            RecordEcologyPreReplenishmentState();
             UpdateAnimalPopulation(dt);
             UpdateMilestones();
 
@@ -1114,6 +1142,12 @@ namespace WorldSim.Simulation
 
             return _foodRegrowthProgress.GetValueOrDefault((x, y), 0f);
         }
+
+        internal static bool IsActiveFoodNode(ResourceNode? node)
+            => node is { Type: Resource.Food, Amount: > 0 };
+
+        internal static bool IsDepletedFoodNode(ResourceNode? node)
+            => node is { Type: Resource.Food, Amount: <= 0 };
 
         public ColonyWarState GetColonyWarState(int colonyId)
             => _colonyWarStates.TryGetValue(colonyId, out var state) ? state : ColonyWarState.Peace;
@@ -2495,11 +2529,52 @@ namespace WorldSim.Simulation
             if (herbivores < Math.Max(8, (Width * Height) / 400))
             {
                 _animals.Add(new Herbivore(RandomFreePos(), CreateEntityRng()));
+                TotalHerbivoreReplenishmentSpawns++;
                 return;
             }
 
             if (predators < Math.Max(3, herbivores / 6) && _rng.NextDouble() < 0.5)
+            {
                 _animals.Add(new Predator(RandomFreePos(), CreateEntityRng()));
+                TotalPredatorReplenishmentSpawns++;
+            }
+        }
+
+        void RecordEcologyPreReplenishmentState()
+        {
+            int herbivores = _animals.Count(a => a is Herbivore && a.IsAlive);
+            int predators = _animals.Count(a => a is Predator && a.IsAlive);
+
+            if (herbivores == 0)
+            {
+                TicksWithZeroHerbivores++;
+                FirstZeroHerbivoreTick ??= _tickCounter;
+            }
+
+            if (predators == 0)
+            {
+                TicksWithZeroPredators++;
+                FirstZeroPredatorTick ??= _tickCounter;
+            }
+        }
+
+        (int activeFoodNodes, int depletedFoodNodes) CountFoodNodes()
+        {
+            int activeFoodNodes = 0;
+            int depletedFoodNodes = 0;
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    var node = _map[x, y].Node;
+                    if (IsActiveFoodNode(node))
+                        activeFoodNodes++;
+                    else if (IsDepletedFoodNode(node))
+                        depletedFoodNodes++;
+                }
+            }
+
+            return (activeFoodNodes, depletedFoodNodes);
         }
 
         void UpdateMilestones()

@@ -57,6 +57,11 @@ public sealed class DrilldownTests
         Assert.True(aiTelemetry.TryGetProperty("topCommand", out _));
         Assert.True(aiTelemetry.TryGetProperty("topReplanReason", out _));
         Assert.True(aiTelemetry.TryGetProperty("topDebugCause", out _));
+        Assert.True(firstSample.TryGetProperty("ecology", out var ecologyTelemetry));
+        Assert.True(ecologyTelemetry.TryGetProperty("herbivores", out _));
+        Assert.True(ecologyTelemetry.TryGetProperty("predators", out _));
+        Assert.True(ecologyTelemetry.TryGetProperty("activeFoodNodes", out _));
+        Assert.True(ecologyTelemetry.TryGetProperty("depletedFoodNodes", out _));
     }
 
     [Fact]

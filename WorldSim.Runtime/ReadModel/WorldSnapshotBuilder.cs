@@ -27,13 +27,10 @@ public static class WorldSnapshotBuilder
                     : colonyFactionById.TryGetValue(ownerColonyId, out var ownerFaction)
                         ? (int)ownerFaction
                         : -1;
-                if (nodeType == Resource.Food)
-                {
-                    if (nodeAmount > 0)
-                        activeFoodNodes++;
-                    else
-                        depletedFoodNodes++;
-                }
+                if (World.IsActiveFoodNode(tile.Node))
+                    activeFoodNodes++;
+                else if (World.IsDepletedFoodNode(tile.Node))
+                    depletedFoodNodes++;
 
                 tiles.Add(new TileRenderData(
                     x,

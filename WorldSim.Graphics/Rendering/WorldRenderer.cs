@@ -63,7 +63,7 @@ public sealed class WorldRenderer
         spriteBatch.Begin(samplerState: SamplerState.PointClamp, transformMatrix: camera.BuildMatrix());
 
         var viewport = spriteBatch.GraphicsDevice.Viewport;
-        var visibleTileBounds = ComputeVisibleTileBounds(snapshot, camera, viewport, Settings.TileSize);
+        var visibleTileBounds = ComputeVisibleTileBounds(snapshot, camera, viewport, Settings);
         var visualPolicy = ResolveVisualPolicy(RequestedVisualLane);
 
         _territoryOverlayPass.Enabled = TerritoryOverlayEnabled;
@@ -93,8 +93,9 @@ public sealed class WorldRenderer
         WorldRenderSnapshot snapshot,
         Camera2D camera,
         Viewport viewport,
-        int tileSize)
+        WorldRenderSettings settings)
     {
+        int tileSize = settings.TileSize;
         var worldTopLeft = camera.ScreenToWorld(Vector2.Zero);
         var worldBottomRight = camera.ScreenToWorld(new Vector2(viewport.Width, viewport.Height));
 
@@ -103,11 +104,11 @@ public sealed class WorldRenderer
         var minWorldY = MathF.Min(worldTopLeft.Y, worldBottomRight.Y);
         var maxWorldY = MathF.Max(worldTopLeft.Y, worldBottomRight.Y);
 
-        const int paddingTiles = 2;
-        var minTileX = Math.Max(0, (int)MathF.Floor(minWorldX / tileSize) - paddingTiles);
-        var minTileY = Math.Max(0, (int)MathF.Floor(minWorldY / tileSize) - paddingTiles);
-        var maxTileX = Math.Min(snapshot.Width - 1, (int)MathF.Floor(maxWorldX / tileSize) + paddingTiles);
-        var maxTileY = Math.Min(snapshot.Height - 1, (int)MathF.Floor(maxWorldY / tileSize) + paddingTiles);
+        var padding = RenderLayout.CalculateVisibleTilePadding(settings);
+        var minTileX = Math.Max(0, (int)MathF.Floor(minWorldX / tileSize) - padding.Horizontal);
+        var minTileY = Math.Max(0, (int)MathF.Floor(minWorldY / tileSize) - padding.Top);
+        var maxTileX = Math.Min(snapshot.Width - 1, (int)MathF.Floor(maxWorldX / tileSize) + padding.Horizontal);
+        var maxTileY = Math.Min(snapshot.Height - 1, (int)MathF.Floor(maxWorldY / tileSize) + padding.Bottom);
 
         return new TileBounds(minTileX, minTileY, maxTileX, maxTileY);
     }
