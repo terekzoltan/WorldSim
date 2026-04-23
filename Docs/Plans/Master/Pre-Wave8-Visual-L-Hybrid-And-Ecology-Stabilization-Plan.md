@@ -173,6 +173,10 @@ Success criteria:
 |---------|---------|--------|-------|
 | SMR Analyst | PW8-B1 evidence | PW8-B1 ✅ | Run baseline and drilldown package; confirm artifacts are sufficient for tuning |
 
+Evidence closeout:
+- `Docs/Evidence/SMR/pre-wave8-pw8-b1-ecology/README.md`
+- Decision: `PW8-B1 evidence sufficient for PW8-B2`.
+
 ### Step 3 - ecology stabilization
 
 | Session | Epic(s) | Prereq | Notes |

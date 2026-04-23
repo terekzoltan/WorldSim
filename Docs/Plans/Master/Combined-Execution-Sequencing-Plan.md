@@ -1536,6 +1536,9 @@ Approved slices:
 |---------|---------|--------|-------|
 | SMR Analyst | PW8-B1 evidence | PW8-B1 ✅ | Run baseline + drilldown package and confirm the ecology artifact surface is sufficient for tuning |
 
+Pre-Wave8 Step 2 progress note:
+- ✅ `PW8-B1 evidence` closed: baseline + stress-focused ecology drilldown artifacts were reviewed (`.artifacts/smr/baseline-candidate-pw8-b1-ecology-001/`, `.artifacts/smr/baseline-candidate-pw8-b1-ecology-stress-focus-001/`), both Headless + `exitCode=0`; checked-in report: `Docs/Evidence/SMR/pre-wave8-pw8-b1-ecology/README.md`; decision: ecology artifact surface is sufficient for `PW8-B2`.
+
 **Step 3 - ecology stabilization**
 
 | Session | Epic(s) | Prereq | Notes |
