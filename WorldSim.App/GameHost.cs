@@ -22,7 +22,7 @@ namespace WorldSim;
 public class GameHost : Game
 {
     private static readonly float[] HudScales = { 1.0f };
-    private static readonly float[] SimSpeedPresets = { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 10.0f };
+    private static readonly float[] SimSpeedPresets = { 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 5.0f, 8.0f, 10.0f };
 
     private static readonly (string Name, WorldRenderTheme Theme)[] ThemePresets =
     {
@@ -52,9 +52,9 @@ public class GameHost : Game
     private readonly RefineryTriggerAdapter _refineryRuntime;
 
     private float _accumulator;
-    private float _timeScale = 10.0f;
+    private float _timeScale = 5.0f;
     private bool _simPaused;
-    private int _simSpeedIndex = SimSpeedPresets.Length - 1;
+    private int _simSpeedIndex = 5;
     private bool _showTechMenu;
     private int _selectedColony;
     private int _previousWheel;
@@ -220,7 +220,7 @@ public class GameHost : Game
         if (IsChordPressed(keys, Keys.OemMinus, requireCtrl: true) || IsChordPressed(keys, Keys.Subtract, requireCtrl: true))
             AdjustSimulationSpeed(-1);
 
-        if (IsChordPressed(keys, Keys.OemPlus, requireCtrl: true) || IsChordPressed(keys, Keys.Add, requireCtrl: true))
+        if (IsChordPressed(keys, Keys.M, requireCtrl: true))
             AdjustSimulationSpeed(1);
 
         if (IsChordPressed(keys, Keys.OemPeriod, requireCtrl: true) || IsChordPressed(keys, Keys.Decimal, requireCtrl: true))
