@@ -120,7 +120,7 @@ public sealed class EcologyTelemetryArtifactTests
             out _);
         Assert.Equal(0, baselineExit);
 
-        var oldBaselinePath = RemoveEcologyBlockFromSummary(Path.Combine(baselineArtifact, "summary.json"));
+        var oldBaselinePath = RemoveEcologyBlocksFromSummary(Path.Combine(baselineArtifact, "summary.json"));
 
         var compareArtifact = CreateArtifactDir();
         var compareExit = RunScenarioRunner(
@@ -140,13 +140,70 @@ public sealed class EcologyTelemetryArtifactTests
         Assert.True(File.Exists(Path.Combine(compareArtifact, "compare.json")));
     }
 
-    private static string RemoveEcologyBlockFromSummary(string summaryPath)
+    [Fact]
+    public void ConfigJson_EcologyBalanceValues_ArePersistedAsEffectiveValues()
+    {
+        var artifactDir = CreateArtifactDir();
+        var configJson = "[{\"Name\":\"ecology-balance\",\"Width\":32,\"Height\":20,\"InitialPop\":12,\"Ticks\":8,\"Dt\":0.25,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0,\"EnableSiege\":true,\"AnimalReplenishmentChancePerSecond\":0.25,\"PredatorReplenishmentChance\":0.75,\"FoodRegrowthMinSeconds\":9.0,\"FoodRegrowthJitterSeconds\":4.0}]";
+
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "725",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var balance = summary.RootElement.GetProperty("runs").EnumerateArray().First().GetProperty("ecologyBalance");
+        Assert.Equal(0.25f, balance.GetProperty("animalReplenishmentChancePerSecond").GetSingle());
+        Assert.Equal(0.75f, balance.GetProperty("predatorReplenishmentChance").GetSingle());
+        Assert.Equal(9f, balance.GetProperty("foodRegrowthMinSeconds").GetSingle());
+        Assert.Equal(4f, balance.GetProperty("foodRegrowthJitterSeconds").GetSingle());
+    }
+
+    [Fact]
+    public void ConfigJson_InvalidEcologyBalanceValues_AreClampedInArtifact()
+    {
+        var artifactDir = CreateArtifactDir();
+        var configJson = "[{\"Name\":\"ecology-balance-clamp\",\"Width\":32,\"Height\":20,\"InitialPop\":12,\"Ticks\":8,\"Dt\":0.25,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0,\"EnableSiege\":true,\"AnimalReplenishmentChancePerSecond\":2.0,\"PredatorReplenishmentChance\":-1.0,\"FoodRegrowthMinSeconds\":-5.0,\"FoodRegrowthJitterSeconds\":99999.0}]";
+
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "726",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var balance = summary.RootElement.GetProperty("runs").EnumerateArray().First().GetProperty("ecologyBalance");
+        Assert.Equal(1f, balance.GetProperty("animalReplenishmentChancePerSecond").GetSingle());
+        Assert.Equal(0f, balance.GetProperty("predatorReplenishmentChance").GetSingle());
+        Assert.True(balance.GetProperty("foodRegrowthMinSeconds").GetSingle() > 0f);
+        Assert.Equal(3600f, balance.GetProperty("foodRegrowthJitterSeconds").GetSingle());
+    }
+
+    private static string RemoveEcologyBlocksFromSummary(string summaryPath)
     {
         var node = JsonNode.Parse(File.ReadAllText(summaryPath))?.AsObject()
                    ?? throw new InvalidOperationException("Invalid summary json");
         var runs = node["runs"]?.AsArray() ?? throw new InvalidOperationException("Summary missing runs");
         foreach (var run in runs.OfType<JsonObject>())
+        {
             run.Remove("ecology");
+            run.Remove("ecologyBalance");
+        }
 
         var patchedPath = Path.Combine(Path.GetTempPath(), $"worldsim-baseline-no-ecology-{Guid.NewGuid():N}.json");
         File.WriteAllText(patchedPath, node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));

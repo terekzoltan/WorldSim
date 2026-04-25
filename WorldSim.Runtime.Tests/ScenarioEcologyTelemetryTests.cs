@@ -109,7 +109,125 @@ public sealed class ScenarioEcologyTelemetryTests
         Assert.Equal(7, timeline.TicksWithZeroPredators);
     }
 
-    private static void DepleteSingleFoodNode(World world)
+    [Fact]
+    public void EcologyBalanceDefaults_AreTunedPw8B2Values()
+    {
+        var world = new World(16, 16, 8, randomSeed: 181);
+
+        Assert.Equal(World.DefaultAnimalReplenishmentChancePerSecond, world.AnimalReplenishmentChancePerSecond);
+        Assert.Equal(World.DefaultPredatorReplenishmentChance, world.PredatorReplenishmentChance);
+        Assert.Equal(World.DefaultFoodRegrowthMinSeconds, world.FoodRegrowthMinSeconds);
+        Assert.Equal(World.DefaultFoodRegrowthJitterSeconds, world.FoodRegrowthJitterSeconds);
+
+        var balance = world.BuildScenarioEcologyBalanceSnapshot();
+        Assert.Equal(0.04f, balance.AnimalReplenishmentChancePerSecond);
+        Assert.Equal(1.0f, balance.PredatorReplenishmentChance);
+        Assert.Equal(18f, balance.FoodRegrowthMinSeconds);
+        Assert.Equal(18f, balance.FoodRegrowthJitterSeconds);
+    }
+
+    [Fact]
+    public void EcologyBalanceKnobs_ClampInvalidValues()
+    {
+        var world = new World(16, 16, 8, randomSeed: 182)
+        {
+            AnimalReplenishmentChancePerSecond = 3f,
+            PredatorReplenishmentChance = -1f,
+            FoodRegrowthMinSeconds = float.NaN,
+            FoodRegrowthJitterSeconds = float.PositiveInfinity
+        };
+
+        Assert.Equal(1f, world.AnimalReplenishmentChancePerSecond);
+        Assert.Equal(0f, world.PredatorReplenishmentChance);
+        Assert.True(world.FoodRegrowthMinSeconds > 0f);
+        Assert.Equal(3600f, world.FoodRegrowthJitterSeconds);
+    }
+
+    [Fact]
+    public void ConfiguredReplenishmentChanceAndPredatorChance_CanSpawnPredatorWhenEligible()
+    {
+        var world = new World(16, 16, 8, randomSeed: 183)
+        {
+            AnimalReplenishmentChancePerSecond = 1f,
+            PredatorReplenishmentChance = 1f
+        };
+        world._animals.Clear();
+        for (var i = 0; i < 8; i++)
+            world._animals.Add(new Herbivore((i, 1), new Random(200 + i)));
+
+        var method = typeof(World).GetMethod("UpdateAnimalPopulation", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(world, new object[] { 1f });
+
+        var telemetry = world.BuildScenarioEcologyTelemetrySnapshot();
+        Assert.Equal(1, telemetry.PredatorReplenishmentSpawns);
+        Assert.Equal(1, telemetry.Predators);
+    }
+
+    [Fact]
+    public void ReplenishmentTick_CanRunHerbivoreAndPredatorBranchesTogether()
+    {
+        var world = new World(16, 16, 8, randomSeed: 185)
+        {
+            AnimalReplenishmentChancePerSecond = 1f,
+            PredatorReplenishmentChance = 1f
+        };
+        world._animals.Clear();
+        for (var i = 0; i < 7; i++)
+            world._animals.Add(new Herbivore((i, 2), new Random(300 + i)));
+
+        var method = typeof(World).GetMethod("UpdateAnimalPopulation", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(world, new object[] { 1f });
+
+        var telemetry = world.BuildScenarioEcologyTelemetrySnapshot();
+        Assert.Equal(1, telemetry.HerbivoreReplenishmentSpawns);
+        Assert.Equal(1, telemetry.PredatorReplenishmentSpawns);
+        Assert.Equal(8, telemetry.Herbivores);
+        Assert.Equal(1, telemetry.Predators);
+    }
+
+    [Fact]
+    public void PredatorRescue_CanRunBelowHerbivoreFloor_WhenPredatorsAreExtinctAndPreyExists()
+    {
+        var world = new World(16, 16, 8, randomSeed: 186)
+        {
+            AnimalReplenishmentChancePerSecond = 1f,
+            PredatorReplenishmentChance = 1f
+        };
+        world._animals.Clear();
+        for (var i = 0; i < 4; i++)
+            world._animals.Add(new Herbivore((i, 3), new Random(400 + i)));
+
+        var method = typeof(World).GetMethod("UpdateAnimalPopulation", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(world, new object[] { 1f });
+
+        var telemetry = world.BuildScenarioEcologyTelemetrySnapshot();
+        Assert.Equal(1, telemetry.HerbivoreReplenishmentSpawns);
+        Assert.Equal(1, telemetry.PredatorReplenishmentSpawns);
+        Assert.Equal(5, telemetry.Herbivores);
+        Assert.Equal(1, telemetry.Predators);
+    }
+
+    [Fact]
+    public void ConfiguredFoodRegrowthDelay_IsHonored()
+    {
+        var world = new World(24, 16, 10, randomSeed: 184)
+        {
+            FoodRegrowthMinSeconds = 0.1f,
+            FoodRegrowthJitterSeconds = 0f
+        };
+        var pos = DepleteSingleFoodNode(world);
+
+        InvokeFoodRegrowthTick(world, 0.05f);
+        Assert.Equal(0, world.GetTile(pos.x, pos.y).Node?.Amount ?? 0);
+
+        InvokeFoodRegrowthTick(world, 0.05f);
+        Assert.True(world.GetTile(pos.x, pos.y).Node?.Amount > 0);
+    }
+
+    private static (int x, int y) DepleteSingleFoodNode(World world)
     {
         for (var y = 0; y < world.Height; y++)
         {
@@ -120,11 +238,18 @@ public sealed class ScenarioEcologyTelemetryTests
                 {
                     var amount = tile.Node.Amount;
                     Assert.True(world.TryHarvest((x, y), Resource.Food, amount));
-                    return;
+                    return (x, y);
                 }
             }
         }
 
         throw new Xunit.Sdk.XunitException("No harvestable food tile found for depletion path.");
+    }
+
+    private static void InvokeFoodRegrowthTick(World world, float dt)
+    {
+        var method = typeof(World).GetMethod("UpdateFoodRegrowth", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(world, new object[] { dt });
     }
 }

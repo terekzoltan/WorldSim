@@ -137,6 +137,40 @@ namespace WorldSim.Simulation
         public int NavigationTopologyVersion => _navigationTopologyVersion;
         internal bool IsLargeCombatTopology => (Width * Height) >= 18000;
 
+        public const float DefaultAnimalReplenishmentChancePerSecond = 0.04f;
+        public const float DefaultPredatorReplenishmentChance = 1.0f;
+        public const float DefaultFoodRegrowthMinSeconds = 18f;
+        public const float DefaultFoodRegrowthJitterSeconds = 18f;
+
+        float _animalReplenishmentChancePerSecond = DefaultAnimalReplenishmentChancePerSecond;
+        float _predatorReplenishmentChance = DefaultPredatorReplenishmentChance;
+        float _foodRegrowthMinSeconds = DefaultFoodRegrowthMinSeconds;
+        float _foodRegrowthJitterSeconds = DefaultFoodRegrowthJitterSeconds;
+
+        public float AnimalReplenishmentChancePerSecond
+        {
+            get => _animalReplenishmentChancePerSecond;
+            set => _animalReplenishmentChancePerSecond = ClampFinite(value, 0f, 1f);
+        }
+
+        public float PredatorReplenishmentChance
+        {
+            get => _predatorReplenishmentChance;
+            set => _predatorReplenishmentChance = ClampFinite(value, 0f, 1f);
+        }
+
+        public float FoodRegrowthMinSeconds
+        {
+            get => _foodRegrowthMinSeconds;
+            set => _foodRegrowthMinSeconds = ClampFinite(value, MinFoodRegrowthSeconds, MaxFoodRegrowthSeconds);
+        }
+
+        public float FoodRegrowthJitterSeconds
+        {
+            get => _foodRegrowthJitterSeconds;
+            set => _foodRegrowthJitterSeconds = ClampFinite(value, 0f, MaxFoodRegrowthSeconds);
+        }
+
         public Season CurrentSeason { get; private set; } = Season.Spring;
         public bool IsDroughtActive { get; private set; }
         public IReadOnlyList<string> RecentEvents => _recentEvents;
@@ -290,6 +324,13 @@ namespace WorldSim.Simulation
                 PredatorDeaths: TotalPredatorDeaths,
                 PredatorHumanHits: TotalPredatorHumanHits);
         }
+
+        public ScenarioEcologyBalanceSnapshot BuildScenarioEcologyBalanceSnapshot()
+            => new(
+                AnimalReplenishmentChancePerSecond,
+                PredatorReplenishmentChance,
+                FoodRegrowthMinSeconds,
+                FoodRegrowthJitterSeconds);
 
         public bool CanBuildFortifications(Colony colony)
         {
@@ -460,6 +501,9 @@ namespace WorldSim.Simulation
         const float ProfessionRebalancePeriod = 12f;
         const float SpecializedBuildPeriod = 14f;
         const float FoodParityPeriod = 6f;
+        const float MinFoodRegrowthSeconds = 0.001f;
+        const float MaxFoodRegrowthSeconds = 3600f;
+        const int PredatorRescueMinHerbivores = 4;
         const int TerritoryRecomputeIntervalTicks = 5;
         const double TerritoryContestedThreshold = 2.2d;
         const int CrowdDissipationNeighborRadius = 2;
@@ -2455,7 +2499,7 @@ namespace WorldSim.Simulation
             if (_foodRegrowth.Any(s => s.x == x && s.y == y))
                 return;
 
-            _foodRegrowth.Add((x, y, 0f, 24f + (float)_rng.NextDouble() * 24f));
+            _foodRegrowth.Add((x, y, 0f, FoodRegrowthMinSeconds + (float)_rng.NextDouble() * FoodRegrowthJitterSeconds));
             _foodRegrowthProgress[(x, y)] = 0f;
         }
 
@@ -2520,24 +2564,43 @@ namespace WorldSim.Simulation
 
         void UpdateAnimalPopulation(float dt)
         {
-            if (_rng.NextDouble() >= dt * 0.01)
-                return;
-
             int herbivores = _animals.Count(a => a is Herbivore && a.IsAlive);
             int predators = _animals.Count(a => a is Predator && a.IsAlive);
+            bool predatorRescueCheck = predators == 0 && herbivores >= PredatorRescueMinHerbivores;
+            if (!predatorRescueCheck && _rng.NextDouble() >= Math.Clamp(dt * AnimalReplenishmentChancePerSecond, 0f, 1f))
+                return;
 
-            if (herbivores < Math.Max(8, (Width * Height) / 400))
+            int herbivoreFloor = Math.Max(8, (Width * Height) / 400);
+
+            if (herbivores < herbivoreFloor)
             {
                 _animals.Add(new Herbivore(RandomFreePos(), CreateEntityRng()));
                 TotalHerbivoreReplenishmentSpawns++;
-                return;
+                herbivores++;
             }
 
-            if (predators < Math.Max(3, herbivores / 6) && _rng.NextDouble() < 0.5)
+            var predatorRescueEligible = predators == 0 && herbivores >= PredatorRescueMinHerbivores;
+            if ((herbivores >= herbivoreFloor || predatorRescueEligible)
+                && predators < Math.Max(3, herbivores / 6)
+                && _rng.NextDouble() < PredatorReplenishmentChance)
             {
                 _animals.Add(new Predator(RandomFreePos(), CreateEntityRng()));
                 TotalPredatorReplenishmentSpawns++;
             }
+        }
+
+        static float ClampFinite(float value, float min, float max)
+        {
+            if (float.IsNaN(value))
+                return min;
+
+            if (float.IsNegativeInfinity(value))
+                return min;
+
+            if (float.IsPositiveInfinity(value))
+                return max;
+
+            return Math.Clamp(value, min, max);
         }
 
         void RecordEcologyPreReplenishmentState()

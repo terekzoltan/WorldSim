@@ -1519,7 +1519,7 @@ Wave 8 turn-gate:
 Approved slices:
 - ✅ **PW8-A1** Visual-L Hybrid readability/overhaul pass (Track A)
 - ✅ **PW8-B1** Ecology observability for ScenarioRunner/SMR (Track B)
-- ⬜ **PW8-B2** Ecology stabilization on the current model (Track B primary, SMR Analyst evidence)
+- ✅ **PW8-B2** Ecology stabilization on the current model (Track B primary, SMR Analyst evidence)
 
 ### Pre-Wave8 - Execution Steps
 
@@ -1545,6 +1545,9 @@ Pre-Wave8 Step 2 progress note:
 |---------|---------|--------|-------|
 | Track B agent | PW8-B2 | PW8-B1 ✅ + PW8-B1 evidence ✅ | Stabilize the current model only; do not pre-implement the later true closed-loop redesign |
 
+Pre-Wave8 Step 3 progress note:
+- ✅ `PW8-B2` implementation-side stabilization candidate wired: runtime current-model ecology defaults changed to `AnimalReplenishmentChancePerSecond=0.04`, `PredatorReplenishmentChance=1.0`, `FoodRegrowthMinSeconds=18`, `FoodRegrowthJitterSeconds=18`; predator rescue fairness added for extinct-predator + viable-prey state without touching predator speed/vision/capture/energy or initial predator multiplier; ScenarioRunner config accepts nullable ecology balance overrides and exports clamp-effective `ecologyBalance`; compare baseline paths for evidence must point at `summary.json`, while ecology improvement remains manual review via `ecology` run/timeline fields.
+
 **Step 4 - stabilization verification**
 
 | Session | Epic(s) | Prereq | Notes |
@@ -1553,7 +1556,7 @@ Pre-Wave8 Step 2 progress note:
 
 Parallelism:
 - `PW8-A1` may run in parallel with `PW8-B1` and does not need to wait for ecology evidence.
-- `PW8-B2` is blocked on `PW8-B1` and the first SMR evidence pass.
+- `PW8-B2` depended on `PW8-B1` and the first SMR evidence pass; this dependency is now satisfied.
 - Wave 8 remains blocked until the full pre-wave addendum closes.
 
 ---

@@ -94,6 +94,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 BirthRateMultiplier = config.BirthRateMultiplier,
                 MovementSpeedMultiplier = config.MovementSpeedMultiplier
             };
+            ApplyEcologyBalanceConfig(world, config);
 
             List<double>? tickTimesMs = perfEnabled ? new List<double>(config.Ticks) : null;
             long peakEntities = 0;
@@ -252,6 +253,7 @@ static ScenarioRunResult BuildRunResult(
     var contactTelemetry = world.BuildScenarioContactTelemetrySnapshot();
     var aiTelemetry = world.BuildScenarioAiTelemetrySnapshot();
     var ecologyTelemetry = world.BuildScenarioEcologyTelemetrySnapshot();
+    var ecologyBalance = world.BuildScenarioEcologyBalanceSnapshot();
     if (tickTimesMs is { Count: > 0 })
     {
         perfAvgTickMs = tickTimesMs.Average();
@@ -320,7 +322,23 @@ static ScenarioRunResult BuildRunResult(
         PerfP99TickMs: perfP99TickMs,
         PerfPeakEntities: perfPeakEntities,
         Ecology: ecologyTelemetry,
+        EcologyBalance: ecologyBalance,
         EnablePredatorHumanAttacks: world.EnablePredatorHumanAttacks);
+}
+
+static void ApplyEcologyBalanceConfig(World world, ScenarioConfig config)
+{
+    if (config.AnimalReplenishmentChancePerSecond.HasValue)
+        world.AnimalReplenishmentChancePerSecond = config.AnimalReplenishmentChancePerSecond.Value;
+
+    if (config.PredatorReplenishmentChance.HasValue)
+        world.PredatorReplenishmentChance = config.PredatorReplenishmentChance.Value;
+
+    if (config.FoodRegrowthMinSeconds.HasValue)
+        world.FoodRegrowthMinSeconds = config.FoodRegrowthMinSeconds.Value;
+
+    if (config.FoodRegrowthJitterSeconds.HasValue)
+        world.FoodRegrowthJitterSeconds = config.FoodRegrowthJitterSeconds.Value;
 }
 
 static void WriteOutput(
@@ -1495,7 +1513,11 @@ sealed record ScenarioConfig(
     float BirthRateMultiplier,
     float MovementSpeedMultiplier,
     bool EnableSiege = true,
-    bool EnablePredatorHumanAttacks = false);
+    bool EnablePredatorHumanAttacks = false,
+    float? AnimalReplenishmentChancePerSecond = null,
+    float? PredatorReplenishmentChance = null,
+    float? FoodRegrowthMinSeconds = null,
+    float? FoodRegrowthJitterSeconds = null);
 
 sealed record ScenarioRunResult(
     string ConfigName,
@@ -1553,6 +1575,7 @@ sealed record ScenarioRunResult(
     double PerfP99TickMs,
     long PerfPeakEntities,
     ScenarioEcologyTelemetrySnapshot? Ecology = null,
+    ScenarioEcologyBalanceSnapshot? EcologyBalance = null,
     bool EnablePredatorHumanAttacks = false);
 
 sealed record ScenarioRunEnvelope(

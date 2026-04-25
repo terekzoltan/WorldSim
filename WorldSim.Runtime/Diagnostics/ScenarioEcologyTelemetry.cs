@@ -60,3 +60,16 @@ public sealed record ScenarioEcologyTelemetrySnapshot(
             TicksWithZeroHerbivores,
             TicksWithZeroPredators);
 }
+
+public sealed record ScenarioEcologyBalanceSnapshot(
+    float AnimalReplenishmentChancePerSecond,
+    float PredatorReplenishmentChance,
+    float FoodRegrowthMinSeconds,
+    float FoodRegrowthJitterSeconds)
+{
+    public static ScenarioEcologyBalanceSnapshot Empty { get; } = new(
+        AnimalReplenishmentChancePerSecond: 0f,
+        PredatorReplenishmentChance: 0f,
+        FoodRegrowthMinSeconds: 0f,
+        FoodRegrowthJitterSeconds: 0f);
+}
