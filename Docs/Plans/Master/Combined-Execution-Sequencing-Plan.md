@@ -1554,6 +1554,9 @@ Pre-Wave8 Step 3 progress note:
 |---------|---------|--------|-------|
 | SMR Analyst | PW8-B2 evidence | PW8-B2 ✅ | Validate the tuned state across the agreed matrix before Wave 8 starts |
 
+Pre-Wave8 Step 4 progress note:
+- ✅ `PW8-B2 evidence` SMR Analyst package captured in `Docs/Evidence/SMR/pre-wave8-pw8-b2-ecology/README.md`: primary + stress-focus compare packages ran with explicit env reset and `Headless`; compare identity is clean (`18/18` and `9/9`, no current-only/baseline-only keys), no compare regressions or threshold breaches; ecology review shows predator collapse materially improved (default zero-predator ticks `4704 -> 67`, stress `10554 -> 24`) while herbivore zero-species pressure does not regress. Caveat: stress clustering warnings increased `3 -> 5`; SMR Analyst recommends Meta Coordinator close Pre-Wave8 and unblock Wave 8 after review.
+
 Parallelism:
 - `PW8-A1` may run in parallel with `PW8-B1` and does not need to wait for ecology evidence.
 - `PW8-B2` depended on `PW8-B1` and the first SMR evidence pass; this dependency is now satisfied.

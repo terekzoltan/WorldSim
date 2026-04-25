@@ -189,6 +189,10 @@ Evidence closeout:
 |---------|---------|--------|-------|
 | SMR Analyst | PW8-B2 evidence | PW8-B2 ✅ | Validate the tuned model across the agreed matrix; compare against the captured pre-tuning baseline |
 
+Evidence recommendation:
+- `Docs/Evidence/SMR/pre-wave8-pw8-b2-ecology/README.md`
+- SMR Analyst decision recommendation: `PW8-B2 evidence accepted; recommend Meta Coordinator close Pre-Wave8 and unblock Wave 8`.
+
 ## Role Split
 
 ### Track A
