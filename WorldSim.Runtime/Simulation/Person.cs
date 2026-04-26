@@ -57,6 +57,7 @@ public class Person
     public int CommanderIntelligence { get; private set; }
     public float CommanderMoraleStabilityBonus { get; private set; }
     public Colony Home => _home;
+    public PersonInventory Inventory { get; } = new();
 
     Colony _home;
     readonly Random _rng;
