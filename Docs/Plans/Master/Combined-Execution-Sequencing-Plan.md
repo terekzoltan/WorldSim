@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-04-19
+Last updated: 2026-04-26
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -20,6 +20,7 @@ their execution steps are not retroactively documented — see their proof links
 | **Director Plan** | `Docs/Plans/Master/Director-Integration-Master-Plan.md` |
 | **Combat Plan** | `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md` |
 | **Refinery Live SMR Plan** | `Docs/Plans/Master/Refinery-Live-SMR-Plan.md` |
+| **Wave 11 Ecology Plan** | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
 
 Epic codes (e.g., `S1-A`, `P0-B`) are unique and greppable in the respective master plan.
 
@@ -1918,6 +1919,103 @@ Wave 10.5 policy note:
 
 ---
 
+## Wave 11 - Closed-Loop Ecology Redesign (Ecology Phase 2)
+
+Purpose:
+- Replace the Pre-Wave8 current-model ecology stabilization with an emergent plant/herbivore/predator loop.
+- Move normal viability away from replenishment/respawn and toward lifecycle state, plant availability, hunting pressure, reproduction, starvation, and carrying capacity.
+- Keep emergency rescue only as debug/safety fallback with explicit counters, not as the normal balancing mechanism.
+- Introduce staged plant/meat supply coupling without pulling domestication, farms, milk, eggs, or full food taxonomy into this wave.
+
+Source of truth:
+- `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md`
+
+Wave turn-gate:
+- Wave 11 is `READY` only after Wave 10.5 closeout is `✅`.
+- Reason: the Pre-Wave8 ecology patch was intentionally a current-model stabilizer; the full closed-loop redesign was deferred until after the Wave 10.5 convergence point.
+
+### Sprint E11-A: Runtime Ecology Core (Track B primary)
+
+> Wave 11 Ecology Plan > Runtime model
+
+- ⬜ **E11-A** Ecology state contract - tile fertility, region capacity, plant biomass, animal lifecycle fields, counters, and snapshot/export shape (Track B)
+- ⬜ **E11-B** Plant growth + region carrying capacity - deterministic growth, overgrazing, season/drought modifiers, and bounded caches (Track B)
+- ⬜ **E11-C** Herbivore lifecycle - energy, grazing, starvation, reproduction, migration pressure, and no normal respawn dependency (Track B)
+- ⬜ **E11-D** Predator lifecycle - energy, hunting, capture gain, starvation, reproduction, and prey-linked capacity (Track B)
+- ⬜ **E11-E** Emergency rescue demotion - existing replenish/rescue becomes explicit debug/safety policy with separate counters (Track B)
+
+### Sprint E11-B: Behavior + Supply + SMR Gates (Track C/B + SMR Analyst)
+
+> Wave 11 Ecology Plan > Integration and evidence
+
+- ⬜ **E11-F** Animal/AI behavior alignment - animals and NPC reactions consume ecology context; predator-human baseline ON gets bounded behavior (Track C, Track B consult)
+- ⬜ **E11-G** Plant/meat supply bridge - staged plant/meat production counters and minimal Wave 8+ supply hooks, no domestication/farming scope (Track B)
+- ⬜ **E11-H** SMR ecology invariant pack - hard ecology invariants, ecology-aware drilldown, compare policy, and multi-lane scenario matrix (SMR Analyst, Track B)
+
+### Sprint E11-C: Debug UX + Evidence Closeout (Track A + SMR Analyst)
+
+> Wave 11 Ecology Plan > Visualization and closeout
+
+- ⬜ **E11-I** Ecology snapshot + debug overlay - fertility/overgrazing, region pressure, animal lifecycle markers, and HUD counters from snapshots (Track A after Track B)
+- ⬜ **E11-J** Evidence closeout + baseline decision - full ecology matrix, manual app smoke, hard invariant gate, and baseline promotion decision (SMR Analyst + Meta Coordinator)
+
+### Wave 11 - Execution Steps
+
+**Step 1 - runtime contract first (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | E11-A | Wave 10.5 ✅ | Contract locks the runtime/snapshot fields before model logic or consumers start |
+
+**Step 2 - plant capacity foundation (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | E11-B | E11-A ✅ | Plant availability and region capacity must exist before animal lifecycle can use them |
+
+**Step 3 - herbivore lifecycle before predator lifecycle (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | E11-C | E11-B ✅ | Herbivores depend on plant capacity; predators depend on viable prey behavior |
+
+**Step 4 - predator lifecycle and rescue demotion (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | E11-D | E11-C ✅ | Predator reproduction/starvation should be tied to the stabilized prey loop |
+| Track B agent | E11-E | E11-C ✅ + E11-D ✅ | Rescue demotion should happen after both lifecycle paths can stand on their own |
+
+**Step 5 - behavior, supply bridge, and SMR gates open after runtime core**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | E11-F | E11-C ✅ + E11-D ✅ | AI/behavior consumes lifecycle context and must bound predator-human baseline behavior |
+| Track B agent | E11-G | E11-C ✅ + E11-D ✅ | Plant/meat supply bridge should use real lifecycle outputs, not respawn counters |
+| SMR Analyst | E11-H | E11-E ✅ | Hard ecology invariants must distinguish lifecycle births from emergency rescues |
+
+**Step 6 - visual/debug consume after snapshot and invariants are stable**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track A agent | E11-I | E11-A ✅ + E11-H ✅ | Debug overlay consumes stable snapshot fields and SMR terminology |
+
+**Step 7 - evidence closeout**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst + Meta Coordinator | E11-J | E11-F ✅ + E11-G ✅ + E11-H ✅ + E11-I ✅ | Close only if accepted lanes pass hard ecology invariants without depending on emergency rescue |
+
+Wave 11 policy note:
+- Predator-human interaction is ON in the Wave 11 baseline lanes, but it must be bounded and observable so the ecology gate does not become an uncontrolled colony-wipe test.
+- Domestication/farms/milk/eggs are explicitly later work; Wave 11 is wild ecology first.
+- Emergency rescue may remain as a debug/safety fallback, but normal acceptance lanes must not rely on it.
+
+**Critical path:** `E11-A -> E11-B -> E11-C -> E11-D -> E11-E -> E11-H -> E11-J`.
+**Parallelism:** Track C `E11-F` and Track B `E11-G` can proceed after lifecycle runtime is available; Track A `E11-I` waits for stable snapshot + SMR terminology.
+
+---
+
 ## Summary Table
 
 | Wave | Director Sprint | Combat Sprint(s) | Parallel? |
@@ -1937,8 +2035,9 @@ Wave 10.5 policy note:
 | 9 | — | C9-C10 (Phase 5-6 S9-10) | Mostly sequential; Track A only at final campaign overlay consume |
 | 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential by phase, parallel consumer steps inside phases |
 | 10.5 | TR3 (Tools.Refinery Phase TR3) | — | Director-only convergence after Wave 10 and Wave 8.5 |
+| 11 | — | E11 (Closed-loop ecology redesign) | Runtime-first; Track C/B/SMR after lifecycle core; Track A debug consume late |
 
-**Totals:** 16 wave entries, 28 named sprints/sidecar blocks, ~106 epics.
+**Totals:** 17 wave entries, 31 named sprints/sidecar blocks, ~116 epics.
 
 ---
 
@@ -1955,6 +2054,7 @@ Wave 10.5 policy note:
 | Wave 7 complete + TR1-C consult note locked | Tools.Refinery TR2 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
 | Wave 10 complete + Track A polish bandwidth available | Track A visual overhaul refresh triage | `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md` |
 | Wave 10 complete + Wave 8.5 complete | Tools.Refinery TR3 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
+| Wave 10.5 complete + ecology redesign desired | Wave 11 closed-loop ecology kickoff | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
 
 Track A deferred-reference note:
 - The Wave 10 visual-overhaul trigger is a refresh/triage point, not approval to execute the old Track A Phase 1 docs as-is.
