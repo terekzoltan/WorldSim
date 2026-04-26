@@ -1571,8 +1571,8 @@ Parallelism:
 
 > Combat Plan > Phase 5 Sprint 8
 
-- ⬜ **P5-A** Person inventory data model (Track B)
-- ⬜ **P5-B** Storehouse integration — withdraw/deposit (Track B)
+- ✅ **P5-A** Person inventory data model (Track B)
+- ✅ **P5-B** Storehouse integration — withdraw/deposit (Track B)
 - ⬜ **P5-C** Consumption from inventory first (Track B)
 - ⬜ **P5-D** Snapshot and UI indicators (Track B -> A)
 - ⬜ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
@@ -1585,11 +1585,17 @@ Parallelism:
 |---------|---------|--------|-------|
 | Track B agent | P5-A | Pre-Wave8 addendum ✅ | Inventory data model is the base for storage, consumption, tech hooks, and UI |
 
+Wave 8 Step 1 progress note:
+- ✅ `P5-A` closed in `fb7dd49 feat(wave8): add person inventory model`: `PersonInventory`, `ItemType.Food`, and `Person.Inventory` landed with focused inventory tests, runtime gate, and full solution build green.
+
 **Step 2 — opens when P5-A ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P5-B | P5-A ✅ | Storehouse withdraw/deposit rules depend on the inventory model existing |
+
+Wave 8 Step 2 progress note:
+- ✅ `P5-B` closed in `0bdb281 feat(wave8): add storehouse inventory refill`: `RefillInventory` command/job mapping, owned-storehouse access, refill/deposit transfer helpers, and fixed-brain refill integration landed; focused, AI, runtime, and full build gates were green.
 
 **Step 3 — opens when P5-B ✅**
 
