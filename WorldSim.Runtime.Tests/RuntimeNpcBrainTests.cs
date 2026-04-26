@@ -25,6 +25,7 @@ public class RuntimeNpcBrainTests
     [InlineData(NpcCommand.BuildWatchtower, Job.BuildWatchtower)]
     [InlineData(NpcCommand.RaidBorder, Job.RaidBorder)]
     [InlineData(NpcCommand.AttackStructure, Job.AttackStructure)]
+    [InlineData(NpcCommand.RefillInventory, Job.RefillInventory)]
     [InlineData(NpcCommand.Fight, Job.Fight)]
     [InlineData(NpcCommand.Flee, Job.Flee)]
     public void Think_MapsAiCommandToRuntimeJob(NpcCommand command, Job expected)

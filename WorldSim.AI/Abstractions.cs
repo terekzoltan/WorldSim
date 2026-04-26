@@ -17,6 +17,7 @@ public enum NpcCommand
     BuildWatchtower,
     RaidBorder,
     AttackStructure,
+    RefillInventory,
     Fight,
     Flee
 }

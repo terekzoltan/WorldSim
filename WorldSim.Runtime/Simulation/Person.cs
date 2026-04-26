@@ -25,6 +25,7 @@ public enum Job
     BuildWatchtower,
     RaidBorder,
     AttackStructure,
+    RefillInventory,
     Fight,
     Flee
 }
@@ -649,6 +650,18 @@ public class Person
 
             // 3) Utility-goal fallback → pick a job (e.g., BuildHouse if feasible)
             var next = ThinkAiOncePerTick(w, dt);
+            if (next == Job.RefillInventory)
+            {
+                if (TryExecuteRefillInventoryIntent(w))
+                {
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
+
+                next = Job.Idle;
+            }
+
             if (next == Job.BuildHouse && !CanStartHouseBuild(w))
                 next = ResolveHouseBuildFallback(w);
 
@@ -761,6 +774,63 @@ public class Person
             : 1f;
 
         return Math.Max(1, (int)MathF.Round(baseYield * colonyMultiplier * professionMultiplier * economyMultiplier * foodDomainMultiplier));
+    }
+
+    internal bool TryRefillInventoryFromStorehouse(World w)
+    {
+        if (!w.IsOwnedStorehouseAccessTile(_home, Pos))
+            return false;
+
+        var freeSlots = Inventory.FreeSlots;
+        var availableFood = _home.Stock[Resource.Food];
+        var amount = Math.Min(freeSlots, availableFood);
+        if (amount <= 0)
+            return false;
+
+        if (!Inventory.TryAdd(ItemType.Food, amount))
+            return false;
+
+        _home.Stock[Resource.Food] -= amount;
+        return true;
+    }
+
+    internal bool TryDepositInventoryToStorehouse(World w)
+    {
+        if (!w.IsOwnedStorehouseAccessTile(_home, Pos))
+            return false;
+
+        var amount = Inventory.GetCount(ItemType.Food);
+        if (amount <= 0)
+            return false;
+
+        if (!Inventory.TryRemove(ItemType.Food, amount))
+            return false;
+
+        _home.Stock[Resource.Food] += amount;
+        return true;
+    }
+
+    bool TryExecuteRefillInventoryIntent(World w)
+    {
+        if (Inventory.FreeSlots <= 0 || _home.Stock[Resource.Food] <= 0)
+            return false;
+
+        if (!w.TryFindNearestOwnedStorehouseAccessTile(_home, Pos, out var accessTile))
+            return false;
+
+        if (!w.IsOwnedStorehouseAccessTile(_home, Pos))
+        {
+            DebugDecisionCause = "move_to_storehouse";
+            DebugTargetKey = $"storehouse:{accessTile.x}:{accessTile.y}";
+            _trackNoProgressForCurrentMove = true;
+            _noProgressTrackContext = "resource";
+            MoveTowards(w, accessTile, 1);
+            return true;
+        }
+
+        DebugDecisionCause = "refill_inventory";
+        DebugTargetKey = $"storehouse:{Pos.x}:{Pos.y}";
+        return TryRefillInventoryFromStorehouse(w);
     }
 
     private Job ThinkAiOncePerTick(World w, float dt)

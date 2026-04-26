@@ -89,6 +89,7 @@ public sealed class RuntimeNpcBrain
             NpcCommand.BuildWatchtower => Job.BuildWatchtower,
             NpcCommand.RaidBorder => Job.RaidBorder,
             NpcCommand.AttackStructure => Job.AttackStructure,
+            NpcCommand.RefillInventory => Job.RefillInventory,
             NpcCommand.Fight => Job.Fight,
             NpcCommand.Flee => Job.Flee,
             _ => Job.Idle

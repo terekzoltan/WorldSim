@@ -836,6 +836,58 @@ namespace WorldSim.Simulation
             MarkTerritoryDirty();
         }
 
+        internal bool IsOwnedStorehouseAccessTile(Colony owner, (int x, int y) pos)
+        {
+            if (owner == null || IsMovementBlocked(pos.x, pos.y, owner.Id))
+                return false;
+
+            return SpecializedBuildings.Any(building =>
+                building.Kind == SpecializedBuildingKind.Storehouse
+                && ReferenceEquals(building.Owner, owner)
+                && Manhattan(pos, building.Pos) == 1);
+        }
+
+        internal bool TryFindNearestOwnedStorehouseAccessTile(Colony owner, (int x, int y) from, out (int x, int y) accessTile)
+        {
+            accessTile = default;
+            if (owner == null)
+                return false;
+
+            var candidate = SpecializedBuildings
+                .Where(building => building.Kind == SpecializedBuildingKind.Storehouse && ReferenceEquals(building.Owner, owner))
+                .SelectMany(building => GetCardinalNeighbors(building.Pos)
+                    .Where(tile => !IsMovementBlocked(tile.x, tile.y, owner.Id))
+                    .Select(tile => new
+                    {
+                        Storehouse = building.Pos,
+                        AccessTile = tile,
+                        Distance = Manhattan(from, tile)
+                    }))
+                .OrderBy(entry => entry.Distance)
+                .ThenBy(entry => entry.Storehouse.x)
+                .ThenBy(entry => entry.Storehouse.y)
+                .ThenBy(entry => entry.AccessTile.x)
+                .ThenBy(entry => entry.AccessTile.y)
+                .FirstOrDefault();
+
+            if (candidate == null)
+                return false;
+
+            accessTile = candidate.AccessTile;
+            return true;
+        }
+
+        private static IEnumerable<(int x, int y)> GetCardinalNeighbors((int x, int y) pos)
+        {
+            yield return (pos.x - 1, pos.y);
+            yield return (pos.x + 1, pos.y);
+            yield return (pos.x, pos.y - 1);
+            yield return (pos.x, pos.y + 1);
+        }
+
+        private static int Manhattan((int x, int y) left, (int x, int y) right)
+            => Math.Abs(left.x - right.x) + Math.Abs(left.y - right.y);
+
         public bool TryAddWoodWall(Colony colony, (int x, int y) pos)
         {
             if (!InBounds(pos.x, pos.y) || IsOccupiedByStructure(pos.x, pos.y) || GetTile(pos.x, pos.y).Ground == Ground.Water)
