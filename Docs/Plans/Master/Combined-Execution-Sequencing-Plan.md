@@ -1576,6 +1576,7 @@ Parallelism:
 - ✅ **P5-C** Consumption from inventory first (Track B)
 - ⬜ **P5-D** Snapshot and UI indicators (Track B -> A)
 - ⬜ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
+- ⬜ **Wave 8 SMR evidence** Supply/inventory scenario evidence package (SMR Analyst)
 
 ### Wave 8 — Execution Steps
 
@@ -1624,7 +1625,20 @@ Wave 8 Step 3 progress note:
 |---------|---------|--------|-------|
 | Track A agent | P5-D (A part) | P5-D (B part) ✅ | UI indicators consume the finalized carry/supply snapshot fields |
 
-**Parallelism:** Wave 8 is intentionally mostly sequential Track B work; only the final Track A consume step is separate.
+**Step 7 — opens when P5-D (A part) ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | Wave 8 SMR evidence | P5-D (A part) ✅ | Run and review SMR packages for the completed supply/inventory wave before Wave 8 closeout |
+
+Wave 8 SMR evidence requirements:
+- Use `Docs/Plans/Master/SMR-Minimum-Ops-Checklist.md` for artifact naming, manifest/summary/anomaly review, worst-run ranking, and report format.
+- Minimum expected package: a Headless `all-around-smoke` or equivalent multi-seed, multi-planner run covering the completed Wave 8 inventory/supply behavior.
+- Include an inventory/supply-focused scenario lane if the runner configuration surface supports it; if not, state that limitation explicitly in the evidence note.
+- Run `compare-baseline` only when a valid comparable baseline path exists; otherwise mark baseline compare as unavailable rather than manufacturing one.
+- Closeout artifact/report should state healthy signals, suspicious signals, unknowns, and the recommended next run or baseline decision.
+
+**Parallelism:** Wave 8 is intentionally mostly sequential Track B work; only the final Track A consume step and the SMR Analyst closeout evidence step are separate.
 
 ---
 
