@@ -59,7 +59,11 @@ public static class WorldSnapshotInterpolator
                 cur.Formation,
                 cur.IsCommander,
                 cur.CommanderIntelligence,
-                cur.CommanderMoraleStabilityBonus));
+                cur.CommanderMoraleStabilityBonus,
+                cur.InventoryFood,
+                cur.InventoryUsedSlots,
+                cur.InventoryCapacitySlots,
+                cur.HasFood));
         }
 
         for (int i = shared; i < current.Count; i++)

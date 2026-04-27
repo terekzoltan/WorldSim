@@ -70,27 +70,35 @@ public static class WorldSnapshotBuilder
             .ToList();
 
         var people = world._people
-            .Select(p => new PersonRenderData(
-                p.Pos.x,
-                p.Pos.y,
-                p.Id,
-                p.Home.Id,
-                p.Health,
-                p.IsInCombat,
-                p.LastCombatTick,
-                p.NoProgressStreak,
-                p.BackoffTicksRemaining,
-                p.DebugDecisionCause,
-                p.DebugTargetKey,
-                p.CombatMorale,
-                p.IsRouting,
-                p.RoutingTicksRemaining,
-                p.ActiveCombatGroupId,
-                p.ActiveBattleId,
-                p.AssignedFormation.ToString(),
-                p.IsCombatCommander,
-                p.CommanderIntelligence,
-                p.CommanderMoraleStabilityBonus))
+            .Select(p =>
+            {
+                var inventoryFood = p.Inventory.GetCount(ItemType.Food);
+                return new PersonRenderData(
+                    p.Pos.x,
+                    p.Pos.y,
+                    p.Id,
+                    p.Home.Id,
+                    p.Health,
+                    p.IsInCombat,
+                    p.LastCombatTick,
+                    p.NoProgressStreak,
+                    p.BackoffTicksRemaining,
+                    p.DebugDecisionCause,
+                    p.DebugTargetKey,
+                    p.CombatMorale,
+                    p.IsRouting,
+                    p.RoutingTicksRemaining,
+                    p.ActiveCombatGroupId,
+                    p.ActiveBattleId,
+                    p.AssignedFormation.ToString(),
+                    p.IsCombatCommander,
+                    p.CommanderIntelligence,
+                    p.CommanderMoraleStabilityBonus,
+                    inventoryFood,
+                    p.Inventory.UsedSlots,
+                    p.Inventory.CapacitySlots,
+                    inventoryFood > 0);
+            })
             .ToList();
 
         var animals = world._animals
@@ -147,7 +155,9 @@ public static class WorldSnapshotBuilder
                     world.GetColonyWarriorCount(colony.Id),
                     colony.WeaponLevel,
                     colony.ArmorLevel,
-                    averageCombatMorale
+                    averageCombatMorale,
+                    colony.InventoryCapacityBonusSlots,
+                    colony.InventorySupplyEfficiencyMultiplier
                 );
             })
             .ToList();
@@ -254,7 +264,8 @@ public static class WorldSnapshotBuilder
             world.TotalNoProgressBackoffFlee,
             world.TotalNoProgressBackoffCombat,
             world.DenseNeighborhoodTicks,
-            world.LastTickDenseActors
+            world.LastTickDenseActors,
+            world.TotalInventoryFoodConsumed
         );
 
         return new WorldRenderSnapshot(

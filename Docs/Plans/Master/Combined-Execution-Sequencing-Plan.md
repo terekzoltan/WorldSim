@@ -1620,13 +1620,16 @@ Wave 8 Step 4 progress note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P5-D(B_part) | P5-E ✅ | Snapshot/export side should reflect the final inventory + tech shape |
+| Track B agent | P5-D(B_part) ✅ | P5-E ✅ | Snapshot/export side should reflect the final inventory + tech shape |
+
+Wave 8 Step 5 progress note:
+- ✅ `P5-D(B_part)` closed: runtime read-model export now carries supply/inventory state for Track A consume (`PersonRenderData.InventoryFood/InventoryUsedSlots/InventoryCapacitySlots/HasFood`, `ColonyHudData.InventoryCapacityBonusSlots/InventorySupplyEfficiencyMultiplier`, `EcoHudData.InventoryFoodConsumed`). `HasFood` means carried inventory food only; `InventoryFoodConsumed` is a global cumulative counter. `WorldSnapshotInterpolator` preserves the new person carry fields from the current snapshot. Top-level `P5-D` remains open until Track A P5-D(A_part) completes.
 
 **Step 6 — opens when P5-D (B part) ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent | P5-D (A part) | P5-D (B part) ✅ | UI indicators consume the finalized carry/supply snapshot fields |
+| Track A agent | P5-D(A_part) | P5-D(B_part) ✅ | UI indicators consume the finalized carry/supply snapshot fields |
 
 **Step 7 — opens when P5-D (A part) ✅**
 

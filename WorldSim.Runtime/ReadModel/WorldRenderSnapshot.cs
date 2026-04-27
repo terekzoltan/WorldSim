@@ -171,7 +171,11 @@ public sealed record PersonRenderData(
     string Formation = "Line",
     bool IsCommander = false,
     int CommanderIntelligence = 0,
-    float CommanderMoraleStabilityBonus = 0f);
+    float CommanderMoraleStabilityBonus = 0f,
+    int InventoryFood = 0,
+    int InventoryUsedSlots = 0,
+    int InventoryCapacitySlots = 0,
+    bool HasFood = false);
 
 public sealed record AnimalRenderData(int X, int Y, AnimalKindView Kind);
 
@@ -203,7 +207,9 @@ public sealed record ColonyHudData(
     int WarriorCount,
     int WeaponLevel,
     int ArmorLevel,
-    float AverageCombatMorale = 100f
+    float AverageCombatMorale = 100f,
+    int InventoryCapacityBonusSlots = 0,
+    float InventorySupplyEfficiencyMultiplier = 1f
 );
 
 public sealed record CombatGroupRenderData(
@@ -295,5 +301,6 @@ public sealed record EcoHudData(
     int NoProgressBackoffFlee,
     int NoProgressBackoffCombat,
     int DenseNeighborhoodTicks,
-    int LastTickDenseActors
+    int LastTickDenseActors,
+    int InventoryFoodConsumed = 0
 );
