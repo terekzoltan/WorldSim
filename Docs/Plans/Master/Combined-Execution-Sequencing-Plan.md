@@ -1574,8 +1574,9 @@ Parallelism:
 - ✅ **P5-A** Person inventory data model (Track B)
 - ✅ **P5-B** Storehouse integration — withdraw/deposit (Track B)
 - ✅ **P5-C** Consumption from inventory first (Track B)
-- ⬜ **P5-D** Snapshot and UI indicators (Track B -> A)
+- ✅ **P5-D** Snapshot and UI indicators (Track B -> A)
 - ✅ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
+- ⬜ **Wave 8 SMR supply prep** ScenarioRunner supply/inventory evidence surface (Track B / SMR Analyst)
 - ⬜ **Wave 8 SMR evidence** Supply/inventory scenario evidence package (SMR Analyst)
 
 ### Wave 8 — Execution Steps
@@ -1629,22 +1630,71 @@ Wave 8 Step 5 progress note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent | P5-D(A_part) | P5-D(B_part) ✅ | UI indicators consume the finalized carry/supply snapshot fields |
+| Track A agent | P5-D(A_part) ✅ | P5-D(B_part) ✅ | UI indicators consume the finalized carry/supply snapshot fields |
 
-**Step 7 — opens when P5-D (A part) ✅**
+Wave 8 Step 6 progress note:
+- ✅ `P5-D(A_part)` closed: Track A consumes the finalized supply snapshot fields without reopening Runtime/ReadModel boundaries. In-world carried-food badges now show only for `HasFood` actors, AI debug exposes tracked actor carried food and slots, colony HUD conditionally shows non-default backpack/rationing supply state, and ecology diagnostics label global cumulative inventory food consumption. Build/test gates were green. Manual smoke did not visibly catch a carried-food badge; this is accepted as non-blocking because the smoke run did not prove a `HasFood` carrier was present, and organic gameplay does not guarantee a refill/carry moment. Step 7A must provide deterministic ScenarioRunner supply evidence for carried food and inventory consumption before final Wave 8 SMR evidence.
+
+**Step 7A — opens when P5-D (A part) ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst | Wave 8 SMR evidence | P5-D (A part) ✅ | Run and review SMR packages for the completed supply/inventory wave before Wave 8 closeout |
+| Track B agent | Wave 8 SMR supply prep - export/config | P5-D (A part) ✅ | Add the ScenarioRunner supply/inventory artifact fields, deterministic supply-focused lane/config surface, and focused tests |
+| SMR Analyst | Wave 8 SMR supply prep - validation | Track B export/config ✅ | Validate that the new artifact surface and supply-focused lane are sufficient before the final Wave 8 SMR evidence run |
+
+Wave 8 SMR supply prep requirements - Track B export/config:
+- Add a supply/inventory block to ScenarioRunner run-level artifacts (`summary.json` / per-run result) with at least:
+  - `inventoryFoodConsumed` from `World.TotalInventoryFoodConsumed`.
+  - `carriersWithFood` = living people with `InventoryFood > 0`.
+  - `totalCarriedFood` = sum of carried inventory food.
+  - `avgInventoryUsedSlots` and `avgInventoryCapacitySlots` across living people.
+  - `coloniesWithBackpacks` = colonies with `InventoryCapacityBonusSlots > 0` or `backpacks` unlocked.
+  - `coloniesWithRationing` = colonies with `InventorySupplyEfficiencyMultiplier > 1f` or `rationing` unlocked.
+- Add compact drilldown timeline fields for supply evidence if drilldown is enabled:
+  - `inventoryFoodConsumed`, `carriersWithFood`, `totalCarriedFood`, and optional average used/capacity slots.
+- Add a supply-focused ScenarioRunner config/lane or env/config surface that can deterministically exercise Wave 8 supply behavior:
+  - enable/free-unlock `backpacks` and `rationing`, or otherwise document the unlock/setup path in the run config;
+  - include a storehouse/refill/carry setup or deterministic condition likely to produce non-zero carried food and inventory consumption;
+  - keep the lane Headless-compatible and deterministic across seeds/planners.
+- Add focused ScenarioRunner tests proving:
+  - run artifacts contain the supply block;
+  - old baselines without the supply block still parse when compare mode is used;
+  - drilldown timeline contains compact supply fields when enabled;
+  - the supply-focused lane produces non-zero supply evidence in at least one deterministic smoke case.
+- Do not change runtime gameplay rules, Graphics UI, or Track A presentation during this prep step.
+
+Wave 8 SMR supply prep requirements - SMR Analyst validation:
+- Run a narrow Headless validation package against the Track B supply-focused lane after export/config lands.
+- Inspect `manifest.json`, `summary.json`, `anomalies.json`, and drilldown output if enabled.
+- Confirm the artifact surface can answer at least:
+  - whether carried food exists in the run (`carriersWithFood`, `totalCarriedFood`);
+  - whether inventory food was consumed (`inventoryFoodConsumed`);
+  - whether backpack/rationing tech state is visible (`coloniesWithBackpacks`, `coloniesWithRationing`);
+  - whether old compare baselines without the new supply block remain parse-compatible.
+- Produce a short validation note or handoff stating either:
+  - `supply prep sufficient for Step 7B`, or
+  - the exact missing field/lane/test that Track B must fix before Step 7B.
+
+**Step 7B — opens when Wave 8 SMR supply prep ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | Wave 8 SMR evidence | Wave 8 SMR supply prep ✅ | Run and review SMR packages for the completed supply/inventory wave before Wave 8 closeout |
 
 Wave 8 SMR evidence requirements:
 - Use `Docs/Plans/Master/SMR-Minimum-Ops-Checklist.md` for artifact naming, manifest/summary/anomaly review, worst-run ranking, and report format.
-- Minimum expected package: a Headless `all-around-smoke` or equivalent multi-seed, multi-planner run covering the completed Wave 8 inventory/supply behavior.
-- Include an inventory/supply-focused scenario lane if the runner configuration surface supports it; if not, state that limitation explicitly in the evidence note.
+- Minimum expected package: a Headless `all-around-smoke` or equivalent multi-seed, multi-planner run plus the supply-focused lane from Step 7A.
+- Required matrix target: seeds `101,202,303`, planners `simple`, `goap`, and `htn`, unless SMR Analyst records a narrower smoke-only exception with a follow-up run recommendation.
+- Evidence review must explicitly inspect the supply block and state whether supply behavior was actually exercised:
+  - `inventoryFoodConsumed` non-zero in supply-focused runs, or a documented explanation if zero;
+  - `carriersWithFood` / `totalCarriedFood` observed where refill/carry setup should create carriers;
+  - backpack/rationing effective fields present when the lane enables those techs;
+  - no new `starvation_with_food`, clustering/backoff, survival, or economy regression that blocks Wave 8 closeout.
 - Run `compare-baseline` only when a valid comparable baseline path exists; otherwise mark baseline compare as unavailable rather than manufacturing one.
 - Closeout artifact/report should state healthy signals, suspicious signals, unknowns, and the recommended next run or baseline decision.
+- Wave 8 is not fully closeable from a generic SMR smoke alone; the report must include supply/inventory-specific evidence from Step 7A fields.
 
-**Parallelism:** Wave 8 is intentionally mostly sequential Track B work; only the final Track A consume step and the SMR Analyst closeout evidence step are separate.
+**Parallelism:** Wave 8 is intentionally mostly sequential Track B work; only the final Track A consume step, the ScenarioRunner supply-evidence prep, and the SMR Analyst closeout evidence step are separate.
 
 ---
 

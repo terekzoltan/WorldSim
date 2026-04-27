@@ -50,6 +50,7 @@ public sealed class ActorRenderPass : IRenderPass
                 spriteBatch.Draw(textures.Pixel, bounds, Color.White * 0.92f);
             }
 
+            DrawCarriedFoodBadge(spriteBatch, textures, person, bounds, settings, theme);
             DrawHealthBar(spriteBatch, textures, person, bounds, settings, theme);
             DrawCombatMarker(spriteBatch, textures, person, bounds, settings, theme);
             DrawBattleMarkers(spriteBatch, textures, person, bounds, settings, theme);
@@ -150,6 +151,31 @@ public sealed class ActorRenderPass : IRenderPass
         };
 
         spriteBatch.Draw(textures.Pixel, fillRect, fillColor);
+    }
+
+    private static void DrawCarriedFoodBadge(
+        SpriteBatch spriteBatch,
+        TextureCatalog textures,
+        PersonRenderData person,
+        Rectangle actorBounds,
+        WorldRenderSettings settings,
+        WorldRenderTheme theme)
+    {
+        if (!person.HasFood)
+            return;
+
+        int size = Math.Max(2, settings.TileSize / 2);
+        int x = actorBounds.X + 1;
+        int y = Math.Max(actorBounds.Y + 1, actorBounds.Bottom - size - 1);
+        var badge = new Rectangle(x, y, size, size);
+        var border = Color.Lerp(theme.FoodNode, theme.Highlight, 0.35f);
+
+        spriteBatch.Draw(textures.Pixel, new Rectangle(badge.X - 1, badge.Y - 1, badge.Width + 2, badge.Height + 2), new Color(18, 22, 18) * 0.82f);
+        spriteBatch.Draw(textures.Pixel, badge, theme.FoodNode);
+        spriteBatch.Draw(textures.Pixel, new Rectangle(badge.X, badge.Y, badge.Width, 1), border);
+        spriteBatch.Draw(textures.Pixel, new Rectangle(badge.X, badge.Bottom - 1, badge.Width, 1), border);
+        spriteBatch.Draw(textures.Pixel, new Rectangle(badge.X, badge.Y, 1, badge.Height), border);
+        spriteBatch.Draw(textures.Pixel, new Rectangle(badge.Right - 1, badge.Y, 1, badge.Height), border);
     }
 
     private static void DrawCombatMarker(

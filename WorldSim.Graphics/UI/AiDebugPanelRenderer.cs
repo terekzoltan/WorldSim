@@ -43,10 +43,15 @@ public sealed class AiDebugPanelRenderer
         var buildIntent = ResolveBuildIntent(debugCause, debugTarget);
         var noProgress = trackedPerson?.NoProgressStreak ?? 0;
         var backoff = trackedPerson?.BackoffTicksRemaining ?? 0;
+        var carryFood = trackedPerson?.InventoryFood ?? 0;
+        var usedSlots = trackedPerson?.InventoryUsedSlots ?? 0;
+        var capacitySlots = trackedPerson?.InventoryCapacitySlots ?? 0;
 
         spriteBatch.DrawString(font, $"Cause {debugCause} | Target {debugTarget}", new Vector2(x, y), theme.StatusText);
         y += 18;
         spriteBatch.DrawString(font, $"Intent {buildIntent} | NoProg {noProgress} | Backoff {backoff}", new Vector2(x, y), theme.StatusText);
+        y += 18;
+        spriteBatch.DrawString(font, $"Carry Food {carryFood} | Slots {usedSlots}/{capacitySlots}", new Vector2(x, y), theme.StatusText);
         y += 22;
 
         if (compact)

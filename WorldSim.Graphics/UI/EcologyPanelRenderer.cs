@@ -18,7 +18,7 @@ public sealed class EcologyPanelRenderer
         y = TextWrap.DrawWrapped(spriteBatch, font, ecoLine, new Vector2(startX, y), theme.SecondaryText, maxWidth, 20);
 
         var deathLine =
-            $"Deaths: Age {snapshot.Ecology.DeathsOldAge}, Starv {snapshot.Ecology.DeathsStarvation} (60s:{snapshot.Ecology.DeathsStarvationRecent60s}, WithFood:{snapshot.Ecology.DeathsStarvationWithFood}), Pred {snapshot.Ecology.DeathsPredator}, Other {snapshot.Ecology.DeathsOther} | Pred->Human {(snapshot.Ecology.PredatorHumanAttacksEnabled ? "ON" : "off")}";
+            $"Deaths: Age {snapshot.Ecology.DeathsOldAge}, Starv {snapshot.Ecology.DeathsStarvation} (60s:{snapshot.Ecology.DeathsStarvationRecent60s}, WithFood:{snapshot.Ecology.DeathsStarvationWithFood}), Pred {snapshot.Ecology.DeathsPredator}, Other {snapshot.Ecology.DeathsOther} | InvFoodUsed(total) {snapshot.Ecology.InventoryFoodConsumed} | Pred->Human {(snapshot.Ecology.PredatorHumanAttacksEnabled ? "ON" : "off")}";
         y = TextWrap.DrawWrapped(spriteBatch, font, deathLine, new Vector2(startX, y), theme.SecondaryText, maxWidth, 20);
 
         return y;
