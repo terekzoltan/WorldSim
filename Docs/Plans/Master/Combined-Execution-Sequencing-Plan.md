@@ -1620,7 +1620,7 @@ Wave 8 Step 4 progress note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P5-D (B part) | P5-E ✅ | Snapshot/export side should reflect the final inventory + tech shape |
+| Track B agent | P5-D(B_part) | P5-E ✅ | Snapshot/export side should reflect the final inventory + tech shape |
 
 **Step 6 — opens when P5-D (B part) ✅**
 
