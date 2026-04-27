@@ -196,6 +196,7 @@ namespace WorldSim.Simulation
         public int TotalDeathsOther { get; private set; }
         public int RecentDeathsStarvation60s => _recentStarvationDeaths.Count;
         public int TotalStarvationDeathsWithFood { get; private set; }
+        public int TotalInventoryFoodConsumed { get; private set; }
         public int TotalOverlapResolveMoves { get; private set; }
         public int TotalCrowdDissipationMoves { get; private set; }
         public int TotalBirthFallbackToOccupiedCount { get; private set; }
@@ -1156,6 +1157,7 @@ namespace WorldSim.Simulation
         public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
         public void ReportCombatEngagement() => TotalCombatEngagements++;
         public void ReportCombatDeath() => TotalCombatDeaths++;
+        internal void ReportInventoryFoodConsumed() => TotalInventoryFoodConsumed++;
         public void ReportSiegePressure(Colony attacker, DefensiveStructure target)
         {
             if (attacker == null || target == null)
@@ -1416,7 +1418,8 @@ namespace WorldSim.Simulation
                 case PersonDeathReason.Starvation:
                     TotalDeathsStarvation++;
                     _recentStarvationDeaths.Enqueue(_simulationTimeSeconds);
-                    if (person.Home.Stock.GetValueOrDefault(Resource.Food, 0) > 0)
+                    if (person.Home.Stock.GetValueOrDefault(Resource.Food, 0) > 0
+                        || person.Inventory.GetCount(ItemType.Food) > 0)
                         TotalStarvationDeathsWithFood++;
                     break;
                 case PersonDeathReason.Predator:

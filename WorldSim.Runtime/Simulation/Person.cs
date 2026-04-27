@@ -299,19 +299,18 @@ public class Person
             _ = ThinkAiOncePerTick(w, dt);
 
         // Critical hunger preemption happens before starvation damage to avoid dying with available food.
-        if (hunger >= 78f && _home.Stock[Resource.Food] > 0)
+        if (hunger >= 78f && HasConsumableFood())
         {
             if (hunger >= 96f)
             {
-                _home.Stock[Resource.Food] -= 1;
-                Needs["Hunger"] = Math.Max(0f, hunger - 28f);
-                Stamina = Math.Clamp(Stamina + 8f, 0f, 100f);
-                Health = Math.Min(100f + w.HealthBonus, Health + 0.8f);
-                Current = Job.Idle;
-                _doingJob = 0;
-                _idleTimeSeconds = 0f;
-                _lastPos = Pos;
-                return true;
+                if (TryConsumeFoodForHunger(w, hungerReduction: 28f, staminaGain: 8f, healthGain: 0.8f))
+                {
+                    Current = Job.Idle;
+                    _doingJob = 0;
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
             }
 
             Current = Job.EatFood;
@@ -332,16 +331,16 @@ public class Person
                 return false;
 
             // Last-chance starvation rescue: consume food if available before declaring death.
-            if (hunger >= 85f && _home.Stock[Resource.Food] > 0)
+            if (hunger >= 85f && HasConsumableFood())
             {
-                _home.Stock[Resource.Food] -= 1;
-                Needs["Hunger"] = Math.Max(0f, hunger - 30f);
-                Health = Math.Max(1f, Health + 1.2f);
-                Current = Job.Idle;
-                _doingJob = 0;
-                _idleTimeSeconds = 0f;
-                _lastPos = Pos;
-                return true;
+                if (TryConsumeFoodForHunger(w, hungerReduction: 30f, staminaGain: 0f, healthGain: 1.2f, minimumHealth: 1f))
+                {
+                    Current = Job.Idle;
+                    _doingJob = 0;
+                    _idleTimeSeconds = 0f;
+                    _lastPos = Pos;
+                    return true;
+                }
             }
 
             LastDeathReason = hunger >= 85f ? PersonDeathReason.Starvation : PersonDeathReason.Other;
@@ -350,7 +349,7 @@ public class Person
 
         if (Age < 16f)
         {
-            if (hunger >= 68f && _home.Stock[Resource.Food] > 0)
+            if (hunger >= 68f && HasConsumableFood())
             {
                 Current = Job.EatFood;
                 _doingJob = ComputeTicks(EatWorkTime, w, isHeavyWork: false);
@@ -482,13 +481,7 @@ public class Person
                         break;
 
                     case Job.EatFood:
-                        if (_home.Stock[Resource.Food] > 0)
-                        {
-                            _home.Stock[Resource.Food] -= 1;
-                            Needs["Hunger"] = Math.Max(0f, Needs.GetValueOrDefault("Hunger", 30f) - 35f);
-                            Stamina = Math.Clamp(Stamina + 12f, 0f, 100f);
-                            Health = Math.Min(100f + w.HealthBonus, Health + 1.5f);
-                        }
+                        TryConsumeFoodForHunger(w, hungerReduction: 35f, staminaGain: 12f, healthGain: 1.5f);
                         break;
 
                     case Job.Rest:
@@ -530,7 +523,7 @@ public class Person
             if (abundantFood)
                 seekFoodThreshold += 8f;
 
-            if (_home.Stock[Resource.Food] > 0 && localHunger >= 86f)
+            if (HasConsumableFood() && localHunger >= 86f)
             {
                 Current = Job.EatFood;
                 _doingJob = 1;
@@ -542,7 +535,7 @@ public class Person
             if (abundantFood && localHunger < 58f)
                 veryLowFood = false;
 
-            if (localHunger >= eatNowThreshold && _home.Stock[Resource.Food] > 0)
+            if (localHunger >= eatNowThreshold && HasConsumableFood())
             {
                 Current = Job.EatFood;
                 _doingJob = ComputeTicks(EatWorkTime, w, isHeavyWork: false);
@@ -774,6 +767,45 @@ public class Person
             : 1f;
 
         return Math.Max(1, (int)MathF.Round(baseYield * colonyMultiplier * professionMultiplier * economyMultiplier * foodDomainMultiplier));
+    }
+
+    bool HasConsumableFood()
+        => Inventory.GetCount(ItemType.Food) > 0 || _home.Stock[Resource.Food] > 0;
+
+    bool TryConsumeFoodForHunger(
+        World w,
+        float hungerReduction,
+        float staminaGain,
+        float healthGain,
+        float? minimumHealth = null)
+    {
+        if (Inventory.TryRemove(ItemType.Food))
+        {
+            w.ReportInventoryFoodConsumed();
+            ApplyFoodConsumptionEffects(w, hungerReduction, staminaGain, healthGain, minimumHealth);
+            return true;
+        }
+
+        if (_home.Stock[Resource.Food] <= 0)
+            return false;
+
+        _home.Stock[Resource.Food] -= 1;
+        ApplyFoodConsumptionEffects(w, hungerReduction, staminaGain, healthGain, minimumHealth);
+        return true;
+    }
+
+    void ApplyFoodConsumptionEffects(
+        World w,
+        float hungerReduction,
+        float staminaGain,
+        float healthGain,
+        float? minimumHealth)
+    {
+        Needs["Hunger"] = Math.Max(0f, Needs.GetValueOrDefault("Hunger", 30f) - hungerReduction);
+        Stamina = Math.Clamp(Stamina + staminaGain, 0f, 100f);
+        Health = minimumHealth.HasValue
+            ? Math.Max(minimumHealth.Value, Health + healthGain)
+            : Math.Min(100f + w.HealthBonus, Health + healthGain);
     }
 
     internal bool TryRefillInventoryFromStorehouse(World w)
