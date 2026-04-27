@@ -42,6 +42,35 @@ public class Wave8SupplyTechTests
     }
 
     [Fact]
+    public void BackpacksUnlock_OnlyAffectsUnlockedColonyPeople()
+    {
+        TechTree.Load(GetTechPath());
+        var world = CreateSupplyWorld(seed: 6410);
+        var colony = world._colonies[0];
+        var otherColony = world._colonies[1];
+        var colonyPerson = world._people.First(p => p.Home == colony);
+        var otherPerson = Person.Spawn(
+            otherColony,
+            otherColony.Origin,
+            new RuntimeNpcBrain(new FixedBrain(NpcCommand.Idle)),
+            new Random(64101));
+        world._people.Add(otherPerson);
+
+        Assert.True(TechTree.TryUnlock("backpacks", world, colony).Success);
+        var futureOtherPerson = Person.Spawn(
+            otherColony,
+            otherColony.Origin,
+            new RuntimeNpcBrain(new FixedBrain(NpcCommand.Idle)),
+            new Random(64102));
+
+        Assert.Equal(5, colonyPerson.Inventory.CapacitySlots);
+        Assert.Equal(3, otherPerson.Inventory.CapacitySlots);
+        Assert.Equal(3, futureOtherPerson.Inventory.CapacitySlots);
+        Assert.Equal(2, colony.InventoryCapacityBonusSlots);
+        Assert.Equal(0, otherColony.InventoryCapacityBonusSlots);
+    }
+
+    [Fact]
     public void BackpacksUnlock_IsIdempotentAndDoesNotStack()
     {
         TechTree.Load(GetTechPath());
