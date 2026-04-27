@@ -159,6 +159,7 @@ public class Person
         Intelligence = _rng.Next(3, 11);
         Age = newborn ? 0f : 18f + (float)_rng.NextDouble() * 22f;
         Profession = PickInitialProfession(home, _rng);
+        Inventory.SetCapacityBonusSlots(home.InventoryCapacityBonusSlots);
 
         // Needs/Emotions baseline-ok
         Needs["Hunger"] = 20f; // 0..100, kisebb = jobb (jóllakott)
@@ -782,7 +783,12 @@ public class Person
         if (Inventory.TryRemove(ItemType.Food))
         {
             w.ReportInventoryFoodConsumed();
-            ApplyFoodConsumptionEffects(w, hungerReduction, staminaGain, healthGain, minimumHealth);
+            ApplyFoodConsumptionEffects(
+                w,
+                hungerReduction * _home.InventorySupplyEfficiencyMultiplier,
+                staminaGain,
+                healthGain,
+                minimumHealth);
             return true;
         }
 

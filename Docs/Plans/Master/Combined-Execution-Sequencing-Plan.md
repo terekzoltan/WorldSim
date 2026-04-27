@@ -1575,7 +1575,7 @@ Parallelism:
 - ✅ **P5-B** Storehouse integration — withdraw/deposit (Track B)
 - ✅ **P5-C** Consumption from inventory first (Track B)
 - ⬜ **P5-D** Snapshot and UI indicators (Track B -> A)
-- ⬜ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
+- ✅ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
 - ⬜ **Wave 8 SMR evidence** Supply/inventory scenario evidence package (SMR Analyst)
 
 ### Wave 8 — Execution Steps
@@ -1612,6 +1612,9 @@ Wave 8 Step 3 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P5-E | P5-C ✅ | Tech effects should target the stabilized inventory/carry rules |
+
+Wave 8 Step 4 progress note:
+- ✅ `P5-E` closed: `backpacks` and `rationing` tech entries landed with colony-specific, idempotent runtime effects (`+2` inventory slots, `1.25x` inventory-only carried-food hunger efficiency), existing/future colony people receive backpack capacity, and focused/runtime/full build gates were green.
 
 **Step 5 — opens when P5-E ✅**
 

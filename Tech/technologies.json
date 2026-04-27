@@ -65,6 +65,22 @@
       "cost": { "wood": 16, "stone": 16, "gold": 4 }
     },
     {
+      "id": "backpacks",
+      "name": "Field Backpacks",
+      "description": "Adds two inventory slots for carried food and supplies.",
+      "effect": "inventory_capacity_bonus",
+      "prerequisites": ["logistics"],
+      "cost": { "wood": 12, "food": 10, "gold": 4 }
+    },
+    {
+      "id": "rationing",
+      "name": "Rationing Practices",
+      "description": "Carried food restores hunger more efficiently.",
+      "effect": "supply_efficiency",
+      "prerequisites": ["backpacks"],
+      "cost": { "food": 14, "wood": 8, "gold": 6 }
+    },
+    {
       "id": "education",
       "name": "Education System",
       "description": "Increases intelligence of new births.",

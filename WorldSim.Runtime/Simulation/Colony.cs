@@ -52,6 +52,8 @@ namespace WorldSim.Simulation
         public int ScoutRadiusBonus { get; set; }
         public float CombatMoraleBonus { get; set; }
         public float FortificationHpMultiplier { get; set; } = 1f;
+        public int InventoryCapacityBonusSlots { get; private set; }
+        public float InventorySupplyEfficiencyMultiplier { get; private set; } = 1f;
         public int WeaponLevel { get; private set; }
         public int ArmorLevel { get; private set; }
 
@@ -121,6 +123,18 @@ namespace WorldSim.Simulation
         public void SetArmorLevelClamped(int level)
         {
             ArmorLevel = Math.Clamp(level, 0, 3);
+        }
+
+        public void SetInventoryCapacityBonusSlots(int bonusSlots)
+        {
+            InventoryCapacityBonusSlots = Math.Max(0, bonusSlots);
+        }
+
+        public void SetInventorySupplyEfficiencyMultiplier(float multiplier)
+        {
+            InventorySupplyEfficiencyMultiplier = float.IsFinite(multiplier)
+                ? Math.Max(1f, multiplier)
+                : 1f;
         }
 
         public void Update(World world, float dt)

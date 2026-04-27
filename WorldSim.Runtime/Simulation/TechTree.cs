@@ -226,7 +226,20 @@ namespace WorldSim.Simulation
                 case "siege_damage":
                     world.SiegeDamageMultiplier = Math.Max(world.SiegeDamageMultiplier, 1.15f);
                     break;
+                case "inventory_capacity_bonus":
+                    colony.SetInventoryCapacityBonusSlots(Math.Max(colony.InventoryCapacityBonusSlots, 2));
+                    ApplyInventoryCapacityBonus(world, colony);
+                    break;
+                case "supply_efficiency":
+                    colony.SetInventorySupplyEfficiencyMultiplier(Math.Max(colony.InventorySupplyEfficiencyMultiplier, 1.25f));
+                    break;
             }
+        }
+
+        static void ApplyInventoryCapacityBonus(World world, Colony colony)
+        {
+            foreach (var person in world._people.Where(p => p.Home == colony))
+                person.Inventory.SetCapacityBonusSlots(colony.InventoryCapacityBonusSlots);
         }
     }
 }
