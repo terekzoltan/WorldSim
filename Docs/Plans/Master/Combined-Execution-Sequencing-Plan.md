@@ -1573,7 +1573,7 @@ Parallelism:
 
 - ✅ **P5-A** Person inventory data model (Track B)
 - ✅ **P5-B** Storehouse integration — withdraw/deposit (Track B)
-- ⬜ **P5-C** Consumption from inventory first (Track B)
+- ✅ **P5-C** Consumption from inventory first (Track B)
 - ⬜ **P5-D** Snapshot and UI indicators (Track B -> A)
 - ⬜ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
 
@@ -1602,6 +1602,9 @@ Wave 8 Step 2 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P5-C | P5-B ✅ | Consumption should switch to inventory only after refill/storehouse semantics are stable |
+
+Wave 8 Step 3 progress note:
+- ✅ `P5-C` closed in `7e6743f feat(wave8): consume inventory food first`: human food consumption now uses inventory before colony stock across eating/critical hunger paths, runtime-only inventory consumption counter landed, starvation-with-food telemetry counts carried food, and focused/runtime/full build gates were green.
 
 **Step 4 — opens when P5-C ✅**
 
