@@ -1576,7 +1576,7 @@ Parallelism:
 - ✅ **P5-C** Consumption from inventory first (Track B)
 - ✅ **P5-D** Snapshot and UI indicators (Track B -> A)
 - ✅ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
-- ⬜ **Wave 8 SMR supply prep** ScenarioRunner supply/inventory evidence surface (Track B / SMR Analyst)
+- ✅ **Wave 8 SMR supply prep** ScenarioRunner supply/inventory evidence surface (Track B / SMR Analyst)
 - ⬜ **Wave 8 SMR evidence** Supply/inventory scenario evidence package (SMR Analyst)
 
 ### Wave 8 — Execution Steps
@@ -1640,7 +1640,7 @@ Wave 8 Step 6 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | Wave 8 SMR supply prep - export/config ✅ | P5-D (A part) ✅ | Add the ScenarioRunner supply/inventory artifact fields, deterministic supply-focused lane/config surface, and focused tests |
-| SMR Analyst | Wave 8 SMR supply prep - validation | Track B export/config ✅ | Validate that the new artifact surface and supply-focused lane are sufficient before the final Wave 8 SMR evidence run |
+| SMR Analyst | Wave 8 SMR supply prep - validation ✅ | Track B export/config ✅ | Validate that the new artifact surface and supply-focused lane are sufficient before the final Wave 8 SMR evidence run |
 
 Wave 8 SMR supply prep requirements - Track B export/config:
 - Add a supply/inventory block to ScenarioRunner run-level artifacts (`summary.json` / per-run result) with at least:
@@ -1678,6 +1678,9 @@ Wave 8 SMR supply prep requirements - SMR Analyst validation:
 - Produce a short validation note or handoff stating either:
   - `supply prep sufficient for Step 7B`, or
   - the exact missing field/lane/test that Track B must fix before Step 7B.
+
+Wave 8 Step 7A SMR Analyst validation note:
+- ✅ SMR validation closed: `SupplyScenario = "storehouse_refill_consumption"` was validated in `.artifacts/smr/wave8-step7a-supply-prep-validation-001/` with `Headless`, seed `101`, planners `simple,goap,htn`, and drilldown `sampleEvery=1`. Manifest exit `0`, anomaly count `0`, run-level `supply` block and compact timeline `supply` fields are present. All three planner runs produced `inventoryFoodConsumed=2`, `carriersWithFood=1`, `totalCarriedFood=3`, `coloniesWithBackpacks=1`, and `coloniesWithRationing=1`; timelines also show transient carried-food proof (`totalCarriedFood` max `4`). Old-baseline compatibility is covered by `SupplyTelemetryArtifactTests.Compare_OldBaselineWithoutSupplyBlock_StillParses`; focused no-build supply test rerun passed `4/4`. Evidence note: `Docs/Evidence/SMR/wave8-step7a-supply-prep-validation/README.md`. Decision: `supply prep sufficient for Step 7B`.
 
 **Step 7B — opens when Wave 8 SMR supply prep ✅**
 
