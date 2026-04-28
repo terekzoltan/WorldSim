@@ -1639,7 +1639,7 @@ Wave 8 Step 6 progress note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | Wave 8 SMR supply prep - export/config | P5-D (A part) ✅ | Add the ScenarioRunner supply/inventory artifact fields, deterministic supply-focused lane/config surface, and focused tests |
+| Track B agent | Wave 8 SMR supply prep - export/config ✅ | P5-D (A part) ✅ | Add the ScenarioRunner supply/inventory artifact fields, deterministic supply-focused lane/config surface, and focused tests |
 | SMR Analyst | Wave 8 SMR supply prep - validation | Track B export/config ✅ | Validate that the new artifact surface and supply-focused lane are sufficient before the final Wave 8 SMR evidence run |
 
 Wave 8 SMR supply prep requirements - Track B export/config:
@@ -1662,6 +1662,10 @@ Wave 8 SMR supply prep requirements - Track B export/config:
   - drilldown timeline contains compact supply fields when enabled;
   - the supply-focused lane produces non-zero supply evidence in at least one deterministic smoke case.
 - Do not change runtime gameplay rules, Graphics UI, or Track A presentation during this prep step.
+
+Wave 8 Step 7A Track B progress note:
+- ✅ Track B export/config closed: ScenarioRunner run-level and per-run artifacts now emit nullable/default-safe `supply` blocks with `inventoryFoodConsumed`, `carriersWithFood`, `totalCarriedFood`, `avgInventoryUsedSlots`, `avgInventoryCapacitySlots`, `coloniesWithBackpacks`, and `coloniesWithRationing`; drilldown timeline samples emit compact `supply` fields for inventory consumption, carriers, carried food, and average slots. Deterministic supply lane contract is `SupplyScenario = "storehouse_refill_consumption"`, which prepares the primary colony through actual `backpacks`/`rationing` `TechTree` unlocks, places an owned storehouse, invokes the existing refill path, and starts inventory consumption with spare carried food. Focused ScenarioRunner test gate: `dotnet test "WorldSim.ScenarioRunner.Tests/WorldSim.ScenarioRunner.Tests.csproj" --filter "SupplyTelemetryArtifactTests"` passed 4/4. Example SMR Analyst smoke env: `WORLDSIM_SCENARIO_CONFIGS_JSON=[{"Name":"supply-storehouse-refill-consumption","Width":32,"Height":20,"InitialPop":12,"Ticks":8,"Dt":0.25,"EnableCombatPrimitives":false,"EnableDiplomacy":false,"StoneBuildingsEnabled":false,"BirthRateMultiplier":0.0,"MovementSpeedMultiplier":1.0,"EnableSiege":true,"SupplyScenario":"storehouse_refill_consumption"}]`, with `WORLDSIM_SCENARIO_DRILLDOWN=true`, `WORLDSIM_SCENARIO_DRILLDOWN_TOP=1`, and `WORLDSIM_SCENARIO_SAMPLE_EVERY=1`. Full Wave 8 SMR supply prep remains open until SMR Analyst validation returns sufficient-for-Step-7B.
+- ✅ Post-review fix note: `AllowFreeTechUnlocks` is restored after supply-lane tech setup, existing storehouse setup no longer duplicates buildings, and the stale low-intensity combat assertion fixture was retargeted to a deterministic low-intensity run. Full gates after fix: `WorldSim.ScenarioRunner.Tests` 57/57, `WorldSim.Runtime.Tests` 251/251, and `dotnet build "WorldSim.sln"` all green.
 
 Wave 8 SMR supply prep requirements - SMR Analyst validation:
 - Run a narrow Headless validation package against the Track B supply-focused lane after export/config lands.

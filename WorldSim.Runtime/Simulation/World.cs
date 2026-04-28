@@ -326,6 +326,41 @@ namespace WorldSim.Simulation
                 PredatorHumanHits: TotalPredatorHumanHits);
         }
 
+        public ScenarioSupplyTelemetrySnapshot BuildScenarioSupplyTelemetrySnapshot()
+        {
+            var livingPeople = _people.Where(person => person.Health > 0f).ToList();
+            var carriersWithFood = 0;
+            var totalCarriedFood = 0;
+            var totalUsedSlots = 0;
+            var totalCapacitySlots = 0;
+
+            foreach (var person in livingPeople)
+            {
+                var inventoryFood = person.Inventory.GetCount(ItemType.Food);
+                if (inventoryFood > 0)
+                    carriersWithFood++;
+
+                totalCarriedFood += inventoryFood;
+                totalUsedSlots += person.Inventory.UsedSlots;
+                totalCapacitySlots += person.Inventory.CapacitySlots;
+            }
+
+            var livingCount = livingPeople.Count;
+            var coloniesWithBackpacks = _colonies.Count(colony =>
+                colony.InventoryCapacityBonusSlots > 0 || colony.UnlockedTechs.Contains("backpacks"));
+            var coloniesWithRationing = _colonies.Count(colony =>
+                colony.InventorySupplyEfficiencyMultiplier > 1f || colony.UnlockedTechs.Contains("rationing"));
+
+            return new ScenarioSupplyTelemetrySnapshot(
+                InventoryFoodConsumed: TotalInventoryFoodConsumed,
+                CarriersWithFood: carriersWithFood,
+                TotalCarriedFood: totalCarriedFood,
+                AvgInventoryUsedSlots: livingCount > 0 ? totalUsedSlots / (float)livingCount : 0f,
+                AvgInventoryCapacitySlots: livingCount > 0 ? totalCapacitySlots / (float)livingCount : 0f,
+                ColoniesWithBackpacks: coloniesWithBackpacks,
+                ColoniesWithRationing: coloniesWithRationing);
+        }
+
         public ScenarioEcologyBalanceSnapshot BuildScenarioEcologyBalanceSnapshot()
             => new(
                 AnimalReplenishmentChancePerSecond,

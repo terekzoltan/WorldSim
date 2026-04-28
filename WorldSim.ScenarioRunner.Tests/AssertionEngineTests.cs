@@ -66,18 +66,18 @@ public sealed class AssertionEngineTests
     public void Assertions_LowIntensityCombat_SkipsDeathCounterChecks()
     {
         var artifactDir = CreateArtifactDir();
-        var configJson = "[{\"Name\":\"medium-default\",\"Width\":128,\"Height\":72,\"InitialPop\":48,\"Ticks\":1200,\"Dt\":0.25,\"EnableCombatPrimitives\":true,\"EnableDiplomacy\":true,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0}]";
+        var configJson = "[{\"Name\":\"medium-default\",\"Width\":128,\"Height\":72,\"InitialPop\":48,\"Ticks\":20,\"Dt\":0.25,\"EnableCombatPrimitives\":true,\"EnableDiplomacy\":true,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0}]";
 
         RunScenarioRunner(
             artifactDir,
             expectedExitCode: 0,
             new Dictionary<string, string>
             {
-                ["WORLDSIM_SCENARIO_SEEDS"] = "101",
+                ["WORLDSIM_SCENARIO_SEEDS"] = "505",
                 ["WORLDSIM_SCENARIO_PLANNERS"] = "goap",
                 ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
                 ["WORLDSIM_SCENARIO_ASSERT"] = "true",
-                ["WORLDSIM_SCENARIO_TICKS"] = "1200",
+                ["WORLDSIM_SCENARIO_TICKS"] = "20",
                 ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson
             });
 

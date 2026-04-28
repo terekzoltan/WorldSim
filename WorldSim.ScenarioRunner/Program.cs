@@ -95,6 +95,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 MovementSpeedMultiplier = config.MovementSpeedMultiplier
             };
             ApplyEcologyBalanceConfig(world, config);
+            ApplySupplyScenarioConfig(world, config);
 
             List<double>? tickTimesMs = perfEnabled ? new List<double>(config.Ticks) : null;
             long peakEntities = 0;
@@ -254,6 +255,7 @@ static ScenarioRunResult BuildRunResult(
     var aiTelemetry = world.BuildScenarioAiTelemetrySnapshot();
     var ecologyTelemetry = world.BuildScenarioEcologyTelemetrySnapshot();
     var ecologyBalance = world.BuildScenarioEcologyBalanceSnapshot();
+    var supplyTelemetry = world.BuildScenarioSupplyTelemetrySnapshot();
     if (tickTimesMs is { Count: > 0 })
     {
         perfAvgTickMs = tickTimesMs.Average();
@@ -323,6 +325,7 @@ static ScenarioRunResult BuildRunResult(
         PerfPeakEntities: perfPeakEntities,
         Ecology: ecologyTelemetry,
         EcologyBalance: ecologyBalance,
+        Supply: supplyTelemetry,
         EnablePredatorHumanAttacks: world.EnablePredatorHumanAttacks);
 }
 
@@ -339,6 +342,115 @@ static void ApplyEcologyBalanceConfig(World world, ScenarioConfig config)
 
     if (config.FoodRegrowthJitterSeconds.HasValue)
         world.FoodRegrowthJitterSeconds = config.FoodRegrowthJitterSeconds.Value;
+}
+
+static void ApplySupplyScenarioConfig(World world, ScenarioConfig config)
+{
+    if (string.IsNullOrWhiteSpace(config.SupplyScenario))
+        return;
+
+    if (!string.Equals(config.SupplyScenario, "storehouse_refill_consumption", StringComparison.OrdinalIgnoreCase))
+        return;
+
+    var colony = world._colonies.FirstOrDefault();
+    if (colony == null)
+        return;
+
+    var actor = world._people
+        .Where(person => person.Health > 0f && ReferenceEquals(person.Home, colony))
+        .OrderBy(person => person.Id)
+        .FirstOrDefault();
+    if (actor == null)
+        return;
+
+    TechTree.Load(FindTechPath());
+    var previousAllowFreeTechUnlocks = world.AllowFreeTechUnlocks;
+    try
+    {
+        world.AllowFreeTechUnlocks = true;
+        _ = TechTree.TryUnlock("backpacks", world, colony);
+        _ = TechTree.TryUnlock("rationing", world, colony);
+    }
+    finally
+    {
+        world.AllowFreeTechUnlocks = previousAllowFreeTechUnlocks;
+    }
+
+    var (storehouse, access, shouldAddStorehouse) = EnsureOwnedStorehouseWithAccess(world, colony);
+    if (shouldAddStorehouse)
+        world.AddSpecializedBuilding(colony, storehouse, SpecializedBuildingKind.Storehouse);
+    actor.Pos = access;
+    actor.Profession = Profession.Generalist;
+    actor.Needs["Hunger"] = 96f;
+    colony.Stock[Resource.Food] = Math.Max(colony.Stock[Resource.Food], actor.Inventory.CapacitySlots + 3);
+
+    _ = actor.TryRefillInventoryFromStorehouse(world);
+}
+
+static ((int x, int y) Storehouse, (int x, int y) Access, bool ShouldAddStorehouse) EnsureOwnedStorehouseWithAccess(World world, Colony colony)
+{
+    if (world.TryFindNearestOwnedStorehouseAccessTile(colony, colony.Origin, out var existingAccess))
+    {
+        var existingStorehouse = world.SpecializedBuildings
+            .Where(building => building.Kind == SpecializedBuildingKind.Storehouse && ReferenceEquals(building.Owner, colony))
+            .OrderBy(building => Math.Abs(building.Pos.x - existingAccess.x) + Math.Abs(building.Pos.y - existingAccess.y))
+            .ThenBy(building => building.Pos.x)
+            .ThenBy(building => building.Pos.y)
+            .First();
+        return (existingStorehouse.Pos, existingAccess, ShouldAddStorehouse: false);
+    }
+
+    for (var radius = 1; radius <= Math.Max(world.Width, world.Height); radius++)
+    {
+        for (var dy = -radius; dy <= radius; dy++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                if (Math.Abs(dx) + Math.Abs(dy) != radius)
+                    continue;
+
+                var storehouse = (x: colony.Origin.x + dx, y: colony.Origin.y + dy);
+                if (!world.CanPlaceStructureAt(storehouse.x, storehouse.y))
+                    continue;
+
+                var access = CardinalNeighbors(storehouse)
+                    .Where(tile => !world.IsMovementBlocked(tile.x, tile.y, colony.Id))
+                    .OrderBy(tile => Math.Abs(tile.x - colony.Origin.x) + Math.Abs(tile.y - colony.Origin.y))
+                    .ThenBy(tile => tile.x)
+                    .ThenBy(tile => tile.y)
+                    .Select(tile => ((int x, int y)?)tile)
+                    .FirstOrDefault();
+
+                if (access.HasValue)
+                    return (storehouse, access.Value, ShouldAddStorehouse: true);
+            }
+        }
+    }
+
+    throw new InvalidOperationException($"Could not prepare supply scenario storehouse access for config colony {colony.Id}.");
+}
+
+static IEnumerable<(int x, int y)> CardinalNeighbors((int x, int y) pos)
+{
+    yield return (pos.x + 1, pos.y);
+    yield return (pos.x - 1, pos.y);
+    yield return (pos.x, pos.y + 1);
+    yield return (pos.x, pos.y - 1);
+}
+
+static string FindTechPath()
+{
+    var current = new DirectoryInfo(AppContext.BaseDirectory);
+    while (current != null)
+    {
+        var path = Path.Combine(current.FullName, "Tech", "technologies.json");
+        if (File.Exists(path))
+            return path;
+
+        current = current.Parent;
+    }
+
+    throw new DirectoryNotFoundException("Could not locate repository root containing Tech/technologies.json");
 }
 
 static void WriteOutput(
@@ -1228,6 +1340,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
     var contactTelemetry = world.BuildScenarioContactTelemetrySnapshot().ToTimelineSnapshot();
     var aiTelemetry = world.BuildScenarioAiTelemetrySnapshot().ToTimelineSnapshot();
     var ecologyTelemetry = world.BuildScenarioEcologyTelemetrySnapshot().ToTimelineSnapshot();
+    var supplyTelemetry = world.BuildScenarioSupplyTelemetrySnapshot().ToTimelineSnapshot();
 
     return new ScenarioTimelineSample(
         Tick: tick,
@@ -1251,6 +1364,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
         Contact: contactTelemetry,
         Ai: aiTelemetry,
         Ecology: ecologyTelemetry,
+        Supply: supplyTelemetry,
         PerfTickMs: perfTickMs);
 }
 
@@ -1400,6 +1514,12 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
                 continue;
             }
 
+            if (!IsKnownSupplyScenario(config.SupplyScenario))
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (SupplyScenario must be null or 'storehouse_refill_consumption'). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
             configs.Add(config with
             {
                 Name = string.IsNullOrWhiteSpace(config.Name) ? $"config_{index + 1}" : config.Name
@@ -1422,6 +1542,10 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
             new[] { $"Warning: invalid WORLDSIM_SCENARIO_CONFIGS_JSON ({ex.Message}). Exiting with config_error." });
     }
 }
+
+static bool IsKnownSupplyScenario(string? supplyScenario)
+    => string.IsNullOrWhiteSpace(supplyScenario)
+       || string.Equals(supplyScenario, "storehouse_refill_consumption", StringComparison.OrdinalIgnoreCase);
 
 static bool ParseBool(string? value, bool fallback)
 {
@@ -1517,7 +1641,8 @@ sealed record ScenarioConfig(
     float? AnimalReplenishmentChancePerSecond = null,
     float? PredatorReplenishmentChance = null,
     float? FoodRegrowthMinSeconds = null,
-    float? FoodRegrowthJitterSeconds = null);
+    float? FoodRegrowthJitterSeconds = null,
+    string? SupplyScenario = null);
 
 sealed record ScenarioRunResult(
     string ConfigName,
@@ -1576,6 +1701,7 @@ sealed record ScenarioRunResult(
     long PerfPeakEntities,
     ScenarioEcologyTelemetrySnapshot? Ecology = null,
     ScenarioEcologyBalanceSnapshot? EcologyBalance = null,
+    ScenarioSupplyTelemetrySnapshot? Supply = null,
     bool EnablePredatorHumanAttacks = false);
 
 sealed record ScenarioRunEnvelope(
@@ -1755,6 +1881,7 @@ sealed record ScenarioTimelineSample(
     ScenarioContactTimelineSnapshot Contact,
     ScenarioAiTimelineSnapshot Ai,
     ScenarioEcologyTimelineSnapshot? Ecology,
+    ScenarioSupplyTimelineSnapshot? Supply,
     double PerfTickMs);
 
 sealed record ScenarioDrilldownSummary(
