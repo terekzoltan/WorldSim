@@ -2100,6 +2100,8 @@ Wave 11 policy note:
 **Critical path:** `E11-A -> E11-B -> E11-C -> E11-D -> E11-E -> E11-H -> E11-J`.
 **Parallelism:** Track C `E11-F` and Track B `E11-G` can proceed after lifecycle runtime is available; Track A `E11-I` waits for stable snapshot + SMR terminology.
 
+
+Wave 12: Improve codebase architecture
 ---
 
 ## Summary Table
