@@ -1577,7 +1577,7 @@ Parallelism:
 - ✅ **P5-D** Snapshot and UI indicators (Track B -> A)
 - ✅ **P5-E** Supply-related tech entries — backpacks, rationing (Track B)
 - ✅ **Wave 8 SMR supply prep** ScenarioRunner supply/inventory evidence surface (Track B / SMR Analyst)
-- ⬜ **Wave 8 SMR evidence** Supply/inventory scenario evidence package (SMR Analyst)
+- ✅ **Wave 8 SMR evidence** Supply/inventory scenario evidence package (SMR Analyst)
 
 ### Wave 8 — Execution Steps
 
@@ -1700,6 +1700,9 @@ Wave 8 SMR evidence requirements:
 - Run `compare-baseline` only when a valid comparable baseline path exists; otherwise mark baseline compare as unavailable rather than manufacturing one.
 - Closeout artifact/report should state healthy signals, suspicious signals, unknowns, and the recommended next run or baseline decision.
 - Wave 8 is not fully closeable from a generic SMR smoke alone; the report must include supply/inventory-specific evidence from Step 7A fields.
+
+Wave 8 Step 7B SMR Analyst evidence note:
+- ✅ SMR evidence closed: two Headless packages were captured and reviewed. Peaceful all-around package `.artifacts/smr/all-around-smoke-wave8-001/` ran `27/27` (`small-default`, `medium-default`, `standard-default` x seeds `101,202,303` x planners `simple,goap,htn`) with `exitCode=0`, `assertionFailures=0`, and supply blocks present in every run; it produced `12` reviewed `ANOM-CLUSTER-HIGH-BACKOFF` warnings, but no survival/economy/supply blocker (`minLivingColonies=4`, `minPeople=24`, `minFood=894`, `starvationWithFood=0`). Supply-focused package `.artifacts/smr/wave8-step7b-supply-focused-001/` ran `9/9` with `SupplyScenario="storehouse_refill_consumption"`, `exitCode=0`, `anomalyCount=0`, and every run produced `inventoryFoodConsumed=2`, `carriersWithFood=1`, `totalCarriedFood=3`, `coloniesWithBackpacks=1`, and `coloniesWithRationing=1`; drilldown timelines show transient carried food (`totalCarriedFood` max `4`). Evidence note: `Docs/Evidence/SMR/wave8-step7b-supply-inventory-evidence/README.md`. Decision: `Wave 8 SMR evidence accepted; recommend Wave 8 closeout`.
 
 **Parallelism:** Wave 8 is intentionally mostly sequential Track B work; only the final Track A consume step, the ScenarioRunner supply-evidence prep, and the SMR Analyst closeout evidence step are separate.
 
