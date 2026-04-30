@@ -117,6 +117,35 @@ class DirectorSnapshotMapperTest {
     }
 
     @Test
+    void map_DirectorCooldownWinsOverLegacyWorldCooldown() {
+        ObjectNode world = objectMapper.createObjectNode();
+        world.put("colonyCount", 2);
+        world.put("storyBeatCooldownTicks", 99);
+
+        ObjectNode director = objectMapper.createObjectNode();
+        director.put("beatCooldownRemainingTicks", 8);
+        director.put("remainingInfluenceBudget", 4.0);
+
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.set("world", world);
+        snapshot.set("director", director);
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-map-cooldown-precedence",
+                42L,
+                256L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                snapshot,
+                null
+        );
+
+        DirectorRuntimeFacts facts = mapper.map(request);
+
+        assertEquals(8, facts.beatCooldownTicks());
+    }
+
+    @Test
     void map_ConstraintsMaxBudgetOverridesSnapshotBudget() {
         ObjectNode snapshot = objectMapper.createObjectNode();
         snapshot.putObject("world").put("colonyCount", 2);

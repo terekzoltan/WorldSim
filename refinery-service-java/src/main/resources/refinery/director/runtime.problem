@@ -1,15 +1,23 @@
 class DirectorRuntimeLayerAnchor.
 
 class RuntimeCheckpointContext {
+    int tick
+    int colonyCount
+    int beatCooldownRemainingTicks
+    real remainingInfluenceBudget
     DirectorCheckpoint[] checkpoint
     contains ActiveBeatFact[] activeBeats
     contains ActiveDirectiveFact[] activeDirectives
 }
 
 class ActiveBeatFact {
+    string beatId
+    int remainingTicks
     Severity[] severity
 }
 
 class ActiveDirectiveFact {
+    int colonyId
+    string directiveKey
     DirectiveKind[] directive
 }
