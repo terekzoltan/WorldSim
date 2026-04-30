@@ -12,3 +12,9 @@ ModelConstraint(inv_goal_bias_weight_bounds).
 ModelConstraint(inv_domain_stack_cap).
 ModelConstraint(inv_budget_cap).
 ModelConstraint(inv_no_contradictory_same_domain_modifiers).
+
+error storyBeatDuringCooldown(RuntimeCheckpointContext ctx, DesignatedOutputArea area, DirectorCheckpoint checkpoint, StoryBeatOutput story) <->
+    RuntimeCheckpointContext::checkpoint(ctx, checkpoint),
+    DesignatedOutputArea::checkpoint(area, checkpoint),
+    DesignatedOutputArea::storyBeatSlot(area, story),
+    beatCooldownRemainingTicks(ctx) > 0.

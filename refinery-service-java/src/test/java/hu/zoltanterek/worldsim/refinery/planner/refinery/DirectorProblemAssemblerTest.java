@@ -29,7 +29,7 @@ class DirectorProblemAssemblerTest {
         assertTrue(assembled.contains("DirectorOutputLayerAnchor"));
         assertTrue(assembled.contains("RuntimeCheckpointContext(runtimeCheckpoint)."));
         assertTrue(assembled.contains("tick(runtimeCheckpoint): 987."));
-        assertTrue(assembled.contains("beatId(activeBeat_000): \"BEAT_MAJOR_1\"."));
+        assertTrue(assembled.contains("ActiveBeatFact::beatId(activeBeat_000): \"BEAT_MAJOR_1\"."));
     }
 
     @Test
@@ -49,6 +49,17 @@ class DirectorProblemAssemblerTest {
         assertTrue(assembled.indexOf("DirectorModelLayerAnchor") < assembled.indexOf("DirectorRuntimeLayerAnchor"));
         assertTrue(assembled.indexOf("DirectorRuntimeLayerAnchor") < assembled.indexOf("DirectorOutputLayerAnchor"));
         assertTrue(assembled.indexOf("DirectorOutputLayerAnchor") < assembled.indexOf("RuntimeCheckpointContext(runtimeCheckpoint)."));
+    }
+
+    @Test
+    void assemble_AcceptsOrderedDynamicFragments() {
+        String assembled = assembler.assemble(List.of(
+                new DirectorProblemFragment(List.of("RuntimeCheckpointContext(runtimeCheckpoint).")),
+                new DirectorProblemFragment(List.of("DesignatedOutputArea(outputArea_000)."))
+        ));
+
+        assertTrue(assembled.indexOf("DirectorOutputLayerAnchor") < assembled.indexOf("RuntimeCheckpointContext(runtimeCheckpoint)."));
+        assertTrue(assembled.indexOf("RuntimeCheckpointContext(runtimeCheckpoint).") < assembled.indexOf("DesignatedOutputArea(outputArea_000)."));
     }
 
     private static DirectorRuntimeFacts sampleFacts() {

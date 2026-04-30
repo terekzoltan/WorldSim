@@ -51,9 +51,9 @@ class DirectorRuntimeAssertionsMapperTest {
 
         String fragment = mapper.map(facts).problemFragment();
 
-        assertTrue(fragment.indexOf("beatId(activeBeat_000): \"BEAT_A\".")
-                < fragment.indexOf("beatId(activeBeat_001): \"BEAT_Z\"."));
-        assertTrue(fragment.contains("remainingTicks(activeBeat_000): 20."));
+        assertTrue(fragment.indexOf("ActiveBeatFact::beatId(activeBeat_000): \"BEAT_A\".")
+                < fragment.indexOf("ActiveBeatFact::beatId(activeBeat_001): \"BEAT_Z\"."));
+        assertTrue(fragment.contains("ActiveBeatFact::remainingTicks(activeBeat_000): 20."));
         assertTrue(fragment.contains("Severity(severity_major)."));
         assertTrue(fragment.contains("ActiveBeatFact::severity(activeBeat_000, severity_major)."));
     }
@@ -74,9 +74,9 @@ class DirectorRuntimeAssertionsMapperTest {
 
         String fragment = mapper.map(facts).problemFragment();
 
-        assertTrue(fragment.indexOf("colonyId(activeDirective_000): 0.")
-                < fragment.indexOf("colonyId(activeDirective_001): 2."));
-        assertTrue(fragment.contains("directiveKey(activeDirective_000): \"PrioritizeFood\"."));
+        assertTrue(fragment.indexOf("ActiveDirectiveFact::colonyId(activeDirective_000): 0.")
+                < fragment.indexOf("ActiveDirectiveFact::colonyId(activeDirective_001): 2."));
+        assertTrue(fragment.contains("ActiveDirectiveFact::directiveKey(activeDirective_000): \"PrioritizeFood\"."));
         assertTrue(fragment.contains("DirectiveKind(directive_prioritizefood)."));
         assertTrue(fragment.contains("ActiveDirectiveFact::directive(activeDirective_000, directive_prioritizefood)."));
     }
@@ -94,7 +94,7 @@ class DirectorRuntimeAssertionsMapperTest {
 
         String fragment = mapper.map(facts).problemFragment();
 
-        assertTrue(fragment.contains("beatId(activeBeat_000): \"BEAT \\\"quoted\\\"\\\\path\"."));
+        assertTrue(fragment.contains("ActiveBeatFact::beatId(activeBeat_000): \"BEAT \\\"quoted\\\"\\\\path\"."));
         assertTrue(fragment.contains("Severity(severity_major_pressure)."));
         assertTrue(fragment.contains("DirectiveKind(directive_prioritize_food)."));
     }

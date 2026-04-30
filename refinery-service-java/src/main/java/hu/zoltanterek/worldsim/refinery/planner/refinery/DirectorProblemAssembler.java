@@ -10,14 +10,22 @@ import hu.zoltanterek.worldsim.refinery.planner.director.DirectorRuntimeAssertio
 
 public final class DirectorProblemAssembler {
     public String assemble(DirectorRuntimeAssertions runtimeAssertions) {
+        return assemble(runtimeAssertions == null
+                ? List.of()
+                : List.of(new DirectorProblemFragment(runtimeAssertions.lines())));
+    }
+
+    public String assemble(List<DirectorProblemFragment> fragments) {
         List<String> sections = new ArrayList<>();
         for (String resourcePath : RefineryArtifactCatalog.directorCanonicalProblemResourcePaths()) {
             sections.add(readResource(resourcePath));
         }
 
-        String fragment = runtimeAssertions == null ? "" : runtimeAssertions.problemFragment();
-        if (!fragment.isBlank()) {
-            sections.add(fragment);
+        for (DirectorProblemFragment item : fragments == null ? List.<DirectorProblemFragment>of() : fragments) {
+            String fragment = item == null ? "" : item.problemFragment();
+            if (!fragment.isBlank()) {
+                sections.add(fragment);
+            }
         }
 
         return String.join(System.lineSeparator() + System.lineSeparator(), sections);

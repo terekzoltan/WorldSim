@@ -61,8 +61,8 @@ public final class DirectorRuntimeAssertionsMapper {
         String severityId = "severity_" + safeIdentifierPart(beat.severity());
         lines.add("ActiveBeatFact(" + beatId + ").");
         lines.add("activeBeats(" + CONTEXT_ID + ", " + beatId + ").");
-        lines.add("beatId(" + beatId + "): \"" + escapeString(beat.beatId()) + "\".");
-        lines.add("remainingTicks(" + beatId + "): " + Math.max(0L, beat.remainingTicks()) + ".");
+        lines.add("ActiveBeatFact::beatId(" + beatId + "): \"" + escapeString(beat.beatId()) + "\".");
+        lines.add("ActiveBeatFact::remainingTicks(" + beatId + "): " + Math.max(0L, beat.remainingTicks()) + ".");
         lines.add("Severity(" + severityId + ").");
         lines.add("ActiveBeatFact::severity(" + beatId + ", " + severityId + ").");
     }
@@ -76,8 +76,8 @@ public final class DirectorRuntimeAssertionsMapper {
         String directiveKindId = "directive_" + safeIdentifierPart(directive.directive());
         lines.add("ActiveDirectiveFact(" + directiveFactId + ").");
         lines.add("activeDirectives(" + CONTEXT_ID + ", " + directiveFactId + ").");
-        lines.add("colonyId(" + directiveFactId + "): " + Math.max(0, directive.colonyId()) + ".");
-        lines.add("directiveKey(" + directiveFactId + "): \"" + escapeString(directive.directive()) + "\".");
+        lines.add("ActiveDirectiveFact::colonyId(" + directiveFactId + "): " + Math.max(0, directive.colonyId()) + ".");
+        lines.add("ActiveDirectiveFact::directiveKey(" + directiveFactId + "): \"" + escapeString(directive.directive()) + "\".");
         lines.add("DirectiveKind(" + directiveKindId + ").");
         lines.add("ActiveDirectiveFact::directive(" + directiveFactId + ", " + directiveKindId + ").");
     }

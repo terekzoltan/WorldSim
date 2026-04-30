@@ -43,3 +43,12 @@ Entries:
 - Impact: A clustering investigation can correctly rank worst runs from `summary.json`/`anomalies.json`, but drilldown artifacts may not include detailed timelines for the actual clustering-worst runs.
 - Resolution / guidance: For clustering-focused evidence, explicitly verify whether `drilldown/index.json` covers the worst anomaly runs. If not, rank from `summary.json`/`anomalies.json` and either record that limitation or add a future clustering-aware drilldown selector.
 - Status: guidance
+
+## 2026-04-30 - TR2-B Minimal Solver Slice - Minor - Report unsupported nested output features explicitly
+
+- Track: Track D / Tools.Refinery migration
+- Source: Step review for Wave 8.5 `TR2-B`
+- Finding: Minimal solver slices may intentionally model only a subset of the existing internal assertion DTO. If nested fields are omitted from the formal problem, they can be mistaken as solver-validated unless diagnostics or tests make the omission explicit.
+- Impact: Later bridge-mapping work could accidentally assume fields such as effects, biases, campaign, or causal chains were formally validated when the minimal slice only proved story/directive shell consistency.
+- Resolution / guidance: For every intentionally unsupported assertion field, either emit an explicit unsupported-feature diagnostic or add a test that proves the field is out of scope for the current slice. Do not silently treat omitted fields as solved/validated facts.
+- Status: guidance
