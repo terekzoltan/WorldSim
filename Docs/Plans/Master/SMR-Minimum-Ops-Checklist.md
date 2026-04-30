@@ -64,10 +64,16 @@ After running:
    - `drilldown/index.json`
 4. Rank the worst runs instead of only listing aggregate averages.
 5. Say clearly:
-   - what looks healthy,
-   - what looks suspicious,
-   - what remains unknown,
-   - what run should happen next.
+    - what looks healthy,
+    - what looks suspicious,
+    - what remains unknown,
+    - what run should happen next.
+
+ScenarioRunner test wrapper timeout note:
+- Direct SMR CLI runs through `dotnet run --project WorldSim.ScenarioRunner/WorldSim.ScenarioRunner.csproj` are not limited by this checklist.
+- The `WorldSim.ScenarioRunner.Tests` xUnit wrappers use a test-only safety timeout so failed test runs do not leave orphan `dotnet.exe` process trees.
+- Default wrapper timeout: 30 minutes.
+- For intentionally long xUnit-wrapper ScenarioRunner tests, set `WORLDSIM_SCENARIO_TEST_TIMEOUT_MINUTES`, for example `120`.
 
 ---
 

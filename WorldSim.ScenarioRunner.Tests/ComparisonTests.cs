@@ -52,14 +52,11 @@ public sealed class ComparisonTests
         startInfo.Environment["WORLDSIM_SCENARIO_OUTPUT"] = "json";
         startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
-        using var process = Process.Start(startInfo);
-        Assert.NotNull(process);
+        var result = ScenarioRunnerProcess.Run(startInfo, artifactDir);
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        Assert.Equal(0, process.ExitCode);
+        Assert.Equal(0, result.ExitCode);
+        var stdout = result.Stdout;
+        var stderr = result.Stderr;
         using var parsed = JsonDocument.Parse(stdout);
         Assert.Equal(JsonValueKind.Object, parsed.RootElement.ValueKind);
         Assert.Contains("compare baseline unavailable", stderr, StringComparison.OrdinalIgnoreCase);
@@ -296,14 +293,9 @@ public sealed class ComparisonTests
         foreach (var pair in env)
             startInfo.Environment[pair.Key] = pair.Value;
 
-        using var process = Process.Start(startInfo);
-        Assert.NotNull(process);
+        var result = ScenarioRunnerProcess.Run(startInfo, artifactDir);
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        Assert.True(process.ExitCode == expectedExitCode, $"ScenarioRunner exit mismatch. Expected={expectedExitCode} Actual={process.ExitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(result.ExitCode == expectedExitCode, $"ScenarioRunner exit mismatch. Expected={expectedExitCode} Actual={result.ExitCode}\nSTDOUT:\n{result.Stdout}\nSTDERR:\n{result.Stderr}");
     }
 
     private static string FindRepoRoot()

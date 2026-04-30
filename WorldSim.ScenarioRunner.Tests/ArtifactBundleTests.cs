@@ -230,14 +230,9 @@ public sealed class ArtifactBundleTests
         startInfo.Environment["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson;
         startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
-        using var process = Process.Start(startInfo);
-        Assert.NotNull(process);
+        var result = ScenarioRunnerProcess.Run(startInfo, artifactDir);
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        Assert.True(process.ExitCode == 0, $"ScenarioRunner failed. Exit={process.ExitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(result.ExitCode == 0, $"ScenarioRunner failed. Exit={result.ExitCode}\nSTDOUT:\n{result.Stdout}\nSTDERR:\n{result.Stderr}");
 
         var files = Directory.GetFiles(Path.Combine(artifactDir, "runs"), "*.json")
             .Select(Path.GetFileName)
@@ -271,14 +266,9 @@ public sealed class ArtifactBundleTests
         startInfo.Environment["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson;
         startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
-        using var process = Process.Start(startInfo);
-        Assert.NotNull(process);
+        var result = ScenarioRunnerProcess.Run(startInfo, artifactDir);
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        Assert.True(process.ExitCode == 0, $"ScenarioRunner failed. Exit={process.ExitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(result.ExitCode == 0, $"ScenarioRunner failed. Exit={result.ExitCode}\nSTDOUT:\n{result.Stdout}\nSTDERR:\n{result.Stderr}");
 
         var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
         var run = summary.RootElement.GetProperty("runs")[0];
@@ -332,14 +322,9 @@ public sealed class ArtifactBundleTests
                 startInfo.Environment[key] = value;
         }
 
-        using var process = Process.Start(startInfo);
-        Assert.NotNull(process);
+        var result = ScenarioRunnerProcess.Run(startInfo, artifactDir);
 
-        var stdout = process.StandardOutput.ReadToEnd();
-        var stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-
-        Assert.True(process.ExitCode == 0, $"ScenarioRunner failed. Exit={process.ExitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(result.ExitCode == 0, $"ScenarioRunner failed. Exit={result.ExitCode}\nSTDOUT:\n{result.Stdout}\nSTDERR:\n{result.Stderr}");
     }
 
     private static string FindRepoRoot()

@@ -192,13 +192,10 @@ public sealed class SupplyTelemetryArtifactTests
         foreach (var pair in env)
             startInfo.Environment[pair.Key] = pair.Value;
 
-        using var process = Process.Start(startInfo);
-        Assert.NotNull(process);
-
-        stdout = process.StandardOutput.ReadToEnd();
-        stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        return process.ExitCode;
+        var result = ScenarioRunnerProcess.Run(startInfo, artifactDir);
+        stdout = result.Stdout;
+        stderr = result.Stderr;
+        return result.ExitCode;
     }
 
     private static JsonDocument ReadJson(string path)
