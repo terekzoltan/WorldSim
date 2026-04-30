@@ -1774,6 +1774,9 @@ Proof targets:
 
 ## Wave 9 — Army Supply + Campaign Start (Combat Phase 5b + 6a)
 
+SMR closeout source of truth:
+- `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`
+
 ### Sprint C9: Army Supply Model (Track B -> C)
 
 > Combat Plan > Phase 5 Sprint 9
@@ -1791,6 +1794,8 @@ Proof targets:
 - ⬜ **P6-B** Assembly and rally points (Track B)
 - ⬜ **P6-C** March system + encounters (Track B)
 - ⬜ **P6-D** Snapshot + overlays (Track B + A)
+- ⬜ **Wave 9 SMR campaign/supply prep** ScenarioRunner army supply + campaign skeleton evidence surface (Track B / SMR Analyst validation)
+- ⬜ **Wave 9 SMR evidence** Army supply + campaign skeleton closeout package (SMR Analyst)
 
 **Parallelism:** C9 and C10 are **sequential** (C10 depends on supply model from C9).
 
@@ -1862,9 +1867,25 @@ Proof targets:
 |---------|---------|--------|-------|
 | Track A agent | P6-D (A part) | P6-D (B part) ✅ | Overlays consume the campaign snapshot once it is stable |
 
+**Step 12A — SMR evidence surface before closeout**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | Wave 9 SMR prep - export/config | P6-D (B part) ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for army supply, carrier/resupply, foraging, and campaign skeleton evidence per `Wave9-10-SMR-Closeout-Plan.md` |
+| SMR Analyst | Wave 9 SMR prep - validation | Track B export/config ✅ | Validate that the new artifact surface and deterministic lanes can prove Wave 9 behavior before the final closeout package |
+
+**Step 12B — final Wave 9 closeout evidence**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | Wave 9 SMR evidence | P6-D (A part) ✅ + Wave 9 SMR prep ✅ | Run and review Wave 9 all-around + targeted campaign/supply packages before Wave 10 kickoff; generic smoke alone is not sufficient |
+
 ---
 
 ## Wave 10 — Campaign Resolution + Advanced Warfare (Combat Phase 6b + 7)
+
+SMR closeout source of truth:
+- `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`
 
 ### Sprint C11: Campaign Siege + Resolution (Track B -> C -> A)
 
@@ -1892,6 +1913,8 @@ Proof targets:
 - ⬜ **P7-F** Siege unit AI deployment (Track C)
 - ⬜ **P7-G** Multi-front war — bounded (Track B)
 - ⬜ **P7-H** Graphics for siege units (Track A)
+- ⬜ **Wave 10 SMR advanced campaign prep** ScenarioRunner campaign resolution + logistics + siege-unit evidence surface (Track B / SMR Analyst validation)
+- ⬜ **Wave 10 SMR evidence** Campaign resolution + advanced warfare closeout package (SMR Analyst)
 
 **Parallelism:** C11 -> C12 -> C13 are **sequential** (each builds on previous).
 
@@ -1955,6 +1978,19 @@ Proof targets:
 | Track B agent | P7-G | P7-E ✅ | Multi-front war should be bounded using the finalized siege-unit/runtime constraints |
 | Track A agent | P7-H | P7-E ✅ | Graphics consume the siege-unit snapshot once the runtime entity set is stable |
 
+**Step 10A — SMR evidence surface before closeout**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | Wave 10 SMR prep - export/config | P7-E ✅ + P7-G ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for campaign resolution, supply lines, forward bases, scouts, siege units, and multi-front constraints per `Wave9-10-SMR-Closeout-Plan.md` |
+| SMR Analyst | Wave 10 SMR prep - validation | Track B export/config ✅ | Validate that the new artifact surface and deterministic lanes can prove Wave 10 behavior before the final closeout package |
+
+**Step 10B — final Wave 10 closeout evidence**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | Wave 10 SMR evidence | P7-F ✅ + P7-G ✅ + P7-H ✅ + Wave 10 SMR prep ✅ | Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient |
+
 **Parallelism:** Wave 10 stays sequential across major phases (`C11 -> C12 -> C13`), but inside each phase the final consumer steps are grouped into the same step whenever cross-track work can proceed in parallel.
 
 ---
@@ -1970,6 +2006,7 @@ Purpose:
 Wave turn-gate:
 - Wave 10.5 is `READY` only after Wave 8.5 closeout is `✅` and Wave 10 closeout is `✅`.
 - Reason: convergence work should build on a proven solver-backed slice and the matured late combat/campaign surface before shared-family expansion prep begins.
+- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5.
 
 ### Sprint TR3: Convergence + Expansion Prep (Track D primary, Track B/C consult on shared vocabulary touchpoints)
 
