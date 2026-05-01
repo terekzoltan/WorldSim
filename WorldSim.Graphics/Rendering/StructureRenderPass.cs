@@ -92,7 +92,7 @@ public sealed class StructureRenderPass : IRenderPass
             int tileX = structure.X * settings.TileSize;
             int tileY = structure.Y * settings.TileSize;
             var tileRect = new Rectangle(tileX, tileY, settings.TileSize, settings.TileSize);
-            if (settings.DefensiveStructureScale < 0.999f)
+            if (Math.Abs(settings.DefensiveStructureScale - 1f) > 0.001f)
                 tileRect = RenderLayout.CenteredInTile(structure.X, structure.Y, settings.TileSize, settings.DefensiveStructureScale);
 
             var icon = textures.GetDefensiveStructureIcon(structure.Kind);
