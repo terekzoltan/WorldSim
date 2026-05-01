@@ -13,6 +13,7 @@ public final class DirectorOutputAssertionsProblemMapper {
 
     public OutputAreaMapping map(DirectorOutputAssertions assertions) {
         List<String> lines = new ArrayList<>();
+        List<String> diagnostics = new ArrayList<>();
         List<String> unsupportedFeatures = new ArrayList<>();
 
         lines.add("DirectorCheckpoint(" + CHECKPOINT_ID + ").");
@@ -21,20 +22,22 @@ public final class DirectorOutputAssertionsProblemMapper {
         lines.add("DesignatedOutputArea::checkpoint(" + OUTPUT_AREA_ID + ", " + CHECKPOINT_ID + ").");
 
         if (assertions == null) {
-            return new OutputAreaMapping(new DirectorProblemFragment(lines), unsupportedFeatures);
+            return new OutputAreaMapping(new DirectorProblemFragment(lines), diagnostics, unsupportedFeatures);
         }
 
-        appendStory(lines, unsupportedFeatures, assertions.storyBeat());
-        appendDirective(lines, assertions.directive());
+        appendStory(lines, diagnostics, unsupportedFeatures, assertions.storyBeat());
+        appendDirective(lines, diagnostics, assertions.directive());
         if (assertions.campaign() != null) {
             unsupportedFeatures.add("campaign");
+            diagnostics.add("unsupportedFeaturesIgnored:campaign");
         }
 
-        return new OutputAreaMapping(new DirectorProblemFragment(lines), unsupportedFeatures);
+        return new OutputAreaMapping(new DirectorProblemFragment(lines), diagnostics, unsupportedFeatures);
     }
 
     private static void appendStory(
             List<String> lines,
+            List<String> diagnostics,
             List<String> unsupportedFeatures,
             DirectorOutputAssertions.StoryBeatAssertion story
     ) {
@@ -45,19 +48,28 @@ public final class DirectorOutputAssertionsProblemMapper {
         String storyId = "storyOutput_000";
         lines.add("StoryBeatOutput(" + storyId + ").");
         lines.add("DesignatedOutputArea::storyBeatSlot(" + OUTPUT_AREA_ID + ", " + storyId + ").");
-        lines.add("StoryBeatOutput::beatId(" + storyId + "): \"" + escapeString(story.beatId()) + "\".");
+        lines.add("StoryBeatOutput::storyBeatId(" + storyId + "): \"" + escapeString(story.beatId()) + "\".");
         lines.add("StoryBeatOutput::text(" + storyId + "): \"" + escapeString(story.text()) + "\".");
-        lines.add("StoryBeatOutput::durationTicks(" + storyId + "): " + Math.max(0L, story.durationTicks()) + ".");
+        lines.add("StoryBeatOutput::storyDurationTicks(" + storyId + "): " + Math.max(0L, story.durationTicks()) + ".");
         String severity = safeIdentifierPart(story.severity() == null ? "minor" : story.severity());
         lines.add("Severity(severity_" + severity + ").");
         lines.add("StoryBeatOutput::severity(" + storyId + ", severity_" + severity + ").");
 
+        if (story.effects() != null && !story.effects().isEmpty()) {
+            diagnostics.add("unvalidatedNestedFieldsOmitted:effects");
+        }
+
         if (story.causalChain() != null) {
             unsupportedFeatures.add("causalChain");
+            diagnostics.add("unsupportedFeaturesIgnored:causalChain");
         }
     }
 
-    private static void appendDirective(List<String> lines, DirectorOutputAssertions.DirectiveAssertion directive) {
+    private static void appendDirective(
+            List<String> lines,
+            List<String> diagnostics,
+            DirectorOutputAssertions.DirectiveAssertion directive
+    ) {
         if (directive == null) {
             return;
         }
@@ -66,14 +78,18 @@ public final class DirectorOutputAssertionsProblemMapper {
         String directiveKind = safeIdentifierPart(directive.directive());
         lines.add("ColonyDirectiveOutput(" + directiveId + ").");
         lines.add("DesignatedOutputArea::directiveSlot(" + OUTPUT_AREA_ID + ", " + directiveId + ").");
-        lines.add("ColonyDirectiveOutput::colonyId(" + directiveId + "): " + Math.max(0, directive.colonyId()) + ".");
-        lines.add("ColonyDirectiveOutput::directiveKey(" + directiveId + "): \"" + escapeString(directive.directive()) + "\".");
-        lines.add("ColonyDirectiveOutput::durationTicks(" + directiveId + "): " + Math.max(0L, directive.durationTicks()) + ".");
+        lines.add("ColonyDirectiveOutput::directiveColonyId(" + directiveId + "): " + Math.max(0, directive.colonyId()) + ".");
+        lines.add("ColonyDirectiveOutput::directiveName(" + directiveId + "): \"" + escapeString(directive.directive()) + "\".");
+        lines.add("ColonyDirectiveOutput::directiveDurationTicks(" + directiveId + "): " + Math.max(0L, directive.durationTicks()) + ".");
         lines.add("DirectiveKind(directive_" + directiveKind + ").");
         lines.add("ColonyDirectiveOutput::directive(" + directiveId + ", directive_" + directiveKind + ").");
+
+        if (directive.biases() != null && !directive.biases().isEmpty()) {
+            diagnostics.add("unvalidatedNestedFieldsOmitted:biases");
+        }
     }
 
-    private static String safeIdentifierPart(String value) {
+    static String safeIdentifierPart(String value) {
         String normalized = value == null ? "unknown" : value
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "_")
@@ -104,8 +120,9 @@ public final class DirectorOutputAssertionsProblemMapper {
         return builder.toString();
     }
 
-    public record OutputAreaMapping(DirectorProblemFragment fragment, List<String> unsupportedFeatures) {
+    public record OutputAreaMapping(DirectorProblemFragment fragment, List<String> diagnostics, List<String> unsupportedFeatures) {
         public OutputAreaMapping {
+            diagnostics = List.copyOf(diagnostics == null ? List.of() : diagnostics);
             unsupportedFeatures = List.copyOf(unsupportedFeatures == null ? List.of() : unsupportedFeatures);
         }
     }

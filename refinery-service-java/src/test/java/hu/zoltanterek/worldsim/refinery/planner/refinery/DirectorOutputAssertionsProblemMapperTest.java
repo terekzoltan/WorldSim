@@ -29,7 +29,10 @@ class DirectorOutputAssertionsProblemMapperTest {
         assertTrue(fragment.contains("DesignatedOutputArea::checkpoint(outputArea_000, checkpoint_000)."));
         assertTrue(fragment.contains("ColonyDirectiveOutput(directiveOutput_000)."));
         assertTrue(fragment.contains("DesignatedOutputArea::directiveSlot(outputArea_000, directiveOutput_000)."));
-        assertTrue(fragment.contains("ColonyDirectiveOutput::directiveKey(directiveOutput_000): \"PrioritizeFood\"."));
+        assertTrue(fragment.contains("ColonyDirectiveOutput::directiveName(directiveOutput_000): \"PrioritizeFood\"."));
+        assertTrue(fragment.contains("ColonyDirectiveOutput::directiveColonyId(directiveOutput_000): 0."));
+        assertTrue(fragment.contains("ColonyDirectiveOutput::directiveDurationTicks(directiveOutput_000): 12."));
+        assertTrue(result.diagnostics().isEmpty());
     }
 
     @Test
@@ -44,9 +47,9 @@ class DirectorOutputAssertionsProblemMapperTest {
 
         assertTrue(fragment.contains("StoryBeatOutput(storyOutput_000)."));
         assertTrue(fragment.contains("DesignatedOutputArea::storyBeatSlot(outputArea_000, storyOutput_000)."));
-        assertTrue(fragment.contains("StoryBeatOutput::beatId(storyOutput_000): \"BEAT_A\"."));
+        assertTrue(fragment.contains("StoryBeatOutput::storyBeatId(storyOutput_000): \"BEAT_A\"."));
         assertTrue(fragment.contains("StoryBeatOutput::text(storyOutput_000): \"Story\"."));
-        assertTrue(fragment.contains("StoryBeatOutput::durationTicks(storyOutput_000): 24."));
+        assertTrue(fragment.contains("StoryBeatOutput::storyDurationTicks(storyOutput_000): 24."));
         assertTrue(fragment.contains("StoryBeatOutput::severity(storyOutput_000, severity_major)."));
     }
 
@@ -87,6 +90,35 @@ class DirectorOutputAssertionsProblemMapperTest {
         DirectorOutputAssertionsProblemMapper.OutputAreaMapping result = mapper.map(assertions);
 
         assertEquals(List.of("causalChain", "campaign"), result.unsupportedFeatures());
+        assertEquals(List.of("unsupportedFeaturesIgnored:causalChain", "unsupportedFeaturesIgnored:campaign"), result.diagnostics());
+    }
+
+    @Test
+    void map_ReportsEffectsAndBiasesAsUnvalidatedNestedFields() {
+        DirectorOutputAssertions assertions = new DirectorOutputAssertions(
+                new DirectorOutputAssertions.StoryBeatAssertion(
+                        "BEAT_A",
+                        "Story",
+                        24,
+                        "minor",
+                        List.of(new DirectorOutputAssertions.EffectAssertion("food", -0.1, 24)),
+                        null
+                ),
+                new DirectorOutputAssertions.DirectiveAssertion(
+                        0,
+                        "PrioritizeFood",
+                        18,
+                        List.of(new DirectorOutputAssertions.BiasAssertion("farming", 0.25, 18L))
+                ),
+                null
+        );
+
+        DirectorOutputAssertionsProblemMapper.OutputAreaMapping result = mapper.map(assertions);
+
+        assertEquals(List.of(
+                "unvalidatedNestedFieldsOmitted:effects",
+                "unvalidatedNestedFieldsOmitted:biases"
+        ), result.diagnostics());
     }
 
     @Test
@@ -99,7 +131,7 @@ class DirectorOutputAssertionsProblemMapperTest {
 
         String fragment = mapper.map(assertions).fragment().problemFragment();
 
-        assertTrue(fragment.contains("StoryBeatOutput::beatId(storyOutput_000): \"BEAT \\\"Q\\\"\"."));
+        assertTrue(fragment.contains("StoryBeatOutput::storyBeatId(storyOutput_000): \"BEAT \\\"Q\\\"\"."));
         assertTrue(fragment.contains("StoryBeatOutput::text(storyOutput_000): \"Line\\\\path\\nnext\"."));
     }
 }

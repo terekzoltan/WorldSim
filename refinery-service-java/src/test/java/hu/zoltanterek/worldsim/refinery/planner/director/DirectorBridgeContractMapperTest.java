@@ -9,8 +9,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
+import hu.zoltanterek.worldsim.refinery.planner.refinery.DirectorValidatedCoreOutput;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -240,5 +242,49 @@ class DirectorBridgeContractMapperTest {
         );
 
         assertTrue(ex.getMessage().contains("campaign.treatyKind"));
+    }
+
+    @Test
+    void mapsValidatedCoreOutputToPatchOpsWithoutNestedFields() {
+        DirectorValidatedCoreOutput validatedCoreOutput = new DirectorValidatedCoreOutput(
+                new DirectorValidatedCoreOutput.StoryBeatCore("BEAT_CORE", "Validated story", 20, "minor"),
+                new DirectorValidatedCoreOutput.DirectiveCore(0, "PrioritizeFood", 18)
+        );
+
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-bridge-core",
+                123L,
+                456L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                objectMapper.createObjectNode(),
+                null
+        );
+
+        List<PatchOp> patch = mapper.toPatchOps(request, validatedCoreOutput);
+        assertEquals(2, patch.size());
+
+        PatchOp.AddStoryBeat story = (PatchOp.AddStoryBeat) patch.get(0);
+        assertTrue(story.effects().isEmpty());
+        assertNull(story.causalChain());
+
+        PatchOp.SetColonyDirective directive = (PatchOp.SetColonyDirective) patch.get(1);
+        assertTrue(directive.biases().isEmpty());
+    }
+
+    @Test
+    void mapsEmptyValidatedCoreOutputToEmptyPatch() {
+        PatchRequest request = new PatchRequest(
+                "v1",
+                "req-bridge-empty-core",
+                123L,
+                456L,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                objectMapper.createObjectNode(),
+                null
+        );
+
+        List<PatchOp> patch = mapper.toPatchOps(request, new DirectorValidatedCoreOutput(null, null));
+        assertTrue(patch.isEmpty());
     }
 }

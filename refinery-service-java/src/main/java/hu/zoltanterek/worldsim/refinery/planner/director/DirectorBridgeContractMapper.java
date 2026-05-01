@@ -5,6 +5,7 @@ import java.util.List;
 
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
+import hu.zoltanterek.worldsim.refinery.planner.refinery.DirectorValidatedCoreOutput;
 import hu.zoltanterek.worldsim.refinery.util.DeterministicIds;
 
 public final class DirectorBridgeContractMapper {
@@ -121,6 +122,53 @@ public final class DirectorBridgeContractMapper {
             } else {
                 throw new IllegalArgumentException("Unsupported campaign assertion kind: " + campaign.kind());
             }
+        }
+
+        return List.copyOf(ops);
+    }
+
+    public List<PatchOp> toPatchOps(PatchRequest request, DirectorValidatedCoreOutput validatedOutput) {
+        List<PatchOp> ops = new ArrayList<>(2);
+        if (validatedOutput == null) {
+            return List.of();
+        }
+
+        DirectorValidatedCoreOutput.StoryBeatCore story = validatedOutput.storyBeat();
+        if (story != null) {
+            String storyOpId = DeterministicIds.opId(
+                    request.seed(),
+                    request.tick(),
+                    request.goal().name(),
+                    "addStoryBeat",
+                    story.beatId() + ':' + story.durationTicks() + ':' + story.severity()
+            );
+            ops.add(new PatchOp.AddStoryBeat(
+                    storyOpId,
+                    story.beatId(),
+                    story.text(),
+                    story.durationTicks(),
+                    story.severity(),
+                    List.of(),
+                    null
+            ));
+        }
+
+        DirectorValidatedCoreOutput.DirectiveCore directive = validatedOutput.directive();
+        if (directive != null) {
+            String directiveOpId = DeterministicIds.opId(
+                    request.seed(),
+                    request.tick(),
+                    request.goal().name(),
+                    "setColonyDirective",
+                    directive.colonyId() + ":" + directive.directive() + ':' + directive.durationTicks()
+            );
+            ops.add(new PatchOp.SetColonyDirective(
+                    directiveOpId,
+                    directive.colonyId(),
+                    directive.directive(),
+                    directive.durationTicks(),
+                    List.of()
+            ));
         }
 
         return List.copyOf(ops);

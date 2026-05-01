@@ -23,37 +23,62 @@ public final class DirectorRefinerySolver {
                 outputMapping.fragment()
         ));
 
-        return solveProblemText(problemText, outputMapping.unsupportedFeatures());
+        return solveProblemText(problemText, outputMapping.diagnostics(), outputMapping.unsupportedFeatures());
     }
 
     DirectorRefinerySolveResult solveProblemText(String problemText, List<String> unsupportedFeatures) {
+        return solveProblemText(problemText, List.of(), unsupportedFeatures);
+    }
+
+    DirectorRefinerySolveResult solveProblemText(
+            String problemText,
+            List<String> preExtractionDiagnostics,
+            List<String> unsupportedFeatures
+    ) {
+        var diagnostics = new ArrayList<>(preExtractionDiagnostics == null ? List.<String>of() : preExtractionDiagnostics);
         try {
             var problem = StandaloneRefinery.getProblemLoader().loadString(problemText);
             try (var generator = StandaloneRefinery.getGeneratorFactory().createGenerator(problem)) {
                 GeneratorResult result = generator.tryGenerate();
                 if (result == GeneratorResult.SUCCESS) {
+                    diagnostics.add("solverResult:success");
+                    DirectorValidatedOutputExtractor.ExtractionResult extractionResult = new DirectorValidatedOutputExtractor().extract(generator);
+                    diagnostics.addAll(extractionResult.diagnostics());
+                    if (!extractionResult.success()) {
+                        return new DirectorRefinerySolveResult(
+                                DirectorRefinerySolveStatus.NON_SUCCESS,
+                                result.name(),
+                                null,
+                                diagnostics,
+                                unsupportedFeatures
+                        );
+                    }
+
                     return new DirectorRefinerySolveResult(
                             DirectorRefinerySolveStatus.SUCCESS,
                             result.name(),
-                            List.of("solverResult:success"),
+                            extractionResult.validatedOutput(),
+                            diagnostics,
                             unsupportedFeatures
                     );
                 }
 
+                diagnostics.add("solverResult:non_success:" + result.name());
                 return new DirectorRefinerySolveResult(
                         DirectorRefinerySolveStatus.NON_SUCCESS,
                         result.name(),
-                        List.of("solverResult:non_success:" + result.name()),
+                        null,
+                        diagnostics,
                         unsupportedFeatures
                 );
             }
         } catch (Exception ex) {
-            List<String> diagnostics = new ArrayList<>();
             diagnostics.add("solverResult:load_failure");
             diagnostics.add(ex.getClass().getSimpleName() + ": " + ex.getMessage());
             return new DirectorRefinerySolveResult(
                     DirectorRefinerySolveStatus.LOAD_FAILURE,
                     "loadFailure",
+                    null,
                     diagnostics,
                     unsupportedFeatures
             );

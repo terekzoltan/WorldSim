@@ -1726,7 +1726,7 @@ Wave turn-gate:
 
 - ✅ **TR2-A** Runtime snapshot -> runtime assertions mapper (Track D, Track B consult)
 - ✅ **TR2-B** Solve/refinement path for minimal director output (Track D)
-- ⬜ **TR2-C** Validated facts -> bridge mapping (Track D)
+- ✅ **TR2-C** Validated facts -> bridge mapping (Track D)
 - ⬜ **TR2-D** Solver-path observability + headless refinery evidence lane foundation (Track D primary, Track B owns the `ScenarioRunner` lane implementation)
 
 ### Wave 8.5 — Execution Steps

@@ -5,6 +5,7 @@ import java.util.List;
 public record DirectorRefinerySolveResult(
         DirectorRefinerySolveStatus status,
         String generatorResult,
+        DirectorValidatedCoreOutput validatedOutput,
         List<String> diagnostics,
         List<String> unsupportedFeaturesIgnored
 ) {

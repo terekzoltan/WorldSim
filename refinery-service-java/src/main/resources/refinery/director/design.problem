@@ -6,17 +6,17 @@ class DirectorCheckpoint {
 }
 
 class StoryBeatOutput {
-    string beatId
+    string storyBeatId
     string text
-    int durationTicks
+    int storyDurationTicks
     Severity[] severity
     contains EffectOutput[] effects
 }
 
 class ColonyDirectiveOutput {
-    int colonyId
-    string directiveKey
-    int durationTicks
+    int directiveColonyId
+    string directiveName
+    int directiveDurationTicks
     DirectiveKind[] directive
     contains BiasOutput[] biases
 }
