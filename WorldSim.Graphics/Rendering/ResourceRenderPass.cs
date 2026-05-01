@@ -27,7 +27,13 @@ public sealed class ResourceRenderPass : IRenderPass
             if (tile.NodeAmount <= 0)
                 continue;
 
-            var iconRect = RenderLayout.BottomAnchoredInTile(tile.X, tile.Y, settings.TileSize, settings.ResourceScale);
+            float resourceScale = tile.NodeType switch
+            {
+                ResourceView.Wood => settings.ResourceScale * 1.5f,
+                ResourceView.Stone or ResourceView.Iron or ResourceView.Gold or ResourceView.Food => settings.ResourceScale * 0.5f,
+                _ => settings.ResourceScale
+            };
+            var iconRect = RenderLayout.BottomAnchoredInTile(tile.X, tile.Y, settings.TileSize, resourceScale);
             RenderLayout.DrawGroundShadow(spriteBatch, textures.Pixel, iconRect, settings.StructureShadowAlpha * 0.7f);
 
             if (tile.NodeType == ResourceView.Wood)

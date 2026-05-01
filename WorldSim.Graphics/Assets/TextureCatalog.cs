@@ -57,7 +57,7 @@ public sealed class TextureCatalog
 
         Predator = LoadOptional(content, "predator");
         Herbivore = LoadOptional(content, "herbivore");
-        Food = LoadOptional(content, "food");
+        Food = LoadOptional(content, "food1") ?? LoadOptional(content, "food");
         FarmPlot = LoadOptional(content, "farmplot");
         Workshop = LoadOptional(content, "workshop");
         Storehouse = LoadOptional(content, "storehouse");
