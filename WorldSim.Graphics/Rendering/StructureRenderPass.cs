@@ -95,29 +95,37 @@ public sealed class StructureRenderPass : IRenderPass
             if (settings.DefensiveStructureScale < 0.999f)
                 tileRect = RenderLayout.CenteredInTile(structure.X, structure.Y, settings.TileSize, settings.DefensiveStructureScale);
 
-            switch (structure.Kind)
+            var icon = textures.GetDefensiveStructureIcon(structure.Kind);
+            if (icon != null)
             {
-                case DefensiveStructureKindView.WoodWall:
-                    DrawWoodWall(spriteBatch, textures.Pixel, tileRect);
-                    break;
-                case DefensiveStructureKindView.StoneWall:
-                    DrawStoneWall(spriteBatch, textures.Pixel, tileRect);
-                    break;
-                case DefensiveStructureKindView.ReinforcedWall:
-                    DrawReinforcedWall(spriteBatch, textures.Pixel, tileRect);
-                    break;
-                case DefensiveStructureKindView.Gate:
-                    DrawGate(spriteBatch, textures.Pixel, tileRect);
-                    break;
-                case DefensiveStructureKindView.Watchtower:
-                    DrawWatchtower(spriteBatch, textures.Pixel, tileRect);
-                    break;
-                case DefensiveStructureKindView.ArrowTower:
-                    DrawArrowTower(spriteBatch, textures.Pixel, tileRect);
-                    break;
-                case DefensiveStructureKindView.CatapultTower:
-                    DrawCatapultTower(spriteBatch, textures.Pixel, tileRect);
-                    break;
+                spriteBatch.Draw(icon, tileRect, Color.White);
+            }
+            else
+            {
+                switch (structure.Kind)
+                {
+                    case DefensiveStructureKindView.WoodWall:
+                        DrawWoodWall(spriteBatch, textures.Pixel, tileRect);
+                        break;
+                    case DefensiveStructureKindView.StoneWall:
+                        DrawStoneWall(spriteBatch, textures.Pixel, tileRect);
+                        break;
+                    case DefensiveStructureKindView.ReinforcedWall:
+                        DrawReinforcedWall(spriteBatch, textures.Pixel, tileRect);
+                        break;
+                    case DefensiveStructureKindView.Gate:
+                        DrawGate(spriteBatch, textures.Pixel, tileRect);
+                        break;
+                    case DefensiveStructureKindView.Watchtower:
+                        DrawWatchtower(spriteBatch, textures.Pixel, tileRect);
+                        break;
+                    case DefensiveStructureKindView.ArrowTower:
+                        DrawArrowTower(spriteBatch, textures.Pixel, tileRect);
+                        break;
+                    case DefensiveStructureKindView.CatapultTower:
+                        DrawCatapultTower(spriteBatch, textures.Pixel, tileRect);
+                        break;
+                }
             }
 
             if (!structure.IsActive)

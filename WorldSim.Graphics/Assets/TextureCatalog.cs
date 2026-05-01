@@ -26,6 +26,13 @@ public sealed class TextureCatalog
     public Texture2D? FarmPlot { get; }
     public Texture2D? Workshop { get; }
     public Texture2D? Storehouse { get; }
+    public Texture2D? WoodWall { get; }
+    public Texture2D? StoneWall { get; }
+    public Texture2D? ReinforcedWall { get; }
+    public Texture2D? Gate { get; }
+    public Texture2D? Watchtower { get; }
+    public Texture2D? ArrowTower { get; }
+    public Texture2D? CatapultTower { get; }
     public Texture2D MissingTexture { get; }
 
     public TextureCatalog(GraphicsDevice graphicsDevice, ContentManager content)
@@ -61,6 +68,14 @@ public sealed class TextureCatalog
         FarmPlot = LoadOptional(content, "farmplot");
         Workshop = LoadOptional(content, "workshop");
         Storehouse = LoadOptional(content, "storehouse");
+
+        WoodWall = LoadOptional(content, "woodwall");
+        StoneWall = LoadOptional(content, "stonewall");
+        ReinforcedWall = LoadOptional(content, "reinforcedwall");
+        Gate = LoadOptional(content, "gate");
+        Watchtower = LoadOptional(content, "watchtower");
+        ArrowTower = LoadOptional(content, "arrowtower");
+        CatapultTower = LoadOptional(content, "catapulttower");
     }
 
     private Texture2D LoadOrFallback(ContentManager content, string assetName)
@@ -128,6 +143,21 @@ public sealed class TextureCatalog
             SpecializedBuildingKindView.FarmPlot => FarmPlot,
             SpecializedBuildingKindView.Workshop => Workshop,
             SpecializedBuildingKindView.Storehouse => Storehouse,
+            _ => null
+        };
+    }
+
+    public Texture2D? GetDefensiveStructureIcon(DefensiveStructureKindView kind)
+    {
+        return kind switch
+        {
+            DefensiveStructureKindView.WoodWall => WoodWall,
+            DefensiveStructureKindView.StoneWall => StoneWall,
+            DefensiveStructureKindView.ReinforcedWall => ReinforcedWall,
+            DefensiveStructureKindView.Gate => Gate,
+            DefensiveStructureKindView.Watchtower => Watchtower,
+            DefensiveStructureKindView.ArrowTower => ArrowTower,
+            DefensiveStructureKindView.CatapultTower => CatapultTower,
             _ => null
         };
     }
