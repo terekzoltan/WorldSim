@@ -29,7 +29,7 @@ public sealed class ResourceRenderPass : IRenderPass
 
             float resourceScale = tile.NodeType switch
             {
-                ResourceView.Wood => settings.ResourceScale * 1.5f,
+                ResourceView.Wood => settings.ResourceScale * 1.275f,
                 ResourceView.Stone or ResourceView.Iron or ResourceView.Gold or ResourceView.Food => settings.ResourceScale * 0.5f,
                 _ => settings.ResourceScale
             };
