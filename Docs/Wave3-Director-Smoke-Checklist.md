@@ -53,6 +53,7 @@ Terminology lock (TU1-D1):
 - Debug-visible operator detail should expose: `stage`, `effSrc`, `reqSrc`, `profileSrc`.
 - HUD director detail block includes: `mode=<...> apply=<...>` plus debug-only `stage/src/cd` detail.
 - For Season Director live path, `stage` should be `directorStage:*` (not the legacy `refineryStage:*` marker family).
+- Optional TR2-D solver-sidecar markers use the `directorSolver*` family and are separate from `directorStage:*` pipeline truth.
 - Raw adapter status text is no longer the default green-path HUD line.
 - On failure, diagnostics should surface `Refinery apply failed: outcome=<apply_failed|request_failed>, ...` and preserve request-failure kind taxonomy.
 - Trigger-start status line uses disambiguated control-state wording:
@@ -120,6 +121,7 @@ For each matrix case collect:
 - HUD director line snapshot (`stage/apply/mode/src/budget`)
 - Top status line (`Refinery applied` or `Refinery apply failed` with outcome)
 - Java explain markers from response (`directorStage`, `llmCompletionCount`, `llmRetryRounds`, `llmCandidateSanitized`, `budgetUsed`)
+- If `planner.director.solverObservabilityEnabled=true`, capture normalized Java solver markers (`directorSolverPath`, `directorSolverStatus`, `directorSolverGeneratorResult`, `directorSolverExtraction`, `directorSolverValidatedCoverage`, `directorSolverUnsupported`, `directorSolverDiagnostic`).
 - If present, also capture `llmStage` to distinguish disabled config from parse/request failures.
 - Optional Java telemetry snapshot: `curl http://localhost:8091/v1/director/telemetry`
 
@@ -129,6 +131,7 @@ For each matrix case collect:
 - Any mismatch between response-level stage markers and local apply outcome is fail.
 - Any budget reset/consume on request/apply failure is fail.
 - Any inability to answer completion count or sanitize occurrence from markers/logs is fail.
+- If solver observability is enabled, any artifact or report that treats `directorStage:refinery-validated` as solver-backed validation is fail; use `directorSolverValidatedCoverage:*` instead.
 
 ## Wave 6.1 Contract Guardrails
 
@@ -144,6 +147,7 @@ For each matrix case collect:
   - `llmCompletionCount:<n>` = actual completion calls
   - `llmRetryRounds:<n>` = validator retry rounds
   - `llmCandidateSanitized:<true|false>` (+ optional tags) = planner-side repair happened before validation
+  - `directorSolverValidatedCoverage:<...>` = optional solver-sidecar core-field coverage only
 
 ## Optional Checks
 

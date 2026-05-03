@@ -329,6 +329,26 @@ Recommended `RDIR-*` invariants:
 - `RDIR-07`: bridge output remains applyable by the existing C# runtime
 - `RDIR-08`: checkpoint bookkeeping is internally consistent
 
+TR2-D Track D marker contract for Track B consumption:
+
+- `directorStage:*` remains pipeline truth and is not equivalent to solver-backed validation.
+- Solver-sidecar truth, when enabled, is exposed only through normalized `directorSolver*` markers.
+- `directorSolverPath` values: `unwired`, `sidecar`, `validated_core`, `unavailable`.
+- `directorSolverStatus` values: `success`, `non_success`, `load_failure`, `not_run`.
+- `directorSolverGeneratorResult` values: Refinery `GeneratorResult` lowercased, or `none`.
+- `directorSolverExtraction` values: `success`, `failed`, `empty`, `not_run`.
+- `directorSolverValidatedCoverage` is repeated per value: `none`, `story_core`, `directive_core`.
+- `directorSolverUnsupported` is repeated per value: `none`, `campaign`, `causalChain`.
+- `directorSolverDiagnostic` carries stable diagnostic codes only; raw Java exception text is not a schema field.
+
+Validated coverage is core-only in TR2-D:
+
+- story core: `beatId`, `text`, `durationTicks`, `severity`
+- directive core: `colonyId`, `directive`, `durationTicks`
+- not solver-validated: `effects`, `biases`, `campaign`, `causalChain`
+
+Track B should parse/store these markers but must not redefine their meaning.
+
 ### 10.2 Initial anomaly family
 
 Recommended `ANOM-RDIR-*` anomalies:

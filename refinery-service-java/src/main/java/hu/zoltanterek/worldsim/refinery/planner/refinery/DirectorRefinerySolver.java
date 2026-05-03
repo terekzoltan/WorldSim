@@ -16,14 +16,24 @@ public final class DirectorRefinerySolver {
     private final DirectorProblemAssembler assembler = new DirectorProblemAssembler();
 
     public DirectorRefinerySolveResult solve(DirectorRuntimeFacts facts, DirectorOutputAssertions assertions) {
+        return solve(facts, assertions, List.of());
+    }
+
+    public DirectorRefinerySolveResult solve(
+            DirectorRuntimeFacts facts,
+            DirectorOutputAssertions assertions,
+            List<String> additionalUnsupportedFeatures
+    ) {
         DirectorRuntimeAssertions runtimeAssertions = runtimeMapper.map(facts);
         DirectorOutputAssertionsProblemMapper.OutputAreaMapping outputMapping = outputMapper.map(assertions);
+        List<String> unsupportedFeatures = new ArrayList<>(outputMapping.unsupportedFeatures());
+        unsupportedFeatures.addAll(additionalUnsupportedFeatures == null ? List.of() : additionalUnsupportedFeatures);
         String problemText = assembler.assemble(List.of(
                 new DirectorProblemFragment(runtimeAssertions.lines()),
                 outputMapping.fragment()
         ));
 
-        return solveProblemText(problemText, outputMapping.diagnostics(), outputMapping.unsupportedFeatures());
+        return solveProblemText(problemText, outputMapping.diagnostics(), unsupportedFeatures);
     }
 
     DirectorRefinerySolveResult solveProblemText(String problemText, List<String> unsupportedFeatures) {

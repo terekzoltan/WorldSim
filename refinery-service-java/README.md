@@ -54,6 +54,27 @@ When `PLANNER_MODE=pipeline`, responses include explicit explain markers:
 - `causalChainMetrics:food_reserves_pct,morale_avg,population,economy_output`
 - `causalChainEqPolicy:population_exact;floating_tolerance=0.0001`
 
+Optional TR2-D solver-sidecar observability is disabled by default with
+`PLANNER_DIRECTOR_SOLVER_OBSERVABILITY_ENABLED=false` /
+`planner.director.solverObservabilityEnabled=false`. When explicitly enabled, the response also includes additive
+`directorSolver*` markers. These markers do not change patch ops, `directorStage:*`, fallback decisions, or output-mode
+selection.
+
+- `directorSolverPath:<unwired|sidecar|validated_core|unavailable>`
+- `directorSolverStatus:<success|non_success|load_failure|not_run>`
+- `directorSolverGeneratorResult:<GeneratorResult|none>`
+- `directorSolverExtraction:<success|failed|empty|not_run>`
+- `directorSolverValidatedCoverage:<none|story_core|directive_core>` (repeated for multiple coverage values)
+- `directorSolverUnsupported:<none|campaign|causalChain>` (repeated for multiple unsupported values)
+- `directorSolverDiagnostic:<stable-code>` (only when a stable diagnostic is available)
+
+Truth-in-labeling rules:
+
+- `directorStage:*` remains pipeline truth; `directorStage:refinery-validated` does not imply solver-backed validation.
+- `directorSolverValidatedCoverage:story_core` covers only `beatId`, `text`, `durationTicks`, and `severity`.
+- `directorSolverValidatedCoverage:directive_core` covers only `colonyId`, `directive`, and `durationTicks`.
+- `effects`, `biases`, `campaign`, and `causalChain` are not solver-validated in TR2-D.
+
 Output mode policy for campaign-enabled checkpoints:
 
 - `both`: story + directive + optional campaign op
@@ -84,6 +105,7 @@ Important behavior:
 - `retryAttemptsTotal` = extra LLM completion attempts beyond the first completion in a request
 - `validationRetryRoundsTotal` = validator retry rounds used by the director refinement loop
 - `llmCandidateSanitized` + `llmCandidateSanitizeTags` show whether Java-side planner normalization repaired the LLM candidate before validation.
+- When enabled, `directorSolver*` markers and `latestSolverObservability` telemetry show solver-sidecar status separately from pipeline/apply status.
 - For quick local observability, query telemetry counters:
 - Final Wave 6.1.1 manual regression matrix + pass/fail rules: `Docs/Wave3-Director-Smoke-Checklist.md`.
 

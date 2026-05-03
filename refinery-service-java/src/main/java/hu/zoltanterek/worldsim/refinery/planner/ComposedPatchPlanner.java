@@ -18,9 +18,14 @@ import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.model.PatchResponse;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorCampaignOpFactory;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorCorePatchAssertionsMapper;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorDesign;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorInfluenceBudget;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorRuntimeFacts;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorPipelineTelemetry;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorSnapshotMapper;
+import hu.zoltanterek.worldsim.refinery.planner.refinery.DirectorRefinerySolver;
+import hu.zoltanterek.worldsim.refinery.planner.refinery.DirectorSolverObservability;
 
 @Component
 @Primary
@@ -34,6 +39,11 @@ public class ComposedPatchPlanner implements PatchPlanner {
     private final DirectorPipelineTelemetry directorTelemetry;
     private final String plannerMode;
     private final String directorOutputMode;
+    private final double directorBudget;
+    private final boolean solverObservabilityEnabled;
+    private final DirectorSnapshotMapper directorSnapshotMapper = new DirectorSnapshotMapper();
+    private final DirectorCorePatchAssertionsMapper corePatchAssertionsMapper = new DirectorCorePatchAssertionsMapper();
+    private final DirectorRefinerySolver directorSolver = new DirectorRefinerySolver();
 
     public ComposedPatchPlanner(
             MockPlanner mockPlanner,
@@ -42,7 +52,9 @@ public class ComposedPatchPlanner implements PatchPlanner {
             DirectorRefineryPlanner directorRefineryPlanner,
             DirectorPipelineTelemetry directorTelemetry,
             @Value("${planner.mode:mock}") String plannerMode,
-            @Value("${planner.director.outputMode:both}") String directorOutputMode
+            @Value("${planner.director.outputMode:both}") String directorOutputMode,
+            @Value("${planner.director.budget:5.0}") double directorBudget,
+            @Value("${planner.director.solverObservabilityEnabled:false}") boolean solverObservabilityEnabled
     ) {
         this.mockPlanner = mockPlanner;
         this.llmPlanner = llmPlanner;
@@ -51,6 +63,8 @@ public class ComposedPatchPlanner implements PatchPlanner {
         this.directorTelemetry = directorTelemetry;
         this.plannerMode = plannerMode;
         this.directorOutputMode = normalizeOutputMode(directorOutputMode);
+        this.directorBudget = directorBudget > 0d ? directorBudget : DirectorDesign.DEFAULT_INFLUENCE_BUDGET;
+        this.solverObservabilityEnabled = solverObservabilityEnabled;
     }
 
     @Override
@@ -178,6 +192,11 @@ public class ComposedPatchPlanner implements PatchPlanner {
         explain.add("causalChainMaxTriggers:" + DirectorDesign.CAUSAL_MAX_TRIGGERS);
         explain.add("causalChainMetrics:" + String.join(",", DirectorDesign.CAUSAL_ALLOWED_METRICS));
         explain.add("causalChainEqPolicy:population_exact;floating_tolerance=" + DirectorDesign.CAUSAL_EQ_TOLERANCE);
+        if (solverObservabilityEnabled) {
+            DirectorSolverObservability.Report solverReport = buildDirectorSolverObservability(request, validatedPatch);
+            explain.addAll(solverReport.markers());
+            directorTelemetry.recordSolverObservability(solverReport);
+        }
         explain.add(describeLlmProposal(initialProposal.status()));
         if (validationResult.fallbackUsed()) {
             explain.add("Director validation exhausted retries; deterministic fallback candidate applied.");
@@ -224,6 +243,25 @@ public class ComposedPatchPlanner implements PatchPlanner {
                 explain,
                 warnings
         );
+    }
+
+    private DirectorSolverObservability.Report buildDirectorSolverObservability(PatchRequest request, List<PatchOp> validatedPatch) {
+        try {
+            DirectorCorePatchAssertionsMapper.Result mapping = corePatchAssertionsMapper.map(validatedPatch);
+            if (!mapping.available()) {
+                return DirectorSolverObservability.unavailable(mapping.unavailableReason());
+            }
+
+            DirectorRuntimeFacts facts = directorSnapshotMapper.map(request, directorBudget);
+            return DirectorSolverObservability.fromSolveResult(directorSolver.solve(
+                    facts,
+                    mapping.assertions(),
+                    mapping.unsupportedFeatures()
+            ));
+        } catch (Exception ex) {
+            logger.warn("director solver observability sidecar unavailable: {}", ex.toString());
+            return DirectorSolverObservability.unavailable("unexpected_exception");
+        }
     }
 
     private static String normalizeOutputMode(String rawMode) {
