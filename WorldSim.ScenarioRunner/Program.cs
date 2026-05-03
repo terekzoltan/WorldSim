@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using WorldSim.ScenarioRunner.Refinery;
 using WorldSim.Runtime.Diagnostics;
 using WorldSim.Runtime.Profiles;
 using WorldSim.Simulation;
@@ -69,6 +70,24 @@ if (configs.Count == 0 && string.IsNullOrWhiteSpace(rawConfigsJson))
         BirthRateMultiplier: 1f,
         MovementSpeedMultiplier: 1f,
         EnablePredatorHumanAttacks: false));
+}
+
+var requestedScenarioLane = Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_LANE");
+if (!IsCoreScenarioLane(requestedScenarioLane))
+{
+    var refineryExitCode = RefineryScenarioRunner.Run(new RefineryScenarioRunnerRequest(
+        RawLane: requestedScenarioLane,
+        Configs: configs.Select(config => new RefineryScenarioConfig(config.Name, config.Width, config.Height, config.InitialPop, config.Ticks, config.Dt)).ToList(),
+        Seeds: seeds,
+        Planners: planners,
+        ArtifactDir: artifactDir,
+        OutputMode: outputMode.ToString(),
+        AssertEnabled: assertEnabled,
+        InitialRunLog: runLogBuffer.ToString(),
+        BaseDirectory: Directory.GetCurrentDirectory(),
+        ConfigHadError: parsedConfigs.HadError));
+    Environment.ExitCode = refineryExitCode;
+    return refineryExitCode;
 }
 
 var runs = new List<ScenarioRunResult>(configs.Count * planners.Count * seeds.Length);
@@ -1546,6 +1565,10 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
 static bool IsKnownSupplyScenario(string? supplyScenario)
     => string.IsNullOrWhiteSpace(supplyScenario)
        || string.Equals(supplyScenario, "storehouse_refill_consumption", StringComparison.OrdinalIgnoreCase);
+
+static bool IsCoreScenarioLane(string? rawLane)
+    => string.IsNullOrWhiteSpace(rawLane)
+       || string.Equals(rawLane.Trim(), "core", StringComparison.OrdinalIgnoreCase);
 
 static bool ParseBool(string? value, bool fallback)
 {

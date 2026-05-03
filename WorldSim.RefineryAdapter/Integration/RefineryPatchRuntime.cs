@@ -138,6 +138,8 @@ public sealed class RefineryPatchRuntime
             IsDirectorGoal: isDirectorGoal,
             BudgetUsed: 0d,
             BudgetMarkerPresent: false,
+            ExplainMarkers: Array.Empty<string>(),
+            WarningCount: 0,
             ResponseReceived: false);
 
         try
@@ -161,6 +163,8 @@ public sealed class RefineryPatchRuntime
                 Stage = stageMarker,
                 BudgetUsed = hasBudgetMarker ? budgetUsed : 0d,
                 BudgetMarkerPresent = hasBudgetMarker,
+                ExplainMarkers = response.Explain,
+                WarningCount = response.Warnings.Count,
                 ResponseReceived = true
             };
 
@@ -303,7 +307,9 @@ public sealed class RefineryPatchRuntime
             IsDirectorGoal: context.IsDirectorGoal,
             ApplyStatus: applyStatus,
             BudgetUsed: context.BudgetUsed,
-            BudgetMarkerPresent: context.BudgetMarkerPresent
+            BudgetMarkerPresent: context.BudgetMarkerPresent,
+            ExplainMarkers: context.ExplainMarkers,
+            WarningCount: context.WarningCount
         );
     }
 
@@ -601,6 +607,8 @@ public sealed class RefineryPatchRuntime
         bool IsDirectorGoal,
         double BudgetUsed,
         bool BudgetMarkerPresent,
+        IReadOnlyList<string> ExplainMarkers,
+        int WarningCount,
         bool ResponseReceived);
 
 }

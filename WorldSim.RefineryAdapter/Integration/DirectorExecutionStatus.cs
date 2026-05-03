@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace WorldSim.RefineryAdapter.Integration;
 
 public sealed record DirectorExecutionStatus(
@@ -8,7 +11,9 @@ public sealed record DirectorExecutionStatus(
     bool IsDirectorGoal,
     string ApplyStatus,
     double BudgetUsed = 0d,
-    bool BudgetMarkerPresent = false
+    bool BudgetMarkerPresent = false,
+    IReadOnlyList<string>? ExplainMarkers = null,
+    int WarningCount = 0
 )
 {
     public static DirectorExecutionStatus NotTriggered { get; } = new(
@@ -19,6 +24,8 @@ public sealed record DirectorExecutionStatus(
         IsDirectorGoal: false,
         ApplyStatus: "not_triggered",
         BudgetUsed: 0d,
-        BudgetMarkerPresent: false
+        BudgetMarkerPresent: false,
+        ExplainMarkers: Array.Empty<string>(),
+        WarningCount: 0
     );
 }

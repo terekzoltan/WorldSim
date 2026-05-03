@@ -72,11 +72,16 @@ public sealed class SimulationRuntime
     }
 
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath, RuntimeAiOptions? aiOptions = null)
+        : this(width, height, initialPopulation, technologyFilePath, aiOptions, null)
+    {
+    }
+
+    public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath, RuntimeAiOptions? aiOptions, int? randomSeed)
     {
         var resolvedOptions = aiOptions ?? RuntimeAiOptions.FromEnvironment();
         PlannerMode = resolvedOptions.PlannerMode;
         PolicyMode = resolvedOptions.PolicyMode;
-        _world = new World(width, height, initialPopulation, colony => CreateBrain(colony, resolvedOptions));
+        _world = new World(width, height, initialPopulation, colony => CreateBrain(colony, resolvedOptions), randomSeed);
         _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode.ToString(), PolicyMode.ToString());
         TechTree.Load(technologyFilePath);
 
