@@ -19,6 +19,60 @@
 
 ---
 
+## Context Compact / Refresh Policy
+
+A context compact a hosszu Meta Coordinator mukodes normalis, tudatos frissitesi pontja.
+
+Working definition:
+
+- a compact szandekos context compression / refresh: a hosszu session aktualis tudasa tartos handoff osszefoglaloba kerul, majd egy kesobbi vagy uj session innen es a canonical fajlokbol allitja vissza a munkat
+- compact azert hasznos, mert a modell context ablaka veges; a pontos token countot a Meta nem latja, de hosszu sessionokban sok stale feltetelezes, lokalis tortenet es irrelevans reszlet gyulhet fel
+- compact kockazatos is: rossz idozitessel intelligencia-, kontextus- vagy nuance-veszteshez, illetve regresszio-szeru dontesekhez vezethet
+
+Default Meta rule:
+
+- amikor a Meta kovetkezo lepeseket ajanl, mindig gondolja at, hogy a kovetkezo nagyobb munkaegyseg elott hasznos lenne-e compact
+- mivel a pontos token/context load nem ismert, a javaslat legyen felteteles, peldaul: `ha a session mar context-heavy`, `ha sok a token/context load`, vagy `ha tiszta wave/step boundary elott akarunk frissiteni`
+- compactot ne kezeljunk onallo haladasnak; ez csak context-risk management
+- ne ajanlj compactot kotelezokent, ha a session friss vagy a kovetkezo lepes kicsi es lokalizalt
+
+Jo compact timing:
+
+- commit vagy closeout utan, amikor a worktree tiszta vagy legalabb egyertelmuen dokumentalt
+- uj wave, sprint, nagy epic vagy nagy review-sorozat elott
+- track/scope valtas elott, ha a kovetkezo cel mas mentalis modellt igenyel
+- full-sweep, nagy statusz-szinkron vagy evidenciacsomag review utan, amikor a kovetkezo session canonical forrasokbol konnyen restore-olhat
+- inkabb wave/step boundary-n, mint implementacio vagy review kozepen
+
+Rossz compact timing:
+
+- implementacio kozben
+- review kozben, mielott findings/verdict/handoff uzenet megszuletett
+- failing testek utan, ha a root cause nincs rogzitive
+- ownership konfliktus vagy kevert, meg nem klasszifikalt worktree kozepen
+- kozvetlen commit elott, ha a stage scope es verifikacio nincs pontosan felirva
+
+Compact elott a handoff minimum tartalma:
+
+- restored role es operating mode
+- current wave / sprint / step / target
+- latest relevant commits
+- current git status, beleertve ignored/local-only caveat-eket
+- mi keszult el es mi nem keszult el
+- lefuttatott verifikacio PASS/FAIL/BLOCKED eredmennyel
+- nyitott findings, blockers, open questions
+- kovetkezo ajanlott lepes
+- explicit note: `Compact means context compression/refresh; it may lose nuance, so the next session must restore from canonical files rather than trusting memory alone.`
+
+Compact utan az elso lepes context restore legyen:
+
+- ha elerheto, hasznald a `context-restore` skillt
+- csak a minimalis canonical/planning/handoff forrasokat olvasd vissza az aktualis targethez
+- ellenorizd a tenyleges repo allapotot, mielott tovabblepsz
+- ne folytasd pusztan a compressed summary alapjan, ha a canonical fajlok mast mondanak
+
+---
+
 ## Consult Closeout Semantics
 
 Cross-track consultoknal kulon kell kezelni:

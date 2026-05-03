@@ -52,3 +52,21 @@ Entries:
 - Impact: Later bridge-mapping work could accidentally assume fields such as effects, biases, campaign, or causal chains were formally validated when the minimal slice only proved story/directive shell consistency.
 - Resolution / guidance: For every intentionally unsupported assertion field, either emit an explicit unsupported-feature diagnostic or add a test that proves the field is out of scope for the current slice. Do not silently treat omitted fields as solved/validated facts.
 - Status: guidance
+
+## 2026-05-03 - TR2-D Cross-Track Review - Guidance - Classify no-churn diffs before closeout
+
+- Track: Meta Coordinator / Track D / Track B
+- Source: Step review for Wave 8.5 `TR2-D`
+- Finding: A Track D no-churn gate can legitimately detect parallel Track B-owned C#/ScenarioRunner diffs during a coordinated cross-track step.
+- Impact: Treating all non-empty no-churn gates as Track D bugs can incorrectly block allowed parallel work, while ignoring them can hide ownership violations.
+- Resolution / guidance: Stop Track D closeout, classify the foreign diffs by owner/scope, then resume only the owning track's verification. Mark the step YELLOW until the dependent Track B consume/evidence pass and Track D final verification are both complete.
+- Status: guidance
+
+## 2026-05-03 - TR2-D Evidence Fixtures - Major - Keep marker-rich evidence payloads semantically consistent
+
+- Track: Track B / ScenarioRunner evidence
+- Source: Step review for Wave 8.5 `TR2-D` Track B B2
+- Finding: Repo-local marker-rich fixture/mock responses can claim `directorSolverValidatedCoverage:story_core` while omitting a core field such as story beat `severity` from the response patch payload.
+- Impact: The artifact proves parser persistence but overclaims solver-backed semantic coverage, weakening truth-in-labeling evidence for TR2-D.
+- Resolution / guidance: Marker-rich evidence responses must include every core field implied by their claimed coverage. For `story_core`, include `beatId`, `text`, `durationTicks`, and `severity`; for `directive_core`, include `colonyId`, `directive`, and `durationTicks`.
+- Status: fixed

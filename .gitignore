@@ -36,6 +36,7 @@ packages/
 *.snupkg
 
 # Other
+.opencode/
 *.tmp
 *.bak
 *.swp

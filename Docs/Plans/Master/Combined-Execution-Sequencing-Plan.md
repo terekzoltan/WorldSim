@@ -1727,7 +1727,7 @@ Wave turn-gate:
 - ✅ **TR2-A** Runtime snapshot -> runtime assertions mapper (Track D, Track B consult)
 - ✅ **TR2-B** Solve/refinement path for minimal director output (Track D)
 - ✅ **TR2-C** Validated facts -> bridge mapping (Track D)
-- ⬜ **TR2-D** Solver-path observability + headless refinery evidence lane foundation (Track D primary, Track B owns the `ScenarioRunner` lane implementation)
+- ✅ **TR2-D** Solver-path observability + headless refinery evidence lane foundation (Track D primary, Track B owns the `ScenarioRunner` lane implementation)
 
 ### Wave 8.5 — Execution Steps
 
@@ -1757,6 +1757,9 @@ Wave turn-gate:
 |---------|---------|--------|-------|
 | Track D agent | TR2-D (D part: solver markers + evidence semantics) | TR2-C ✅ | Define the solver-path observability contract and operator-facing marker semantics; detailed execution shape lives in the Refinery Live SMR Plan |
 | Track B agent | TR2-D (B part: `ScenarioRunner` refinery fixture + live_mock foundation) | TR2-C ✅ | Build the first headless refinery evidence lane against the stabilized bridge semantics; detailed defaults and guardrails live in the Refinery Live SMR Plan |
+
+Wave 8.5 Step 4 closeout note:
+- ✅ `TR2-D` joint closeout completed: Track D D-part and Track B B2 + fixture/live_mock evidence are GREEN; the normalized `directorSolver*` marker contract is consumed by `ScenarioRunner`, `core` remains the default lane, and `refinery_live_validator` / `refinery_live_paid` remain deferred/config-error for TR2-D.
 
 Wave 8.5 policy note:
 - Any task in this wave that creates, edits, or reviews refinery/model artifacts or solver semantics requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
