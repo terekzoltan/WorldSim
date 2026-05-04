@@ -65,6 +65,7 @@ The following decisions are locked unless a later explicit planning pass changes
   - `paid_probe_2x2x2` -> 2 seeds, 2 checkpoints/run, 2 completions/checkpoint, estimated completions 8
   - paid concurrency remains `1`
   - no-cost rehearsal is mandatory before paid
+- W8.6-D1 Track D policy lock handoff: `Docs/Plans/Master/Wave8.6-W8.6-D1-Track-D-Policy-Lock-Handoff.md`
 
 ## 4. Why A Separate Refinery Lane Exists
 
@@ -166,18 +167,20 @@ Each scheduled refinery checkpoint must end in one of these terminal states:
 
 The runner should never silently skip or lose a scheduled checkpoint after it has been accepted for execution.
 
-## 7. Enforced Operational Guardrails
+## 7. Operational Guardrails
 
-These are code-enforced defaults, not documentation-only preferences.
+This section separates guardrails already enforced by the current TR2-D refinery lane from guardrails that W8.6-B1 must implement before paid runs can start.
 
-### 7.1 General lane guardrails
+### 7.1 Currently enforced lane guardrails
 
 - `core` remains the default lane.
 - `refinery` is explicit opt-in.
-- `refinery_live_paid` is explicit opt-in.
 - generic `all` mode must not silently include `refinery_live_paid`.
+- `refinery_live_validator` and `refinery_live_paid` are still deferred/config-error until W8.6-B1 implements their guardrails.
 
-### 7.2 Paid live guardrails
+### 7.2 Planned W8.6-B1-owned paid live enforcement
+
+W8.6-B1 must implement these before `refinery_live_paid` can run:
 
 - default `maxTriggers = 1`
 - hard cap `maxTriggers = 3`
@@ -490,6 +493,7 @@ Combined should record:
 - that Track B owns paid/validator ScenarioRunner guardrails and artifacts,
 - that SMR Analyst owns the no-cost rehearsal plus paid micro evidence review,
 - that `refinery_live_paid` remains local-only and advisory,
+- that Track B consumes the W8.6-D1 handoff for Java marker/telemetry meaning instead of redefining it,
 - and that paid is still excluded from default `core`, generic `all`, CI, and deterministic baselines.
 
 ### 12.3 TR3-B

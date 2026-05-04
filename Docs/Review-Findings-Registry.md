@@ -70,3 +70,21 @@ Entries:
 - Impact: The artifact proves parser persistence but overclaims solver-backed semantic coverage, weakening truth-in-labeling evidence for TR2-D.
 - Resolution / guidance: Marker-rich evidence responses must include every core field implied by their claimed coverage. For `story_core`, include `beatId`, `text`, `durationTicks`, and `severity`; for `directive_core`, include `colonyId`, `directive`, and `durationTicks`.
 - Status: fixed
+
+## 2026-05-04 - W8.6-D1 Paid-Live Policy Lock - Major - Prove documented env vars map to runtime properties
+
+- Track: Track D / Java refinery config
+- Source: Step review for Wave 8.6 `W8.6-D1`
+- Finding: A policy handoff documented `PLANNER_DIRECTOR_SOLVER_OBSERVABILITY_ENABLED` as the switch for `directorSolver*` markers before `application.yml` explicitly mapped that env var to `planner.director.solverObservabilityEnabled`.
+- Impact: Track B could follow the handoff and still fail to enable solver observability, producing paid/rehearsal artifacts without the expected `directorSolver*` evidence.
+- Resolution / guidance: Any documented operator env var used as a cross-track contract must be backed by code/config or the exact supported property mechanism must be documented and tested. Prefer explicit `application.yml` mappings for Java Spring properties.
+- Status: fixed
+
+## 2026-05-04 - W8.6-D1 Paid-Live Policy Lock - Major - Separate current enforcement from planned guardrails
+
+- Track: Meta Coordinator / Track D / Track B
+- Source: Step review for Wave 8.6 `W8.6-D1`
+- Finding: Refinery live SMR docs described paid-live guardrails as code-enforced even though `refinery_live_validator` and `refinery_live_paid` guardrail implementation belonged to the later Track B `W8.6-B1` step.
+- Impact: Future agents could assume paid confirmation, rehearsal proof, completion caps, or concurrency locks already existed and start paid or review work on a false safety premise.
+- Resolution / guidance: Planning docs must distinguish currently enforced behavior from planned downstream enforcement, especially around paid/live/secret/cost guardrails.
+- Status: fixed

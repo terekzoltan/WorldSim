@@ -82,7 +82,37 @@ Output mode policy for campaign-enabled checkpoints:
 - `nudge_only`: directive + optional campaign op
 - `off`: no ops
 
+## Wave 8.6 Paid-Live Director Policy
+
+Wave 8.6 keeps paid LLM Director evidence local-only, explicit, capped, and advisory. Java-side defaults remain safe:
+
+- `PLANNER_LLM_ENABLED=false` remains the default.
+- `PLANNER_LLM_MODEL` defaults to `openai/gpt-5.4-mini`.
+- `PLANNER_DIRECTOR_MAX_RETRIES` defaults to `2` for the general Java director path, but this is **not** the paid preset default.
+- `PLANNER_DIRECTOR_SOLVER_OBSERVABILITY_ENABLED=false` remains the default and maps explicitly to `planner.director.solverObservabilityEnabled` in `application.yml`.
+
+Wave 8.6 paid presets must set Java retry policy explicitly:
+
+- `paid_micro_total2`: `PLANNER_DIRECTOR_MAX_RETRIES=0`, estimated completions `2`.
+- `paid_probe_2x2x2`: `PLANNER_DIRECTOR_MAX_RETRIES=1`, estimated completions `8`; this preset is guarded and optional, not an automatic Wave 8.6 closeout blocker unless Meta promotes it after micro evidence.
+
+Paid runs require `PLANNER_LLM_ENABLED=true` and a local `PLANNER_LLM_API_KEY` set outside the repo. Do not commit keys, raw auth headers, or raw paid response payloads. The Wave 8.6 paid capture default is `hash`; `full` capture is not allowed for paid presets.
+
+Marker and telemetry semantics for Wave 8.6:
+
+- `llmCompletionCount` is the observed OpenRouter completion count for one `/v1/patch` request.
+- `llmRetryRounds` is the number of Java validator feedback/correction rounds used inside that request.
+- C# request retries are separate and belong to runner-side `REFINERY_RETRY_COUNT` cost estimation.
+- `llmRetries` is a legacy alias for validator retry rounds and should not be the primary artifact contract.
+- `directorStage:*` remains pipeline truth; `directorStage:refinery-validated` does not imply solver-backed validation.
+- `directorSolver*` remains optional solver-sidecar truth and is recommended for Wave 8.6 rehearsal and paid evidence.
+- `/v1/director/telemetry` is recommended when runner telemetry capture is enabled, but per-checkpoint explain markers remain the required minimum contract.
+
+Detailed Track B handoff for W8.6-D1: `Docs/Plans/Master/Wave8.6-W8.6-D1-Track-D-Policy-Lock-Handoff.md`.
+
 ## Director Live Smoke Notes (Wave 6.1)
+
+This older smoke profile is not a Wave 8.6 paid preset recipe. For paid retry caps, capture policy, and solver observability expectations, use the Wave 8.6 policy section above and the W8.6-D1 handoff.
 
 Recommended Java-side local profile:
 
@@ -90,7 +120,7 @@ Recommended Java-side local profile:
 export PLANNER_MODE=pipeline
 export PLANNER_REFINERY_ENABLED=true
 export PLANNER_LLM_ENABLED=true
-export PLANNER_LLM_API_KEY=<your-openrouter-key>
+# Set PLANNER_LLM_API_KEY in your local shell before running.
 ./gradlew bootRun
 ```
 

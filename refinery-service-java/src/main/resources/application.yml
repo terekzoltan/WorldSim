@@ -22,6 +22,7 @@ planner:
     outputMode: ${PLANNER_DIRECTOR_OUTPUT_MODE:both}
     campaignEnabled: ${PLANNER_DIRECTOR_CAMPAIGN_ENABLED:false}
     maxRetries: ${PLANNER_DIRECTOR_MAX_RETRIES:2}
+    solverObservabilityEnabled: ${PLANNER_DIRECTOR_SOLVER_OBSERVABILITY_ENABLED:false}
     budget: ${PLANNER_DIRECTOR_BUDGET:5.0}
 
 logging:

@@ -1792,7 +1792,7 @@ Wave turn-gate:
 
 ### Sprint D8.6: Paid-live Director evidence pilot (Track D -> Track B -> SMR Analyst)
 
-- ⬜ **W8.6-D1** Paid/validator LLM policy lock + scorecard semantics (Track D)
+- ✅ **W8.6-D1** Paid/validator LLM policy lock + scorecard semantics (Track D)
 - ⬜ **W8.6-B1** ScenarioRunner validator rehearsal + paid preset guardrails (Track B)
 - ⬜ **W8.6-SMR1** No-cost rehearsal + `paid_micro_total2` evidence review (SMR Analyst / Meta)
 - ⬜ **W8.6-SMR2** Optional `paid_probe_2x2x2` evidence review (SMR Analyst / Meta, non-blocking unless Meta promotes it)
@@ -1829,6 +1829,9 @@ Wave 8.6 policy notes:
 - Paid runs require local manual API-key setup and explicit confirmation; no API key may be committed or captured in artifacts.
 - No-cost rehearsal is mandatory before paid.
 - Default model remains Java default `openai/gpt-5.4-mini` unless W8.6-D1 changes it explicitly.
+
+Wave 8.6 Step 1 closeout note:
+- ✅ `W8.6-D1` Track D policy lock completed: Java paid/validator defaults remain safe, `PLANNER_DIRECTOR_SOLVER_OBSERVABILITY_ENABLED` is explicitly mapped to the Java solver-observability property, paid preset retry semantics and marker/telemetry meanings are locked, `PLANNER_DIRECTOR_MAX_RETRIES=2` is explicitly not a paid preset default, telemetry endpoint capture is recommended but not universally mandatory, and Track B handoff lives in `Docs/Plans/Master/Wave8.6-W8.6-D1-Track-D-Policy-Lock-Handoff.md`. `W8.6-B1` is unblocked; SMR steps and full Wave 8.6 remain open.
 
 Proof targets:
 - Paid cannot run without explicit confirmation and GREEN rehearsal proof.

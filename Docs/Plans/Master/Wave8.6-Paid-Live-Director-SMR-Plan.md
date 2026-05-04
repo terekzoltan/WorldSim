@@ -2,6 +2,11 @@
 
 Status: planning draft, ready for Meta/Track review
 
+Policy source hierarchy:
+- This plan is the Meta/source-of-truth workflow policy for Wave 8.6.
+- `refinery-service-java/README.md` is the Java operator/env reference.
+- `Docs/Plans/Master/Wave8.6-W8.6-D1-Track-D-Policy-Lock-Handoff.md` is the Track B implementation contract for W8.6-D1 semantics.
+
 Owner split:
 - Meta Coordinator owns sequencing, acceptance, and paid-run go/no-go decisions.
 - Track D owns Java director/refinery semantics, LLM policy, validator/fallback meaning, formal/refinery quality markers, and telemetry meaning.
@@ -293,7 +298,9 @@ Acceptance:
 - plan/docs updated,
 - no Java behavior change unless needed to expose already-existing markers safely,
 - Java tests updated only if Track D changes policy code,
-- paid default remains off.
+- paid default remains off,
+- Track B handoff explicitly states that `/v1/director/telemetry` is recommended when telemetry capture is enabled, not hard-required for every artifact,
+- full warning/invariant catalog expansion is not required in D1; stable categories and known marker families are sufficient.
 
 ### Step W8.6-B1 - Track B runner guardrails
 
