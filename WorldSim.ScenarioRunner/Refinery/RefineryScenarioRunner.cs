@@ -68,16 +68,23 @@ public static class RefineryScenarioRunner
             runLog.AppendLine(line);
         }
 
-        var options = RefineryScenarioOptions.FromEnvironment(request.RawLane, request.BaseDirectory);
+        var options = RefineryScenarioOptions.FromEnvironment(request.RawLane, request.BaseDirectory)
+            .ValidateAgainst(request);
         foreach (var warning in options.Warnings)
             LogBufferOnly(warning);
+        if (options.PaidPreset is not null)
+        {
+            var preflightLine = $"Refinery paid preflight | preset={options.PaidPreset} estimatedCompletions={options.EstimatedCompletions?.ToString(CultureInfo.InvariantCulture) ?? "unknown"} maxCompletions={options.MaxCompletions?.ToString(CultureInfo.InvariantCulture) ?? "unknown"}";
+            Console.Error.WriteLine(preflightLine);
+            runLog.AppendLine(preflightLine);
+        }
 
         var runs = new List<RefineryRunResult>();
         var assertions = new List<RefineryAssertionResult>();
         var anomalies = new List<RefineryAnomaly>();
         var hasConfigError = options.HadConfigError || request.ConfigHadError;
 
-        if (!hasConfigError && options.LaneType == "refinery")
+        if (!hasConfigError && options.LaneType == "refinery" && !options.CostEstimateOnly)
         {
             foreach (var config in request.Configs.OrderBy(c => c.Name, StringComparer.Ordinal))
             {
@@ -93,8 +100,12 @@ public static class RefineryScenarioRunner
             }
         }
 
+        if (!hasConfigError && !options.CostEstimateOnly)
+            AddPostRunGates(options, runs, anomalies);
+
         var failedAssertions = assertions.Count(a => !a.Passed && !a.Skipped && string.Equals(a.Severity, "error", StringComparison.Ordinal));
-        var (exitCode, exitReason) = ResolveExitCode(hasConfigError, failedAssertions > 0);
+        var hardAnomaly = anomalies.Any(a => string.Equals(a.Severity, "error", StringComparison.Ordinal));
+        var (exitCode, exitReason) = ResolveExitCode(hasConfigError, failedAssertions > 0, hardAnomaly);
         var envelope = BuildEnvelope(options, request, runs, assertions, anomalies, exitCode, exitReason);
 
         WriteOutput(envelope, request.OutputMode, LogLine, LogBufferOnly);
@@ -187,6 +198,7 @@ public static class RefineryScenarioRunner
             ? (status.ExplainMarkers?.ToList() ?? new List<string>())
             : new List<string> { "directorStage:unknown" };
         var parsedSolverMarkers = ParseSolverMarkers(explainMarkers);
+        var parsedObservabilityMarkers = ParseObservabilityMarkers(explainMarkers);
 
         return new RefineryCheckpointRecord(
             TriggerIndex: triggerIndex,
@@ -207,6 +219,12 @@ public static class RefineryScenarioRunner
             DirectorSolverUnsupported: parsedSolverMarkers.Unsupported,
             DirectorSolverDiagnostic: parsedSolverMarkers.Diagnostics,
             SolverParseWarnings: parsedSolverMarkers.Warnings,
+            LlmStage: parsedObservabilityMarkers.LlmStage,
+            LlmCompletionCount: parsedObservabilityMarkers.LlmCompletionCount,
+            LlmRetryRounds: parsedObservabilityMarkers.LlmRetryRounds,
+            LlmCandidateSanitized: parsedObservabilityMarkers.LlmCandidateSanitized,
+            LlmCandidateSanitizeTags: parsedObservabilityMarkers.LlmCandidateSanitizeTags,
+            CausalChainOps: parsedObservabilityMarkers.CausalChainOps,
             ActionStatus: rawStatusText,
             SettleLatencyMs: stopwatch.ElapsedMilliseconds,
             WarningsCount: status.Tick == triggerTick ? status.WarningCount : (rawStatusText.Contains(", warn=", StringComparison.Ordinal) ? 1 : 0),
@@ -285,6 +303,45 @@ public static class RefineryScenarioRunner
         }
     }
 
+    private static void AddPostRunGates(
+        RefineryScenarioOptions options,
+        List<RefineryRunResult> runs,
+        List<RefineryAnomaly> anomalies)
+    {
+        var checkpoints = runs.SelectMany(run => run.Checkpoints).ToList();
+        var observedCompletionCount = checkpoints.Any(checkpoint => checkpoint.LlmCompletionCount.HasValue)
+            ? checkpoints.Where(checkpoint => checkpoint.LlmCompletionCount.HasValue).Sum(checkpoint => checkpoint.LlmCompletionCount!.Value)
+            : (int?)null;
+
+        if (options.RefineryProfile == "validator" && observedCompletionCount is > 0)
+        {
+            anomalies.Add(new RefineryAnomaly(
+                "ANOM-RDIR-VALIDATOR-PAID-COMPLETION",
+                "refinery",
+                "error",
+                null,
+                "refinery_live_validator observed LLM completions and is not proven no-cost",
+                observedCompletionCount.Value.ToString(CultureInfo.InvariantCulture),
+                "0"));
+        }
+
+        if (options.RefineryProfile == "live_paid" && observedCompletionCount.HasValue)
+        {
+            var completionCap = options.EstimatedCompletions ?? options.MaxCompletions;
+            if (completionCap.HasValue && observedCompletionCount.Value > completionCap.Value)
+            {
+                anomalies.Add(new RefineryAnomaly(
+                    "ANOM-RDIR-PAID-COMPLETION-CAP-EXCEEDED",
+                    "refinery",
+                    "error",
+                    null,
+                    "refinery_live_paid observed completions exceeded the preset completion cap",
+                    observedCompletionCount.Value.ToString(CultureInfo.InvariantCulture),
+                    completionCap.Value.ToString(CultureInfo.InvariantCulture)));
+            }
+        }
+    }
+
     private static RefineryRunEnvelope BuildEnvelope(
         RefineryScenarioOptions options,
         RefineryScenarioRunnerRequest request,
@@ -316,7 +373,13 @@ public static class RefineryScenarioRunner
             DirectorSolverExtractionHistogram: BuildHistogram(checkpoints.Select(c => c.DirectorSolverExtraction)),
             DirectorSolverValidatedCoverageCheckpointCounts: BuildCheckpointValueHistogram(checkpoints.Select(c => c.DirectorSolverValidatedCoverage)),
             DirectorSolverUnsupportedCheckpointCounts: BuildCheckpointValueHistogram(checkpoints.Select(c => c.DirectorSolverUnsupported)),
-            DirectorSolverDiagnosticCounts: BuildValueOccurrencesHistogram(checkpoints.Select(c => c.DirectorSolverDiagnostic)));
+            DirectorSolverDiagnosticCounts: BuildValueOccurrencesHistogram(checkpoints.Select(c => c.DirectorSolverDiagnostic)),
+            LlmStageHistogram: BuildHistogram(checkpoints.Select(c => c.LlmStage)),
+            ObservedCompletionCount: checkpoints.Any(c => c.LlmCompletionCount.HasValue) ? checkpoints.Where(c => c.LlmCompletionCount.HasValue).Sum(c => c.LlmCompletionCount!.Value) : null,
+            ObservedRetryRounds: checkpoints.Any(c => c.LlmRetryRounds.HasValue) ? checkpoints.Where(c => c.LlmRetryRounds.HasValue).Sum(c => c.LlmRetryRounds!.Value) : null,
+            LlmCandidateSanitizedHistogram: BuildHistogram(checkpoints.Select(c => c.LlmCandidateSanitized)),
+            LlmCandidateSanitizeTagCounts: BuildValueOccurrencesHistogram(checkpoints.Select(c => c.LlmCandidateSanitizeTags)),
+            CausalChainOpsTotal: checkpoints.Any(c => c.CausalChainOps.HasValue) ? checkpoints.Where(c => c.CausalChainOps.HasValue).Sum(c => c.CausalChainOps!.Value) : null);
 
         return new RefineryRunEnvelope(
             SchemaVersion: "smr/refinery/v1",
@@ -332,6 +395,13 @@ public static class RefineryScenarioRunner
             RequestTimeoutMs: options.RequestTimeoutMs,
             RetryCount: options.RetryCount,
             DirectorMaxBudget: options.DirectorMaxBudget,
+            PaidPreset: options.PaidPreset,
+            EstimatedCompletions: options.EstimatedCompletions,
+            MaxCompletions: options.MaxCompletions,
+            ExpectedJavaDirectorMaxRetries: options.ExpectedJavaDirectorMaxRetries,
+            PaidConfirmPresent: options.PaidConfirmPresent,
+            RehearsalArtifact: options.NormalizedRehearsalManifestPath,
+            CostEstimateOnly: options.CostEstimateOnly,
             SeedCount: request.Seeds.Count,
             PlannerCount: request.Planners.Count,
             ConfigCount: request.Configs.Count,
@@ -398,6 +468,21 @@ public static class RefineryScenarioRunner
             Runs: envelope.Runs.Select(run => new RefineryArtifactRunIndex(run.RunKey, run.ConfigName, run.PlannerMode, run.Seed, run.Checkpoints.Count)).ToList());
         File.WriteAllText(Path.Combine(refineryDir, "index.json"), JsonSerializer.Serialize(index, jsonOptions));
         File.WriteAllText(Path.Combine(refineryDir, "summary.json"), JsonSerializer.Serialize(envelope.Summary, jsonOptions));
+        File.WriteAllText(Path.Combine(refineryDir, "scorecard.json"), JsonSerializer.Serialize(BuildScorecard(envelope), jsonOptions));
+        if (envelope.CostEstimateOnly)
+        {
+            File.WriteAllText(Path.Combine(refineryDir, "preflight.json"), JsonSerializer.Serialize(new
+            {
+                envelope.PaidPreset,
+                envelope.EstimatedCompletions,
+                envelope.MaxCompletions,
+                envelope.ExpectedJavaDirectorMaxRetries,
+                envelope.PaidConfirmPresent,
+                envelope.RehearsalArtifact,
+                envelope.CostEstimateOnly,
+                javaExecutionSkipped = true
+            }, jsonOptions));
+        }
 
         var manifest = new RefineryArtifactManifest(
             SchemaVersion: "smr/v1",
@@ -419,12 +504,55 @@ public static class RefineryScenarioRunner
             RequestTimeoutMs: envelope.RequestTimeoutMs,
             RetryCount: envelope.RetryCount,
             DirectorMaxBudget: envelope.DirectorMaxBudget,
+            PaidPreset: envelope.PaidPreset,
+            EstimatedCompletions: envelope.EstimatedCompletions,
+            MaxCompletions: envelope.MaxCompletions,
+            ExpectedJavaDirectorMaxRetries: envelope.ExpectedJavaDirectorMaxRetries,
+            ObservedCompletionCount: envelope.Summary.ObservedCompletionCount,
+            PaidConfirmPresent: envelope.PaidConfirmPresent,
+            RehearsalArtifact: envelope.RehearsalArtifact,
+            CostEstimateOnly: envelope.CostEstimateOnly,
             RefineryAppliedCount: envelope.Summary.AppliedCount,
             RefineryApplyFailedCount: envelope.Summary.ApplyFailedCount,
             RefineryRequestFailedCount: envelope.Summary.RequestFailedCount,
             RefineryFallbackCount: envelope.Summary.FallbackCount,
             RefineryValidatedCount: envelope.Summary.ValidatedCount);
         File.WriteAllText(Path.Combine(artifactDir, "manifest.json"), JsonSerializer.Serialize(manifest, jsonOptions));
+    }
+
+    private static object BuildScorecard(RefineryRunEnvelope envelope)
+    {
+        var hardAnomalyCount = envelope.Anomalies.Count(anomaly => string.Equals(anomaly.Severity, "error", StringComparison.Ordinal));
+        return new
+        {
+            balanceStability = new
+            {
+                status = "deferred_to_smr_analyst",
+                note = "Track B records refinery lane signals only; SMR Analyst owns balance verdict."
+            },
+            directorCreativity = new
+            {
+                status = "marker_and_operator_review_only",
+                hashCaptureStatus = envelope.CaptureMode == "hash" ? "raw_response_hash_not_available_in_b1" : "not_requested",
+                note = "W8.6-B1 does not persist raw paid payloads; creativity review uses safe markers, distributions, and operator notes."
+            },
+            failureHardening = new
+            {
+                status = hardAnomalyCount == 0 ? "no_hard_refinery_anomaly" : "hard_refinery_anomaly",
+                requestFailed = envelope.Summary.RequestFailedCount,
+                applyFailed = envelope.Summary.ApplyFailedCount,
+                hardAnomalyCount
+            },
+            formalRefineryQuality = new
+            {
+                status = "track_d_semantics_consumed",
+                observedCompletionCount = envelope.Summary.ObservedCompletionCount,
+                observedRetryRounds = envelope.Summary.ObservedRetryRounds,
+                solverCoverage = envelope.Summary.DirectorSolverValidatedCoverageCheckpointCounts,
+                unsupported = envelope.Summary.DirectorSolverUnsupportedCheckpointCounts
+            },
+            finalVerdictOwner = "SMR Analyst"
+        };
     }
 
     private static Dictionary<string, int> BuildHistogram(IEnumerable<string?> values)
@@ -482,6 +610,49 @@ public static class RefineryScenarioRunner
             Unsupported: unsupported.Count == 0 ? Array.Empty<string>() : unsupported.Distinct(StringComparer.Ordinal).ToArray(),
             Diagnostics: diagnostics.Count == 0 ? Array.Empty<string>() : diagnostics.ToArray(),
             Warnings: warnings.Count == 0 ? Array.Empty<string>() : warnings.ToArray());
+    }
+
+    private static ObservabilityMarkerParseResult ParseObservabilityMarkers(IReadOnlyList<string> explainMarkers)
+    {
+        string? llmStage = null;
+        int? llmCompletionCount = null;
+        int? llmRetryRounds = null;
+        string? llmCandidateSanitized = null;
+        var sanitizeTags = new List<string>();
+        int? causalChainOps = null;
+
+        foreach (var marker in explainMarkers)
+        {
+            ConsumeStringMarker(marker, "llmStage:", ref llmStage);
+            ConsumeIntMarker(marker, "llmCompletionCount:", ref llmCompletionCount);
+            ConsumeIntMarker(marker, "llmRetryRounds:", ref llmRetryRounds);
+            ConsumeStringMarker(marker, "llmCandidateSanitized:", ref llmCandidateSanitized);
+            ConsumeRepeatedMarker(marker, "llmCandidateSanitizeTags:", sanitizeTags);
+            ConsumeIntMarker(marker, "causalChainOps:", ref causalChainOps);
+        }
+
+        return new ObservabilityMarkerParseResult(
+            LlmStage: llmStage,
+            LlmCompletionCount: llmCompletionCount,
+            LlmRetryRounds: llmRetryRounds,
+            LlmCandidateSanitized: llmCandidateSanitized,
+            LlmCandidateSanitizeTags: sanitizeTags.Count == 0 ? Array.Empty<string>() : sanitizeTags.ToArray(),
+            CausalChainOps: causalChainOps);
+    }
+
+    private static void ConsumeStringMarker(string marker, string prefix, ref string? target)
+    {
+        if (marker.StartsWith(prefix, StringComparison.Ordinal))
+            target = marker[prefix.Length..].Trim();
+    }
+
+    private static void ConsumeIntMarker(string marker, string prefix, ref int? target)
+    {
+        if (!marker.StartsWith(prefix, StringComparison.Ordinal))
+            return;
+
+        if (int.TryParse(marker[prefix.Length..].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            target = parsed;
     }
 
     private static void ConsumeSingleValueMarker(string marker, string prefix, HashSet<string> knownValues, ref string? target, List<string> warnings)
@@ -545,12 +716,14 @@ public static class RefineryScenarioRunner
         results.Add(new RefineryAssertionResult(invariantId, category, "warning", runKey, true, true, skipReason, message, null, null));
     }
 
-    private static (int ExitCode, string ExitReason) ResolveExitCode(bool hasConfigError, bool hasAssertionFailures)
+    private static (int ExitCode, string ExitReason) ResolveExitCode(bool hasConfigError, bool hasAssertionFailures, bool hasHardAnomaly)
     {
         if (hasConfigError)
             return (3, "config_error");
         if (hasAssertionFailures)
             return (2, "assert_fail");
+        if (hasHardAnomaly)
+            return (4, "anomaly_gate_fail");
         return (0, "ok");
     }
 
@@ -646,6 +819,14 @@ internal sealed record SolverMarkerParseResult(
     IReadOnlyList<string> Diagnostics,
     IReadOnlyList<string> Warnings);
 
+internal sealed record ObservabilityMarkerParseResult(
+    string? LlmStage,
+    int? LlmCompletionCount,
+    int? LlmRetryRounds,
+    string? LlmCandidateSanitized,
+    IReadOnlyList<string> LlmCandidateSanitizeTags,
+    int? CausalChainOps);
+
 internal sealed record RefineryScenarioOptions(
     string LaneType,
     string? RefineryProfile,
@@ -662,6 +843,13 @@ internal sealed record RefineryScenarioOptions(
     double DirectorMaxBudget,
     string FixtureResponsePath,
     string BaseDirectory,
+    string? PaidPreset,
+    bool PaidConfirmPresent,
+    string? NormalizedRehearsalManifestPath,
+    int? MaxCompletions,
+    int? EstimatedCompletions,
+    int? ExpectedJavaDirectorMaxRetries,
+    bool CostEstimateOnly,
     bool HadConfigError,
     IReadOnlyList<string> Warnings)
 {
@@ -673,10 +861,13 @@ internal sealed record RefineryScenarioOptions(
         {
             return Create("core", null, baseDirectory, warnings, hadConfigError: false);
         }
-        if (normalizedLane is "refinery_live_validator" or "refinery_live_paid")
+        if (normalizedLane == "refinery_live_validator")
         {
-            warnings.Add($"Warning: WORLDSIM_SCENARIO_LANE={normalizedLane} is unsupported/deferred in TR2-D. Exiting with config_error.");
-            return Create("refinery", normalizedLane.Replace("refinery_", string.Empty), baseDirectory, warnings, hadConfigError: true);
+            return Create("refinery", "validator", baseDirectory, warnings, hadConfigError: false);
+        }
+        if (normalizedLane == "refinery_live_paid")
+        {
+            return Create("refinery", "live_paid", baseDirectory, warnings, hadConfigError: false);
         }
         if (normalizedLane is not ("refinery_fixture" or "refinery_live_mock"))
         {
@@ -696,17 +887,20 @@ internal sealed record RefineryScenarioOptions(
 
     private static RefineryScenarioOptions Create(string laneType, string? profile, string baseDirectory, List<string> warnings, bool hadConfigError)
     {
-        var triggerPolicy = ReadToken("WORLDSIM_SCENARIO_REFINERY_TRIGGER_POLICY", "every_n_ticks");
+        var isPaid = profile == "live_paid";
+        var triggerPolicy = ReadToken("WORLDSIM_SCENARIO_REFINERY_TRIGGER_POLICY", isPaid ? "tick_list" : "every_n_ticks");
         if (triggerPolicy is not ("every_n_ticks" or "tick_list" or "season_boundary"))
         {
             warnings.Add($"Warning: unsupported WORLDSIM_SCENARIO_REFINERY_TRIGGER_POLICY='{triggerPolicy}'. Exiting with config_error.");
             hadConfigError = true;
         }
 
-        var captureMode = ReadToken("WORLDSIM_SCENARIO_REFINERY_CAPTURE", "redacted");
+        var captureMode = ReadToken("WORLDSIM_SCENARIO_REFINERY_CAPTURE", isPaid ? "hash" : "redacted");
         if (captureMode is not ("none" or "hash" or "redacted"))
         {
-            warnings.Add($"Warning: unsupported WORLDSIM_SCENARIO_REFINERY_CAPTURE='{captureMode}'. Exiting with config_error.");
+            warnings.Add(isPaid && captureMode == "full"
+                ? "Warning: WORLDSIM_SCENARIO_REFINERY_CAPTURE=full is not allowed for paid Wave 8.6 presets. Exiting with config_error."
+                : $"Warning: unsupported WORLDSIM_SCENARIO_REFINERY_CAPTURE='{captureMode}'. Exiting with config_error.");
             hadConfigError = true;
         }
 
@@ -724,7 +918,7 @@ internal sealed record RefineryScenarioOptions(
             TriggerPolicy: triggerPolicy,
             TriggerEvery: ReadIntClamped("WORLDSIM_SCENARIO_REFINERY_TRIGGER_EVERY", 4, 1, 100_000),
             TriggerTicks: ReadTickList("WORLDSIM_SCENARIO_REFINERY_TRIGGER_TICKS"),
-            MaxTriggers: ReadIntClamped("WORLDSIM_SCENARIO_REFINERY_MAX_TRIGGERS", 1, 1, 10),
+            MaxTriggers: ReadIntClamped("WORLDSIM_SCENARIO_REFINERY_MAX_TRIGGERS", 1, 1, isPaid ? 3 : 10),
             WaitMode: waitMode,
             WaitTimeoutMs: ReadIntClamped("WORLDSIM_SCENARIO_REFINERY_WAIT_TIMEOUT_MS", 4_000, 1, 120_000),
             CaptureMode: captureMode,
@@ -733,8 +927,214 @@ internal sealed record RefineryScenarioOptions(
             DirectorMaxBudget: ReadDouble("WORLDSIM_SCENARIO_REFINERY_DIRECTOR_MAX_BUDGET", 5d),
             FixtureResponsePath: ReadFixtureResponsePath(baseDirectory),
             BaseDirectory: baseDirectory,
+            PaidPreset: isPaid ? ReadToken("WORLDSIM_SCENARIO_REFINERY_PAID_PRESET", string.Empty) : null,
+            PaidConfirmPresent: string.Equals(Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_REFINERY_PAID_CONFIRM"), "I_UNDERSTAND_OPENROUTER_COSTS", StringComparison.Ordinal),
+            NormalizedRehearsalManifestPath: isPaid ? NormalizeRehearsalManifestPath(Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_REFINERY_REHEARSAL_ARTIFACT")) : null,
+            MaxCompletions: isPaid ? ReadIntClamped("WORLDSIM_SCENARIO_REFINERY_MAX_COMPLETIONS", 8, 1, 8) : null,
+            EstimatedCompletions: null,
+            ExpectedJavaDirectorMaxRetries: null,
+            CostEstimateOnly: isPaid && ReadBool("WORLDSIM_SCENARIO_REFINERY_COST_ESTIMATE_ONLY"),
             HadConfigError: hadConfigError,
             Warnings: warnings);
+    }
+
+    public RefineryScenarioOptions ValidateAgainst(RefineryScenarioRunnerRequest request)
+    {
+        if (RefineryProfile != "live_paid")
+            return this;
+
+        var warnings = Warnings.ToList();
+        var hadConfigError = HadConfigError;
+        var preset = string.IsNullOrWhiteSpace(PaidPreset) ? null : PaidPreset;
+        var expectedCheckpoints = 0;
+        var expectedJavaRetries = 0;
+        if (preset is null)
+        {
+            warnings.Add("Warning: refinery_live_paid requires WORLDSIM_SCENARIO_REFINERY_PAID_PRESET. Exiting with config_error.");
+            hadConfigError = true;
+        }
+        else if (preset == "paid_micro_total2")
+        {
+            expectedCheckpoints = 1;
+            expectedJavaRetries = 0;
+        }
+        else if (preset == "paid_probe_2x2x2")
+        {
+            expectedCheckpoints = 2;
+            expectedJavaRetries = 1;
+        }
+        else if (preset == "custom")
+        {
+            warnings.Add("Warning: custom paid preset is deferred beyond W8.6-B1. Exiting with config_error.");
+            hadConfigError = true;
+        }
+        else
+        {
+            warnings.Add($"Warning: unsupported WORLDSIM_SCENARIO_REFINERY_PAID_PRESET='{preset}'. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        if (!PaidConfirmPresent)
+        {
+            warnings.Add("Warning: refinery_live_paid requires WORLDSIM_SCENARIO_REFINERY_PAID_CONFIRM=I_UNDERSTAND_OPENROUTER_COSTS. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        if (!IsEnvPresent("WORLDSIM_SCENARIO_REFINERY_REQUEST_TIMEOUT_MS") || !IsEnvPresent("WORLDSIM_SCENARIO_REFINERY_WAIT_TIMEOUT_MS"))
+        {
+            warnings.Add("Warning: refinery_live_paid requires explicit request and wait timeout env vars. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        ValidatePaidIntEnv("WORLDSIM_SCENARIO_REFINERY_REQUEST_TIMEOUT_MS", 1, 120_000, required: true, warnings, ref hadConfigError);
+        ValidatePaidIntEnv("WORLDSIM_SCENARIO_REFINERY_WAIT_TIMEOUT_MS", 1, 120_000, required: true, warnings, ref hadConfigError);
+        ValidatePaidIntEnv("WORLDSIM_SCENARIO_REFINERY_MAX_TRIGGERS", 1, 3, required: false, warnings, ref hadConfigError);
+        ValidatePaidIntEnv("WORLDSIM_SCENARIO_REFINERY_MAX_COMPLETIONS", 1, 8, required: false, warnings, ref hadConfigError);
+
+        if (RetryCount != 0)
+        {
+            warnings.Add("Warning: Wave 8.6 paid presets require WORLDSIM_SCENARIO_REFINERY_RETRY_COUNT=0. Exiting with config_error.");
+            hadConfigError = true;
+        }
+        var declaredRetryCount = ValidatePaidIntEnv("WORLDSIM_SCENARIO_REFINERY_RETRY_COUNT", 0, 0, required: true, warnings, ref hadConfigError);
+        var declaredJavaRetries = ValidatePaidIntEnv("WORLDSIM_SCENARIO_REFINERY_EXPECTED_JAVA_MAX_RETRIES", 0, 2, required: true, warnings, ref hadConfigError);
+        if (declaredJavaRetries.HasValue && expectedCheckpoints > 0 && declaredJavaRetries.Value != expectedJavaRetries)
+        {
+            warnings.Add($"Warning: {preset} requires WORLDSIM_SCENARIO_REFINERY_EXPECTED_JAVA_MAX_RETRIES={expectedJavaRetries}; got {declaredJavaRetries.Value}. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        var rehearsalStatus = ValidateRehearsalArtifact(NormalizedRehearsalManifestPath);
+        if (!rehearsalStatus.Accepted)
+        {
+            warnings.Add($"Warning: refinery_live_paid requires a GREEN rehearsal artifact ({rehearsalStatus.Message}). Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        if (expectedCheckpoints > 0)
+        {
+            ValidateExactPaidShape(request, expectedCheckpoints, warnings, ref hadConfigError);
+        }
+
+        var estimatedCompletions = expectedCheckpoints > 0
+            ? request.Seeds.Count * request.Planners.Count * request.Configs.Count * expectedCheckpoints * ((declaredRetryCount ?? RetryCount) + 1) * ((declaredJavaRetries ?? expectedJavaRetries) + 1)
+            : 0;
+        if (MaxCompletions.HasValue && estimatedCompletions > MaxCompletions.Value)
+        {
+            warnings.Add($"Warning: paid estimated completions {estimatedCompletions} exceed cap {MaxCompletions.Value}. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        return this with
+        {
+            EstimatedCompletions = estimatedCompletions,
+            ExpectedJavaDirectorMaxRetries = expectedCheckpoints > 0 ? expectedJavaRetries : null,
+            HadConfigError = hadConfigError,
+            Warnings = warnings
+        };
+    }
+
+    private void ValidateExactPaidShape(RefineryScenarioRunnerRequest request, int expectedCheckpoints, List<string> warnings, ref bool hadConfigError)
+    {
+        if (request.Seeds.Count != 2)
+        {
+            warnings.Add($"Warning: {PaidPreset} requires exactly 2 seeds; got {request.Seeds.Count}. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        if (request.Planners.Count != 1)
+        {
+            warnings.Add($"Warning: {PaidPreset} requires exactly 1 planner; got {request.Planners.Count}. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        if (request.Configs.Count != 1)
+        {
+            warnings.Add($"Warning: {PaidPreset} requires exactly 1 config; got {request.Configs.Count}. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        foreach (var config in request.Configs)
+        {
+            var scheduledCount = RefineryCheckpointScheduler.Create(this, config.Ticks).ScheduledTicks.Count;
+            if (scheduledCount != expectedCheckpoints)
+            {
+                warnings.Add($"Warning: {PaidPreset} requires exactly {expectedCheckpoints} checkpoint(s) per run; got {scheduledCount} for config '{config.Name}'. Exiting with config_error.");
+                hadConfigError = true;
+            }
+        }
+    }
+
+    private static (bool Accepted, string Message) ValidateRehearsalArtifact(string? manifestPath)
+    {
+        if (string.IsNullOrWhiteSpace(manifestPath))
+            return (false, "missing WORLDSIM_SCENARIO_REFINERY_REHEARSAL_ARTIFACT");
+        if (!File.Exists(manifestPath))
+            return (false, "manifest not found");
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var root = document.RootElement;
+            var accepted = GetString(root, "laneType") == "refinery"
+                && GetBool(root, "refineryEnabled") == true
+                && GetString(root, "refineryProfile") == "validator"
+                && GetInt(root, "exitCode") == 0
+                && GetInt(root, "checkpointCount") is > 0
+                && GetInt(root, "refineryRequestFailedCount") == 0
+                && GetInt(root, "refineryApplyFailedCount") == 0;
+            return accepted ? (true, "green") : (false, "manifest is not GREEN validator rehearsal");
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
+        {
+            return (false, "manifest unreadable");
+        }
+    }
+
+    private static string? NormalizeRehearsalManifestPath(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+        var path = Path.GetFullPath(raw);
+        return Directory.Exists(path) ? Path.Combine(path, "manifest.json") : path;
+    }
+
+    private static string? GetString(JsonElement root, string property)
+        => root.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    private static bool? GetBool(JsonElement root, string property)
+        => root.TryGetProperty(property, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : null;
+
+    private static int? GetInt(JsonElement root, string property)
+        => root.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var parsed) ? parsed : null;
+
+    private static int? ValidatePaidIntEnv(string key, int min, int max, bool required, List<string> warnings, ref bool hadConfigError)
+    {
+        var raw = Environment.GetEnvironmentVariable(key);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            if (required)
+            {
+                warnings.Add($"Warning: refinery_live_paid requires explicit {key}. Exiting with config_error.");
+                hadConfigError = true;
+            }
+            return null;
+        }
+
+        if (!int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        {
+            warnings.Add($"Warning: refinery_live_paid requires numeric {key}; got '{raw}'. Exiting with config_error.");
+            hadConfigError = true;
+            return null;
+        }
+
+        if (parsed < min || parsed > max)
+        {
+            warnings.Add($"Warning: refinery_live_paid {key} must be between {min} and {max}; got {parsed}. Exiting with config_error.");
+            hadConfigError = true;
+        }
+
+        return parsed;
     }
 
     public RefineryRuntimeOptions ToRuntimeOptions()
@@ -754,13 +1154,29 @@ internal sealed record RefineryScenarioOptions(
             ApplyToWorld: true,
             MinTriggerIntervalMs: 0,
             DirectorMaxBudget: DirectorMaxBudget,
-            OperatorProfileName: RefineryProfile == "fixture" ? RefineryRuntimeOptions.ProfileFixtureSmoke : RefineryRuntimeOptions.ProfileLiveMock);
+            OperatorProfileName: RefineryProfile switch
+            {
+                "fixture" => RefineryRuntimeOptions.ProfileFixtureSmoke,
+                "live_mock" => RefineryRuntimeOptions.ProfileLiveMock,
+                _ => RefineryRuntimeOptions.ProfileLiveDirector
+            });
     }
 
     private static string ReadToken(string key, string fallback)
     {
         var raw = Environment.GetEnvironmentVariable(key);
         return string.IsNullOrWhiteSpace(raw) ? fallback : raw.Trim().ToLowerInvariant().Replace('-', '_');
+    }
+
+    private static bool IsEnvPresent(string key)
+        => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(key));
+
+    private static bool ReadBool(string key)
+    {
+        var raw = Environment.GetEnvironmentVariable(key);
+        return string.Equals(raw, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(raw, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(raw, "yes", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int ReadIntClamped(string key, int fallback, int min, int max)
@@ -838,6 +1254,13 @@ internal sealed record RefineryRunEnvelope(
     int RequestTimeoutMs,
     int RetryCount,
     double DirectorMaxBudget,
+    string? PaidPreset,
+    int? EstimatedCompletions,
+    int? MaxCompletions,
+    int? ExpectedJavaDirectorMaxRetries,
+    bool PaidConfirmPresent,
+    string? RehearsalArtifact,
+    bool CostEstimateOnly,
     int SeedCount,
     int PlannerCount,
     int ConfigCount,
@@ -882,6 +1305,12 @@ internal sealed record RefineryCheckpointRecord(
     IReadOnlyList<string> DirectorSolverUnsupported,
     IReadOnlyList<string> DirectorSolverDiagnostic,
     IReadOnlyList<string> SolverParseWarnings,
+    string? LlmStage,
+    int? LlmCompletionCount,
+    int? LlmRetryRounds,
+    string? LlmCandidateSanitized,
+    IReadOnlyList<string> LlmCandidateSanitizeTags,
+    int? CausalChainOps,
     string ActionStatus,
     long SettleLatencyMs,
     int WarningsCount,
@@ -912,7 +1341,13 @@ internal sealed record RefinerySummary(
     Dictionary<string, int> DirectorSolverExtractionHistogram,
     Dictionary<string, int> DirectorSolverValidatedCoverageCheckpointCounts,
     Dictionary<string, int> DirectorSolverUnsupportedCheckpointCounts,
-    Dictionary<string, int> DirectorSolverDiagnosticCounts);
+    Dictionary<string, int> DirectorSolverDiagnosticCounts,
+    Dictionary<string, int> LlmStageHistogram,
+    int? ObservedCompletionCount,
+    int? ObservedRetryRounds,
+    Dictionary<string, int> LlmCandidateSanitizedHistogram,
+    Dictionary<string, int> LlmCandidateSanitizeTagCounts,
+    int? CausalChainOpsTotal);
 
 internal sealed record RefineryAssertionResult(
     string InvariantId,
@@ -959,6 +1394,14 @@ internal sealed record RefineryArtifactManifest(
     int RequestTimeoutMs,
     int RetryCount,
     double DirectorMaxBudget,
+    string? PaidPreset,
+    int? EstimatedCompletions,
+    int? MaxCompletions,
+    int? ExpectedJavaDirectorMaxRetries,
+    int? ObservedCompletionCount,
+    bool PaidConfirmPresent,
+    string? RehearsalArtifact,
+    bool CostEstimateOnly,
     int RefineryAppliedCount,
     int RefineryApplyFailedCount,
     int RefineryRequestFailedCount,

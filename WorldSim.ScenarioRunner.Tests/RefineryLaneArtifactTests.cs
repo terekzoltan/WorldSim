@@ -265,28 +265,374 @@ public sealed class RefineryLaneArtifactTests
         Assert.Contains(anomalies.RootElement.EnumerateArray(), anomaly => anomaly.GetProperty("id").GetString() == "ANOM-RDIR-SOLVER-MARKER-UNKNOWN");
     }
 
-    [Theory]
-    [InlineData("refinery_live_paid")]
-    [InlineData("refinery_live_validator")]
-    public void RefineryDeferredProfiles_ReturnConfigError(string lane)
+    [Fact]
+    public void RefineryLiveValidator_DoesNotRequirePaidConfirmOrRehearsal()
     {
         var artifactDir = CreateArtifactDir();
+        using var server = TemporaryPatchServer.Start(CreateResponseJson(
+            "directorStage:refinery-validated",
+            "directorOutputMode:both",
+            "budgetUsed:1.000",
+            "llmStage:disabled",
+            "llmCompletionCount:0",
+            "llmRetryRounds:0"));
         var exitCode = RunScenarioRunner(
             artifactDir,
             new Dictionary<string, string>
             {
-                ["WORLDSIM_SCENARIO_LANE"] = lane,
+                ["WORLDSIM_SCENARIO_LANE"] = "refinery_live_validator",
                 ["WORLDSIM_SCENARIO_SEEDS"] = "101",
                 ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
-                ["WORLDSIM_SCENARIO_TICKS"] = "2"
+                ["WORLDSIM_SCENARIO_TICKS"] = "2",
+                ["WORLDSIM_SCENARIO_REFINERY_TRIGGER_EVERY"] = "1",
+                ["WORLDSIM_SCENARIO_REFINERY_WAIT_TIMEOUT_MS"] = "3000",
+                ["WORLDSIM_SCENARIO_REFINERY_REQUEST_TIMEOUT_MS"] = "500",
+                ["REFINERY_BASE_URL"] = server.BaseUrl,
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json"
             },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        Assert.True(server.RequestCount > 0, $"Expected validator HTTP request\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("validator", manifest.RootElement.GetProperty("refineryProfile").GetString());
+        Assert.False(manifest.RootElement.GetProperty("paidConfirmPresent").GetBoolean());
+        Assert.Equal(1, manifest.RootElement.GetProperty("checkpointCount").GetInt32());
+        using var refinerySummary = ReadJson(Path.Combine(artifactDir, "refinery", "summary.json"));
+        Assert.Equal(0, refinerySummary.RootElement.GetProperty("observedCompletionCount").GetInt32());
+        Assert.Equal(0, refinerySummary.RootElement.GetProperty("observedRetryRounds").GetInt32());
+    }
+
+    [Fact]
+    public void RefineryLiveValidator_ObservedCompletion_ReturnsAnomalyGateFail()
+    {
+        var artifactDir = CreateArtifactDir();
+        using var server = TemporaryPatchServer.Start(CreateResponseJson(
+            "directorStage:refinery-validated",
+            "directorOutputMode:both",
+            "budgetUsed:1.000",
+            "llmStage:candidate",
+            "llmCompletionCount:1",
+            "llmRetryRounds:0"));
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_LANE"] = "refinery_live_validator",
+                ["WORLDSIM_SCENARIO_SEEDS"] = "101",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_TICKS"] = "2",
+                ["WORLDSIM_SCENARIO_REFINERY_TRIGGER_EVERY"] = "1",
+                ["WORLDSIM_SCENARIO_REFINERY_WAIT_TIMEOUT_MS"] = "3000",
+                ["WORLDSIM_SCENARIO_REFINERY_REQUEST_TIMEOUT_MS"] = "500",
+                ["REFINERY_BASE_URL"] = server.BaseUrl,
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json"
+            },
+            out _,
+            out _);
+
+        Assert.Equal(4, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("anomaly_gate_fail", manifest.RootElement.GetProperty("exitReason").GetString());
+        Assert.Equal(1, manifest.RootElement.GetProperty("observedCompletionCount").GetInt32());
+        using var anomalies = ReadJson(Path.Combine(artifactDir, "anomalies.json"));
+        Assert.Contains(anomalies.RootElement.EnumerateArray(), anomaly => anomaly.GetProperty("id").GetString() == "ANOM-RDIR-VALIDATOR-PAID-COMPLETION");
+    }
+
+    [Fact]
+    public void RefineryLivePaid_MissingConfirm_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_REFINERY_PAID_CONFIRM", string.Empty),
             out _,
             out _);
 
         Assert.Equal(3, exitCode);
         using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
         Assert.Equal("config_error", manifest.RootElement.GetProperty("exitReason").GetString());
+        Assert.False(manifest.RootElement.GetProperty("paidConfirmPresent").GetBoolean());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_MissingRehearsal_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var env = ValidPaidMicroEnv(CreateArtifactDir());
+        env.Remove("WORLDSIM_SCENARIO_REFINERY_REHEARSAL_ARTIFACT");
+        var exitCode = RunScenarioRunner(artifactDir, env, out _, out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("config_error", manifest.RootElement.GetProperty("exitReason").GetString());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_RedRehearsal_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 1, applyFailed: 0);
+        var exitCode = RunScenarioRunner(artifactDir, ValidPaidMicroEnv(rehearsalDir), out _, out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("config_error", manifest.RootElement.GetProperty("exitReason").GetString());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_FullCapture_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_REFINERY_CAPTURE", "full"),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("config_error", manifest.RootElement.GetProperty("exitReason").GetString());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_WrongPresetShape_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_SEEDS", "101"),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal(1, manifest.RootElement.GetProperty("estimatedCompletions").GetInt32());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_WrongPlannerShape_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_PLANNERS", "simple,goap"),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal(4, manifest.RootElement.GetProperty("estimatedCompletions").GetInt32());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_WrongConfigShape_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var configsJson = "[{\"Name\":\"a\",\"Width\":64,\"Height\":40,\"InitialPop\":24,\"Ticks\":4,\"Dt\":0.25,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0},{\"Name\":\"b\",\"Width\":64,\"Height\":40,\"InitialPop\":24,\"Ticks\":4,\"Dt\":0.25,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0}]";
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_CONFIGS_JSON", configsJson),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal(4, manifest.RootElement.GetProperty("estimatedCompletions").GetInt32());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_WrongCheckpointShape_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(
+                WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_REFINERY_TRIGGER_TICKS", "2,3"),
+                "WORLDSIM_SCENARIO_REFINERY_MAX_TRIGGERS",
+                "2"),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal(2, manifest.RootElement.GetProperty("estimatedCompletions").GetInt32());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_InvalidNumericEnv_ReturnsConfigErrorInsteadOfClamping()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_REFINERY_MAX_TRIGGERS", "not-a-number"),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("config_error", manifest.RootElement.GetProperty("exitReason").GetString());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_CustomPreset_IsDeferredConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_REFINERY_PAID_PRESET", "custom"),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("custom", manifest.RootElement.GetProperty("paidPreset").GetString());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_EstimateCapFail_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_REFINERY_MAX_COMPLETIONS", "1"),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal(2, manifest.RootElement.GetProperty("estimatedCompletions").GetInt32());
+        Assert.Equal(1, manifest.RootElement.GetProperty("maxCompletions").GetInt32());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_MissingExpectedJavaRetries_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var env = ValidPaidMicroEnv(rehearsalDir);
+        env.Remove("WORLDSIM_SCENARIO_REFINERY_EXPECTED_JAVA_MAX_RETRIES");
+        var exitCode = RunScenarioRunner(artifactDir, env, out _, out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("config_error", manifest.RootElement.GetProperty("exitReason").GetString());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_WrongExpectedJavaRetries_ReturnsConfigError()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_REFINERY_EXPECTED_JAVA_MAX_RETRIES", "1"),
+            out _,
+            out _);
+
+        Assert.Equal(3, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("config_error", manifest.RootElement.GetProperty("exitReason").GetString());
+    }
+
+    [Fact]
+    public void RefineryLivePaid_FakeServerSuccess_StaysWithinObservedCap()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        using var server = TemporaryPatchServer.Start(CreateResponseJson(
+            "directorStage:refinery-validated",
+            "directorOutputMode:both",
+            "budgetUsed:1.000",
+            "llmStage:candidate",
+            "llmCompletionCount:1",
+            "llmRetryRounds:0"));
+
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "REFINERY_BASE_URL", server.BaseUrl),
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        Assert.True(server.RequestCount > 0, $"Expected paid fake-server request\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("live_paid", manifest.RootElement.GetProperty("refineryProfile").GetString());
+        Assert.Equal("paid_micro_total2", manifest.RootElement.GetProperty("paidPreset").GetString());
+        Assert.Equal(2, manifest.RootElement.GetProperty("estimatedCompletions").GetInt32());
+        Assert.Equal(2, manifest.RootElement.GetProperty("observedCompletionCount").GetInt32());
+        Assert.Equal(0, manifest.RootElement.GetProperty("expectedJavaDirectorMaxRetries").GetInt32());
+        Assert.True(File.Exists(Path.Combine(artifactDir, "refinery", "scorecard.json")));
+        AssertArtifactsDoNotContainSecrets(artifactDir);
+    }
+
+    [Fact]
+    public void RefineryLivePaid_ObservedCompletionOverCap_ReturnsAnomalyGateFail()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        using var server = TemporaryPatchServer.Start(CreateResponseJson(
+            "directorStage:refinery-validated",
+            "directorOutputMode:both",
+            "budgetUsed:1.000",
+            "llmStage:candidate",
+            "llmCompletionCount:9",
+            "llmRetryRounds:0"));
+
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(ValidPaidMicroEnv(rehearsalDir), "REFINERY_BASE_URL", server.BaseUrl),
+            out _,
+            out _);
+
+        Assert.Equal(4, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("anomaly_gate_fail", manifest.RootElement.GetProperty("exitReason").GetString());
+        Assert.Equal(18, manifest.RootElement.GetProperty("observedCompletionCount").GetInt32());
+        using var anomalies = ReadJson(Path.Combine(artifactDir, "anomalies.json"));
+        Assert.Contains(anomalies.RootElement.EnumerateArray(), anomaly => anomaly.GetProperty("id").GetString() == "ANOM-RDIR-PAID-COMPLETION-CAP-EXCEEDED");
+    }
+
+    [Fact]
+    public void RefineryLivePaid_CostEstimateOnly_WritesPreflightArtifactWithoutHttpCall()
+    {
+        var artifactDir = CreateArtifactDir();
+        var rehearsalDir = CreateRehearsalArtifact(exitCode: 0, requestFailed: 0, applyFailed: 0);
+        var rehearsalManifestPath = Path.Combine(rehearsalDir, "manifest.json");
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            WithEnv(
+                WithEnv(
+                    WithEnv(ValidPaidMicroEnv(rehearsalDir), "WORLDSIM_SCENARIO_REFINERY_REHEARSAL_ARTIFACT", rehearsalManifestPath),
+                    "WORLDSIM_SCENARIO_REFINERY_COST_ESTIMATE_ONLY",
+                    "true"),
+                "REFINERY_BASE_URL",
+                "http://127.0.0.1:65529"),
+            out _,
+            out _);
+
+        Assert.Equal(0, exitCode);
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal("live_paid", manifest.RootElement.GetProperty("refineryProfile").GetString());
+        Assert.True(manifest.RootElement.GetProperty("costEstimateOnly").GetBoolean());
+        Assert.Equal(2, manifest.RootElement.GetProperty("estimatedCompletions").GetInt32());
+        Assert.Equal(8, manifest.RootElement.GetProperty("maxCompletions").GetInt32());
+        Assert.True(manifest.RootElement.GetProperty("paidConfirmPresent").GetBoolean());
+        Assert.Equal(rehearsalManifestPath, manifest.RootElement.GetProperty("rehearsalArtifact").GetString());
         Assert.Equal(0, manifest.RootElement.GetProperty("checkpointCount").GetInt32());
+        Assert.True(File.Exists(Path.Combine(artifactDir, "refinery", "preflight.json")));
+
+        AssertArtifactsDoNotContainSecrets(artifactDir);
     }
 
     [Fact]
@@ -392,6 +738,13 @@ public sealed class RefineryLaneArtifactTests
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_RETRY_COUNT");
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_FIXTURE_RESPONSE");
         startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_CAPTURE");
+        startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_PAID_PRESET");
+        startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_PAID_CONFIRM");
+        startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_REHEARSAL_ARTIFACT");
+        startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_MAX_COMPLETIONS");
+        startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_COST_ESTIMATE_ONLY");
+        startInfo.Environment.Remove("WORLDSIM_SCENARIO_REFINERY_EXPECTED_JAVA_MAX_RETRIES");
+        startInfo.Environment.Remove("PLANNER_LLM_API_KEY");
         startInfo.Environment.Remove("REFINERY_BASE_URL");
         startInfo.Environment.Remove("WORLDSIM_VISUAL_PROFILE");
 
@@ -402,6 +755,58 @@ public sealed class RefineryLaneArtifactTests
         stdout = result.Stdout;
         stderr = result.Stderr;
         return result.ExitCode;
+    }
+
+    private static Dictionary<string, string> ValidPaidMicroEnv(string rehearsalDir)
+        => new(StringComparer.Ordinal)
+        {
+            ["WORLDSIM_SCENARIO_LANE"] = "refinery_live_paid",
+            ["WORLDSIM_SCENARIO_SEEDS"] = "101,202",
+            ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+            ["WORLDSIM_SCENARIO_TICKS"] = "4",
+            ["WORLDSIM_SCENARIO_REFINERY_TRIGGER_POLICY"] = "tick_list",
+            ["WORLDSIM_SCENARIO_REFINERY_TRIGGER_TICKS"] = "2",
+            ["WORLDSIM_SCENARIO_REFINERY_MAX_TRIGGERS"] = "1",
+            ["WORLDSIM_SCENARIO_REFINERY_WAIT_TIMEOUT_MS"] = "3000",
+            ["WORLDSIM_SCENARIO_REFINERY_REQUEST_TIMEOUT_MS"] = "500",
+            ["WORLDSIM_SCENARIO_REFINERY_RETRY_COUNT"] = "0",
+            ["WORLDSIM_SCENARIO_REFINERY_EXPECTED_JAVA_MAX_RETRIES"] = "0",
+            ["WORLDSIM_SCENARIO_REFINERY_PAID_PRESET"] = "paid_micro_total2",
+            ["WORLDSIM_SCENARIO_REFINERY_PAID_CONFIRM"] = "I_UNDERSTAND_OPENROUTER_COSTS",
+            ["WORLDSIM_SCENARIO_REFINERY_REHEARSAL_ARTIFACT"] = rehearsalDir,
+            ["WORLDSIM_SCENARIO_OUTPUT"] = "json"
+        };
+
+    private static Dictionary<string, string> WithEnv(Dictionary<string, string> env, string key, string value)
+    {
+        env[key] = value;
+        return env;
+    }
+
+    private static string CreateRehearsalArtifact(int exitCode, int requestFailed, int applyFailed)
+    {
+        var dir = CreateArtifactDir();
+        var manifest = new JsonObject
+        {
+            ["schemaVersion"] = "smr/v1",
+            ["laneType"] = "refinery",
+            ["refineryEnabled"] = true,
+            ["refineryProfile"] = "validator",
+            ["exitCode"] = exitCode,
+            ["checkpointCount"] = 1,
+            ["refineryRequestFailedCount"] = requestFailed,
+            ["refineryApplyFailedCount"] = applyFailed
+        };
+        File.WriteAllText(Path.Combine(dir, "manifest.json"), manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        return dir;
+    }
+
+    private static void AssertArtifactsDoNotContainSecrets(string artifactDir)
+    {
+        var allArtifacts = string.Join('\n', Directory.EnumerateFiles(artifactDir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+        Assert.DoesNotContain("I_UNDERSTAND_OPENROUTER_COSTS", allArtifacts, StringComparison.Ordinal);
+        Assert.DoesNotContain("PLANNER_LLM_API_KEY", allArtifacts, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Authorization", allArtifacts, StringComparison.OrdinalIgnoreCase);
     }
 
     private static JsonDocument ReadJson(string path)
