@@ -1775,10 +1775,79 @@ Proof targets:
 
 ---
 
+## Wave 8.6 — Guardrailed Paid LLM Director SMR Pilot
+
+Source of truth:
+- `Docs/Plans/Master/Wave8.6-Paid-Live-Director-SMR-Plan.md`
+
+Purpose:
+- Pull a small, safe part of paid-live Refinery evidence forward before Wave 9.
+- Prove that `ScenarioRunner` can run no-cost validator rehearsal and tightly capped paid LLM Director pilots through the real runtime/adapter path.
+- Keep paid behavior local-only, explicit opt-in, advisory, and excluded from default `core`, generic `all`, CI, and Wave 9 closeout gates.
+
+Wave turn-gate:
+- Wave 8.6 is `READY` only after Wave 8.5 `TR2-D` is `✅`.
+- Wave 9 Step 1 is intentionally serialized behind Wave 8.6 closeout by current Meta decision.
+- Reason: paid-live Director evidence can inform SMR/balance workflow design before the supply/campaign growth wave starts.
+
+### Sprint D8.6: Paid-live Director evidence pilot (Track D -> Track B -> SMR Analyst)
+
+- ⬜ **W8.6-D1** Paid/validator LLM policy lock + scorecard semantics (Track D)
+- ⬜ **W8.6-B1** ScenarioRunner validator rehearsal + paid preset guardrails (Track B)
+- ⬜ **W8.6-SMR1** No-cost rehearsal + `paid_micro_total2` evidence review (SMR Analyst / Meta)
+- ⬜ **W8.6-SMR2** Optional `paid_probe_2x2x2` evidence review (SMR Analyst / Meta, non-blocking unless Meta promotes it)
+
+### Wave 8.6 — Execution Steps
+
+**Step 1 — Track D policy lock**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | W8.6-D1 | TR2-D ✅ | Lock Java LLM policy, completion/retry semantics, marker/telemetry meaning, scorecard taxonomy, and Track B handoff without enabling paid by default |
+
+**Step 2 — opens when W8.6-D1 ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | W8.6-B1 | W8.6-D1 ✅ | Enable no-cost validator rehearsal and paid presets only behind explicit confirm, cost estimate, hard cap, rehearsal gate, and safe artifact policy |
+
+**Step 3 — opens when W8.6-B1 ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst / Meta | W8.6-SMR1 | W8.6-B1 ✅ | Run/review mandatory no-cost rehearsal and `paid_micro_total2` local paid pilot; write evidence summary and Wave 9 go/no-go recommendation |
+
+**Optional Step 4 — only after W8.6-SMR1 GREEN and explicit user approval**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst / Meta | W8.6-SMR2 | W8.6-SMR1 GREEN + explicit approval | Run/review `paid_probe_2x2x2`; this is optional and does not block Wave 9 unless Meta promotes it based on micro evidence |
+
+Wave 8.6 policy notes:
+- `paid_micro_total2`: 2 seeds, 1 checkpoint per run, max 1 completion per checkpoint, total estimated completions 2, concurrency 1.
+- `paid_probe_2x2x2`: 2 seeds, 2 checkpoints per run, max 2 completions per checkpoint, total estimated completions 8, concurrency 1.
+- Paid runs require local manual API-key setup and explicit confirmation; no API key may be committed or captured in artifacts.
+- No-cost rehearsal is mandatory before paid.
+- Default model remains Java default `openai/gpt-5.4-mini` unless W8.6-D1 changes it explicitly.
+
+Proof targets:
+- Paid cannot run without explicit confirmation and GREEN rehearsal proof.
+- Estimated completion cap is printed, persisted, and enforced.
+- `core` and generic `all` remain no-paid paths.
+- Scorecard covers balance stability, director creativity, failure hardening, and formal/refinery quality.
+- Paid evidence remains advisory and local-only.
+
+**Critical path:** `W8.6-D1 -> W8.6-B1 -> W8.6-SMR1`. `W8.6-SMR2` is optional.
+
+---
+
 ## Wave 9 — Army Supply + Campaign Start (Combat Phase 5b + 6a)
 
 SMR closeout source of truth:
 - `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`
+
+Wave turn-gate:
+- Wave 9 is `READY` only after Wave 8.6 closeout is `✅`.
 
 ### Sprint C9: Army Supply Model (Track B -> C)
 
@@ -1808,7 +1877,7 @@ SMR closeout source of truth:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P5-F | Wave 8 ✅ | Aggregate army supply and consumption rules are the base for every later campaign step |
+| Track B agent | P5-F | Wave 8.6 ✅ | Aggregate army supply and consumption rules are the base for every later campaign step |
 
 **Step 2 — opens when P5-F ✅**
 
@@ -2163,12 +2232,13 @@ Wave 12: Improve codebase architecture
 | 7.5 | — | LC1 (Low-Cost baseline) | Staged parallel after `LC1-B1` |
 | 8 | — | C8 (Phase 5 S8) | Mostly sequential; final Track A consume |
 | 8.5 | TR2 (Tools.Refinery Phase TR2) | — | Director-only sidecar; sequential inside wave, parallel-eligible with Combat Waves 8-10 once Wave 7 + consult gate hold |
+| 8.6 | Paid LLM Director SMR Pilot | — | Guardrailed local-only paid pilot before Wave 9; Track D -> Track B -> SMR Analyst |
 | 9 | — | C9-C10 (Phase 5-6 S9-10) | Mostly sequential; Track A only at final campaign overlay consume |
 | 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential by phase, parallel consumer steps inside phases |
 | 10.5 | TR3 (Tools.Refinery Phase TR3) | — | Director-only convergence after Wave 10 and Wave 8.5 |
 | 11 | — | E11 (Closed-loop ecology redesign) | Runtime-first; Track C/B/SMR after lifecycle core; Track A debug consume late |
 
-**Totals:** 17 wave entries, 31 named sprints/sidecar blocks, ~116 epics.
+**Totals:** 18 wave entries, 32 named sprints/sidecar blocks, ~120 epics.
 
 ---
 
@@ -2183,6 +2253,7 @@ Wave 12: Improve codebase architecture
 | Wave 7 complete + telemetry/operator readability follow-up desired | Wave 7.1 telemetry/operator cleanup kickoff | `Docs/Plans/Master/Post-Wave7-Telemetry-Operator-UX-Cleanup-Plan.md` |
 | Wave 7 complete | Low-Cost 2D alignment / Wave 7.5 kickoff | `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` |
 | Wave 7 complete + TR1-C consult note locked | Tools.Refinery TR2 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
+| Wave 8.5 complete + paid LLM Director pilot desired before Wave 9 | Wave 8.6 paid-live SMR pilot kickoff | `Docs/Plans/Master/Wave8.6-Paid-Live-Director-SMR-Plan.md` |
 | Wave 10 complete + Track A polish bandwidth available | Track A visual overhaul refresh triage | `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md` |
 | Wave 10 complete + Wave 8.5 complete | Tools.Refinery TR3 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
 | Wave 10.5 complete + ecology redesign desired | Wave 11 closed-loop ecology kickoff | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |

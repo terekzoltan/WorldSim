@@ -2,7 +2,7 @@
 
 Status: planning approved
 Owner: Track B primary for `WorldSim.ScenarioRunner` lane work, Track D primary for refinery semantics and live-path policy
-Last updated: 2026-04-04
+Last updated: 2026-05-04
 
 ## 1. Purpose
 
@@ -60,6 +60,11 @@ The following decisions are locked unless a later explicit planning pass changes
   - default max triggers = `1`
   - hard cap max triggers = `3`
   - explicit opt-in only
+- Wave 8.6 paid pilot presets:
+  - `paid_micro_total2` -> 2 seeds, 1 checkpoint/run, 1 completion/checkpoint, estimated completions 2
+  - `paid_probe_2x2x2` -> 2 seeds, 2 checkpoints/run, 2 completions/checkpoint, estimated completions 8
+  - paid concurrency remains `1`
+  - no-cost rehearsal is mandatory before paid
 
 ## 4. Why A Separate Refinery Lane Exists
 
@@ -181,6 +186,10 @@ These are code-enforced defaults, not documentation-only preferences.
 - explicit timeout required
 - explicit settle timeout required
 - explicit cost estimate logged before the run starts
+- explicit paid confirmation required
+- no-cost rehearsal proof required before paid
+- paid concurrency hard-locked to `1` in Wave 8.6
+- Wave 8.6 estimated completion hard cap = `8`
 
 ### 7.3 Cost ceiling model
 
@@ -188,7 +197,7 @@ For `refinery_live_paid`, the runner should estimate an upper-bound completion b
 
 Recommended estimate:
 
-`maxTriggers * (REFINERY_RETRY_COUNT + 1) * (PLANNER_DIRECTOR_MAX_RETRIES + 1)`
+`run_count * checkpoints_per_run * (REFINERY_RETRY_COUNT + 1) * (PLANNER_DIRECTOR_MAX_RETRIES + 1)`
 
 This estimate does not need to be financially exact. Its purpose is to stop obviously unsafe run shapes before they start.
 
@@ -222,6 +231,11 @@ Recommended runner-facing env vars:
 | `WORLDSIM_SCENARIO_REFINERY_CAPTURE_TELEMETRY` | whether to persist Java telemetry snapshots when available |
 | `WORLDSIM_SCENARIO_REFINERY_ABORT_ON_APPLY_FAIL` | abort policy toggle |
 | `WORLDSIM_SCENARIO_REFINERY_ABORT_ON_REQUEST_FAIL` | abort policy toggle |
+| `WORLDSIM_SCENARIO_REFINERY_PAID_PRESET` | `paid_micro_total2`, `paid_probe_2x2x2`, or bounded `custom` |
+| `WORLDSIM_SCENARIO_REFINERY_PAID_CONFIRM` | explicit local confirmation string for paid runs |
+| `WORLDSIM_SCENARIO_REFINERY_REHEARSAL_ARTIFACT` | path to accepted no-cost rehearsal artifact required before paid |
+| `WORLDSIM_SCENARIO_REFINERY_MAX_COMPLETIONS` | hard cap for estimated paid completions |
+| `WORLDSIM_SCENARIO_REFINERY_COST_ESTIMATE_ONLY` | preflight/dry-run mode for cost estimate without paid calls |
 
 Internal mapping rule:
 
@@ -406,7 +420,8 @@ Acceptance:
 
 - `validated` vs `fallback` outcomes are visible in artifacts,
 - budget and warning markers remain operator-readable,
-- and the validator path is diagnosable without the app.
+- the validator path is diagnosable without the app,
+- and Wave 8.6 paid runs cannot start until this no-cost rehearsal or equivalent staged rehearsal is GREEN.
 
 ### Phase 3 - `refinery_live_paid`
 
@@ -419,7 +434,10 @@ Acceptance:
 - paid runs are opt-in,
 - trigger cap and cost estimate enforcement works,
 - capture defaults remain safe,
-- and the lane is advisory evidence only.
+- the lane is advisory evidence only,
+- `paid_micro_total2` is the first blocking paid preset,
+- `paid_probe_2x2x2` is optional unless Meta explicitly promotes it after micro evidence,
+- and no paid run may exceed 8 estimated completions in Wave 8.6.
 
 ### Phase 4 - Policy maturation
 
@@ -461,15 +479,28 @@ Combined should stay high level and only record:
 - that Track B owns the ScenarioRunner lane/tooling surface,
 - and that the first shipped slice is `fixture + live_mock`.
 
-### 12.2 TR3-B
+### 12.2 Wave 8.6
+
+`Wave 8.6` is the Combined-level home for the first paid-live LLM Director SMR pilot.
+
+Combined should record:
+
+- that the work is serialized before Wave 9 by current Meta decision,
+- that Track D owns paid/validator semantics and scorecard meaning,
+- that Track B owns paid/validator ScenarioRunner guardrails and artifacts,
+- that SMR Analyst owns the no-cost rehearsal plus paid micro evidence review,
+- that `refinery_live_paid` remains local-only and advisory,
+- and that paid is still excluded from default `core`, generic `all`, CI, and deterministic baselines.
+
+### 12.3 TR3-B
 
 `TR3-B` should be the Combined-level home for:
 
-- paid-live guardrail hardening,
+- follow-up paid-live guardrail hardening after the Wave 8.6 pilot,
 - fallback boundary cleanup as it affects live evidence policy,
 - and the shift toward domain-semantic scheduling such as `season_boundary`.
 
-### 12.3 TR3-C
+### 12.4 TR3-C
 
 `TR3-C` should be the Combined-level home for:
 
