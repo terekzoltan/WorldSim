@@ -19,6 +19,63 @@
 
 ---
 
+## Project State Continuity Protocol
+
+Canonical state file:
+- `ops/PROJECT_STATE.md`
+
+The state file is a compact bootloader, not a full log. It exists so a fresh Meta Coordinator, Track agent, or relevant reviewer can quickly answer where the project is, what decision was last accepted, and what concrete action comes next.
+
+Session-start rule:
+- Read `ops/PROJECT_STATE.md` first.
+- Identify the current workflow phase and next concrete action from it.
+- Continue from that action, then verify against the relevant plan/evidence files.
+- Re-plan from scratch only if the state file is stale, missing, incomplete, or contradicted by repo evidence.
+
+Session-end / handoff rule:
+- After any meaningful planning, implementation, review, fix, or handoff step, update `ops/PROJECT_STATE.md`.
+- Keep it short, operational, and current.
+- Record what changed, who acted last, what the next role should do, what should not be reopened, and which evidence should be loaded first.
+- If no state changed, the handoff must explicitly say: `No state change from this step.`
+- Do not create per-track state files unless the repo later explicitly decides to split state ownership.
+
+Gate rule:
+- No Meta Coordinator or Track agent may mark a step complete unless `ops/PROJECT_STATE.md` was updated or the handoff explicitly says `No state change from this step.`
+- The Meta Coordinator may not green-light the next step unless it checked that `ops/PROJECT_STATE.md` is fresh enough and points to the correct next role/action.
+
+Required `ops/PROJECT_STATE.md` structure:
+
+```markdown
+# Current state
+
+# Current workflow phase
+
+One of: Meta planning, Track planning, Meta plan review, Track implementation, Meta step review, Track fix / follow-up, Waiting for user decision, Blocked.
+
+# Last actor / role
+
+# Last decision
+
+# Last completed action
+
+# Next action
+
+# Next expected role
+
+# Do not think about now
+
+# Open questions / blockers
+
+# Evidence pointers
+```
+
+Review/acceptance checklist addition:
+- Before approving or green-lighting a plan/step, confirm `ops/PROJECT_STATE.md` was read and is not contradicted by repo evidence.
+- Before marking a step complete, confirm the state file is updated or the handoff contains `No state change from this step.`
+- If the state file points to a different next role/action than the submitted plan, resolve that mismatch before approval.
+
+---
+
 ## Context Compact / Refresh Policy
 
 A context compact a hosszu Meta Coordinator mukodes normalis, tudatos frissitesi pontja.
@@ -67,6 +124,7 @@ Compact elott a handoff minimum tartalma:
 Compact utan az elso lepes context restore legyen:
 
 - ha elerheto, hasznald a `context-restore` skillt
+- olvasd be eloszor az `ops/PROJECT_STATE.md` fajlt
 - csak a minimalis canonical/planning/handoff forrasokat olvasd vissza az aktualis targethez
 - ellenorizd a tenyleges repo allapotot, mielott tovabblepsz
 - ne folytasd pusztan a compressed summary alapjan, ha a canonical fajlok mast mondanak
@@ -143,14 +201,16 @@ alapertelmezetten ezt az egyseges review formatumot hasznalja, hacsak nincs eros
 
 ### Review workflow
 
-1. Ellenorizd az aktiv frontiert a `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` alapjan.
-2. Ellenorizd az ownershipot, guardrail-eket es cross-track policykat az `AGENTS.md` alapjan.
-3. Nezd meg a tervben hivatkozott kod- es docs-surface-eket a tenyleges repo allapotban.
-4. Dontsd el, hogy a terv valoban `READY`, `NOT READY`, vagy `READY with guardrails`.
-5. Azonositsd a scope-, sequencing-, contract-, ownership- es review-riskeket.
-6. Valaszold meg a track altal explicit felvetett nyitott kerdeseket.
-7. Adj rovid, track-fele kozvetlenul tovabbkuldheto summary uzenetet.
-8. Ha consult/prep artifactrol van szo, mondd ki explicit, hogy az eredmeny `PREP ONLY`, `LOCKED`, vagy `BLOCKED`.
+1. Olvasd be az `ops/PROJECT_STATE.md` fajlt, es ellenorizd, hogy a kovetkezo role/action osszhangban van-e a kapott review targettel.
+2. Ellenorizd az aktiv frontiert a `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` alapjan.
+3. Ellenorizd az ownershipot, guardrail-eket es cross-track policykat az `AGENTS.md` alapjan.
+4. Nezd meg a tervben hivatkozott kod- es docs-surface-eket a tenyleges repo allapotban.
+5. Dontsd el, hogy a terv valoban `READY`, `NOT READY`, vagy `READY with guardrails`.
+6. Azonositsd a scope-, sequencing-, contract-, ownership- es review-riskeket.
+7. Valaszold meg a track altal explicit felvetett nyitott kerdeseket.
+8. Adj rovid, track-fele kozvetlenul tovabbkuldheto summary uzenetet.
+9. Ha consult/prep artifactrol van szo, mondd ki explicit, hogy az eredmeny `PREP ONLY`, `LOCKED`, vagy `BLOCKED`.
+10. Green-light vagy closeout elott ellenorizd, hogy az `ops/PROJECT_STATE.md` frissitve van, vagy a handoff explicit `No state change from this step.` allitast tartalmaz.
 
 **Fontos:**
 

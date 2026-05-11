@@ -213,16 +213,42 @@ Projekt-szintu alapelv:
 - A latvanyosabb post-fx / capture / cinematic utak csak raepulhetnek erre az alapra, nem cserelhetik le.
 - A low-cost strategy nem irhatja felul a snapshot boundary-t: a `Graphics` nem szamolhat gameplay/allapot logikat sajat maga.
 
+## Project State Continuity Protocol
+
+Cel:
+- A repo mindig tartalmazzon egy rovid, aktualis mental-cache fajlt a kovetkezo Meta/Track/Reviewer session gyors es konzisztens inditasahoz.
+
+Canonical state file:
+- `ops/PROJECT_STATE.md`
+
+Kotelezo session-start szabaly minden Meta Coordinator es Track agent szamara:
+- Eloszor olvasd el az `ops/PROJECT_STATE.md` fajlt.
+- Azonositsd belole az aktualis workflow fazist es a kovetkezo konkret actiont.
+- Ezutan ellenorizd a relevans tervet, statuszt es evidence-t.
+- Ne tervezz ujra nullarol, kiveve ha a state fajl stale, hianyos, hianyzik, vagy ellentmond a repo evidence-nek.
+
+Kotelezo session-end / handoff szabaly:
+- Minden meaningful planning, implementation, review, fix vagy handoff lepes vegen frissitsd az `ops/PROJECT_STATE.md` fajlt.
+- Tartsd roviden: bootloader, nem naplo.
+- Csak operationalisan hasznos kontextust irj bele: hol tartunk, utolso elfogadott dontes, ki lepett utoljara, kovetkezo konkret action, mit ne nyissunk ujra, es mely evidence-t kell eloszor betolteni.
+- Ha egy lepes tenyleg nem valtoztat state-et, a handoffban explicit szerepeljen: `No state change from this step.`
+- Kulon track state fajlokat nem kell letrehozni; minden track a kozos project-level state-et frissiti.
+
+Gate szabaly:
+- Meta Coordinator vagy Track agent nem jelolhet stepet kesznek, ha az `ops/PROJECT_STATE.md` nincs frissitve vagy nincs explicit `No state change from this step.` allitas.
+- Meta Coordinator nem green-lightolhatja a kovetkezo lepest, amig nem ellenorizte, hogy az `ops/PROJECT_STATE.md` eleg friss es a helyes kovetkezo role/action fele mutat.
+
 ## Wave turn-gate protocol (all track agents)
 
 Cel:
 - A wave/sprint sorrend es dependency-k kotelezo betartasa, hogy ne induljon el blokkolo elofeltetel nelkul implementacio.
 
 Szabaly:
+- Minden implementation/review elejen eloszor az `ops/PROJECT_STATE.md` fajlt kell olvasni, utana a sequencing tervet.
 - Minden implementacio elejen az adott agent ellenorzi a `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` statuszait es dependency sorrendjet.
 - Ha elofeltetel hianyzik: kotelezo `NOT READY` jelzes a usernek/koordinatornak, es nincs kodolas az adott epicen.
 - Ha minden elofeltetel kesz: `READY` jelzes, majd az adott epic statusza `⬜ -> 🔄`.
-- Lezaraskor (build/test/smoke zold): `🔄 -> ✅`.
+- Lezaraskor (build/test/smoke zold): `🔄 -> ✅`, es az `ops/PROJECT_STATE.md` frissitve van vagy explicit `No state change from this step.` szerepel a handoffban.
 - Masik track epicjet `✅`-re allitani csak owner visszajelzes vagy explicit koordinator jovahagyas alapjan lehet.
 
 ## Kozos uzenofal (cross-track notes)
@@ -420,3 +446,6 @@ Entries:
 - `[2026-05-04][Meta] Wave8.5 TR2-D joint closeout zarva (✅) - Track D D-part es Track B B2+evidence GREEN: solver observability gate + normalized `directorSolver*` marker contract stabil, ScenarioRunner `refinery_fixture`/`refinery_live_mock` evidence elfogadva, focused C# refinery test 10/10 es Java gate zold; `core` default es paid/validator deferred policy valtozatlan - kovetkezo lepes: Wave9/10 SMR closeout flow, TR3 csak Wave10 closeout utan`.
 - `[2026-05-04][Meta] Wave8.6 paid-live Director SMR pilot terv rogzitve - Wave9 elott rovid, guardrailed helyi paid LLM evidence slice indulhat: mandatory no-cost validator rehearsal, `paid_micro_total2` cap=2 completion, optional `paid_probe_2x2x2` cap=8 completion, concurrency=1, no CI/default paid - reszletes terv: Docs/Plans/Master/Wave8.6-Paid-Live-Director-SMR-Plan.md`.
 - `[2026-05-04][Track D] Wave8.6 W8.6-D1 status zarva (✅) - paid/validator policy lock kesz: Java defaultok biztonsagosak maradnak (`PLANNER_LLM_ENABLED=false`, default model `openai/gpt-5.4-mini`, `PLANNER_DIRECTOR_MAX_RETRIES=2` nem paid preset default), solver observability env explicit mapelve, micro/probe retry+completion semantics, marker/telemetry truth es formal/refinery scorecard taxonomy rogzitve, Track B handoff: Docs/Plans/Master/Wave8.6-W8.6-D1-Track-D-Policy-Lock-Handoff.md - kovetkezo lepes: W8.6-B1 Track B ScenarioRunner validator/paid guardrails`.
+- `[2026-05-11][Track B] Wave8.6 W8.6-B1 status zarva (✅) - ScenarioRunner validator/paid guardrails bekotve: no-cost validator lane, paid preset confirm+rehearsal gate, explicit retry/cap ellenorzes, observed completion hard gate, scorecard artifact es focused tests; commit `e423fff` - kovetkezo lepes: W8.6-SMR1 no-cost rehearsal + paid micro evidence`.
+- `[2026-05-11][SMR Analyst] Wave8.6 W8.6-SMR1 closeout elfogadva (YELLOW ✅) - validator rehearsal GREEN, `paid_micro_total2` guardrail evidence tiszta (2/2 completion, request/apply/secret gate zold), de paid checkpointokon solver-sidecar observability `directorSolverStatus=load_failure` + coverage none caveat maradt; `paid_probe_2x2x2` szandekosan nem futott, evidence: Docs/Evidence/SMR/wave8.6-paid-live-director-pilot/README.md - kovetkezo lepes: Wave9 P5-F indithato, Track D sidecar severity/load-failure fix kulon follow-up paid probe/TR3 elott`.
+- `[2026-05-11][Meta] Wave8.7 mini terv rogzitve - W8.6 paid micro sidecar caveat Wave9 elott javitando no-paid Track D korben: major/epic severity reproducer, minimal extractor/status fix, Java gate, opcionális no-cost validator artifact; nincs paid probe - reszletes terv: Docs/Plans/Master/Wave8.7-Refinery-Sidecar-Stabilization-Plan.md`.

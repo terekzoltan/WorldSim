@@ -67,12 +67,23 @@ Turn-gate legend (agent handoff safety):
 
 ### Wave Turn-Gate Protocol (all 4 track agents)
 
+- Before starting any Meta/Track/review session, read `ops/PROJECT_STATE.md` first and continue from its recorded phase and next action unless it is stale, incomplete, missing, or contradicted by repo evidence.
 - Before starting any epic, the active track agent must check current wave statuses and dependencies in this file.
 - If prerequisites are not complete, explicitly report `NOT READY` to the coordinator/user and do not start coding for that epic.
 - If prerequisites are complete, report `READY`, then switch the epic status from `⬜` to `🔄` when implementation begins.
-- After acceptance + smoke/test gates pass, switch epic status from `🔄` to `✅`.
+- After acceptance + smoke/test gates pass, switch epic status from `🔄` to `✅` only after `ops/PROJECT_STATE.md` is updated, or the handoff explicitly states `No state change from this step.`.
 - Do not mark another track's epic `✅` without explicit completion signal from that track owner (or coordinator confirmation).
 - For Wave 1 Combat sprint ordering, Track A `P0-D` is blocked until Track B snapshot additions required by P0-D are completed.
+
+### Project State Continuity Protocol
+
+- Canonical state file: `ops/PROJECT_STATE.md`.
+- Purpose: keep one compact project-level mental cache for the sequential workflow: `Meta Coordinator -> Track plan -> Meta plan review -> Track implementation -> Meta step review -> Track follow-up`.
+- Start rule: every Meta Coordinator, Track, and relevant Swarm review session reads `ops/PROJECT_STATE.md` before this sequencing plan.
+- End rule: every meaningful planning, implementation, review, fix, or handoff step updates `ops/PROJECT_STATE.md` with the current phase, last accepted decision, last actor, next concrete action, next expected role, do-not-reopen list, blockers, and evidence pointers.
+- Size rule: the state file is a bootloader, not a full log; keep it short and link to detailed evidence instead of copying it.
+- No separate per-track state files are required unless a future explicit repo decision changes this.
+- Gate rule: a Meta Coordinator may not green-light the next step unless `ops/PROJECT_STATE.md` is fresh enough and points to the correct next role/action.
 
 ---
 
@@ -1793,9 +1804,9 @@ Wave turn-gate:
 ### Sprint D8.6: Paid-live Director evidence pilot (Track D -> Track B -> SMR Analyst)
 
 - ✅ **W8.6-D1** Paid/validator LLM policy lock + scorecard semantics (Track D)
-- ⬜ **W8.6-B1** ScenarioRunner validator rehearsal + paid preset guardrails (Track B)
-- ⬜ **W8.6-SMR1** No-cost rehearsal + `paid_micro_total2` evidence review (SMR Analyst / Meta)
-- ⬜ **W8.6-SMR2** Optional `paid_probe_2x2x2` evidence review (SMR Analyst / Meta, non-blocking unless Meta promotes it)
+- ✅ **W8.6-B1** ScenarioRunner validator rehearsal + paid preset guardrails (Track B)
+- ✅ **W8.6-SMR1** No-cost rehearsal + `paid_micro_total2` evidence review (SMR Analyst / Meta, YELLOW accepted)
+- ❌ **W8.6-SMR2** Optional `paid_probe_2x2x2` evidence review (skipped for this closeout)
 
 ### Wave 8.6 — Execution Steps
 
@@ -1821,7 +1832,7 @@ Wave turn-gate:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst / Meta | W8.6-SMR2 | W8.6-SMR1 GREEN + explicit approval | Run/review `paid_probe_2x2x2`; this is optional and does not block Wave 9 unless Meta promotes it based on micro evidence |
+| SMR Analyst / Meta | W8.6-SMR2 | W8.6-SMR1 GREEN + explicit approval | Not run in this closeout: W8.6-SMR1 was YELLOW accepted, so the optional 8-completion probe is deferred |
 
 Wave 8.6 policy notes:
 - `paid_micro_total2`: 2 seeds, 1 checkpoint per run, max 1 completion per checkpoint, total estimated completions 2, concurrency 1.
@@ -1832,6 +1843,12 @@ Wave 8.6 policy notes:
 
 Wave 8.6 Step 1 closeout note:
 - ✅ `W8.6-D1` Track D policy lock completed: Java paid/validator defaults remain safe, `PLANNER_DIRECTOR_SOLVER_OBSERVABILITY_ENABLED` is explicitly mapped to the Java solver-observability property, paid preset retry semantics and marker/telemetry meanings are locked, `PLANNER_DIRECTOR_MAX_RETRIES=2` is explicitly not a paid preset default, telemetry endpoint capture is recommended but not universally mandatory, and Track B handoff lives in `Docs/Plans/Master/Wave8.6-W8.6-D1-Track-D-Policy-Lock-Handoff.md`. `W8.6-B1` is unblocked; SMR steps and full Wave 8.6 remain open.
+
+Wave 8.6 closeout note:
+- ✅ `W8.6-B1` Track B guardrails completed and committed (`e423fff`): `refinery_live_validator` and `refinery_live_paid` are enabled only through explicit ScenarioRunner lanes, paid requires confirmation + GREEN rehearsal + preset/cap checks, observed completion cap is enforced, and focused ScenarioRunner tests/build were green.
+- ✅ `W8.6-SMR1` evidence completed and accepted as YELLOW: no-cost validator rehearsal was GREEN; `paid_micro_total2` stayed within the 2-completion cap with clean request/apply/no-secret evidence; the only caveat is solver-sidecar observability (`directorSolverStatus=load_failure`, coverage `none`) on paid checkpoints. Evidence summary: `Docs/Evidence/SMR/wave8.6-paid-live-director-pilot/README.md`.
+- ❌ `W8.6-SMR2` was intentionally not run: the optional `paid_probe_2x2x2` would spend up to 8 completions and would not clarify the already identified Track D sidecar extraction issue. Track D follow-up before future paid probes/TR3: add no-paid major/epic sidecar extraction coverage and fix severity-node/load-failure reporting.
+- ✅ Wave 9 may start with the W8.6 YELLOW caveat accepted; paid behavior remains local-only/advisory and is not part of Wave 9 CI/default gates.
 
 Proof targets:
 - Paid cannot run without explicit confirmation and GREEN rehearsal proof.
@@ -1844,13 +1861,47 @@ Proof targets:
 
 ---
 
+## Wave 8.7 — Refinery Sidecar Stabilization Mini-Wave
+
+Source of truth:
+- `Docs/Plans/Master/Wave8.7-Refinery-Sidecar-Stabilization-Plan.md`
+
+Purpose:
+- Resolve the W8.6 paid micro solver-sidecar caveat before Wave 9 without running more paid LLM calls.
+- Reproduce and fix the likely major/epic severity extraction/load-failure issue in the Java Tools.Refinery sidecar.
+
+Turn-gate:
+- Wave 8.7 is optional from a paid guardrail perspective, but currently preferred before Wave 9 by Meta/user decision.
+- No paid probe is allowed in Wave 8.7.
+
+### Sprint D8.7: Director Solver-Sidecar Stabilization (Track D)
+
+- ⬜ **W8.7-D1** No-paid major/epic sidecar reproducer (Track D)
+- ⬜ **W8.7-D2** Minimal sidecar severity/extraction/status fix (Track D)
+- ⬜ **W8.7-D3** No-paid Java gate and optional validator artifact check (Track D / SMR Analyst)
+
+### Wave 8.7 — Execution Steps
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track D agent | W8.7-D1/D2 | W8.6-SMR1 YELLOW accepted | Add no-paid reproducer, then apply smallest correct fix; stop for human/formal-model review before changing `.problem` constraints broadly |
+| SMR Analyst | W8.7-D3 optional | Track D fix ✅ | Optional no-paid validator artifact only if Meta requests artifact-level confirmation |
+
+Closeout target:
+- Valid `minor`/`major`/`epic` core story/directive sidecar paths do not report `directorSolverStatus=load_failure`.
+- Existing `minor`/mock/validator tests remain green.
+- No paid requests are made.
+
+---
+
 ## Wave 9 — Army Supply + Campaign Start (Combat Phase 5b + 6a)
 
 SMR closeout source of truth:
 - `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`
 
 Wave turn-gate:
-- Wave 9 is `READY` only after Wave 8.6 closeout is `✅`.
+- Wave 9 is blocked by current Meta/user decision until Wave 8.7 is either completed or explicitly deferred.
+- Original Wave 8.6 paid guardrail closeout is accepted with a YELLOW solver-sidecar observability caveat, documented in `Docs/Evidence/SMR/wave8.6-paid-live-director-pilot/README.md`.
 
 ### Sprint C9: Army Supply Model (Track B -> C)
 

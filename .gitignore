@@ -37,13 +37,16 @@ packages/
 
 # Other
 .opencode/
-Docs/Plans/Workflow/
 *.tmp
 *.bak
 *.swp
 *.sdf
 *.cache
 *.dbmdl
+
+# Private workflow/state notes
+ops/
+Docs/Plans/Workflow/
 
 # Local artifact outputs
 .artifacts/*
