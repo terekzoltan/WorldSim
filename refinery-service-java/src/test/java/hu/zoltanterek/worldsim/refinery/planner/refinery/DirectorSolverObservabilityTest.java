@@ -54,6 +54,24 @@ class DirectorSolverObservabilityTest {
     }
 
     @Test
+    void fromSolveResult_UnexpectedExtractionExceptionIsFailedExtraction() {
+        DirectorRefinerySolveResult result = new DirectorRefinerySolveResult(
+                DirectorRefinerySolveStatus.NON_SUCCESS,
+                "SUCCESS",
+                null,
+                List.of("solverResult:success", "extractFailure:unexpected_exception"),
+                List.of()
+        );
+
+        DirectorSolverObservability.Report report = DirectorSolverObservability.fromSolveResult(result);
+
+        assertTrue(report.markers().contains("directorSolverStatus:non_success"));
+        assertTrue(report.markers().contains("directorSolverExtraction:failed"));
+        assertTrue(report.markers().contains("directorSolverDiagnostic:unexpected_exception"));
+        assertTrue(report.markers().contains("directorSolverDiagnostic:non_success"));
+    }
+
+    @Test
     void unavailable_ReportsNotRunWithoutPretendingValidation() {
         DirectorSolverObservability.Report report = DirectorSolverObservability.unavailable("story_core_unavailable");
 

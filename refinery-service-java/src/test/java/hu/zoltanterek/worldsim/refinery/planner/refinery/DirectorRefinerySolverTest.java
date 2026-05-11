@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Locale;
 
 import org.junit.jupiter.api.Test;
 
@@ -45,6 +46,16 @@ class DirectorRefinerySolverTest {
         assertEquals("PrioritizeFood", result.validatedOutput().directive().directive());
         assertTrue(result.diagnostics().contains("validatedCoverage:story_core"));
         assertTrue(result.diagnostics().contains("validatedCoverage:directive_core"));
+    }
+
+    @Test
+    void solve_MajorStorySeverityGeneratesWithoutLoadFailure() {
+        assertStorySeveritySolves("major");
+    }
+
+    @Test
+    void solve_EpicStorySeverityGeneratesWithoutLoadFailure() {
+        assertStorySeveritySolves("epic");
     }
 
     @Test
@@ -228,6 +239,41 @@ class DirectorRefinerySolverTest {
     }
 
     @Test
+    void solveProblemText_UnknownStorySeverityReturnsExtractionFailureNotLoadFailure() {
+        DirectorRuntimeAssertions runtimeAssertions = new DirectorRuntimeAssertions(List.of(
+                "RuntimeCheckpointContext(runtimeCheckpoint).",
+                "tick(runtimeCheckpoint): 100.",
+                "colonyCount(runtimeCheckpoint): 2.",
+                "beatCooldownRemainingTicks(runtimeCheckpoint): 0.",
+                "remainingInfluenceBudget(runtimeCheckpoint): 5.0."
+        ));
+        DirectorProblemFragment unknownSeverityFragment = new DirectorProblemFragment(List.of(
+                "DirectorCheckpoint(checkpoint_000).",
+                "DesignatedOutputArea(outputArea_000).",
+                "RuntimeCheckpointContext::checkpoint(runtimeCheckpoint, checkpoint_000).",
+                "DesignatedOutputArea::checkpoint(outputArea_000, checkpoint_000).",
+                "StoryBeatOutput(storyOutput_000).",
+                "DesignatedOutputArea::storyBeatSlot(outputArea_000, storyOutput_000).",
+                "StoryBeatOutput::storyBeatId(storyOutput_000): \"BEAT_A\".",
+                "StoryBeatOutput::text(storyOutput_000): \"Unknown severity\".",
+                "StoryBeatOutput::storyDurationTicks(storyOutput_000): 24.",
+                "Severity(severity_strange).",
+                "StoryBeatOutput::severity(storyOutput_000, severity_strange)."
+        ));
+        String problemText = assembler.assemble(List.of(
+                new DirectorProblemFragment(runtimeAssertions.lines()),
+                unknownSeverityFragment
+        ));
+
+        DirectorRefinerySolveResult result = solver.solveProblemText(problemText, List.of());
+
+        assertEquals(DirectorRefinerySolveStatus.NON_SUCCESS, result.status());
+        assertNull(result.validatedOutput());
+        assertTrue(result.diagnostics().contains("solverResult:success"));
+        assertTrue(result.diagnostics().contains("extractFailure:story_severity_unknown"));
+    }
+
+    @Test
     void solveProblemText_InvalidProblemReturnsLoadFailureResult() {
         DirectorRefinerySolveResult result = solver.solveProblemText("not a refinery problem", List.of("campaign"));
 
@@ -247,6 +293,26 @@ class DirectorRefinerySolverTest {
                 objectMapper.createObjectNode(),
                 null
         );
+    }
+
+    private void assertStorySeveritySolves(String severity) {
+        DirectorRefinerySolveResult result = solver.solve(
+                facts(0),
+                new DirectorOutputAssertions(
+                        new DirectorOutputAssertions.StoryBeatAssertion("BEAT_" + severity.toUpperCase(Locale.ROOT), "Severity " + severity, 24, severity, List.of(), null),
+                        new DirectorOutputAssertions.DirectiveAssertion(0, "PrioritizeFood", 12, List.of()),
+                        null
+                )
+        );
+
+        assertEquals(DirectorRefinerySolveStatus.SUCCESS, result.status(), result.diagnostics().toString());
+        assertTrue(result.success());
+        assertNotNull(result.validatedOutput());
+        assertEquals(severity, result.validatedOutput().storyBeat().severity());
+        assertEquals("PrioritizeFood", result.validatedOutput().directive().directive());
+        assertTrue(result.diagnostics().contains("solverResult:success"));
+        assertTrue(result.diagnostics().contains("validatedCoverage:story_core"));
+        assertTrue(result.diagnostics().contains("validatedCoverage:directive_core"));
     }
 
     private static DirectorRuntimeFacts facts(long cooldownTicks) {

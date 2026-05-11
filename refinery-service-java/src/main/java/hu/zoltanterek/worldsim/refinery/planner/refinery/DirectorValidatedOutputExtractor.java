@@ -74,22 +74,34 @@ public final class DirectorValidatedOutputExtractor {
         }
 
         int severityId = severityIds.get(0);
-        String severity;
-        if (severityId == trace.getNodeId("severity_minor")) {
-            severity = "minor";
-        } else if (severityId == trace.getNodeId("severity_major")) {
-            severity = "major";
-        } else if (severityId == trace.getNodeId("severity_epic")) {
-            severity = "epic";
-        } else {
-            severity = null;
-        }
+        String severity = knownSeverityName(trace, severityId);
         if (severity == null) {
             diagnostics.add("extractFailure:story_severity_unknown");
             return null;
         }
 
         return new DirectorValidatedCoreOutput.StoryBeatCore(beatId, text, durationTicks.longValue(), severity);
+    }
+
+    private static String knownSeverityName(ProblemTrace trace, int severityId) {
+        if (hasNodeId(trace, "severity_minor", severityId)) {
+            return "minor";
+        }
+        if (hasNodeId(trace, "severity_major", severityId)) {
+            return "major";
+        }
+        if (hasNodeId(trace, "severity_epic", severityId)) {
+            return "epic";
+        }
+        return null;
+    }
+
+    private static boolean hasNodeId(ProblemTrace trace, String nodeName, int expectedId) {
+        try {
+            return trace.getNodeId(nodeName) == expectedId;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
     }
 
     private static DirectorValidatedCoreOutput.DirectiveCore extractDirective(

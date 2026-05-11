@@ -52,7 +52,20 @@ public final class DirectorRefinerySolver {
                 GeneratorResult result = generator.tryGenerate();
                 if (result == GeneratorResult.SUCCESS) {
                     diagnostics.add("solverResult:success");
-                    DirectorValidatedOutputExtractor.ExtractionResult extractionResult = new DirectorValidatedOutputExtractor().extract(generator);
+                    DirectorValidatedOutputExtractor.ExtractionResult extractionResult;
+                    try {
+                        extractionResult = new DirectorValidatedOutputExtractor().extract(generator);
+                    } catch (RuntimeException ex) {
+                        diagnostics.add("extractFailure:unexpected_exception");
+                        diagnostics.add(ex.getClass().getSimpleName() + ": " + ex.getMessage());
+                        return new DirectorRefinerySolveResult(
+                                DirectorRefinerySolveStatus.NON_SUCCESS,
+                                result.name(),
+                                null,
+                                diagnostics,
+                                unsupportedFeatures
+                        );
+                    }
                     diagnostics.addAll(extractionResult.diagnostics());
                     if (!extractionResult.success()) {
                         return new DirectorRefinerySolveResult(

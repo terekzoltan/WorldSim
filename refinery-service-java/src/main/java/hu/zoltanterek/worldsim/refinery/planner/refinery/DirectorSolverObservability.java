@@ -125,7 +125,8 @@ public final class DirectorSolverObservability {
                         || code.endsWith("_missing")
                         || code.contains("_not_single")
                         || code.contains("_unknown")
-                        || code.contains("_mismatch"))
+                        || code.contains("_mismatch")
+                        || "unexpected_exception".equals(code))
                 ? "failed"
                 : "not_run";
     }
