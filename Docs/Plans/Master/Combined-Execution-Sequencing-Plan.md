@@ -1913,7 +1913,7 @@ Wave turn-gate:
 
 > Combat Plan > Phase 5 Sprint 9
 
-- ⬜ **P5-F** Army supply model — aggregate + consumption (Track B)
+- ✅ **P5-F** Army supply model — aggregate + consumption (Track B)
 - ⬜ **P5-G** Supply carrier role + AI behaviors (Track B + C)
 - ⬜ **P5-H** Foraging behavior (Track B + C)
 - ⬜ **P5-I** Fallback supply budget for early prototypes (Track B)
@@ -1938,6 +1938,9 @@ Wave turn-gate:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P5-F | Wave 8.6 ✅ | Aggregate army supply and consumption rules are the base for every later campaign step |
+
+Wave 9 Step 1 progress note:
+- ✅ `P5-F` closed: minimal model-first army supply foundation landed without persistent Army/Campaign entities or `World.Update` wiring. `ArmySupplyModel` consumes aggregate member-carried inventory food deterministically, tracks caller-owned `ArmySupplyState`, reports low/out-of-supply separately, applies conservative sustained out-of-supply morale/stamina attrition and routing, and includes focused runtime tests for no-op safety, fractional demand, fractional zero-supply integer-demand semantics, no-dupe consumption, attrition, routing, and stamina clamp. Focused runtime tests, full runtime tests, full solution build, and diff check were green.
 
 **Step 2 — opens when P5-F ✅**
 

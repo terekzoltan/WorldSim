@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-05-11 - Wave 9 P5-F Army Supply - Minor - Lock fractional zero-supply semantics
+
+- Track: Track B / Runtime supply model
+- Source: Step review synthesis for Wave 9 `P5-F`
+- Finding: Integer inventory-consumption models can leave zero carried food plus sub-unit fractional demand in an ambiguous state if tests do not explicitly define whether supply pressure starts immediately or only after a whole food unit is unmet.
+- Impact: Downstream fallback budget, carrier, foraging, or campaign steps may reinterpret `IsOutOfSupply` differently and create inconsistent attrition/routing behavior.
+- Resolution / guidance: Add focused regression coverage or documentation that locks the intended semantics before closing the step: either zero food with fractional demand is not out-of-supply until whole-unit demand is unmet, or change the model to apply immediate zero-supply pressure.
+- Status: fixed
+
 ## 2026-04-30 - Wave 8 ScenarioRunner Tests - Minor - Bound nested runner process helpers
 
 - Track: Track B / SMR Analyst test harness

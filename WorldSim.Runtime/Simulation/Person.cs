@@ -2416,6 +2416,14 @@ public class Person
         CombatMorale = Math.Clamp(CombatMorale + adjusted, 0f, 100f);
     }
 
+    public void ApplyStaminaDelta(float delta)
+    {
+        if (!float.IsFinite(delta))
+            return;
+
+        Stamina = Math.Clamp(Stamina + delta, 0f, 100f);
+    }
+
     public bool BeginRouting(int ticks, (int x, int y)? origin = null)
     {
         bool wasRouting = IsRouting;
