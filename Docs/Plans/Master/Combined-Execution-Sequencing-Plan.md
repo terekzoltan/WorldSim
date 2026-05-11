@@ -1916,7 +1916,7 @@ Wave turn-gate:
 - ✅ **P5-F** Army supply model — aggregate + consumption (Track B)
 - ⬜ **P5-G** Supply carrier role + AI behaviors (Track B + C)
 - ⬜ **P5-H** Foraging behavior (Track B + C)
-- ⬜ **P5-I** Fallback supply budget for early prototypes (Track B)
+- ✅ **P5-I** Fallback supply budget for early prototypes (Track B)
 
 ### Sprint C10: Campaign Skeleton (Track B -> C -> A)
 
@@ -1948,11 +1948,17 @@ Wave 9 Step 1 progress note:
 |---------|---------|--------|-------|
 | Track B agent | P5-I | P5-F ✅ | The fallback budget should mirror the already-defined supply model instead of competing with it |
 
+Wave 9 Step 2 progress note:
+- ✅ `P5-I` closed: temporary caller-owned ration pool fallback landed without persistent Army/Campaign entities or `World.Update` wiring. `ArmyRationPoolSupplyModel` reserves colony food into `ArmyRationPoolState`, consumes ration-pool food using the same `ArmySupplyState` fractional/out-of-supply semantics as `P5-F`, leaves member inventories untouched in fallback mode, and returns remaining rations idempotently. Focused Wave9 army tests, full runtime tests, full solution build, and diff check were green.
+
 **Step 3 — opens when P5-I ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P5-G (B part) | P5-F ✅ + P5-I ✅ | Runtime role/state hooks for supply carriers build on the settled supply model |
+
+P5-G Track B requirement note:
+- Runtime carrier/caller hooks must choose exactly one army supply mode per army tick: either carried-inventory consumption (`ArmySupplyModel`) or fallback ration-pool consumption (`ArmyRationPoolSupplyModel`), never both. This is a caller-level guard to implement/test once the P5-G caller hook exists; do not push this into Track C AI behavior.
 
 **Step 4 — opens when P5-G (B part) ✅**
 

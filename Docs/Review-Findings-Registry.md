@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-05-11 - Wave 9 P5-I Ration Pool - Minor - Prove lifecycle conservation before integration
+
+- Track: Track B / Runtime supply model
+- Source: Step review synthesis for Wave 9 `P5-I`
+- Finding: Reservation-pool supply models can pass isolated reserve, consume, and return tests while still lacking one end-to-end conservation proof across the whole lifecycle.
+- Impact: Later carrier/campaign wiring could accidentally duplicate or lose food when combining reservation, consumption, and return paths.
+- Resolution / guidance: Add a focused reserve -> consume -> return test proving final colony food equals original food minus consumed food, and pool/member inventory state remains consistent.
+- Status: fixed
+
+## 2026-05-11 - Wave 9 P5-I Ration Pool - Minor - Saturate all reservation arithmetic consistently
+
+- Track: Track B / Runtime supply model
+- Source: Step review synthesis for Wave 9 `P5-I`
+- Finding: If only some reservation calculations use saturating arithmetic, extreme caller/config values can overflow an unguarded intermediate such as home-reserve computation.
+- Impact: Overflow can violate the home-reserve contract and allow reservation from food that should remain protected.
+- Resolution / guidance: Use the same saturating/normalized arithmetic policy for home reserve, desired budget, pool add, and return paths, and cover boundary inputs with focused tests.
+- Status: fixed
+
 ## 2026-05-11 - Wave 9 P5-F Army Supply - Minor - Lock fractional zero-supply semantics
 
 - Track: Track B / Runtime supply model
