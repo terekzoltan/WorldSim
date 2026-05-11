@@ -1876,9 +1876,9 @@ Turn-gate:
 
 ### Sprint D8.7: Director Solver-Sidecar Stabilization (Track D)
 
-- ⬜ **W8.7-D1** No-paid major/epic sidecar reproducer (Track D)
-- ⬜ **W8.7-D2** Minimal sidecar severity/extraction/status fix (Track D)
-- ⬜ **W8.7-D3** No-paid Java gate and optional validator artifact check (Track D / SMR Analyst)
+- ✅ **W8.7-D1** No-paid major/epic sidecar reproducer (Track D)
+- ✅ **W8.7-D2** Minimal sidecar severity/extraction/status fix (Track D)
+- ✅ **W8.7-D3** No-paid Java gate and optional validator artifact check (Track D / SMR Analyst)
 
 ### Wave 8.7 — Execution Steps
 
@@ -1892,6 +1892,12 @@ Closeout target:
 - Existing `minor`/mock/validator tests remain green.
 - No paid requests are made.
 
+Wave 8.7 closeout note:
+- ✅ `W8.7-D1/D2` Track D fix completed and committed (`dfef555`): major/epic no-paid sidecar reproducers added, severity node extraction made safe, extraction exceptions classified as `NON_SUCCESS` extraction failures instead of true `LOAD_FAILURE`, and focused/full Java gates passed.
+- ✅ `W8.7-D3` SMR validator artifact completed: `.artifacts/smr/wave8.7-sidecar-validator-001/` ran `refinery_live_validator` no-paid with fixed 30000/60000ms timeouts, `exitCode=0`, request/apply/fallback failures `0`, observed completions `0`, `directorSolverStatusHistogram success=2`, coverage `story_core=2` and `directive_core=2`, anomalies empty, and secret/auth scan clean.
+- Evidence summary: `Docs/Evidence/SMR/wave8.7-sidecar-validator/README.md`.
+- ✅ Wave 9 P5-F may start; no paid probe was run or needed.
+
 ---
 
 ## Wave 9 — Army Supply + Campaign Start (Combat Phase 5b + 6a)
@@ -1900,8 +1906,8 @@ SMR closeout source of truth:
 - `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`
 
 Wave turn-gate:
-- Wave 9 is blocked by current Meta/user decision until Wave 8.7 is either completed or explicitly deferred.
-- Original Wave 8.6 paid guardrail closeout is accepted with a YELLOW solver-sidecar observability caveat, documented in `Docs/Evidence/SMR/wave8.6-paid-live-director-pilot/README.md`.
+- Wave 9 is `READY` after Wave 8.7 closeout completed the no-paid sidecar validator artifact.
+- Original Wave 8.6 paid guardrail closeout is accepted with a YELLOW solver-sidecar observability caveat, documented in `Docs/Evidence/SMR/wave8.6-paid-live-director-pilot/README.md`; Wave 8.7 no-paid validation closes the local sidecar/load-failure follow-up before Wave 9.
 
 ### Sprint C9: Army Supply Model (Track B -> C)
 
