@@ -54,6 +54,7 @@ public class Person
     public int ActiveCombatGroupId { get; private set; } = -1;
     public int ActiveBattleId { get; private set; } = -1;
     public Formation AssignedFormation { get; private set; } = Formation.Line;
+    public PersonRole Roles { get; private set; } = PersonRole.None;
     public bool IsCombatCommander { get; private set; }
     public int CommanderIntelligence { get; private set; }
     public float CommanderMoraleStabilityBonus { get; private set; }
@@ -2404,6 +2405,15 @@ public class Person
         CommanderIntelligence = Intelligence;
         CommanderMoraleStabilityBonus = Math.Clamp(Intelligence / 30f, 0f, 0.45f);
     }
+
+    public void AssignRole(PersonRole role)
+        => Roles |= role;
+
+    public void ClearRole(PersonRole role)
+        => Roles &= ~role;
+
+    public bool HasRole(PersonRole role)
+        => role != PersonRole.None && (Roles & role) == role;
 
     public void ApplyMoraleDelta(float delta)
     {

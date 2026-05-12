@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-05-12 - Wave 9 P5-G Supply Carrier - Major - Keep singular assignment state and actor role flags synchronized
+
+- Track: Track B / Runtime supply carrier hook
+- Source: Step review synthesis for Wave 9 `P5-G (B part)`
+- Finding: A singular carrier state such as `AssignedCarrierActorId` can drift from per-actor role flags if reassignment does not clear the previous carrier role, or if clear operations accept an actor that is not the assigned carrier.
+- Impact: Later runtime, AI, snapshot, or UI consumers can observe multiple `SupplyCarrier` actors, or an empty carrier state while an actor remains snapshot-visible as a carrier.
+- Resolution / guidance: Lock the lifecycle with focused tests for assign A -> assign B, wrong-actor clear, assigned-actor clear, and snapshot consistency. Reassignment should either reject until explicit clear or atomically transfer the role; wrong-actor clear should reject/no-op without mutating state.
+- Status: fixed
+
 ## 2026-05-11 - Wave 9 P5-I Ration Pool - Minor - Prove lifecycle conservation before integration
 
 - Track: Track B / Runtime supply model

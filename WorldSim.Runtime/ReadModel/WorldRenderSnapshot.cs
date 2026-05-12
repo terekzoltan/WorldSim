@@ -175,7 +175,8 @@ public sealed record PersonRenderData(
     int InventoryFood = 0,
     int InventoryUsedSlots = 0,
     int InventoryCapacitySlots = 0,
-    bool HasFood = false);
+    bool HasFood = false,
+    bool IsSupplyCarrier = false);
 
 public sealed record AnimalRenderData(int X, int Y, AnimalKindView Kind);
 

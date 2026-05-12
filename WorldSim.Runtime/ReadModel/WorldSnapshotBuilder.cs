@@ -97,7 +97,8 @@ public static class WorldSnapshotBuilder
                     inventoryFood,
                     p.Inventory.UsedSlots,
                     p.Inventory.CapacitySlots,
-                    inventoryFood > 0);
+                    inventoryFood > 0,
+                    p.HasRole(PersonRole.SupplyCarrier));
             })
             .ToList();
 

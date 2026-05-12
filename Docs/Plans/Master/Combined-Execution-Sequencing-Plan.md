@@ -1978,6 +1978,9 @@ Wave 9 Step 2 progress note:
 P5-G Track B requirement note:
 - Runtime carrier/caller hooks must choose exactly one army supply mode per army tick: either carried-inventory consumption (`ArmySupplyModel`) or fallback ration-pool consumption (`ArmyRationPoolSupplyModel`), never both. This is a caller-level guard to implement/test once the P5-G caller hook exists; do not push this into Track C AI behavior.
 
+Wave 9 Step 3 progress note:
+- ✅ `P5-G (B part)` closed: runtime-owned supply carrier hook landed without `World.Update` army supply ticking, Track C AI changes, foraging state, or persistent Army/Campaign entities. `ArmySupplyCarrierModel` now provides the caller seam over carried-inventory and ration-pool modes, with first-source-per-tick selection, same-source `AlreadyProcessed` no-op behavior, and mixed-source `RejectedMixedSupplySource` rejection that does not mutate food, pool, fractional demand, morale/stamina, routing, or counters. Durable `PersonRole.SupplyCarrier` helpers and minimal structured snapshot visibility (`PersonRenderData.IsSupplyCarrier`) were added. Focused carrier tests, Wave9 army regression, targeted snapshot tests, full runtime tests, full solution build, and diff/scope checks were green.
+
 Wave 9 audit hardening notes:
 - Detailed execution plan: `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md`.
 - `P5-G (B part)` must add durable supply-carrier role/state hooks, not only debug strings or profession behavior.

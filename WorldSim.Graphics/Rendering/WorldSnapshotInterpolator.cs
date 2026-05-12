@@ -63,7 +63,8 @@ public static class WorldSnapshotInterpolator
                 cur.InventoryFood,
                 cur.InventoryUsedSlots,
                 cur.InventoryCapacitySlots,
-                cur.HasFood));
+                cur.HasFood,
+                cur.IsSupplyCarrier));
         }
 
         for (int i = shared; i < current.Count; i++)
