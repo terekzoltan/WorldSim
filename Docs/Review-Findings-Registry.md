@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-05-12 - Review Process - Guidance - Document accepted residual findings before step closeout
+
+- Track: Meta Coordinator / all Tracks
+- Source: User policy after Wave 9 `P5-H (B part)` review synthesis
+- Finding: Minor, nit, or residual-risk findings that are accepted rather than fixed can be lost if they remain only in chat review output.
+- Impact: Future agents may repeat the issue or assume the risk was resolved instead of consciously deferred.
+- Resolution / guidance: Any non-fixed review finding that remains after final synthesis must be recorded in a durable artifact, preferably `Docs/Review-Findings-Registry.md` and, when tied to future implementation, the relevant master/sequence plan as a deferred follow-up.
+- Status: guidance
+
+## 2026-05-12 - Wave 9 P5-H Foraging - Guidance - Treat HarvestFailed as defensive until harvest seam changes
+
+- Track: Track B / Runtime foraging model
+- Source: Step review synthesis for Wave 9 `P5-H (B part)`
+- Finding: `ArmyForageFailureReason.HarvestFailed` is a defensive branch after prevalidation; current `World.TryHarvest(...)` / `Tile.Harvest(...)` behavior makes it effectively unreachable without introducing a mockable harvest seam or concurrent mutation path.
+- Impact: Adding test-only seams just to force this branch would be unnecessary churn now, but future harvest refactors could make the branch reachable without coverage.
+- Resolution / guidance: Keep the branch as defensive. If a mockable harvest seam, concurrent harvest path, or changed `World.TryHarvest(...)` contract is introduced, add a focused `HarvestFailed` regression test at that time.
+- Status: guidance
+
 ## 2026-05-12 - Wave 9 P5-H Foraging - Minor - Cover no-yield and no-capacity branches explicitly
 
 - Track: Track B / Runtime foraging model

@@ -1996,6 +1996,7 @@ Wave 9 audit hardening notes:
 
 Wave 9 Step 4 progress note:
 - ✅ `P5-H (B part)` closed: runtime-only foraging primitive landed without Track C AI changes, ScenarioRunner artifact export, Graphics consume, organic `World.Update` wiring, or persistent Army/Campaign entities. `ArmyForagingModel` now provides caller-owned `ArmyForagingState` counters and deterministic `ArmyRationPoolState` destination for map-food foraging, with strict consumer-key validation, Chebyshev adjacent-or-same source range, explicit failure reasons, capped per-attempt/per-consumer yield, and exact conservation (`FoodGained == ration-pool delta == source-node decrease`). Focused Wave9 foraging tests, Wave9 runtime regression, full runtime tests, full solution build, and scope checks were green. `P5-H` top-level remains pending until the later Track C part closes.
+- Deferred follow-up: `ArmyForageFailureReason.HarvestFailed` remains a defensive branch under the current `World.TryHarvest(...)` contract. If a mockable harvest seam, concurrent harvest path, or changed harvest contract is introduced later, add focused `HarvestFailed` regression coverage then.
 
 **Step 5 — opens when P5-H (B part) ✅**
 
