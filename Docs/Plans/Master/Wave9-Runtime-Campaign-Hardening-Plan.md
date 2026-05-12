@@ -1,6 +1,6 @@
 # Wave 9 Runtime Campaign Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use repo-valid workflow skills such as `implementation-execution` or `sequence-planning` when appropriate. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Turn the Wave 9 audit notes into executable runtime, AI handoff, graphics snapshot, and SMR evidence gates for army supply carriers, foraging, and the campaign skeleton.
 
@@ -21,6 +21,8 @@ The implementation frontier is still `P5-G (B part)`:
 - No persistent `Army`, `Campaign`, or `CampaignManager` entity should be created before `P6-A`.
 - No army supply behavior should be wired into organic `World.Update` before Meta explicitly opens that scope.
 
+Until Combined and `ops/PROJECT_STATE.md` explicitly open a later Wave 9 step, Tasks 2-6 below are planning scaffolds and acceptance-detail notes, not independent launch authority.
+
 ## File Ownership Map
 
 - Modify: `WorldSim.Runtime/Simulation/Military/ArmySupplyModel.cs`
@@ -31,8 +33,8 @@ The implementation frontier is still `P5-G (B part)`:
 - Modify: `WorldSim.Runtime/ReadModel/WorldSnapshotBuilder.cs`
 - Modify: `WorldSim.Runtime/Diagnostics/ScenarioAiTelemetry.cs`
 - Modify: `WorldSim.ScenarioRunner/Program.cs`
-- Modify later, after runtime hooks exist: `WorldSim.AI/Abstractions.cs`
-- Modify later, after runtime hooks exist: `WorldSim.Runtime/Simulation/AI/RuntimeNpcBrain.cs`
+- Modify later, only when Combined Step 5 opens (`P5-H (B part)` complete and `P5-G (C part)` launchable): `WorldSim.AI/Abstractions.cs`
+- Modify later, only when Combined Step 5 opens (`P5-H (B part)` complete and `P5-G (C part)` launchable): `WorldSim.Runtime/Simulation/AI/RuntimeNpcBrain.cs`
 - Modify later, after `P6-D (B part)`: `WorldSim.Graphics/UI/Panels/CampaignPanelRenderer.cs`
 - Test: `WorldSim.Runtime.Tests/Wave9ArmySupplyModelTests.cs`
 - Test: `WorldSim.Runtime.Tests/Wave9ArmyRationPoolSupplyModelTests.cs`
@@ -107,9 +109,11 @@ Expected after implementation: pass.
 
 ## Task 2: P5-G Track C Handoff Surface
 
+This task is not launchable when Task 1 finishes. It must wait for Combined Step 5 to open: `P5-H (B part)` must be complete, and only then may `P5-G (C part)` start.
+
 **Files:**
-- Modify after Task 1: `WorldSim.AI/Abstractions.cs`
-- Modify after Task 1: `WorldSim.Runtime/Simulation/AI/RuntimeNpcBrain.cs`
+- Modify only when Combined Step 5 opens: `WorldSim.AI/Abstractions.cs`
+- Modify only when Combined Step 5 opens: `WorldSim.Runtime/Simulation/AI/RuntimeNpcBrain.cs`
 - Test: `WorldSim.Runtime.Tests/RuntimeNpcBrainTests.cs`
 
 - [ ] **Step 1: Add explicit AI command vocabulary**
@@ -138,6 +142,8 @@ dotnet test WorldSim.AI.Tests\WorldSim.AI.Tests.csproj --no-restore
 Expected: carrier decisions use the new command/context fields and do not masquerade as generic `GatherFood`.
 
 ## Task 3: P5-H Runtime Foraging Hooks
+
+This task is not launchable until the Combined step for `P5-H (B part)` opens.
 
 **Files:**
 - Modify: `WorldSim.Runtime/Simulation/Person.cs`
@@ -172,6 +178,8 @@ dotnet test WorldSim.Runtime.Tests\WorldSim.Runtime.Tests.csproj --filter Wave9F
 Expected: pass with deterministic food conservation.
 
 ## Task 4: P6-A/P6-B/P6-C Campaign Runtime Foundation
+
+This task is not launchable until `P6-A` opens in Combined.
 
 **Files:**
 - Create when `P6-A` opens: `WorldSim.Runtime/Simulation/Military/CampaignState.cs`
@@ -209,6 +217,8 @@ Expected: route changes are deterministic and no stale path crosses newly blocke
 
 ## Task 5: P6-D Structured Snapshot and Track A Contract
 
+This task is not launchable until `P6-D (B part)` opens in Combined.
+
 **Files:**
 - Modify: `WorldSim.Runtime/ReadModel/WorldRenderSnapshot.cs`
 - Modify: `WorldSim.Runtime/ReadModel/WorldSnapshotBuilder.cs`
@@ -241,6 +251,8 @@ dotnet test WorldSim.Runtime.Tests\WorldSim.Runtime.Tests.csproj --filter Wave9C
 Expected: pass.
 
 ## Task 6: Wave 9 SMR Evidence Surface
+
+This task is not launchable until the Wave 9 SMR prep/evidence steps open in Combined.
 
 **Files:**
 - Modify: `WorldSim.ScenarioRunner/Program.cs`

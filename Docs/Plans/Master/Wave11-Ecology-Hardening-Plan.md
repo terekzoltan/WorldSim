@@ -1,6 +1,6 @@
 # Wave 11 Ecology Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use repo-valid workflow skills such as `implementation-execution` or `sequence-planning` when appropriate. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make the closed-loop ecology redesign cache-aware, land-safe, observable, and evidence-gated before replacing current replenishment behavior.
 
@@ -13,6 +13,8 @@
 ## Current Scope
 
 Wave 11 remains blocked until Wave 10.5 closeout. This plan expands the Combined Wave 11 runtime performance and hard evidence notes.
+
+Until Wave 11 is explicitly opened by Combined and `ops/PROJECT_STATE.md`, every task below is a non-launchable planning scaffold. The file is a source-plan reference, not standalone execution authority.
 
 The goal is not to add farms, domestication, milk, eggs, or a complete food taxonomy. Wave 11 is wild ecology first:
 - tile fertility,

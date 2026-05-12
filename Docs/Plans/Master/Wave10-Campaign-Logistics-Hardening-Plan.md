@@ -1,6 +1,6 @@
 # Wave 10 Campaign Logistics Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use repo-valid workflow skills such as `implementation-execution` or `sequence-planning` when appropriate. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Wave 10 campaign resolution, logistics, scout, siege-unit, and multi-front work bounded, observable, and snapshot-driven before Wave 10 closeout.
 
@@ -16,6 +16,8 @@ Wave 10 is blocked until Wave 9 closeout. This plan defines acceptance detail fo
 - `P6-G` must be a faction/campaign strategist, not a per-person `RuntimeNpcBrain` branch.
 - `P7-A`, `P7-B`, and `P7-G` must define logistics caps before multi-front work.
 - Wave 10 SMR closeout must require all implementation epics plus evidence, not only Track B runtime pieces.
+
+Until Wave 10 is explicitly opened by Combined and `ops/PROJECT_STATE.md`, every task below is a non-launchable planning scaffold. The file is a source-plan reference, not standalone execution authority.
 
 ## File Ownership Map
 

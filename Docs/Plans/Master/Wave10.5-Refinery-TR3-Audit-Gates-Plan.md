@@ -1,6 +1,6 @@
 # Wave 10.5 Refinery TR3 Audit Gates Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use repo-valid workflow skills such as `implementation-execution` or `sequence-planning` when appropriate. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make TR3 convergence measurable by locking Java/C# output-mode parity, validator responsibility ownership, bridge roundtrip coverage, solver coverage honesty, snapshot mapper parity, and shared vocabulary.
 
@@ -14,6 +14,8 @@
 
 This plan expands the TR3 audit gates referenced from Combined Wave 10.5. It is not ready until Wave 10 closeout and Wave 8.5 sidecar foundation are complete.
 
+Until Wave 10.5 is explicitly opened by Combined and `ops/PROJECT_STATE.md`, every task below is a non-launchable planning scaffold. The file is a source-plan reference, not standalone execution authority.
+
 Required pre-reads:
 - `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md`
 - `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md`
@@ -22,11 +24,11 @@ Required pre-reads:
 
 ## File Ownership Map
 
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/ComposedPatchPlanner.java`
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/DirectorRefineryPlanner.java`
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/director/DirectorModelValidator.java`
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/director/DirectorDesign.java`
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/refinery/DirectorRefinerySolver.java`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/ComposedPatchPlanner.java`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/DirectorRefineryPlanner.java`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/director/DirectorModelValidator.java`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/director/DirectorDesign.java`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/refinery/DirectorRefinerySolver.java`
 - Modify: `WorldSim.Contracts/v1/PatchOp.cs`
 - Modify: `WorldSim.Contracts/v2/DirectorOps.cs`
 - Modify: `WorldSim.Contracts/v2/CampaignOps.cs`
@@ -37,7 +39,7 @@ Required pre-reads:
 - Modify: `WorldSim.ScenarioRunner/Refinery/RefineryScenarioRunner.cs`
 - Test: `WorldSim.RefineryClient.Tests/*`
 - Test: `WorldSim.RefineryAdapter.Tests/*`
-- Test: `refinery-service-java/src/test/java/com/worldsim/refinery/**`
+- Test: `refinery-service-java/src/test/java/hu/zoltanterek/worldsim/refinery/**`
 
 ## Non-Negotiable Gates
 
@@ -52,7 +54,7 @@ Required pre-reads:
 ## Task 1: Output-Mode Parity Matrix
 
 **Files:**
-- Modify: `refinery-service-java/src/test/java/com/worldsim/refinery/planner/*`
+- Modify: `refinery-service-java/src/test/java/hu/zoltanterek/worldsim/refinery/planner/*`
 - Modify: `WorldSim.RefineryAdapter.Tests/*`
 - Modify if needed: `WorldSim.RefineryAdapter/Integration/RefineryPatchRuntime.cs`
 
@@ -91,8 +93,8 @@ Expected: Java and C# parity matrix passes.
 
 **Files:**
 - Create: `Docs/Plans/Master/Refinery-TR3-Validator-Responsibility-Matrix.md`
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/director/DirectorModelValidator.java`
-- Test: `refinery-service-java/src/test/java/com/worldsim/refinery/planner/director/*`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/director/DirectorModelValidator.java`
+- Test: `refinery-service-java/src/test/java/hu/zoltanterek/worldsim/refinery/planner/director/*`
 
 - [ ] **Step 1: Inventory every invariant**
 
@@ -165,10 +167,10 @@ Expected: all bridge fixtures pass with deterministic diagnostics.
 ## Task 4: Solver Coverage Honesty
 
 **Files:**
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/refinery/DirectorRefinerySolver.java`
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/refinery/DirectorSolverObservability.java`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/refinery/DirectorRefinerySolver.java`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/refinery/DirectorSolverObservability.java`
 - Modify: `WorldSim.ScenarioRunner/Refinery/RefineryScenarioRunner.cs`
-- Test: `refinery-service-java/src/test/java/com/worldsim/refinery/planner/refinery/*`
+- Test: `refinery-service-java/src/test/java/hu/zoltanterek/worldsim/refinery/planner/refinery/*`
 
 - [ ] **Step 1: Split coverage fields**
 
@@ -198,9 +200,9 @@ Expected: evidence makes unsupported coverage explicit.
 
 **Files:**
 - Modify: `WorldSim.RefineryAdapter/Integration/RefineryPatchRuntime.cs`
-- Modify: `refinery-service-java/src/main/java/com/worldsim/refinery/planner/director/DirectorSnapshotMapper.java`
+- Modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/planner/director/DirectorSnapshotMapper.java`
 - Test: `WorldSim.RefineryAdapter.Tests/*`
-- Test: `refinery-service-java/src/test/java/com/worldsim/refinery/planner/director/*`
+- Test: `refinery-service-java/src/test/java/hu/zoltanterek/worldsim/refinery/planner/director/*`
 
 - [ ] **Step 1: Export C# snapshot fixtures**
 
@@ -229,7 +231,7 @@ Expected: C# and Java snapshot mapper parity passes.
 
 **Files:**
 - Create or modify: `WorldSim.Contracts/v2/RefineryVocabulary.cs`
-- Create or modify: `refinery-service-java/src/main/java/com/worldsim/refinery/contracts/RefineryVocabulary.java`
+- Create or modify: `refinery-service-java/src/main/java/hu/zoltanterek/worldsim/refinery/contracts/RefineryVocabulary.java`
 - Modify: `DirectorDesign.java`
 - Modify: `PatchResponseParser.cs`
 - Modify: `PatchApplier.cs`
