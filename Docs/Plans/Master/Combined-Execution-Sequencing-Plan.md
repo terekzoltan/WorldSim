@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-04-26
+Last updated: 2026-05-12
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -19,12 +19,24 @@ their execution steps are not retroactively documented — see their proof links
 |-------|-----------|
 | **Director Plan** | `Docs/Plans/Master/Director-Integration-Master-Plan.md` |
 | **Combat Plan** | `Docs/Plans/Master/Combat-Defense-Campaign-Master-Plan.md` |
+| **Tools.Refinery Migration Plan** | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
+| **Tools.Refinery Agent Guide** | `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` |
 | **Refinery Live SMR Plan** | `Docs/Plans/Master/Refinery-Live-SMR-Plan.md` |
+| **Wave 8.6 Paid Live Director SMR Plan** | `Docs/Plans/Master/Wave8.6-Paid-Live-Director-SMR-Plan.md` |
+| **Wave 8.7 Refinery Sidecar Stabilization Plan** | `Docs/Plans/Master/Wave8.7-Refinery-Sidecar-Stabilization-Plan.md` |
+| **Wave 9-10 SMR Closeout Plan** | `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md` |
+| **Wave 9 Runtime Campaign Hardening Plan** | `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md` |
+| **Wave 10 Campaign Logistics Hardening Plan** | `Docs/Plans/Master/Wave10-Campaign-Logistics-Hardening-Plan.md` |
+| **Wave 10.5 Refinery TR3 Audit Gates Plan** | `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md` |
 | **Wave 11 Ecology Plan** | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
+| **Wave 11 Ecology Hardening Plan** | `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md` |
+| **Wave 12 Architecture Hardening Plan** | `Docs/Plans/Master/Wave12-Codebase-Architecture-Hardening-Plan.md` |
 
 Epic codes (e.g., `S1-A`, `P0-B`) are unique and greppable in the respective master plan.
 
 Reference format: `Director Plan > Phase X Sprint Y > S1-A` or `Combat Plan > Phase X Sprint Y > P0-A`.
+
+Sequencing authority note: this Combined plan, `ops/PROJECT_STATE.md`, and accepted evidence notes are the active workflow authority. If a source plan's status header is stale, use the latest Combined execution rows, progress notes, and accepted evidence summaries for launch decisions.
 
 Status legend: `⬜` = pending, `🔄` = ongoing, `✅` = done, `❌` = cancelled.
 
@@ -1905,6 +1917,9 @@ Wave 8.7 closeout note:
 SMR closeout source of truth:
 - `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`
 
+Audit hardening source:
+- `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md`
+
 Wave turn-gate:
 - Wave 9 is `READY` after Wave 8.7 closeout completed the no-paid sidecar validator artifact.
 - Original Wave 8.6 paid guardrail closeout is accepted with a YELLOW solver-sidecar observability caveat, documented in `Docs/Evidence/SMR/wave8.6-paid-live-director-pilot/README.md`; Wave 8.7 no-paid validation closes the local sidecar/load-failure follow-up before Wave 9.
@@ -1917,6 +1932,9 @@ Wave turn-gate:
 - ⬜ **P5-G** Supply carrier role + AI behaviors (Track B + C)
 - ⬜ **P5-H** Foraging behavior (Track B + C)
 - ✅ **P5-I** Fallback supply budget for early prototypes (Track B)
+
+Split-status note:
+- `P5-G` and `P5-H` are aggregate B+C epics. Keep the top-level marker pending until both runtime and AI parts close. Current frontier as of 2026-05-12 remains `P5-G (B part)` Track B; do not start `P5-G (C part)` or `P5-H` until their explicit step gates open.
 
 ### Sprint C10: Campaign Skeleton (Track B -> C -> A)
 
@@ -1937,7 +1955,7 @@ Wave turn-gate:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P5-F | Wave 8.6 ✅ | Aggregate army supply and consumption rules are the base for every later campaign step |
+| Track B agent | P5-F | Wave 8.7 ✅ | Aggregate army supply and consumption rules are the base for every later campaign step |
 
 Wave 9 Step 1 progress note:
 - ✅ `P5-F` closed: minimal model-first army supply foundation landed without persistent Army/Campaign entities or `World.Update` wiring. `ArmySupplyModel` consumes aggregate member-carried inventory food deterministically, tracks caller-owned `ArmySupplyState`, reports low/out-of-supply separately, applies conservative sustained out-of-supply morale/stamina attrition and routing, and includes focused runtime tests for no-op safety, fractional demand, fractional zero-supply integer-demand semantics, no-dupe consumption, attrition, routing, and stamina clamp. Focused runtime tests, full runtime tests, full solution build, and diff check were green.
@@ -1960,6 +1978,13 @@ Wave 9 Step 2 progress note:
 P5-G Track B requirement note:
 - Runtime carrier/caller hooks must choose exactly one army supply mode per army tick: either carried-inventory consumption (`ArmySupplyModel`) or fallback ration-pool consumption (`ArmyRationPoolSupplyModel`), never both. This is a caller-level guard to implement/test once the P5-G caller hook exists; do not push this into Track C AI behavior.
 
+Wave 9 audit hardening notes:
+- Detailed execution plan: `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md`.
+- `P5-G (B part)` must add durable supply-carrier role/state hooks, not only debug strings or profession behavior.
+- Before march-heavy `P6-C`, Track B must either add or explicitly defer with evidence: tile-indexed blockage/occupancy maps, world-topology-aware path cache invalidation, path request/blocked-check counters, and a large-lane performance baseline.
+- `P6-D (B part)` should expose structured `CampaignRenderData`, `ArmyRenderData`, `ArmySupplyRenderData`, supply source mode, route progress, carrier/resupply/forage counters, and campaign outcome fields. Track A must not infer campaign/supply visuals from event strings.
+- Wave 9 evidence must use dedicated counters for carrier, forage, and campaign behavior; generic `GatherFood`, movement, or `RaidBorder` telemetry is not enough.
+
 **Step 4 — opens when P5-G (B part) ✅**
 
 | Session | Epic(s) | Prereq | Notes |
@@ -1972,17 +1997,17 @@ P5-G Track B requirement note:
 |---------|---------|--------|-------|
 | Track C agent | P5-G (C part) | P5-H (B part) ✅ | AI carrier behavior should target the actual runtime hooks, not placeholders |
 
-**Step 6 — opens when P5-G (C part) ✅**
+**Step 6 — opens when P5-H (B part) ✅ + P5-G (C part) ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track C agent | P5-H (C part) | P5-H (B part) ✅ | Foraging decision logic depends on the runtime forage command/state existing |
+| Track C agent | P5-H (C part) | P5-H (B part) ✅ + P5-G (C part) ✅ | Foraging decision logic depends on the runtime forage command/state and the carrier AI baseline existing |
 
 **Step 7 — campaign entities (Track B)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P6-A | P5-F ✅ + P5-G ✅ | Start campaign work after defense + navigation runtime ready; P5-H/P5-I are not true execution-dependencies for this step and may proceed in parallel as downstream / non-blocking work |
+| Track B agent | P6-A | P5-F ✅ + P5-G (B+C parts) ✅ | Start campaign work after the carrier runtime+AI hook is stable; `P5-H` organic foraging is not an execution dependency, but `P6-A` must reserve forage telemetry/state extension points |
 
 **Step 8 — opens when P6-A ✅**
 
@@ -2012,14 +2037,14 @@ P5-G Track B requirement note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | Wave 9 SMR prep - export/config | P6-D (B part) ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for army supply, carrier/resupply, foraging, and campaign skeleton evidence per `Wave9-10-SMR-Closeout-Plan.md` |
-| SMR Analyst | Wave 9 SMR prep - validation | Track B export/config ✅ | Validate that the new artifact surface and deterministic lanes can prove Wave 9 behavior before the final closeout package |
+| Track B agent | Wave 9 SMR prep - export/config | P5-G (B part) ✅ + P5-H (B part) ✅ + P6-D (B part) ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for army supply, carrier/resupply, foraging, and campaign skeleton evidence per `Wave9-10-SMR-Closeout-Plan.md` |
+| SMR Analyst | Wave 9 SMR prep - validation | Track B export/config ✅ + P5-G (C part) ✅ + P5-H (C part) ✅ | Validate that the new artifact surface and deterministic lanes can prove runtime and AI-side Wave 9 behavior before the final closeout package |
 
 **Step 12B — final Wave 9 closeout evidence**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst | Wave 9 SMR evidence | P6-D (A part) ✅ + Wave 9 SMR prep ✅ | Run and review Wave 9 all-around + targeted campaign/supply packages before Wave 10 kickoff; generic smoke alone is not sufficient |
+| SMR Analyst | Wave 9 SMR evidence | P5-G (C part) ✅ + P5-H (B+C parts) ✅ + P6-D (A part) ✅ + Wave 9 SMR prep ✅ | Run and review Wave 9 all-around + targeted campaign/supply packages before Wave 10 kickoff; generic smoke alone is not sufficient |
 
 ---
 
@@ -2027,6 +2052,9 @@ P5-G Track B requirement note:
 
 SMR closeout source of truth:
 - `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`
+
+Audit hardening source:
+- `Docs/Plans/Master/Wave10-Campaign-Logistics-Hardening-Plan.md`
 
 ### Sprint C11: Campaign Siege + Resolution (Track B -> C -> A)
 
@@ -2080,6 +2108,10 @@ SMR closeout source of truth:
 | Track C agent | P6-G | P6-E ✅ + P6-F ✅ | Strategic campaign AI should target the finalized campaign state machine |
 | Track A agent | P6-H | P6-E ✅ + P6-F ✅ | UI polish should visualize the full resolution flow, not only partial siege state |
 
+P6-G boundary note:
+- Detailed execution plan: `Docs/Plans/Master/Wave10-Campaign-Logistics-Hardening-Plan.md`.
+- Strategic campaign AI should be a faction/campaign strategist surface over finalized campaign state, not another per-person `RuntimeNpcBrain` branch.
+
 **Step 4 — supply lines foundation (Track B)**
 
 | Session | Epic(s) | Prereq | Notes |
@@ -2119,18 +2151,22 @@ SMR closeout source of truth:
 | Track B agent | P7-G | P7-E ✅ | Multi-front war should be bounded using the finalized siege-unit/runtime constraints |
 | Track A agent | P7-H | P7-E ✅ | Graphics consume the siege-unit snapshot once the runtime entity set is stable |
 
+P7 logistics cap note:
+- Detailed execution plan: `Docs/Plans/Master/Wave10-Campaign-Logistics-Hardening-Plan.md`.
+- `P7-A`, `P7-B`, and `P7-G` must define caps/guards before multi-front work: max active campaigns/convoys per faction, home garrison minimum, route/path budget, and convoy spawn throttles.
+
 **Step 10A — SMR evidence surface before closeout**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | Wave 10 SMR prep - export/config | P7-E ✅ + P7-G ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for campaign resolution, supply lines, forward bases, scouts, siege units, and multi-front constraints per `Wave9-10-SMR-Closeout-Plan.md` |
+| Track B agent | Wave 10 SMR prep - export/config | P6-F ✅ + P7-C (B part) ✅ + P7-E ✅ + P7-G ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for campaign resolution, supply lines, forward bases, scouts, siege units, and multi-front constraints per `Wave9-10-SMR-Closeout-Plan.md` |
 | SMR Analyst | Wave 10 SMR prep - validation | Track B export/config ✅ | Validate that the new artifact surface and deterministic lanes can prove Wave 10 behavior before the final closeout package |
 
 **Step 10B — final Wave 10 closeout evidence**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst | Wave 10 SMR evidence | P7-F ✅ + P7-G ✅ + P7-H ✅ + Wave 10 SMR prep ✅ | Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient |
+| SMR Analyst | Wave 10 SMR evidence | All Wave 10 implementation epics ✅ (`P6-G`/`P6-H`/`P7-C B+C`/`P7-D`/`P7-F`/`P7-G`/`P7-H`) + Wave 10 SMR prep ✅ | Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient |
 
 **Parallelism:** Wave 10 stays sequential across major phases (`C11 -> C12 -> C13`), but inside each phase the final consumer steps are grouped into the same step whenever cross-track work can proceed in parallel.
 
@@ -2148,6 +2184,9 @@ Wave turn-gate:
 - Wave 10.5 is `READY` only after Wave 8.5 closeout is `✅` and Wave 10 closeout is `✅`.
 - Reason: convergence work should build on a proven solver-backed slice and the matured late combat/campaign surface before shared-family expansion prep begins.
 - Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5.
+
+Audit hardening source:
+- `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md`
 
 ### Sprint TR3: Convergence + Expansion Prep (Track D primary, Track B/C consult on shared vocabulary touchpoints)
 
@@ -2181,6 +2220,16 @@ Wave 10.5 policy note:
 - Any task in this wave that creates, edits, or reviews refinery/model artifacts or convergence policy requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
 - `Docs/Plans/Master/Refinery-Live-SMR-Plan.md` remains the detailed operational source of truth for refinery headless lanes; Combined only records ownership, gates, and wave placement.
 
+TR3 audit gates:
+- Detailed execution plan: `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md`.
+- Java/C# output-mode parity matrix must cover story, directive, and campaign ops across `both`, `story_only`, `nudge_only`, and `off`.
+- Each `INV-*` must be classified as formal artifact responsibility, bridge guard, runtime adapter guard, or retired.
+- Bridge contract roundtrip/parity must include v2 director and campaign ops.
+- Solver coverage evidence must distinguish `validated_core` from unsupported effects, biases, causal fields, and campaign fields.
+- Snapshot mapper parity must prove C# refinery snapshots are consumed by the Java mapper without shape drift.
+- Shared vocabulary must cover faction ids, treaty kinds, goal categories, domains, and severities; mirrored constants should not keep expanding.
+- Paid/live guardrails remain opt-in and local; no default CI or generic evidence path may require paid completions.
+
 **Critical path:** `TR3-A -> TR3-B -> TR3-C`.
 **Parallelism:** Wave 10.5 is intentionally sequential Track D convergence work; the optimization target here is boundary clarity, not concurrency.
 
@@ -2197,9 +2246,16 @@ Purpose:
 Source of truth:
 - `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md`
 
+Audit hardening source:
+- `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md`
+
 Wave turn-gate:
 - Wave 11 is `READY` only after Wave 10.5 closeout is `✅`.
 - Reason: the Pre-Wave8 ecology patch was intentionally a current-model stabilizer; the full closed-loop redesign was deferred until after the Wave 10.5 convergence point.
+
+E11 runtime performance note:
+- Detailed execution plan: `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md`.
+- `E11-A`/`E11-B` must define region/tile ecology caches and land-safe spawn/migration policy up front; animal lifecycle work should not add new per-animal full-map scans as the normal path.
 
 ### Sprint E11-A: Runtime Ecology Core (Track B primary)
 
@@ -2246,12 +2302,17 @@ Wave turn-gate:
 |---------|---------|--------|-------|
 | Track B agent | E11-C | E11-B ✅ | Herbivores depend on plant capacity; predators depend on viable prey behavior |
 
-**Step 4 - predator lifecycle and rescue demotion (Track B)**
+**Step 4a - predator lifecycle (Track B)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | E11-D | E11-C ✅ | Predator reproduction/starvation should be tied to the stabilized prey loop |
-| Track B agent | E11-E | E11-C ✅ + E11-D ✅ | Rescue demotion should happen after both lifecycle paths can stand on their own |
+
+**Step 4b - rescue demotion after lifecycle paths stand alone (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | E11-E | E11-D ✅ | Rescue demotion should happen after both lifecycle paths can stand on their own |
 
 **Step 5 - behavior, supply bridge, and SMR gates open after runtime core**
 
@@ -2278,11 +2339,32 @@ Wave 11 policy note:
 - Domestication/farms/milk/eggs are explicitly later work; Wave 11 is wild ecology first.
 - Emergency rescue may remain as a debug/safety fallback, but normal acceptance lanes must not rely on it.
 
+E11 hard evidence gate:
+- Detailed execution plan: `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md`.
+- Required invariants: `ECO-SPECIES`, `ECO-PLANT`, `ECO-OSC`, `ECO-RESCUE`, `ECO-SUPPLY`, and `ECO-HUMAN`.
+- Required seeds: `101`, `202`, `303`.
+- Required planner lanes: `simple`, `goap`, and `htn`.
+- Required scenario lanes: default, medium-stress, drought, predator-human, and long-run.
+- Closeout must show lifecycle births/survival without depending on emergency rescue counters.
+
 **Critical path:** `E11-A -> E11-B -> E11-C -> E11-D -> E11-E -> E11-H -> E11-J`.
 **Parallelism:** Track C `E11-F` and Track B `E11-G` can proceed after lifecycle runtime is available; Track A `E11-I` waits for stable snapshot + SMR terminology.
 
+## Wave 12 Parking Lot - Codebase Architecture Hardening (Not Launchable)
 
-Wave 12: Improve codebase architecture
+Detailed source plan:
+- `Docs/Plans/Master/Wave12-Codebase-Architecture-Hardening-Plan.md`
+
+This is a planning parking lot, not an executable wave. It cannot launch until a source plan defines epics, ownership, gates, and evidence.
+
+Candidate scope from the 2026-05-12 deep audit:
+- Align `SimulationRuntime` and `ScenarioRunner` so headless evidence exercises the same command/runtime boundary as app/refinery paths unless a test deliberately bypasses it.
+- Add real `GameHost` boundary arch tests; current app-host checks should not rely on legacy shims alone.
+- Add snapshot caching or dirty-slice/static-layer separation so `GameHost.Draw()` does not rebuild all read-model data on every draw.
+- Add spatial indexes for actor occupancy, structure/blockage lookup, local threat scans, and crowd deconfliction.
+- Add structured render data for tactical effects, tower beams, campaign entities, convoys, supply routes, and ecology overlays; avoid renderer-side event-string parsing.
+- Harden CI/test matrix around C# runtime/app architecture tests, Java refinery tests, ScenarioRunner smoke/perf lanes, and artifact hygiene.
+
 ---
 
 ## Summary Table
@@ -2302,12 +2384,13 @@ Wave 12: Improve codebase architecture
 | 8 | — | C8 (Phase 5 S8) | Mostly sequential; final Track A consume |
 | 8.5 | TR2 (Tools.Refinery Phase TR2) | — | Director-only sidecar; sequential inside wave, parallel-eligible with Combat Waves 8-10 once Wave 7 + consult gate hold |
 | 8.6 | Paid LLM Director SMR Pilot | — | Guardrailed local-only paid pilot before Wave 9; Track D -> Track B -> SMR Analyst |
+| 8.7 | Refinery Sidecar Stabilization Mini-Wave | — | No-paid sidecar validator closeout before Wave 9 |
 | 9 | — | C9-C10 (Phase 5-6 S9-10) | Mostly sequential; Track A only at final campaign overlay consume |
 | 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential by phase, parallel consumer steps inside phases |
 | 10.5 | TR3 (Tools.Refinery Phase TR3) | — | Director-only convergence after Wave 10 and Wave 8.5 |
 | 11 | — | E11 (Closed-loop ecology redesign) | Runtime-first; Track C/B/SMR after lifecycle core; Track A debug consume late |
 
-**Totals:** 18 wave entries, 32 named sprints/sidecar blocks, ~120 epics.
+**Totals:** 18 summary rows after adding Wave 8.7. Full document contains many sprint/addendum headings; epic counts are approximate and should be regenerated before use.
 
 ---
 
@@ -2323,9 +2406,11 @@ Wave 12: Improve codebase architecture
 | Wave 7 complete | Low-Cost 2D alignment / Wave 7.5 kickoff | `Docs/Plans/Master/world_sim_low_cost_2_d_docs.md` |
 | Wave 7 complete + TR1-C consult note locked | Tools.Refinery TR2 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
 | Wave 8.5 complete + paid LLM Director pilot desired before Wave 9 | Wave 8.6 paid-live SMR pilot kickoff | `Docs/Plans/Master/Wave8.6-Paid-Live-Director-SMR-Plan.md` |
+| Current Wave 9 audit hardening desired before P6-C | Wave 9 runtime/perf hardening review | `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md` |
 | Wave 10 complete + Track A polish bandwidth available | Track A visual overhaul refresh triage | `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md` |
 | Wave 10 complete + Wave 8.5 complete | Tools.Refinery TR3 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
 | Wave 10.5 complete + ecology redesign desired | Wave 11 closed-loop ecology kickoff | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
+| Architecture hardening promoted by Meta | Wave 12 architecture hardening planning | `Docs/Plans/Master/Wave12-Codebase-Architecture-Hardening-Plan.md` |
 
 Track A deferred-reference note:
 - The Wave 10 visual-overhaul trigger is a refresh/triage point, not approval to execute the old Track A Phase 1 docs as-is.
