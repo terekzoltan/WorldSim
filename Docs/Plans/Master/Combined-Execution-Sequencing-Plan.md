@@ -1994,6 +1994,9 @@ Wave 9 audit hardening notes:
 |---------|---------|--------|-------|
 | Track B agent | P5-H (B part) | P5-G (B part) ✅ | Foraging runtime behavior should layer onto the carrier/resupply baseline |
 
+Wave 9 Step 4 progress note:
+- ✅ `P5-H (B part)` closed: runtime-only foraging primitive landed without Track C AI changes, ScenarioRunner artifact export, Graphics consume, organic `World.Update` wiring, or persistent Army/Campaign entities. `ArmyForagingModel` now provides caller-owned `ArmyForagingState` counters and deterministic `ArmyRationPoolState` destination for map-food foraging, with strict consumer-key validation, Chebyshev adjacent-or-same source range, explicit failure reasons, capped per-attempt/per-consumer yield, and exact conservation (`FoodGained == ration-pool delta == source-node decrease`). Focused Wave9 foraging tests, Wave9 runtime regression, full runtime tests, full solution build, and scope checks were green. `P5-H` top-level remains pending until the later Track C part closes.
+
 **Step 5 — opens when P5-H (B part) ✅**
 
 | Session | Epic(s) | Prereq | Notes |

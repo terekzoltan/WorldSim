@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-05-12 - Wave 9 P5-H Foraging - Minor - Cover no-yield and no-capacity branches explicitly
+
+- Track: Track B / Runtime foraging model
+- Source: Step review synthesis for Wave 9 `P5-H (B part)`
+- Finding: A foraging model can implement safe no-yield/no-capacity handling while focused tests only cover successful saturation near capacity, leaving the explicit failure branch unprotected.
+- Impact: Future cap or pool-capacity changes could silently convert a zero-capacity attempt into a mutation, overflow, or misleading success.
+- Resolution / guidance: Add a focused test for full ration-pool or zero-yield conditions that asserts `NoYield`, unchanged source node, unchanged pool, and failure counter updates.
+- Status: fixed
+
 ## 2026-05-12 - Wave 9 P5-G Supply Carrier - Major - Keep singular assignment state and actor role flags synchronized
 
 - Track: Track B / Runtime supply carrier hook
