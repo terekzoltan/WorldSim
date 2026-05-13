@@ -27,6 +27,7 @@ public sealed class SimplePlanner : IPlanner
                 : (context.HomeWood >= 8 ? NpcCommand.BuildWall : NpcCommand.GatherWood),
             "RaidBorder" => SelectRaidBorderCommand(context),
             "UnlockMilitaryTech" => ShouldUnlockMilitaryTech(context) ? NpcCommand.ResearchTech : NpcCommand.CraftTools,
+            "MaintainArmySupply" => SelectSupplyCarrierCommand(context),
             "GatherWood" => NpcCommand.GatherWood,
             "GatherStone" => NpcCommand.GatherStone,
             "SecureFood" => context.Hunger >= 68f && context.HomeFood > 0 ? NpcCommand.EatFood : NpcCommand.GatherFood,
@@ -94,6 +95,29 @@ public sealed class SimplePlanner : IPlanner
         return context.IsWarStance || context.IsHostileStance
             ? NpcCommand.RaidBorder
             : NpcCommand.Flee;
+    }
+
+    private static NpcCommand SelectSupplyCarrierCommand(in NpcAiContext context)
+    {
+        if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
+            return NpcCommand.Idle;
+
+        if (!context.HasArmySupplyDemand)
+            return NpcCommand.Idle;
+
+        if (!context.SupplyCarrierSourceValid)
+            return NpcCommand.AbortSupplyDelivery;
+
+        if (!context.HasColonySupplyCarrier && context.CanAssignSupplyCarrier)
+            return NpcCommand.AssignSupplyCarrier;
+
+        if (context.IsSupplyCarrier && context.SupplyCarrierNeedsRefill && context.SupplyCarrierCanRefill)
+            return NpcCommand.RefillInventory;
+
+        if (context.IsSupplyCarrier && context.SupplyCarrierCanDeliver)
+            return NpcCommand.DeliverSupply;
+
+        return NpcCommand.Idle;
     }
 
     private static bool ShouldUnlockMilitaryTech(in NpcAiContext context)

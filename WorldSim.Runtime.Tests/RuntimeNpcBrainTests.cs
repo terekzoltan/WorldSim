@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using WorldSim.AI;
@@ -25,6 +26,9 @@ public class RuntimeNpcBrainTests
     [InlineData(NpcCommand.BuildWatchtower, Job.BuildWatchtower)]
     [InlineData(NpcCommand.RaidBorder, Job.RaidBorder)]
     [InlineData(NpcCommand.AttackStructure, Job.AttackStructure)]
+    [InlineData(NpcCommand.AssignSupplyCarrier, Job.Idle)]
+    [InlineData(NpcCommand.DeliverSupply, Job.Idle)]
+    [InlineData(NpcCommand.AbortSupplyDelivery, Job.Idle)]
     [InlineData(NpcCommand.RefillInventory, Job.RefillInventory)]
     [InlineData(NpcCommand.Fight, Job.Fight)]
     [InlineData(NpcCommand.Flee, Job.Flee)]
@@ -243,6 +247,164 @@ public class RuntimeNpcBrainTests
         Assert.True(CapturingBrain.LastContext.Value.AmbientThreatScore > 0f);
         Assert.True(CapturingBrain.LastContext.Value.HasImmediateThreat);
         Assert.True(CapturingBrain.LastContext.Value.HasImmediateFactionThreat);
+    }
+
+    [Fact]
+    public void Think_BuildsSupplyCarrierContextFields()
+    {
+        var world = new World(24, 18, 4, randomSeed: 9301)
+        {
+            BirthRateMultiplier = 0f
+        };
+        world._animals.Clear();
+        var carrier = world._people.OrderBy(person => person.Id).First();
+        carrier.AssignRole(PersonRole.SupplyCarrier);
+        carrier.Home.Stock[Resource.Food] = 8;
+        var (storehouse, access) = FindStorehouseWithAccess(world, carrier.Home);
+        world.AddSpecializedBuilding(carrier.Home, storehouse, SpecializedBuildingKind.Storehouse);
+        carrier.Pos = access;
+
+        var brain = new RuntimeNpcBrain(new CapturingBrain());
+        _ = brain.Think(carrier, world, dt: 1f);
+
+        Assert.NotNull(CapturingBrain.LastContext);
+        var context = CapturingBrain.LastContext!.Value;
+        Assert.True(context.IsSupplyCarrier);
+        Assert.True(context.HasColonySupplyCarrier);
+        Assert.False(context.CanAssignSupplyCarrier);
+        Assert.True(context.SupplyCarrierNeedsRefill);
+        Assert.True(context.SupplyCarrierCanRefill);
+        Assert.False(context.SupplyCarrierCanDeliver);
+        Assert.True(context.SupplyCarrierSourceValid);
+        Assert.Equal(1f, context.ArmySupplyRatio);
+        Assert.False(context.IsFallbackRationPoolAllowed);
+        Assert.False(context.HasArmySupplyDemand);
+    }
+
+    [Fact]
+    public void Think_AllowsCarrierAssignmentOnlyWhenSafeAndNoCarrierExists()
+    {
+        var world = new World(24, 18, 4, randomSeed: 9302)
+        {
+            BirthRateMultiplier = 0f
+        };
+        world._animals.Clear();
+        var actor = world._people.OrderBy(person => person.Id).First();
+
+        var brain = new RuntimeNpcBrain(new CapturingBrain());
+        _ = brain.Think(actor, world, dt: 1f);
+
+        Assert.NotNull(CapturingBrain.LastContext);
+        Assert.False(CapturingBrain.LastContext!.Value.HasColonySupplyCarrier);
+        Assert.True(CapturingBrain.LastContext.Value.CanAssignSupplyCarrier);
+        Assert.False(CapturingBrain.LastContext.Value.HasArmySupplyDemand);
+
+        var predator = new Predator((actor.Pos.x + 1, actor.Pos.y), new Random(9302));
+        world._animals.Add(predator);
+        _ = brain.Think(actor, world, dt: 1f);
+
+        Assert.True(CapturingBrain.LastContext!.Value.HasImmediateThreat);
+        Assert.False(CapturingBrain.LastContext.Value.CanAssignSupplyCarrier);
+    }
+
+    [Fact]
+    public void Think_RecordsCarrierCommandTraceEvenWhenRuntimeJobIsIdle()
+    {
+        var world = new World(16, 16, 4, randomSeed: 9303);
+        var actor = world._people[0];
+        var brain = new RuntimeNpcBrain(new FixedBrain(NpcCommand.AssignSupplyCarrier));
+
+        var job = brain.Think(actor, world, dt: 1f);
+
+        Assert.Equal(Job.Idle, job);
+        Assert.NotNull(brain.LastDecision);
+        Assert.Equal(NpcCommand.AssignSupplyCarrier, brain.LastDecision!.Command);
+        Assert.Equal("Fixed", brain.LastDecision.Trace.SelectedGoal);
+        Assert.Contains(NpcCommand.AssignSupplyCarrier, brain.LastDecision.Trace.PlanPreview);
+    }
+
+    [Fact]
+    public void Think_RealPlannerNoDemandUsesUsefulNonCarrierWorkInsteadOfAssigningCarrier()
+    {
+        var world = new World(24, 18, 4, randomSeed: 9304)
+        {
+            BirthRateMultiplier = 0f
+        };
+        world._animals.Clear();
+        var actor = world._people.OrderBy(person => person.Id).First();
+        actor.Home.Stock[Resource.Food] = 50;
+        actor.Home.Stock[Resource.Wood] = 20;
+        actor.Home.Stock[Resource.Stone] = 0;
+        var brain = new RuntimeNpcBrain(NpcPlannerMode.Simple);
+
+        var job = brain.Think(actor, world, dt: 1f);
+
+        Assert.Equal(Job.GatherStone, job);
+        Assert.NotNull(brain.LastDecision);
+        Assert.Equal(NpcCommand.GatherStone, brain.LastDecision!.Command);
+        Assert.Equal("StabilizeResources", brain.LastDecision.Trace.SelectedGoal);
+        Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, brain.LastDecision.Trace.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.DeliverSupply, brain.LastDecision.Trace.PlanPreview);
+    }
+
+    [Fact]
+    public void Think_RealPlannerDoesNotRefillCarrierWithoutExplicitDemand()
+    {
+        var world = new World(24, 18, 4, randomSeed: 9305)
+        {
+            BirthRateMultiplier = 0f
+        };
+        world._animals.Clear();
+        var carrier = world._people.OrderBy(person => person.Id).First();
+        carrier.AssignRole(PersonRole.SupplyCarrier);
+        carrier.Home.Stock[Resource.Food] = 8;
+        var (storehouse, access) = FindStorehouseWithAccess(world, carrier.Home);
+        world.AddSpecializedBuilding(carrier.Home, storehouse, SpecializedBuildingKind.Storehouse);
+        carrier.Pos = access;
+        var brain = new RuntimeNpcBrain(NpcPlannerMode.Simple);
+
+        var job = brain.Think(carrier, world, dt: 1f);
+
+        Assert.NotNull(brain.LastDecision);
+        Assert.NotEqual(NpcCommand.RefillInventory, brain.LastDecision!.Command);
+        Assert.NotEqual("MaintainArmySupply", brain.LastDecision.Trace.SelectedGoal);
+        Assert.NotEqual(Job.RefillInventory, job);
+        Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, brain.LastDecision.Trace.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.DeliverSupply, brain.LastDecision.Trace.PlanPreview);
+    }
+
+    [Fact]
+    public void Think_MultiTickNoDemand_DoesNotRepeatTraceOnlyAssignCarrierIdleLoop()
+    {
+        var world = new World(24, 18, 4, randomSeed: 9306)
+        {
+            BirthRateMultiplier = 0f
+        };
+        world._animals.Clear();
+        var actor = world._people.OrderBy(person => person.Id).First();
+        actor.Home.Stock[Resource.Food] = 50;
+        actor.Home.Stock[Resource.Wood] = 20;
+        actor.Home.Stock[Resource.Stone] = 0;
+        var brain = new RuntimeNpcBrain(NpcPlannerMode.Simple);
+        var commands = new List<NpcCommand>();
+        var jobs = new List<Job>();
+        var goals = new List<string>();
+
+        for (var i = 0; i < 5; i++)
+        {
+            jobs.Add(brain.Think(actor, world, dt: 1f));
+            Assert.NotNull(brain.LastDecision);
+            commands.Add(brain.LastDecision!.Command);
+            goals.Add(brain.LastDecision.Trace.SelectedGoal);
+        }
+
+        Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, commands);
+        Assert.DoesNotContain(NpcCommand.DeliverSupply, commands);
+        Assert.DoesNotContain(NpcCommand.AbortSupplyDelivery, commands);
+        Assert.Contains(NpcCommand.GatherStone, commands);
+        Assert.Contains(Job.GatherStone, jobs);
+        Assert.NotEqual(commands.Count, jobs.Count(job => job == Job.Idle));
+        Assert.NotEqual(goals.Count, goals.Count(goal => goal == "MaintainArmySupply"));
     }
 
     [Fact]
@@ -608,6 +770,45 @@ public class RuntimeNpcBrainTests
         if (world.DefensiveStructures.Any(structure => structure.Pos == pos && !structure.IsDestroyed))
             return false;
         return true;
+    }
+
+    private static ((int x, int y) Storehouse, (int x, int y) Access) FindStorehouseWithAccess(World world, Colony owner)
+    {
+        for (int radius = 1; radius <= Math.Max(world.Width, world.Height); radius++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) != radius)
+                        continue;
+
+                    var storehouse = (x: owner.Origin.x + dx, y: owner.Origin.y + dy);
+                    if (!world.CanPlaceStructureAt(storehouse.x, storehouse.y))
+                        continue;
+
+                    var access = CardinalNeighbors(storehouse)
+                        .Where(tile => tile.x >= 0 && tile.y >= 0 && tile.x < world.Width && tile.y < world.Height)
+                        .Where(tile => !world.IsMovementBlocked(tile.x, tile.y, owner.Id))
+                        .OrderBy(tile => tile.x)
+                        .ThenBy(tile => tile.y)
+                        .FirstOrDefault();
+
+                    if (access != default)
+                        return (storehouse, access);
+                }
+            }
+        }
+
+        throw new InvalidOperationException("Could not find storehouse test placement with access tile.");
+    }
+
+    private static IEnumerable<(int x, int y)> CardinalNeighbors((int x, int y) pos)
+    {
+        yield return (pos.x - 1, pos.y);
+        yield return (pos.x + 1, pos.y);
+        yield return (pos.x, pos.y - 1);
+        yield return (pos.x, pos.y + 1);
     }
 
     private static void ForceAttackStructureTick(Person raider)

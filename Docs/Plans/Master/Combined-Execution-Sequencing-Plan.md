@@ -1929,12 +1929,12 @@ Wave turn-gate:
 > Combat Plan > Phase 5 Sprint 9
 
 - ✅ **P5-F** Army supply model — aggregate + consumption (Track B)
-- ⬜ **P5-G** Supply carrier role + AI behaviors (Track B + C)
+- ✅ **P5-G** Supply carrier role + AI behaviors (Track B + C)
 - ⬜ **P5-H** Foraging behavior (Track B + C)
 - ✅ **P5-I** Fallback supply budget for early prototypes (Track B)
 
 Split-status note:
-- `P5-G` and `P5-H` are aggregate B+C epics. Keep the top-level marker pending until both runtime and AI parts close. Current frontier as of 2026-05-12 remains `P5-G (B part)` Track B; do not start `P5-G (C part)` or `P5-H` until their explicit step gates open.
+- `P5-G` and `P5-H` are aggregate B+C epics. Keep the top-level marker pending until both runtime and AI parts close. Current frontier as of 2026-05-13 is `P5-H (C part)` Track C under Step 6; do not start `P6-A` until `P5-G` B+C is accepted and Step 7 opens.
 
 ### Sprint C10: Campaign Skeleton (Track B -> C -> A)
 
@@ -2003,6 +2003,9 @@ Wave 9 Step 4 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track C agent | P5-G (C part) | P5-H (B part) ✅ | AI carrier behavior should target the actual runtime hooks, not placeholders |
+
+Wave 9 Step 5 progress note:
+- ✅ `P5-G (C part)` closed: Track C AI carrier decision baseline landed with explicit carrier commands (`AssignSupplyCarrier`, `DeliverSupply`, `AbortSupplyDelivery`), safe-default supply context fields, `MaintainArmySupply` goal/planner handling across Simple/GOAP/HTN, and runtime context fill from existing role/inventory/storehouse facts. Initial review blocker was fixed before closeout: trace-only carrier commands remain mapped to `Job.Idle`, but explicit `HasArmySupplyDemand=false` runtime default gating prevents no-demand `MaintainArmySupply -> AssignSupplyCarrier -> Job.Idle` loops. Direct planner no-demand/threat paths return `Idle`, multi-tick runtime regression proves non-carrier progress, and focused AI/runtime, Wave9 runtime, full runtime, solution build, and diff checks were green. `P5-G` top-level is now complete after B+C acceptance.
 
 **Step 6 — opens when P5-H (B part) ✅ + P5-G (C part) ✅**
 

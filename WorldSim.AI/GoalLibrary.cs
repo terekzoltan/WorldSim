@@ -42,6 +42,13 @@ public static class GoalLibrary
         unlockMilitaryTech.Considerations.Add(new InvertedConsideration(new HungerConsideration()));
         goals.Add(unlockMilitaryTech);
 
+        var maintainArmySupply = new Goal("MaintainArmySupply")
+        {
+            CooldownSeconds = 1.0f
+        };
+        maintainArmySupply.Considerations.Add(new SupplyCarrierSupportConsideration());
+        goals.Add(maintainArmySupply);
+
         var gatherWood = new Goal("GatherWood")
         {
             CooldownSeconds = 2f

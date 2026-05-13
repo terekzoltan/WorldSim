@@ -17,6 +17,9 @@ public enum NpcCommand
     BuildWatchtower,
     RaidBorder,
     AttackStructure,
+    AssignSupplyCarrier,
+    DeliverSupply,
+    AbortSupplyDelivery,
     RefillInventory,
     Fight,
     Flee
@@ -86,7 +89,17 @@ public readonly record struct NpcAiContext(
     float DirectThreatScore = 0f,
     float AmbientThreatScore = 0f,
     bool HasImmediateThreat = false,
-    bool HasImmediateFactionThreat = false);
+    bool HasImmediateFactionThreat = false,
+    bool IsSupplyCarrier = false,
+    bool HasColonySupplyCarrier = false,
+    bool CanAssignSupplyCarrier = false,
+    bool SupplyCarrierNeedsRefill = false,
+    bool SupplyCarrierCanRefill = false,
+    bool SupplyCarrierCanDeliver = false,
+    bool SupplyCarrierSourceValid = true,
+    float ArmySupplyRatio = 1f,
+    bool IsFallbackRationPoolAllowed = false,
+    bool HasArmySupplyDemand = false);
 
 public interface IPlanner
 {

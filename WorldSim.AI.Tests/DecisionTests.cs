@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using WorldSim.AI;
 using Xunit;
@@ -1054,6 +1055,220 @@ public class DecisionTests
 
         Assert.Equal(NpcCommand.Fight, decision.Command);
     }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void Planner_MaintainArmySupply_AssignsCarrier_WhenNoCarrierExists(string plannerMode)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("MaintainArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateSupplyCarrierContext(
+            hasColonySupplyCarrier: false,
+            canAssignSupplyCarrier: true,
+            hasArmySupplyDemand: true));
+
+        Assert.Equal(NpcCommand.AssignSupplyCarrier, decision.Command);
+        Assert.DoesNotContain(NpcCommand.GatherFood, decision.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void Planner_MaintainArmySupply_RefillsCarrier_WhenRefillIsAvailable(string plannerMode)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("MaintainArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateSupplyCarrierContext(
+            isSupplyCarrier: true,
+            hasColonySupplyCarrier: true,
+            supplyCarrierNeedsRefill: true,
+            supplyCarrierCanRefill: true,
+            hasArmySupplyDemand: true));
+
+        Assert.Equal(NpcCommand.RefillInventory, decision.Command);
+        Assert.DoesNotContain(NpcCommand.GatherFood, decision.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void Planner_MaintainArmySupply_DeliversOnlyWhenDeliveryContextIsExplicit(string plannerMode)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("MaintainArmySupply"));
+
+        var withoutDelivery = planner.GetNextCommand(CreateSupplyCarrierContext(
+            isSupplyCarrier: true,
+            hasColonySupplyCarrier: true,
+            supplyCarrierCanDeliver: false,
+            hasArmySupplyDemand: true));
+
+        planner.SetGoal(new Goal("MaintainArmySupply"));
+        var withDelivery = planner.GetNextCommand(CreateSupplyCarrierContext(
+            isSupplyCarrier: true,
+            hasColonySupplyCarrier: true,
+            supplyCarrierCanDeliver: true,
+            armySupplyRatio: 0.2f,
+            hasArmySupplyDemand: true));
+
+        Assert.NotEqual(NpcCommand.DeliverSupply, withoutDelivery.Command);
+        Assert.Equal(NpcCommand.DeliverSupply, withDelivery.Command);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void Planner_MaintainArmySupply_AbortsInvalidSupplySource(string plannerMode)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("MaintainArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateSupplyCarrierContext(
+            isSupplyCarrier: true,
+            hasColonySupplyCarrier: true,
+            supplyCarrierSourceValid: false,
+            hasArmySupplyDemand: true));
+
+        Assert.Equal(NpcCommand.AbortSupplyDelivery, decision.Command);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void Planner_MaintainArmySupply_NoDemandReturnsIdleEvenWhenCarrierWorkIsPossible(string plannerMode)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("MaintainArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateSupplyCarrierContext(
+            hasColonySupplyCarrier: false,
+            canAssignSupplyCarrier: true,
+            supplyCarrierSourceValid: false,
+            supplyCarrierCanDeliver: true,
+            hasArmySupplyDemand: false));
+
+        Assert.Equal(NpcCommand.Idle, decision.Command);
+        Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.RefillInventory, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.DeliverSupply, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.AbortSupplyDelivery, decision.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void Planner_MaintainArmySupply_ThreatReturnsIdleEvenWhenDemandExists(string plannerMode)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("MaintainArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateSupplyCarrierContext(
+            hasColonySupplyCarrier: false,
+            canAssignSupplyCarrier: true,
+            directThreatScore: 0.7f,
+            hasImmediateThreat: true,
+            hasArmySupplyDemand: true));
+
+        Assert.Equal(NpcCommand.Idle, decision.Command);
+        Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.DeliverSupply, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.AbortSupplyDelivery, decision.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void UtilityBrain_DefendSelfDominatesSupplyCarrierSupport_WhenImmediateThreatExists(string plannerMode)
+    {
+        var brain = new UtilityGoapBrain(CreatePlanner(plannerMode), GoalLibrary.CreateDefaultGoals(), "Test");
+
+        var result = brain.Think(CreateSupplyCarrierContext(
+            hasColonySupplyCarrier: false,
+            canAssignSupplyCarrier: true,
+            health: 90f,
+            strength: 18,
+            defense: 18,
+            nearbyPredators: 1,
+            directThreatScore: 0.8f,
+            hasImmediateThreat: true,
+            hasArmySupplyDemand: true));
+
+        Assert.Equal("DefendSelf", result.Trace.SelectedGoal);
+        Assert.False(IsCarrierCommand(result.Command));
+        Assert.NotEqual(NpcCommand.GatherFood, result.Command);
+    }
+
+    private static IPlanner CreatePlanner(string plannerMode)
+        => plannerMode switch
+        {
+            "simple" => new SimplePlanner(),
+            "goap" => new GoapPlanner(),
+            "htn" => new HtnPlanner(),
+            _ => throw new ArgumentOutOfRangeException(nameof(plannerMode), plannerMode, "Unknown planner mode")
+        };
+
+    private static bool IsCarrierCommand(NpcCommand command)
+        => command is NpcCommand.AssignSupplyCarrier
+            or NpcCommand.DeliverSupply
+            or NpcCommand.AbortSupplyDelivery;
+
+    private static NpcAiContext CreateSupplyCarrierContext(
+        bool isSupplyCarrier = false,
+        bool hasColonySupplyCarrier = false,
+        bool canAssignSupplyCarrier = false,
+        bool supplyCarrierNeedsRefill = false,
+        bool supplyCarrierCanRefill = false,
+        bool supplyCarrierCanDeliver = false,
+        bool supplyCarrierSourceValid = true,
+        float armySupplyRatio = 1f,
+        float health = 100f,
+        int strength = 10,
+        int defense = 10,
+        int nearbyPredators = 0,
+        float directThreatScore = 0f,
+        bool hasImmediateThreat = false,
+        bool hasArmySupplyDemand = false)
+        => new(
+            SimulationTimeSeconds: 20f,
+            Hunger: 10f,
+            Stamina: 80f,
+            HomeWood: 20,
+            HomeStone: 10,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 12,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: health,
+            Strength: strength,
+            Defense: defense,
+            NearbyPredators: nearbyPredators,
+            DirectThreatScore: directThreatScore,
+            HasImmediateThreat: hasImmediateThreat,
+            IsSupplyCarrier: isSupplyCarrier,
+            HasColonySupplyCarrier: hasColonySupplyCarrier,
+            CanAssignSupplyCarrier: canAssignSupplyCarrier,
+            SupplyCarrierNeedsRefill: supplyCarrierNeedsRefill,
+            SupplyCarrierCanRefill: supplyCarrierCanRefill,
+            SupplyCarrierCanDeliver: supplyCarrierCanDeliver,
+            SupplyCarrierSourceValid: supplyCarrierSourceValid,
+            ArmySupplyRatio: armySupplyRatio,
+            HasArmySupplyDemand: hasArmySupplyDemand);
 
     private sealed class FixedConsideration : Consideration
     {

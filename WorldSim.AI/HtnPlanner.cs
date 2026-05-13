@@ -202,6 +202,10 @@ public sealed class HtnPlanner : IPlanner
                     new[] { NpcCommand.CraftTools }));
                 break;
 
+            case "MaintainArmySupply":
+                candidates.Add(CreateSupplyCarrierMethod(context));
+                break;
+
             default:
                 candidates.Add(new MethodCandidate("FallbackIdle", 0.01f, new[] { NpcCommand.Idle }));
                 break;
@@ -221,6 +225,44 @@ public sealed class HtnPlanner : IPlanner
     }
 
     private sealed record MethodCandidate(string Name, float Score, IReadOnlyList<NpcCommand> Commands);
+
+    private static MethodCandidate CreateSupplyCarrierMethod(in NpcAiContext context)
+    {
+        var command = SelectSupplyCarrierCommand(context);
+        var method = command switch
+        {
+            NpcCommand.AbortSupplyDelivery => "AbortInvalidSupplyCarrier",
+            NpcCommand.AssignSupplyCarrier => "AssignSupplyCarrier",
+            NpcCommand.RefillInventory => "RefillSupplyCarrier",
+            NpcCommand.DeliverSupply => "DeliverSupply",
+            _ => "SupplyCarrierIdle"
+        };
+        var score = command == NpcCommand.Idle ? 0.01f : 1f;
+        return new MethodCandidate(method, score, new[] { command });
+    }
+
+    private static NpcCommand SelectSupplyCarrierCommand(in NpcAiContext context)
+    {
+        if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
+            return NpcCommand.Idle;
+
+        if (!context.HasArmySupplyDemand)
+            return NpcCommand.Idle;
+
+        if (!context.SupplyCarrierSourceValid)
+            return NpcCommand.AbortSupplyDelivery;
+
+        if (!context.HasColonySupplyCarrier && context.CanAssignSupplyCarrier)
+            return NpcCommand.AssignSupplyCarrier;
+
+        if (context.IsSupplyCarrier && context.SupplyCarrierNeedsRefill && context.SupplyCarrierCanRefill)
+            return NpcCommand.RefillInventory;
+
+        if (context.IsSupplyCarrier && context.SupplyCarrierCanDeliver)
+            return NpcCommand.DeliverSupply;
+
+        return NpcCommand.Idle;
+    }
 
     private static bool ShouldUnlockMilitaryTech(in NpcAiContext context)
     {

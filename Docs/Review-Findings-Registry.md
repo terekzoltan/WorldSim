@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-05-13 - Wave 9 P5-G Supply Carrier AI - Blocking - Do not let trace-only commands dominate default utility selection
+
+- Track: Track C / AI supply-carrier behavior
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P5-G (C part)`
+- Finding: A trace-only AI command that maps to `Job.Idle` can become the highest-scoring default utility goal if it is not gated by explicit demand or execution readiness. In `P5-G (C part)`, `MaintainArmySupply -> AssignSupplyCarrier` could be selected in safe no-carrier runtime context while no runtime carrier state is created.
+- Impact: The actor can repeatedly choose a no-effect idle command, suppressing normal productive goals and creating a no-progress loop despite focused one-tick command trace tests passing.
+- Resolution / guidance: Either execute the command by mutating the intended runtime state, or keep it trace-only but gate it behind explicit demand/readiness so it cannot dominate default runtime utility selection. Add a multi-tick regression proving carrier commands do not repeat indefinitely as no-op idle work and that useful fallback/progress resumes.
+- Status: fixed
+
 ## 2026-05-12 - Review Process - Guidance - Document accepted residual findings before step closeout
 
 - Track: Meta Coordinator / all Tracks

@@ -89,6 +89,9 @@ public sealed class RuntimeNpcBrain
             NpcCommand.BuildWatchtower => Job.BuildWatchtower,
             NpcCommand.RaidBorder => Job.RaidBorder,
             NpcCommand.AttackStructure => Job.AttackStructure,
+            NpcCommand.AssignSupplyCarrier => Job.Idle,
+            NpcCommand.DeliverSupply => Job.Idle,
+            NpcCommand.AbortSupplyDelivery => Job.Idle,
             NpcCommand.RefillInventory => Job.RefillInventory,
             NpcCommand.Fight => Job.Fight,
             NpcCommand.Flee => Job.Flee,
@@ -162,6 +165,20 @@ public sealed class RuntimeNpcBrain
             isHostileStance,
             isWarStance);
         var localThreatScore = Math.Clamp(directThreatScore + ambientThreatScore, 0f, 1f);
+        var isSupplyCarrier = actor.HasRole(PersonRole.SupplyCarrier);
+        var hasColonySupplyCarrier = world._people.Any(person =>
+            person.Home == actor.Home
+            && person.Health > 0f
+            && person.HasRole(PersonRole.SupplyCarrier));
+        var canAssignSupplyCarrier = actor.Health > 0f
+            && !actor.IsRouting
+            && !hasImmediateThreat
+            && !hasColonySupplyCarrier;
+        var supplyCarrierNeedsRefill = isSupplyCarrier
+            && actor.Inventory.FreeSlots > 0
+            && actor.Home.Stock[Resource.Food] > 0;
+        var supplyCarrierCanRefill = supplyCarrierNeedsRefill
+            && world.TryFindNearestOwnedStorehouseAccessTile(actor.Home, actor.Pos, out _);
         var isWarriorRole = IsWarriorRole(world, actor, colonyId, isHostileStance);
         var homeMilitaryTechCount = CountUnlockedTechs(actor.Home, MilitaryTechIds);
         var homeFortificationTechCount = CountUnlockedTechs(actor.Home, FortificationTechIds);
@@ -258,7 +275,17 @@ public sealed class RuntimeNpcBrain
             DirectThreatScore: directThreatScore,
             AmbientThreatScore: ambientThreatScore,
             HasImmediateThreat: hasImmediateThreat,
-            HasImmediateFactionThreat: hasImmediateFactionThreat);
+            HasImmediateFactionThreat: hasImmediateFactionThreat,
+            IsSupplyCarrier: isSupplyCarrier,
+            HasColonySupplyCarrier: hasColonySupplyCarrier,
+            CanAssignSupplyCarrier: canAssignSupplyCarrier,
+            SupplyCarrierNeedsRefill: supplyCarrierNeedsRefill,
+            SupplyCarrierCanRefill: supplyCarrierCanRefill,
+            SupplyCarrierCanDeliver: false,
+            SupplyCarrierSourceValid: true,
+            ArmySupplyRatio: 1f,
+            IsFallbackRationPoolAllowed: false,
+            HasArmySupplyDemand: false);
     }
 
     private static int CountUnlockedTechs(Colony colony, IEnumerable<string> techIds)

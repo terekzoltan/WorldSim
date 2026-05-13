@@ -211,6 +211,32 @@ public sealed class LowMilitaryTechCountConsideration : Consideration
     }
 }
 
+public sealed class SupplyCarrierSupportConsideration : Consideration
+{
+    public override float Evaluate(in NpcAiContext context)
+    {
+        if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
+            return 0f;
+
+        if (!context.HasArmySupplyDemand)
+            return 0f;
+
+        if (!context.SupplyCarrierSourceValid)
+            return 1f;
+
+        if (!context.HasColonySupplyCarrier && context.CanAssignSupplyCarrier)
+            return 1f;
+
+        if (context.IsSupplyCarrier && context.SupplyCarrierCanDeliver)
+            return 1f;
+
+        if (context.IsSupplyCarrier && context.SupplyCarrierNeedsRefill && context.SupplyCarrierCanRefill)
+            return 1f;
+
+        return 0f;
+    }
+}
+
 public sealed class InvertedConsideration : Consideration
 {
     private readonly Consideration _inner;

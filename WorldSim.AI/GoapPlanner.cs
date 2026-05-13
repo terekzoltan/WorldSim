@@ -61,6 +61,15 @@ public sealed class GoapPlanner : IPlanner
             return new PlannerDecision(researchCommand, 1, new[] { researchCommand }, 1, researchReason, "GoapTechRule");
         }
 
+        if (_goal.Name == "MaintainArmySupply")
+        {
+            var supplyCommand = SelectSupplyCarrierCommand(context);
+            var supplyReason = _goalChanged ? "GoalChanged" : "SupplyCarrierSupport";
+            var supplyPlanLength = supplyCommand == NpcCommand.Idle ? 0 : 1;
+            _goalChanged = false;
+            return new PlannerDecision(supplyCommand, supplyPlanLength, new[] { supplyCommand }, supplyPlanLength, supplyReason, "GoapSupplyCarrierRule");
+        }
+
         var reason = _goalChanged ? "GoalChanged" : "PlanContinue";
 
         if (_currentPlan.Count > 0 && !CanExecuteCurrentAction(context, _currentPlan.Peek()))
@@ -311,5 +320,28 @@ public sealed class GoapPlanner : IPlanner
             return false;
 
         return context.IsWarStance || (context.IsHostileStance && context.LocalThreatScore >= 0.4f);
+    }
+
+    private static NpcCommand SelectSupplyCarrierCommand(in NpcAiContext context)
+    {
+        if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
+            return NpcCommand.Idle;
+
+        if (!context.HasArmySupplyDemand)
+            return NpcCommand.Idle;
+
+        if (!context.SupplyCarrierSourceValid)
+            return NpcCommand.AbortSupplyDelivery;
+
+        if (!context.HasColonySupplyCarrier && context.CanAssignSupplyCarrier)
+            return NpcCommand.AssignSupplyCarrier;
+
+        if (context.IsSupplyCarrier && context.SupplyCarrierNeedsRefill && context.SupplyCarrierCanRefill)
+            return NpcCommand.RefillInventory;
+
+        if (context.IsSupplyCarrier && context.SupplyCarrierCanDeliver)
+            return NpcCommand.DeliverSupply;
+
+        return NpcCommand.Idle;
     }
 }
