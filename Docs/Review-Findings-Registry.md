@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-05-15 - Wave 9 P6-A Campaign Entities - Guidance - Keep runtime state query seams internal until read-model export
+
+- Track: Track B / Runtime campaign entities
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-A`
+- Finding: Returning a copied collection of live runtime entity objects is useful for runtime tests, but it is not an immutable read-model contract for UI, ScenarioRunner, or cross-track consumption.
+- Impact: Later P6-B/P6-C progression may add mutability to campaign/army state; if downstream tracks consume live state directly, snapshot boundary and ownership can drift.
+- Resolution / guidance: Treat `SimulationRuntime.Campaigns` as a runtime-internal/test seam for P6-A. Before Track A/SMR consumption in P6-D or Wave 9 SMR prep, add explicit immutable read-model/export DTOs rather than exposing live runtime objects.
+- Status: guidance
+
 ## 2026-05-13 - Wave 9 P5-H Foraging AI - Blocking - Zero-score support goals must not become selected trace goals
 
 - Track: Track C / AI foraging behavior

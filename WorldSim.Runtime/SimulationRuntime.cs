@@ -7,6 +7,7 @@ using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
 using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
+using WorldSim.Simulation.Military;
 
 namespace WorldSim.Runtime;
 
@@ -48,8 +49,11 @@ public sealed class SimulationRuntime
     private readonly double _directorDampeningFactor;
     private readonly Queue<string> _recentAiDecisions = new();
     private readonly DirectorState _directorState = new();
+    private readonly List<CampaignState> _campaigns = new();
     private DirectorExecutionState _directorExecutionState = DirectorExecutionState.NotTriggered;
     private int _lastObservedDecisionTick = -1;
+    private int _nextCampaignId = 1;
+    private int _nextArmyId = 1;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
     private int _trackedActorId = -1;
@@ -65,6 +69,7 @@ public sealed class SimulationRuntime
     public int Width => _world.Width;
     public int Height => _world.Height;
     public int ColonyCount => _world._colonies.Count;
+    public IReadOnlyList<CampaignState> Campaigns => _campaigns.ToArray();
 
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath)
         : this(width, height, initialPopulation, technologyFilePath, null)
@@ -145,6 +150,90 @@ public sealed class SimulationRuntime
         {
             Director = BuildDirectorRenderState()
         };
+    }
+
+    public CampaignCreationResult TryCreateCampaign(Faction ownerFaction, Faction targetFaction, int requestedMemberCount)
+    {
+        if (!IsCampaignRuntimeAvailable())
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.CampaignRuntimeUnavailable,
+                "Campaign creation requires WORLDSIM_ENABLE_DIPLOMACY=true and WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true.");
+        }
+
+        if (!Enum.IsDefined(typeof(Faction), ownerFaction))
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.InvalidOwnerFaction,
+                $"Invalid owner faction value: {(int)ownerFaction}.");
+        }
+
+        if (!Enum.IsDefined(typeof(Faction), targetFaction))
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.InvalidTargetFaction,
+                $"Invalid target faction value: {(int)targetFaction}.");
+        }
+
+        if (ownerFaction == targetFaction)
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.SameFaction,
+                "Campaign creation requires ownerFaction != targetFaction.");
+        }
+
+        if (requestedMemberCount <= 0)
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.InvalidRequestedMemberCount,
+                "Campaign creation requires requestedMemberCount > 0.");
+        }
+
+        var ownerColony = _world._colonies.FirstOrDefault(colony => colony.Faction == ownerFaction);
+        if (ownerColony == null)
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.OwnerColonyNotFound,
+                $"No owner colony found for faction {ownerFaction}.");
+        }
+
+        var targetColony = _world._colonies.FirstOrDefault(colony => colony.Faction == targetFaction);
+        if (targetColony == null)
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.TargetColonyNotFound,
+                $"No target colony found for faction {targetFaction}.");
+        }
+
+        var campaignId = _nextCampaignId++;
+        var armyId = _nextArmyId++;
+        var routeIntent = new CampaignRouteIntent(
+            ownerColony.Id,
+            targetColony.Id,
+            ownerColony.Origin.x,
+            ownerColony.Origin.y,
+            targetColony.Origin.x,
+            targetColony.Origin.y);
+        var army = new ArmyState(
+            armyId,
+            ownerFaction,
+            ownerColony.Id,
+            ownerColony.Origin.x,
+            ownerColony.Origin.y,
+            targetColony.Origin.x,
+            targetColony.Origin.y,
+            requestedMemberCount);
+        _campaigns.Add(new CampaignState(
+            campaignId,
+            ownerFaction,
+            targetFaction,
+            ownerColony.Id,
+            targetColony.Id,
+            Tick,
+            routeIntent,
+            army));
+
+        return CampaignCreationResult.Created(campaignId, armyId);
     }
 
     private DirectorRenderState BuildDirectorRenderState()
@@ -571,12 +660,15 @@ public sealed class SimulationRuntime
 
     private void ValidateCampaignRuntimeAvailability()
     {
-        if (!_world.EnableDiplomacy || !_world.EnableCombatPrimitives)
+        if (!IsCampaignRuntimeAvailable())
         {
             throw new InvalidOperationException(
                 "Campaign commands require WORLDSIM_ENABLE_DIPLOMACY=true and WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true.");
         }
     }
+
+    private bool IsCampaignRuntimeAvailable()
+        => _world.EnableDiplomacy && _world.EnableCombatPrimitives;
 
     private static void ValidateFactionValue(Faction faction, string paramName)
     {
