@@ -23,6 +23,7 @@ public static class GoalBiasCategories
             "BuildDefenses" => Math.Max(context.BiasBuilding, context.BiasMilitary),
             "RaidBorder" => context.BiasMilitary,
             "UnlockMilitaryTech" => context.BiasMilitary,
+            "ForageArmySupply" => CanBiasArmyForage(context) ? Math.Max(context.BiasFarming, context.BiasGathering) : 0f,
             "GatherWood" => context.BiasGathering,
             "GatherStone" => context.BiasGathering,
             "StabilizeResources" => Math.Max(context.BiasGathering, context.BiasCrafting),
@@ -34,6 +35,18 @@ public static class GoalBiasCategories
         };
     }
 
+    private static bool CanBiasArmyForage(in NpcAiContext context)
+        => context.HasArmyForageDemand
+            && context.CanForageArmySupply
+            && context.ArmyForageSourceAvailable
+            && context.ArmyForageSourceInRange
+            && context.ArmyForageConsumerCapRemaining
+            && context.ArmyForageRationPoolHasCapacity
+            && context.ArmySupplyRatio < 0.75f
+            && !context.HasImmediateThreat
+            && context.DirectThreatScore <= 0f
+            && !context.IsRouting;
+
     public static float GetCrowdPenaltyForGoal(string goalName, in NpcAiContext context)
     {
         if (string.IsNullOrWhiteSpace(goalName))
@@ -43,6 +56,7 @@ public static class GoalBiasCategories
         {
             "GatherWood" => context.ResourceCrowdPressure,
             "GatherStone" => context.ResourceCrowdPressure,
+            "ForageArmySupply" => context.ResourceCrowdPressure,
             "SecureFood" => context.ResourceCrowdPressure,
             "StabilizeResources" => context.ResourceCrowdPressure,
             "BuildHouse" => context.BuildCrowdPressure,

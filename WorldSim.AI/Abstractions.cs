@@ -20,6 +20,7 @@ public enum NpcCommand
     AssignSupplyCarrier,
     DeliverSupply,
     AbortSupplyDelivery,
+    ForageArmySupply,
     RefillInventory,
     Fight,
     Flee
@@ -99,7 +100,13 @@ public readonly record struct NpcAiContext(
     bool SupplyCarrierSourceValid = true,
     float ArmySupplyRatio = 1f,
     bool IsFallbackRationPoolAllowed = false,
-    bool HasArmySupplyDemand = false);
+    bool HasArmySupplyDemand = false,
+    bool HasArmyForageDemand = false,
+    bool CanForageArmySupply = false,
+    bool ArmyForageSourceAvailable = false,
+    bool ArmyForageSourceInRange = false,
+    bool ArmyForageConsumerCapRemaining = false,
+    bool ArmyForageRationPoolHasCapacity = false);
 
 public interface IPlanner
 {

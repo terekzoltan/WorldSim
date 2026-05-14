@@ -70,6 +70,15 @@ public sealed class GoapPlanner : IPlanner
             return new PlannerDecision(supplyCommand, supplyPlanLength, new[] { supplyCommand }, supplyPlanLength, supplyReason, "GoapSupplyCarrierRule");
         }
 
+        if (_goal.Name == "ForageArmySupply")
+        {
+            var forageCommand = SelectArmyForageCommand(context);
+            var forageReason = _goalChanged ? "GoalChanged" : "ArmyForageSupport";
+            var foragePlanLength = forageCommand == NpcCommand.Idle ? 0 : 1;
+            _goalChanged = false;
+            return new PlannerDecision(forageCommand, foragePlanLength, new[] { forageCommand }, foragePlanLength, forageReason, "GoapArmyForageRule");
+        }
+
         var reason = _goalChanged ? "GoalChanged" : "PlanContinue";
 
         if (_currentPlan.Count > 0 && !CanExecuteCurrentAction(context, _currentPlan.Peek()))
@@ -343,5 +352,25 @@ public sealed class GoapPlanner : IPlanner
             return NpcCommand.DeliverSupply;
 
         return NpcCommand.Idle;
+    }
+
+    private static NpcCommand SelectArmyForageCommand(in NpcAiContext context)
+    {
+        if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
+            return NpcCommand.Idle;
+
+        if (!context.HasArmyForageDemand)
+            return NpcCommand.Idle;
+
+        if (!context.CanForageArmySupply
+            || !context.ArmyForageSourceAvailable
+            || !context.ArmyForageSourceInRange
+            || !context.ArmyForageConsumerCapRemaining
+            || !context.ArmyForageRationPoolHasCapacity)
+            return NpcCommand.Idle;
+
+        return context.ArmySupplyRatio < 0.75f
+            ? NpcCommand.ForageArmySupply
+            : NpcCommand.Idle;
     }
 }

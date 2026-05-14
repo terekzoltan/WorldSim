@@ -1930,7 +1930,7 @@ Wave turn-gate:
 
 - ✅ **P5-F** Army supply model — aggregate + consumption (Track B)
 - ✅ **P5-G** Supply carrier role + AI behaviors (Track B + C)
-- ⬜ **P5-H** Foraging behavior (Track B + C)
+- ✅ **P5-H** Foraging behavior (Track B + C)
 - ✅ **P5-I** Fallback supply budget for early prototypes (Track B)
 
 Split-status note:
@@ -2012,6 +2012,9 @@ Wave 9 Step 5 progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track C agent | P5-H (C part) | P5-H (B part) ✅ + P5-G (C part) ✅ | Foraging decision logic depends on the runtime forage command/state and the carrier AI baseline existing |
+
+Wave 9 Step 6 progress note:
+- ✅ `P5-H (C part)` closed: Track C foraging AI behavior landed with explicit `ForageArmySupply` command support across Simple/GOAP/HTN, safe-default no-demand runtime context, demand/capability/threat/routing gates, and trace-only runtime mapping to `Job.Idle`. Review blocker was fixed before closeout: zero-score trace-only support goals (`ForageArmySupply`, `MaintainArmySupply`) no longer become `Trace.SelectedGoal`, while `GoalScores` debug visibility is preserved and null selection returns a fresh `None`/`Idle` trace. Focused AI tests, runtime brain tests, Wave9 army regression tests, full runtime tests, solution build, diff check, scope search, and parallel Swarm review were green. `P5-H` top-level is now complete after B+C acceptance.
 
 **Step 7 — campaign entities (Track B)**
 

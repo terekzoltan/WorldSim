@@ -237,6 +237,27 @@ public sealed class SupplyCarrierSupportConsideration : Consideration
     }
 }
 
+public sealed class ArmyForagingSupportConsideration : Consideration
+{
+    public override float Evaluate(in NpcAiContext context)
+    {
+        if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
+            return 0f;
+
+        if (!context.HasArmyForageDemand)
+            return 0f;
+
+        if (!context.CanForageArmySupply
+            || !context.ArmyForageSourceAvailable
+            || !context.ArmyForageSourceInRange
+            || !context.ArmyForageConsumerCapRemaining
+            || !context.ArmyForageRationPoolHasCapacity)
+            return 0f;
+
+        return Math.Clamp((0.75f - context.ArmySupplyRatio) / 0.75f, 0f, 1f);
+    }
+}
+
 public sealed class InvertedConsideration : Consideration
 {
     private readonly Consideration _inner;

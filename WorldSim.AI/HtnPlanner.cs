@@ -206,6 +206,10 @@ public sealed class HtnPlanner : IPlanner
                 candidates.Add(CreateSupplyCarrierMethod(context));
                 break;
 
+            case "ForageArmySupply":
+                candidates.Add(CreateArmyForageMethod(context));
+                break;
+
             default:
                 candidates.Add(new MethodCandidate("FallbackIdle", 0.01f, new[] { NpcCommand.Idle }));
                 break;
@@ -241,6 +245,16 @@ public sealed class HtnPlanner : IPlanner
         return new MethodCandidate(method, score, new[] { command });
     }
 
+    private static MethodCandidate CreateArmyForageMethod(in NpcAiContext context)
+    {
+        var command = SelectArmyForageCommand(context);
+        var method = command == NpcCommand.ForageArmySupply
+            ? "ForageNearbyArmySupply"
+            : "ArmyForageIdle";
+        var score = command == NpcCommand.Idle ? 0.01f : 1f;
+        return new MethodCandidate(method, score, new[] { command });
+    }
+
     private static NpcCommand SelectSupplyCarrierCommand(in NpcAiContext context)
     {
         if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
@@ -262,6 +276,26 @@ public sealed class HtnPlanner : IPlanner
             return NpcCommand.DeliverSupply;
 
         return NpcCommand.Idle;
+    }
+
+    private static NpcCommand SelectArmyForageCommand(in NpcAiContext context)
+    {
+        if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
+            return NpcCommand.Idle;
+
+        if (!context.HasArmyForageDemand)
+            return NpcCommand.Idle;
+
+        if (!context.CanForageArmySupply
+            || !context.ArmyForageSourceAvailable
+            || !context.ArmyForageSourceInRange
+            || !context.ArmyForageConsumerCapRemaining
+            || !context.ArmyForageRationPoolHasCapacity)
+            return NpcCommand.Idle;
+
+        return context.ArmySupplyRatio < 0.75f
+            ? NpcCommand.ForageArmySupply
+            : NpcCommand.Idle;
     }
 
     private static bool ShouldUnlockMilitaryTech(in NpcAiContext context)

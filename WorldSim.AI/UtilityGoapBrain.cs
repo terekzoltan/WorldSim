@@ -19,6 +19,21 @@ public sealed class UtilityGoapBrain : INpcDecisionBrain
     public AiDecisionResult Think(in NpcAiContext context)
     {
         var selection = _goalSelector.SelectGoal(_goals, _planner, context);
+        if (selection.SelectedGoal == null)
+        {
+            var idleTrace = new AiDecisionTrace(
+                SelectedGoal: "None",
+                PlannerName: _planner.Name,
+                PolicyName: _policyName,
+                PlanLength: 0,
+                PlanPreview: System.Array.Empty<NpcCommand>(),
+                PlanCost: 0,
+                ReplanReason: "NoGoal",
+                MethodName: "None",
+                GoalScores: selection.Scores);
+            return new AiDecisionResult(NpcCommand.Idle, idleTrace);
+        }
+
         var plannerDecision = _planner.GetNextCommand(context);
         var trace = new AiDecisionTrace(
             SelectedGoal: selection.SelectedGoal?.Name ?? "None",

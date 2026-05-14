@@ -28,6 +28,9 @@ public sealed class GoalSelector
             if (onCooldown)
                 continue;
 
+            if (score <= 0f && IsZeroScoreSelectionBlocked(goal.Name))
+                continue;
+
             if (score > bestScore)
             {
                 bestScore = score;
@@ -43,6 +46,9 @@ public sealed class GoalSelector
 
         return new GoalSelectionResult(best, scores);
     }
+
+    private static bool IsZeroScoreSelectionBlocked(string goalName)
+        => goalName is "ForageArmySupply" or "MaintainArmySupply";
 }
 
 public sealed record GoalSelectionResult(Goal? SelectedGoal, IReadOnlyList<GoalScoreEntry> Scores);

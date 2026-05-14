@@ -28,6 +28,7 @@ public sealed class SimplePlanner : IPlanner
             "RaidBorder" => SelectRaidBorderCommand(context),
             "UnlockMilitaryTech" => ShouldUnlockMilitaryTech(context) ? NpcCommand.ResearchTech : NpcCommand.CraftTools,
             "MaintainArmySupply" => SelectSupplyCarrierCommand(context),
+            "ForageArmySupply" => SelectArmyForageCommand(context),
             "GatherWood" => NpcCommand.GatherWood,
             "GatherStone" => NpcCommand.GatherStone,
             "SecureFood" => context.Hunger >= 68f && context.HomeFood > 0 ? NpcCommand.EatFood : NpcCommand.GatherFood,
@@ -118,6 +119,26 @@ public sealed class SimplePlanner : IPlanner
             return NpcCommand.DeliverSupply;
 
         return NpcCommand.Idle;
+    }
+
+    private static NpcCommand SelectArmyForageCommand(in NpcAiContext context)
+    {
+        if (context.HasImmediateThreat || context.DirectThreatScore > 0f || context.IsRouting)
+            return NpcCommand.Idle;
+
+        if (!context.HasArmyForageDemand)
+            return NpcCommand.Idle;
+
+        if (!context.CanForageArmySupply
+            || !context.ArmyForageSourceAvailable
+            || !context.ArmyForageSourceInRange
+            || !context.ArmyForageConsumerCapRemaining
+            || !context.ArmyForageRationPoolHasCapacity)
+            return NpcCommand.Idle;
+
+        return context.ArmySupplyRatio < 0.75f
+            ? NpcCommand.ForageArmySupply
+            : NpcCommand.Idle;
     }
 
     private static bool ShouldUnlockMilitaryTech(in NpcAiContext context)

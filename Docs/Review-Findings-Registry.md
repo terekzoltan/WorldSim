@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-05-13 - Wave 9 P5-H Foraging AI - Blocking - Zero-score support goals must not become selected trace goals
+
+- Track: Track C / AI foraging behavior
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P5-H (C part)`
+- Finding: `GoalSelector` can select the first non-cooldown goal even when its score is `0f`. For trace-only support goals such as `ForageArmySupply`, command-level no-demand guards can return `Idle` while `Trace.SelectedGoal` still reports the support goal after cooldown rotation.
+- Impact: A runtime-created no-demand context can still pollute AI traces with a support goal that acceptance says must never be selected without explicit demand. Focused command/preview tests can pass while the selected-goal invariant remains unproven.
+- Resolution / guidance: Prevent zero-score support goals from becoming selected goals, either with a positive-score eligibility guard in goal selection or an explicit selector policy for trace-only support goals. Add runtime multi-planner/no-demand regressions that assert `Trace.SelectedGoal`, command, and preview together.
+- Status: fixed
+
 ## 2026-05-13 - Wave 9 P5-G Supply Carrier AI - Blocking - Do not let trace-only commands dominate default utility selection
 
 - Track: Track C / AI supply-carrier behavior

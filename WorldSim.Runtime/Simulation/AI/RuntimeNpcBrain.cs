@@ -92,6 +92,7 @@ public sealed class RuntimeNpcBrain
             NpcCommand.AssignSupplyCarrier => Job.Idle,
             NpcCommand.DeliverSupply => Job.Idle,
             NpcCommand.AbortSupplyDelivery => Job.Idle,
+            NpcCommand.ForageArmySupply => Job.Idle,
             NpcCommand.RefillInventory => Job.RefillInventory,
             NpcCommand.Fight => Job.Fight,
             NpcCommand.Flee => Job.Flee,
@@ -285,7 +286,13 @@ public sealed class RuntimeNpcBrain
             SupplyCarrierSourceValid: true,
             ArmySupplyRatio: 1f,
             IsFallbackRationPoolAllowed: false,
-            HasArmySupplyDemand: false);
+            HasArmySupplyDemand: false,
+            HasArmyForageDemand: false,
+            CanForageArmySupply: false,
+            ArmyForageSourceAvailable: false,
+            ArmyForageSourceInRange: false,
+            ArmyForageConsumerCapRemaining: false,
+            ArmyForageRationPoolHasCapacity: false);
     }
 
     private static int CountUnlockedTechs(Colony colony, IEnumerable<string> techIds)

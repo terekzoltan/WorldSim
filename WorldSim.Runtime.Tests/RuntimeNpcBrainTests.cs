@@ -29,6 +29,7 @@ public class RuntimeNpcBrainTests
     [InlineData(NpcCommand.AssignSupplyCarrier, Job.Idle)]
     [InlineData(NpcCommand.DeliverSupply, Job.Idle)]
     [InlineData(NpcCommand.AbortSupplyDelivery, Job.Idle)]
+    [InlineData(NpcCommand.ForageArmySupply, Job.Idle)]
     [InlineData(NpcCommand.RefillInventory, Job.RefillInventory)]
     [InlineData(NpcCommand.Fight, Job.Fight)]
     [InlineData(NpcCommand.Flee, Job.Flee)]
@@ -279,6 +280,12 @@ public class RuntimeNpcBrainTests
         Assert.Equal(1f, context.ArmySupplyRatio);
         Assert.False(context.IsFallbackRationPoolAllowed);
         Assert.False(context.HasArmySupplyDemand);
+        Assert.False(context.HasArmyForageDemand);
+        Assert.False(context.CanForageArmySupply);
+        Assert.False(context.ArmyForageSourceAvailable);
+        Assert.False(context.ArmyForageSourceInRange);
+        Assert.False(context.ArmyForageConsumerCapRemaining);
+        Assert.False(context.ArmyForageRationPoolHasCapacity);
     }
 
     [Fact]
@@ -324,6 +331,22 @@ public class RuntimeNpcBrainTests
     }
 
     [Fact]
+    public void Think_RecordsForageCommandTraceEvenWhenRuntimeJobIsIdle()
+    {
+        var world = new World(16, 16, 4, randomSeed: 9307);
+        var actor = world._people[0];
+        var brain = new RuntimeNpcBrain(new FixedBrain(NpcCommand.ForageArmySupply));
+
+        var job = brain.Think(actor, world, dt: 1f);
+
+        Assert.Equal(Job.Idle, job);
+        Assert.NotNull(brain.LastDecision);
+        Assert.Equal(NpcCommand.ForageArmySupply, brain.LastDecision!.Command);
+        Assert.Equal("Fixed", brain.LastDecision.Trace.SelectedGoal);
+        Assert.Contains(NpcCommand.ForageArmySupply, brain.LastDecision.Trace.PlanPreview);
+    }
+
+    [Fact]
     public void Think_RealPlannerNoDemandUsesUsefulNonCarrierWorkInsteadOfAssigningCarrier()
     {
         var world = new World(24, 18, 4, randomSeed: 9304)
@@ -345,6 +368,7 @@ public class RuntimeNpcBrainTests
         Assert.Equal("StabilizeResources", brain.LastDecision.Trace.SelectedGoal);
         Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, brain.LastDecision.Trace.PlanPreview);
         Assert.DoesNotContain(NpcCommand.DeliverSupply, brain.LastDecision.Trace.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, brain.LastDecision.Trace.PlanPreview);
     }
 
     [Fact]
@@ -371,6 +395,7 @@ public class RuntimeNpcBrainTests
         Assert.NotEqual(Job.RefillInventory, job);
         Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, brain.LastDecision.Trace.PlanPreview);
         Assert.DoesNotContain(NpcCommand.DeliverSupply, brain.LastDecision.Trace.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, brain.LastDecision.Trace.PlanPreview);
     }
 
     [Fact]
@@ -401,10 +426,51 @@ public class RuntimeNpcBrainTests
         Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, commands);
         Assert.DoesNotContain(NpcCommand.DeliverSupply, commands);
         Assert.DoesNotContain(NpcCommand.AbortSupplyDelivery, commands);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, commands);
         Assert.Contains(NpcCommand.GatherStone, commands);
         Assert.Contains(Job.GatherStone, jobs);
         Assert.NotEqual(commands.Count, jobs.Count(job => job == Job.Idle));
         Assert.NotEqual(goals.Count, goals.Count(goal => goal == "MaintainArmySupply"));
+    }
+
+    [Theory]
+    [InlineData(NpcPlannerMode.Simple)]
+    [InlineData(NpcPlannerMode.Goap)]
+    [InlineData(NpcPlannerMode.Htn)]
+    public void Think_MultiPlannerNoForageDemand_DoesNotSelectTraceOnlyForageGoal(NpcPlannerMode plannerMode)
+    {
+        var world = new World(24, 18, 4, randomSeed: 9308)
+        {
+            BirthRateMultiplier = 0f
+        };
+        world._animals.Clear();
+        var actor = world._people.OrderBy(person => person.Id).First();
+        actor.Home.Stock[Resource.Food] = 50;
+        actor.Home.Stock[Resource.Wood] = 20;
+        actor.Home.Stock[Resource.Stone] = 0;
+        var brain = new RuntimeNpcBrain(plannerMode);
+        var commands = new List<NpcCommand>();
+        var jobs = new List<Job>();
+        var goals = new List<string>();
+
+        for (var i = 0; i < 5; i++)
+        {
+            jobs.Add(brain.Think(actor, world, dt: 1f));
+            Assert.NotNull(brain.LastDecision);
+            commands.Add(brain.LastDecision!.Command);
+            goals.Add(brain.LastDecision.Trace.SelectedGoal);
+            Assert.NotEqual("ForageArmySupply", brain.LastDecision.Trace.SelectedGoal);
+            Assert.NotEqual("MaintainArmySupply", brain.LastDecision.Trace.SelectedGoal);
+            Assert.DoesNotContain(NpcCommand.ForageArmySupply, brain.LastDecision.Trace.PlanPreview);
+            Assert.DoesNotContain(NpcCommand.GatherFood, brain.LastDecision.Trace.PlanPreview);
+        }
+
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, commands);
+        Assert.DoesNotContain("ForageArmySupply", goals);
+        Assert.DoesNotContain("MaintainArmySupply", goals);
+        Assert.Contains(NpcCommand.GatherStone, commands);
+        Assert.Contains(Job.GatherStone, jobs);
+        Assert.NotEqual(commands.Count, jobs.Count(job => job == Job.Idle));
     }
 
     [Fact]

@@ -49,6 +49,13 @@ public static class GoalLibrary
         maintainArmySupply.Considerations.Add(new SupplyCarrierSupportConsideration());
         goals.Add(maintainArmySupply);
 
+        var forageArmySupply = new Goal("ForageArmySupply")
+        {
+            CooldownSeconds = 1.2f
+        };
+        forageArmySupply.Considerations.Add(new ArmyForagingSupportConsideration());
+        goals.Add(forageArmySupply);
+
         var gatherWood = new Goal("GatherWood")
         {
             CooldownSeconds = 2f

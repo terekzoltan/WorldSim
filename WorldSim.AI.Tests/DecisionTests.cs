@@ -537,6 +537,45 @@ public class DecisionTests
     }
 
     [Fact]
+    public void GoalSelector_ZeroScoreGoalsRemainVisibleButAreNotSelected()
+    {
+        var goals = new List<Goal>
+        {
+            new("ForageArmySupply") { Considerations = { new FixedConsideration(0f) } },
+            new("MaintainArmySupply") { Considerations = { new FixedConsideration(0f) } }
+        };
+        var selector = new GoalSelector();
+        var planner = new SimplePlanner();
+
+        var selection = selector.SelectGoal(goals, planner, CreateArmyForageContext(hasArmyForageDemand: false));
+
+        Assert.Null(selection.SelectedGoal);
+        var forageScore = selection.Scores.Single(entry => entry.GoalName == "ForageArmySupply");
+        var supplyScore = selection.Scores.Single(entry => entry.GoalName == "MaintainArmySupply");
+        Assert.Equal(0f, forageScore.Score);
+        Assert.Equal(0f, supplyScore.Score);
+    }
+
+    [Fact]
+    public void GoalSelector_PositiveScoreGoalStillSelected()
+    {
+        var goals = new List<Goal>
+        {
+            new("ForageArmySupply") { Considerations = { new FixedConsideration(0f) } },
+            new("GatherStone") { Considerations = { new FixedConsideration(0.4f) } }
+        };
+        var selector = new GoalSelector();
+        var planner = new SimplePlanner();
+
+        var selection = selector.SelectGoal(goals, planner, CreateArmyForageContext(hasArmyForageDemand: false));
+
+        Assert.NotNull(selection.SelectedGoal);
+        Assert.Equal("GatherStone", selection.SelectedGoal!.Name);
+        var forageScore = selection.Scores.Single(entry => entry.GoalName == "ForageArmySupply");
+        Assert.Equal(0f, forageScore.Score);
+    }
+
+    [Fact]
     public void ThreatDecisionPolicy_LowEquipmentHighThreat_AvoidsFight()
     {
         var context = new NpcAiContext(
@@ -1208,6 +1247,203 @@ public class DecisionTests
         Assert.NotEqual(NpcCommand.GatherFood, result.Command);
     }
 
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void Planner_ForageArmySupply_Forages_WhenDemandAndCapabilitiesArePresent(string plannerMode)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("ForageArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateArmyForageContext());
+
+        Assert.Equal(NpcCommand.ForageArmySupply, decision.Command);
+        Assert.Contains(NpcCommand.ForageArmySupply, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.GatherFood, decision.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void Planner_ForageArmySupply_NoDemandReturnsIdleEvenWhenCapabilitiesArePresent(string plannerMode)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("ForageArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateArmyForageContext(hasArmyForageDemand: false));
+
+        Assert.Equal(NpcCommand.Idle, decision.Command);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.GatherFood, decision.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple", true, 0f, false)]
+    [InlineData("goap", true, 0f, false)]
+    [InlineData("htn", true, 0f, false)]
+    [InlineData("simple", false, 0.7f, false)]
+    [InlineData("goap", false, 0.7f, false)]
+    [InlineData("htn", false, 0.7f, false)]
+    [InlineData("simple", false, 0f, true)]
+    [InlineData("goap", false, 0f, true)]
+    [InlineData("htn", false, 0f, true)]
+    public void Planner_ForageArmySupply_ThreatOrRoutingReturnsIdle(string plannerMode, bool hasImmediateThreat, float directThreatScore, bool isRouting)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("ForageArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateArmyForageContext(
+            hasImmediateThreat: hasImmediateThreat,
+            directThreatScore: directThreatScore,
+            isRouting: isRouting));
+
+        Assert.Equal(NpcCommand.Idle, decision.Command);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.GatherFood, decision.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple", "can_forage")]
+    [InlineData("goap", "can_forage")]
+    [InlineData("htn", "can_forage")]
+    [InlineData("simple", "source_available")]
+    [InlineData("goap", "source_available")]
+    [InlineData("htn", "source_available")]
+    [InlineData("simple", "source_in_range")]
+    [InlineData("goap", "source_in_range")]
+    [InlineData("htn", "source_in_range")]
+    [InlineData("simple", "consumer_cap")]
+    [InlineData("goap", "consumer_cap")]
+    [InlineData("htn", "consumer_cap")]
+    [InlineData("simple", "pool_capacity")]
+    [InlineData("goap", "pool_capacity")]
+    [InlineData("htn", "pool_capacity")]
+    public void Planner_ForageArmySupply_MissingCapabilityReturnsIdle(string plannerMode, string missingCapability)
+    {
+        var planner = CreatePlanner(plannerMode);
+        planner.SetGoal(new Goal("ForageArmySupply"));
+
+        var decision = planner.GetNextCommand(CreateArmyForageContext(
+            canForageArmySupply: missingCapability != "can_forage",
+            armyForageSourceAvailable: missingCapability != "source_available",
+            armyForageSourceInRange: missingCapability != "source_in_range",
+            armyForageConsumerCapRemaining: missingCapability != "consumer_cap",
+            armyForageRationPoolHasCapacity: missingCapability != "pool_capacity"));
+
+        Assert.Equal(NpcCommand.Idle, decision.Command);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, decision.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.GatherFood, decision.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void UtilityBrain_SelectsForageArmySupply_WhenDemandAndLowSupplyExist(string plannerMode)
+    {
+        var brain = new UtilityGoapBrain(CreatePlanner(plannerMode), GoalLibrary.CreateDefaultGoals(), "Test");
+
+        var result = brain.Think(CreateArmyForageContext());
+
+        Assert.Equal("ForageArmySupply", result.Trace.SelectedGoal);
+        Assert.Equal(NpcCommand.ForageArmySupply, result.Command);
+        Assert.Contains(NpcCommand.ForageArmySupply, result.Trace.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.GatherFood, result.Trace.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void UtilityBrain_ForageArmySupplyBiasDoesNotCreateDemand(string plannerMode)
+    {
+        var brain = new UtilityGoapBrain(CreatePlanner(plannerMode), GoalLibrary.CreateDefaultGoals(), "Test");
+
+        var result = brain.Think(CreateArmyForageContext(
+            hasArmyForageDemand: false,
+            biasFarming: 1f,
+            biasGathering: 1f));
+
+        Assert.NotEqual("ForageArmySupply", result.Trace.SelectedGoal);
+        Assert.NotEqual(NpcCommand.ForageArmySupply, result.Command);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, result.Trace.PlanPreview);
+        var forageScore = result.Trace.GoalScores.Single(entry => entry.GoalName == "ForageArmySupply");
+        Assert.Equal(0f, forageScore.Score);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void UtilityBrain_DemandRemovedAfterForage_DoesNotKeepStaleForageTrace(string plannerMode)
+    {
+        var brain = new UtilityGoapBrain(CreatePlanner(plannerMode), GoalLibrary.CreateDefaultGoals(), "Test");
+
+        var first = brain.Think(CreateArmyForageContext(
+            simulationTimeSeconds: 30f,
+            hunger: 0f,
+            stamina: 100f));
+        var second = brain.Think(CreateArmyForageContext(
+            simulationTimeSeconds: 31f,
+            hunger: 0f,
+            stamina: 100f,
+            hasArmyForageDemand: false));
+
+        Assert.Equal("ForageArmySupply", first.Trace.SelectedGoal);
+        Assert.Equal(NpcCommand.ForageArmySupply, first.Command);
+        Assert.NotEqual("ForageArmySupply", second.Trace.SelectedGoal);
+        Assert.NotEqual(NpcCommand.ForageArmySupply, second.Command);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, second.Trace.PlanPreview);
+        var forageScore = second.Trace.GoalScores.Single(entry => entry.GoalName == "ForageArmySupply");
+        Assert.Equal(0f, forageScore.Score);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void UtilityBrain_NoDemandDoesNotSelectTraceOnlySupportGoals(string plannerMode)
+    {
+        var brain = new UtilityGoapBrain(CreatePlanner(plannerMode), GoalLibrary.CreateDefaultGoals(), "Test");
+
+        var result = brain.Think(CreateArmyForageContext(
+            hasArmyForageDemand: false,
+            hasArmySupplyDemand: false,
+            canAssignSupplyCarrier: true,
+            simulationTimeSeconds: 32f,
+            hunger: 0f,
+            stamina: 100f));
+
+        Assert.NotEqual("ForageArmySupply", result.Trace.SelectedGoal);
+        Assert.NotEqual("MaintainArmySupply", result.Trace.SelectedGoal);
+        Assert.NotEqual(NpcCommand.ForageArmySupply, result.Command);
+        Assert.DoesNotContain(NpcCommand.ForageArmySupply, result.Trace.PlanPreview);
+        Assert.DoesNotContain(NpcCommand.AssignSupplyCarrier, result.Trace.PlanPreview);
+    }
+
+    [Theory]
+    [InlineData("simple")]
+    [InlineData("goap")]
+    [InlineData("htn")]
+    public void UtilityBrain_DefendSelfDominatesForageArmySupply_WhenImmediateThreatExists(string plannerMode)
+    {
+        var brain = new UtilityGoapBrain(CreatePlanner(plannerMode), GoalLibrary.CreateDefaultGoals(), "Test");
+
+        var result = brain.Think(CreateArmyForageContext(
+            health: 90f,
+            strength: 18,
+            defense: 18,
+            nearbyPredators: 1,
+            directThreatScore: 0.8f,
+            hasImmediateThreat: true));
+
+        Assert.Equal("DefendSelf", result.Trace.SelectedGoal);
+        Assert.NotEqual(NpcCommand.ForageArmySupply, result.Command);
+        Assert.NotEqual(NpcCommand.GatherFood, result.Command);
+    }
+
     private static IPlanner CreatePlanner(string plannerMode)
         => plannerMode switch
         {
@@ -1269,6 +1505,63 @@ public class DecisionTests
             SupplyCarrierSourceValid: supplyCarrierSourceValid,
             ArmySupplyRatio: armySupplyRatio,
             HasArmySupplyDemand: hasArmySupplyDemand);
+
+    private static NpcAiContext CreateArmyForageContext(
+        bool hasArmyForageDemand = true,
+        bool hasArmySupplyDemand = false,
+        bool canAssignSupplyCarrier = false,
+        bool canForageArmySupply = true,
+        bool armyForageSourceAvailable = true,
+        bool armyForageSourceInRange = true,
+        bool armyForageConsumerCapRemaining = true,
+        bool armyForageRationPoolHasCapacity = true,
+        float armySupplyRatio = 0.25f,
+        float simulationTimeSeconds = 21f,
+        float hunger = 10f,
+        float stamina = 80f,
+        float health = 100f,
+        int strength = 10,
+        int defense = 10,
+        int nearbyPredators = 0,
+        float directThreatScore = 0f,
+        bool hasImmediateThreat = false,
+        bool isRouting = false,
+        float biasFarming = 0f,
+        float biasGathering = 0f)
+        => new(
+            SimulationTimeSeconds: simulationTimeSeconds,
+            Hunger: hunger,
+            Stamina: stamina,
+            HomeWood: 20,
+            HomeStone: 10,
+            HomeIron: 0,
+            HomeGold: 0,
+            HomeFood: 12,
+            HomeHouseCount: 2,
+            HouseWoodCost: 50,
+            ColonyPopulation: 8,
+            HouseCapacity: 5,
+            StoneBuildingsEnabled: false,
+            CanBuildWithStone: false,
+            HouseStoneCost: 100,
+            Health: health,
+            Strength: strength,
+            Defense: defense,
+            NearbyPredators: nearbyPredators,
+            BiasFarming: biasFarming,
+            BiasGathering: biasGathering,
+            DirectThreatScore: directThreatScore,
+            HasImmediateThreat: hasImmediateThreat,
+            IsRouting: isRouting,
+            CanAssignSupplyCarrier: canAssignSupplyCarrier,
+            ArmySupplyRatio: armySupplyRatio,
+            HasArmySupplyDemand: hasArmySupplyDemand,
+            HasArmyForageDemand: hasArmyForageDemand,
+            CanForageArmySupply: canForageArmySupply,
+            ArmyForageSourceAvailable: armyForageSourceAvailable,
+            ArmyForageSourceInRange: armyForageSourceInRange,
+            ArmyForageConsumerCapRemaining: armyForageConsumerCapRemaining,
+            ArmyForageRationPoolHasCapacity: armyForageRationPoolHasCapacity);
 
     private sealed class FixedConsideration : Consideration
     {
