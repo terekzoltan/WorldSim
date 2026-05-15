@@ -1920,6 +1920,9 @@ SMR closeout source of truth:
 Audit hardening source:
 - `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md`
 
+P6-A boundary mini-fix source:
+- `Docs/Plans/Master/Wave9-P6-A1-Campaign-Query-Boundary-Mini-Fix-Plan.md`
+
 Wave turn-gate:
 - Wave 9 is `READY` after Wave 8.7 closeout completed the no-paid sidecar validator artifact.
 - Original Wave 8.6 paid guardrail closeout is accepted with a YELLOW solver-sidecar observability caveat, documented in `Docs/Evidence/SMR/wave8.6-paid-live-director-pilot/README.md`; Wave 8.7 no-paid validation closes the local sidecar/load-failure follow-up before Wave 9.
@@ -1934,13 +1937,14 @@ Wave turn-gate:
 - ✅ **P5-I** Fallback supply budget for early prototypes (Track B)
 
 Split-status note:
-- `P5-G` and `P5-H` are aggregate B+C epics and are now complete after both runtime and AI parts were accepted. Current frontier is Sprint C10 campaign skeleton work; `P6-A` opens the runtime entity baseline, while `P6-B`/`P6-C`/`P6-D` remain sequential follow-ups.
+- `P5-G` and `P5-H` are aggregate B+C epics and are now complete after both runtime and AI parts were accepted. Current frontier is Sprint C10 campaign skeleton work; `P6-A` opened the runtime entity baseline, `P6-A1` hardens the runtime query boundary before assembly/rally, and `P6-B`/`P6-C`/`P6-D` remain sequential follow-ups.
 
 ### Sprint C10: Campaign Skeleton (Track B -> C -> A)
 
 > Combat Plan > Phase 6 Sprint 10
 
 - ✅ **P6-A** Campaign and army entities (Track B)
+- ⬜ **P6-A1** Campaign query boundary hardening (Track B mini-fix)
 - ⬜ **P6-B** Assembly and rally points (Track B)
 - ⬜ **P6-C** March system + encounters (Track B)
 - ⬜ **P6-D** Snapshot + overlays (Track B + A)
@@ -2025,11 +2029,23 @@ Wave 9 Step 6 progress note:
 Wave 9 Step 7 progress note:
 - ✅ `P6-A` closed: Track B runtime campaign/army entity baseline landed without actor assignment/rally, march/pathfinding/encounter execution, render snapshot/export, ScenarioRunner, AI, Graphics, Refinery, or `World.Update` organic campaign/supply/forage ticking. `ArmyState` and `CampaignState` provide persistent runtime state with deterministic runtime-local campaign/army IDs, `TryCreateCampaign(...)` returns deterministic `CampaignCreationResult` domain statuses, initial phase is `AssemblingPending`, member roster starts empty, and route/supply/carrier/forage counters/states are zeroed extension points only. Focused campaign runtime tests, Wave9 runtime regression, full runtime tests, full solution build, diff check, and scope searches were green.
 
-**Step 8 — opens when P6-A ✅**
+**Step 7B — campaign query boundary mini-fix before assembly/rally**
+
+Detailed execution plan:
+- `Docs/Plans/Master/Wave9-P6-A1-Campaign-Query-Boundary-Mini-Fix-Plan.md`
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P6-B | P6-A ✅ | Assembly/rally depends on campaign and army entities |
+| Track B agent | P6-A1 | P6-A ✅ | Replace the temporary live runtime-state `SimulationRuntime.Campaigns` query seam with detached immutable campaign/army runtime snapshots before P6-B mutates assembly/rally state |
+
+P6-A1 requirement note:
+- `SimulationRuntime.Campaigns` must not expose live `CampaignState`, `ArmyState`, supply, ration, carrier, or foraging state objects to downstream consumers. Keep mutable campaign state runtime-owned; P6-D/SMR must later consume explicit immutable read-model/export DTOs, not live runtime entities.
+
+**Step 8 — opens when P6-A1 ✅**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | P6-B | P6-A1 ✅ | Assembly/rally depends on campaign and army entities after the runtime query boundary is hardened |
 
 **Step 9 — opens when P6-B ✅**
 
