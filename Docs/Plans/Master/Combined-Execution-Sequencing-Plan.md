@@ -1944,7 +1944,7 @@ Split-status note:
 > Combat Plan > Phase 6 Sprint 10
 
 - ✅ **P6-A** Campaign and army entities (Track B)
-- ⬜ **P6-A1** Campaign query boundary hardening (Track B mini-fix)
+- ✅ **P6-A1** Campaign query boundary hardening (Track B mini-fix)
 - ⬜ **P6-B** Assembly and rally points (Track B)
 - ⬜ **P6-C** March system + encounters (Track B)
 - ⬜ **P6-D** Snapshot + overlays (Track B + A)
@@ -2040,6 +2040,9 @@ Detailed execution plan:
 
 P6-A1 requirement note:
 - `SimulationRuntime.Campaigns` must not expose live `CampaignState`, `ArmyState`, supply, ration, carrier, or foraging state objects to downstream consumers. Keep mutable campaign state runtime-owned; P6-D/SMR must later consume explicit immutable read-model/export DTOs, not live runtime entities.
+
+Wave 9 Step 7B progress note:
+- ✅ `P6-A1` closed: `SimulationRuntime.Campaigns` now returns detached `CampaignRuntimeSnapshot`/`ArmyRuntimeSnapshot` runtime-query DTOs instead of live `CampaignState`/`ArmyState` objects. Nested supply, ration pool, carrier, foraging, route-counter, and member-roster data are copied value snapshots; retained query results do not grow or mutate after later campaign creation or positive-dt ticks. No assembly/rally, march/pathfinding, encounter, `World.Update`, ScenarioRunner, Graphics, AI, Refinery/Java, or P6-D render/read-model scope was introduced. Focused campaign tests, Wave9 runtime regression, full runtime tests, full solution build, diff check, and scope searches were green.
 
 **Step 8 — opens when P6-A1 ✅**
 

@@ -69,7 +69,8 @@ public sealed class SimulationRuntime
     public int Width => _world.Width;
     public int Height => _world.Height;
     public int ColonyCount => _world._colonies.Count;
-    public IReadOnlyList<CampaignState> Campaigns => _campaigns.ToArray();
+    public IReadOnlyList<CampaignRuntimeSnapshot> Campaigns
+        => _campaigns.Select(CampaignRuntimeSnapshot.From).ToArray();
 
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath)
         : this(width, height, initialPopulation, technologyFilePath, null)

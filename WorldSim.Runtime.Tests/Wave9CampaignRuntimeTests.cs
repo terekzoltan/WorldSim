@@ -39,10 +39,11 @@ public sealed class Wave9CampaignRuntimeTests
         Assert.Equal(4, campaign.Army.RequestedMemberCount);
         Assert.Empty(campaign.Army.MemberActorIds);
         Assert.Equal("army:1", campaign.Army.ForageConsumerKey);
-        Assert.NotNull(campaign.Army.SupplyState);
-        Assert.NotNull(campaign.Army.RationPoolState);
-        Assert.NotNull(campaign.Army.CarrierState);
-        Assert.NotNull(campaign.Army.ForagingState);
+        Assert.Equal(0, campaign.Army.Supply.FractionalFoodDemand);
+        Assert.Equal(0, campaign.Army.Supply.SustainedOutOfSupplyTicks);
+        Assert.Equal(0, campaign.Army.RationPool.RationPoolFood);
+        Assert.False(campaign.Army.Carrier.HasAssignedCarrier);
+        Assert.Equal(0, campaign.Army.Foraging.Attempts);
     }
 
     [Fact]
@@ -165,23 +166,29 @@ public sealed class Wave9CampaignRuntimeTests
             runtime.AdvanceTick(0.25f);
         }
 
+        var currentCampaign = Assert.Single(runtime.Campaigns);
+        var currentArmy = currentCampaign.Army;
+        Assert.Equal(CampaignPhase.AssemblingPending, currentCampaign.Phase);
         Assert.Equal(CampaignPhase.AssemblingPending, campaign.Phase);
+        Assert.Empty(currentArmy.MemberActorIds);
         Assert.Empty(army.MemberActorIds);
+        Assert.Equal(0, currentCampaign.RouteCounters.PathRequests);
+        Assert.Equal(0, currentCampaign.RouteCounters.PathCacheHits);
+        Assert.Equal(0, currentCampaign.RouteCounters.BlockedMovementChecks);
+        Assert.Equal(0, currentCampaign.RouteCounters.RouteRecomputes);
+        Assert.Equal(0, currentCampaign.RouteCounters.MarchProgressTicks);
+        Assert.Equal(0, currentCampaign.RouteCounters.EncounterTicks);
+        Assert.Equal(0, currentCampaign.RouteCounters.NoProgressTicks);
         Assert.Equal(0, campaign.RouteCounters.PathRequests);
-        Assert.Equal(0, campaign.RouteCounters.PathCacheHits);
-        Assert.Equal(0, campaign.RouteCounters.BlockedMovementChecks);
-        Assert.Equal(0, campaign.RouteCounters.RouteRecomputes);
-        Assert.Equal(0, campaign.RouteCounters.MarchProgressTicks);
-        Assert.Equal(0, campaign.RouteCounters.EncounterTicks);
-        Assert.Equal(0, campaign.RouteCounters.NoProgressTicks);
-        Assert.Equal(0, army.SupplyState.FractionalFoodDemand);
-        Assert.Equal(0, army.SupplyState.SustainedOutOfSupplyTicks);
-        Assert.Equal(0, army.RationPoolState.RationPoolFood);
-        Assert.False(army.CarrierState.HasAssignedCarrier);
-        Assert.Equal(0, army.ForagingState.Attempts);
-        Assert.Equal(0, army.ForagingState.Successes);
-        Assert.Equal(0, army.ForagingState.Failures);
-        Assert.Equal(0, army.ForagingState.FoodGained);
+        Assert.Equal(0, currentArmy.Supply.FractionalFoodDemand);
+        Assert.Equal(0, currentArmy.Supply.SustainedOutOfSupplyTicks);
+        Assert.Equal(0, currentArmy.RationPool.RationPoolFood);
+        Assert.False(currentArmy.Carrier.HasAssignedCarrier);
+        Assert.Equal(0, currentArmy.Foraging.Attempts);
+        Assert.Equal(0, currentArmy.Foraging.Successes);
+        Assert.Equal(0, currentArmy.Foraging.Failures);
+        Assert.Equal(0, currentArmy.Foraging.FoodGained);
+        Assert.Equal(0, army.Foraging.Attempts);
         Assert.Equal(originStockBefore, GetWorld(runtime)._colonies.First(colony => colony.Id == campaign.OriginColonyId).Stock[Resource.Food]);
         Assert.Equal(targetStockBefore, GetWorld(runtime)._colonies.First(colony => colony.Id == campaign.TargetColonyId).Stock[Resource.Food]);
     }
@@ -209,18 +216,34 @@ public sealed class Wave9CampaignRuntimeTests
     }
 
     [Fact]
-    public void Campaigns_QueryReturnsSnapshotAndRosterDoesNotExposeMutableList()
+    public void Campaigns_QueryReturnsDetachedRuntimeSnapshots()
     {
         var runtime = CreateRuntime();
         EnableDiplomacyAndCombat(runtime);
         _ = runtime.TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 4);
         var firstView = runtime.Campaigns;
-        var roster = Assert.Single(firstView).Army.MemberActorIds;
+        var firstSnapshot = Assert.Single(firstView);
+        var roster = firstSnapshot.Army.MemberActorIds;
+
+        Assert.IsType<CampaignRuntimeSnapshot>((object)firstSnapshot);
+        Assert.IsNotType<CampaignState>((object)firstSnapshot);
+        Assert.IsType<ArmyRuntimeSnapshot>((object)firstSnapshot.Army);
+        Assert.IsNotType<ArmyState>((object)firstSnapshot.Army);
+        Assert.IsNotType<ArmySupplyState>((object)firstSnapshot.Army.Supply);
+        Assert.IsNotType<ArmyRationPoolState>((object)firstSnapshot.Army.RationPool);
+        Assert.IsNotType<ArmySupplyCarrierState>((object)firstSnapshot.Army.Carrier);
+        Assert.IsNotType<ArmyForagingState>((object)firstSnapshot.Army.Foraging);
 
         _ = runtime.TryCreateCampaign(Faction.Sylvars, Faction.Chirita, requestedMemberCount: 2);
+        runtime.AdvanceTick(0.25f);
 
         Assert.Single(firstView);
         Assert.Equal(2, runtime.Campaigns.Count);
+        Assert.Equal(1, firstSnapshot.CampaignId);
+        Assert.Equal(1, firstSnapshot.ArmyId);
+        Assert.Equal(CampaignPhase.AssemblingPending, firstSnapshot.Phase);
+        Assert.Equal(0, firstSnapshot.RouteCounters.PathRequests);
+        Assert.Equal(0, firstSnapshot.Army.Foraging.Attempts);
         var mutableCollection = Assert.IsAssignableFrom<ICollection<int>>(roster);
         Assert.True(mutableCollection.IsReadOnly);
         Assert.Throws<NotSupportedException>(() => mutableCollection.Add(999));

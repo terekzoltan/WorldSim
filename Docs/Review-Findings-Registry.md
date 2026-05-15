@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-05-15 - Wave 9 P6-A1 Campaign Query Boundary - Minor - Prove detached roster snapshots once rosters become non-empty
+
+- Track: Track B / Runtime campaign query boundary
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-A1`
+- Finding: Empty-roster snapshot tests can prove the public query seam no longer exposes the live roster collection, but they do not prove copied roster contents remain stable after future assembly/rally mutation fills `MemberActorIds`.
+- Impact: P6-B will introduce real roster assignment/mutation; without a non-empty retained-snapshot regression, a later mapper refactor could accidentally re-expose live roster state while existing empty-roster tests still pass.
+- Resolution / guidance: When P6-B adds roster mutation, add a focused non-empty roster regression that captures a `CampaignRuntimeSnapshot`, mutates internal campaign/army roster state through runtime methods, and asserts the retained snapshot keeps the original copied member IDs.
+- Status: guidance
+
 ## 2026-05-15 - Wave 9 P6-A Campaign Entities - Guidance - Keep runtime state query seams internal until read-model export
 
 - Track: Track B / Runtime campaign entities
