@@ -76,6 +76,37 @@ Review/acceptance checklist addition:
 
 ---
 
+## Active Review Finding Follow-up Protocol
+
+Cel:
+- A step-review vagy deep-review alatt elfogadott, de nem azonnal javitott finding ne csak chatben vagy passziv registryben maradjon, hanem a kovetkezo relevans session aktiv gate-je legyen.
+- Compact utan is visszanyerheto legyen, hogy mely deferred findinget kell egy adott epicben lezarnia az aktualis Tracknek vagy Metanak.
+
+Severity policy:
+- `blocking` es `major` finding: commit/green-light elott javitani kell, vagy a step verdict `RED` / `YELLOW` marad explicit blockerrel. Ezeket nem szabad csak future follow-upkent eltenni, kiveve ha a felhasznalo kulon elfogadja a scope csokkentest es a kovetkezo step blokkolasat.
+- `minor`, `nit`, residual-risk finding: akkor deferalhato, ha nincs jelenlegi stephez szukseges runtime/surface a javitas ertelmes tesztelesehez, vagy tudatosan kesobbi ownershiphoz tartozik.
+
+Mandatory routing for every non-fixed accepted finding:
+1. Rogzitsd a findingot `Docs/Review-Findings-Registry.md`-ben, ha ujrafelhasznalhato vagy kesobbi stepet erint.
+2. Emeld be a kovetkezo relevans aktiv gate-be is, nem csak a registrybe:
+   - ha a kovetkezo vagy aktualis Combined step erinti, add hozza `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` requirement/acceptance/follow-up note-kent
+   - ha kulon tervdoc a source of truth, add hozza annak acceptance / verification reszehez
+   - ha cross-track vagy kesobbi wave kockazat, add roviden az AGENTS.md kozos uzenofalra vagy a megfelelo master plan follow-up szekciojaba
+3. Frissitsd `ops/PROJECT_STATE.md`-t ugy, hogy a `Next action`, `Do not think about now`, vagy `Open questions / blockers` resz explicit mutasson a kovetkezo role/action fele, amelynek zarnia kell a findingot.
+4. A Tracknek kuldott copy-paste uzenetben nevezd meg a findingot es azt, hogy mely step acceptance-e fogja szamon kerni.
+
+Step-review final synthesis addition:
+- A final synthesis tartalmazzon egy `Deferred finding routing` vagy azzal egyenerteku szakaszt.
+- Minden nem javitott finding mellett legyen statusz: `fixed now`, `deferred to <step/doc>`, vagy `rejected/downgraded`.
+- `GREEN` csak akkor adhato, ha nincs blocking/major finding, es minden elfogadott minor/residual finding aktiv route-ja dokumentalva van a registry mellett a kovetkezo relevans gate-ben is.
+
+Context-restore obligation:
+- Compact utan Meta Coordinator szerepben celzott follow-up reconciliation kotelezo: `ops/PROJECT_STATE.md`, Combined plan, relevans tervdoc, es az aktualis targethez kapcsolodo `Docs/Review-Findings-Registry.md` bejegyzesek osszevetese.
+- Compact utan Track szerepben token-hatekonyabb restore eleg: eloszor `ops/PROJECT_STATE.md`, Combined plan es a dedikalt terv explicit aktiv gate-jeit kell kovetni. A registryt csak akkor kell celzottan megnyitni/keresni, ha ezek hivatkoznak ra, ha a Track review/closeout szerepben van, vagy ha a target neve alapjan ismert deferred finding kerulhet scope-ba.
+- Ha a registryben vagy aktiv gate-ben van olyan open/guidance finding, amelynek szovege vagy scope-ja illeszkedik az aktualis targethez, a sessionnek explicit ki kell mondania, hogy az finding most `in-scope`, `not-yet-in-scope`, vagy `already resolved`.
+
+---
+
 ## Context Compact / Refresh Policy
 
 A context compact a hosszu Meta Coordinator mukodes normalis, tudatos frissitesi pontja.

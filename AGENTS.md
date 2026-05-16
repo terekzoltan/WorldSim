@@ -238,6 +238,27 @@ Gate szabaly:
 - Meta Coordinator vagy Track agent nem jelolhet stepet kesznek, ha az `ops/PROJECT_STATE.md` nincs frissitve vagy nincs explicit `No state change from this step.` allitas.
 - Meta Coordinator nem green-lightolhatja a kovetkezo lepest, amig nem ellenorizte, hogy az `ops/PROJECT_STATE.md` eleg friss es a helyes kovetkezo role/action fele mutat.
 
+## Active review finding follow-up protocol
+
+Cel:
+- A review alatt elfogadott, de nem azonnal javitott finding ne vesszen el compact vagy session valtas utan.
+- A `Docs/Review-Findings-Registry.md` tartos tudastar, de onmagaban passziv; minden relevans deferred findinget aktiv gate-be is fel kell emelni.
+
+Szabaly:
+- Blocking vagy major finding eseten nincs clean closeout/commit, amig nincs javitas vagy explicit user-dontes a scope/blokkolo kezeleserol.
+- Minor/nit/residual finding csak akkor deferalhato, ha a jelenlegi stepben meg nincs ertelmes implementacios/test surface, vagy egy kesobbi Track/epic ownershipjahoz tartozik.
+- Minden elfogadott, nem azonnal javitott findinghez kotelezo:
+  - rogzites `Docs/Review-Findings-Registry.md`-ben, ha ujrafelhasznalhato vagy kesobbi munkat erint
+  - rogzites a kovetkezo relevans aktiv gate-ben is: Combined plan requirement/acceptance, dedikalt plan acceptance/verification, vagy AGENTS kozos uzenofal/master follow-up
+  - `ops/PROJECT_STATE.md` frissites, ha a finding a kovetkezo konkret actiont vagy readiness-t erinti
+  - Track handoff uzenetben explicit jeloles: melyik step fogja szamon kerni a finding lezarat
+- Step-review `GREEN` csak akkor adhato, ha minden elfogadott minor/residual finding statusza egyertelmu: `fixed now`, `deferred to <step/doc>`, vagy `rejected/downgraded`.
+
+Compact utani visszaallitas:
+- Meta Coordinator szerepben a `context-restore` utan celzottan ellenorizni kell az aktualis targethez tartozo registry/follow-up bejegyzeseket is, es ossze kell vetni oket az `ops/PROJECT_STATE.md` + Combined plan aktiv gate-jeivel.
+- Track szerepben token-hatekonyabb restore eleg: az `ops/PROJECT_STATE.md`, Combined plan es dedikalt terv explicit aktiv gate-jeit kell kovetni; a registryt csak akkor kell celzottan megnyitni/keresni, ha ezek hivatkoznak ra, vagy ha review/closeout role-ban vagy.
+- Ha egy open/guidance finding illeszkedik az aktualis wave/step scope-jahoz, a session explicit mondja ki: `in-scope now`, `not-yet-in-scope`, vagy `already resolved`.
+
 ## Wave turn-gate protocol (all track agents)
 
 Cel:

@@ -2050,6 +2050,9 @@ Wave 9 Step 7B progress note:
 |---------|---------|--------|-------|
 | Track B agent | P6-B | P6-A1 ✅ | Assembly/rally depends on campaign and army entities after the runtime query boundary is hardened |
 
+P6-B requirement note:
+- Close the deferred P6-A1 roster-boundary finding when assembly creates non-empty army rosters: add a regression that captures a `CampaignRuntimeSnapshot` with at least one `MemberActorId`, mutates/advances roster state through runtime-owned assembly/rally methods, and asserts the retained snapshot keeps the original copied member IDs. This proves the P6-A1 detached query boundary under real roster mutation, not only empty-roster state.
+
 **Step 9 — opens when P6-B ✅**
 
 | Session | Epic(s) | Prereq | Notes |
