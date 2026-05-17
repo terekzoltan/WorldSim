@@ -26,6 +26,42 @@ Severity guide:
 
 Entries:
 
+## 2026-05-17 - Wave 9 P6-B Lifecycle Fix - Minor - Add adversarial roster lifecycle coverage before march semantics harden
+
+- Track: Track B / Runtime campaign lifecycle
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-B` lifecycle fix
+- Finding: Shared predicates cover assigned-member invalidation broadly, but explicit regressions are still sparse for individual edge states such as `Health <= 0`, isolated `IsInCombat`, invalidation caused during `_world.Update`, and max-one replacement after pruning with multiple candidates.
+- Impact: P6-C will add march semantics on top of assembled rosters; without adversarial coverage, later refactors could assume roster permanence or miss a specific invalidation path even though the shared helper currently handles it.
+- Resolution / guidance: Before or during P6-C march start, add focused guard tests for health-zero assigned members, isolated in-combat invalidation, world-update-induced invalidation, multi-candidate max-one replacement after pruning, and roster revalidation before first march step.
+- Status: guidance
+
+## 2026-05-17 - Wave 9 P6-C March Handoff - Guidance - Revalidate roster before first march step
+
+- Track: Track B / Runtime campaign march handoff
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-B` lifecycle fix
+- Finding: P6-B now assembles rosters and hands off with `CampaignPhase.Marching`, but P6-C must not assume roster permanence between assembly completion and first march tick.
+- Impact: Actors can die, route, enter combat, or otherwise become unavailable after assembly; starting march without revalidation could reintroduce the same lifecycle class of bugs fixed in P6-B.
+- Resolution / guidance: P6-C must revalidate campaign roster before the first march movement/counter update and define deterministic prune/replacement/non-complete behavior for newly invalid members.
+- Status: guidance
+
+## 2026-05-17 - Wave 9 P6-B Campaign Assembly - Blocking - Revalidate assigned members before movement and completion
+
+- Track: Track B / Runtime campaign assembly
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-B`
+- Finding: Initial campaign roster eligibility can exclude routing, combat, and hard-job actors, but already assigned army members still need lifecycle revalidation before later rally movement and assembly completion.
+- Impact: An actor can become routing, in-combat, active in a battle/group, or hard-combat-job-owned after recruitment; moving or completing that actor as campaign-owned can violate combat/routing ownership and hand P6-C an invalid roster.
+- Resolution / guidance: Before moving rostered members or counting them for completion, revalidate current actor state or define explicit campaign ownership semantics. Add regressions where an assigned member becomes routing, active combat/battle/group, or hard-job-owned after assignment.
+- Status: fixed
+
+## 2026-05-17 - Wave 9 P6-B Campaign Assembly - Blocking - Handle dead or missing assigned members deterministically
+
+- Track: Track B / Runtime campaign assembly
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-B`
+- Finding: A campaign roster that stores only actor IDs can become permanently stuck if an assigned actor dies or is removed before rally completion and no prune/replacement/failure policy exists.
+- Impact: `MemberCount >= RequestedMemberCount` can prevent replacement while completion can never succeed because a roster ID no longer resolves to a living person, leaving assembly blocked forever and making P6-C handoff unsafe.
+- Resolution / guidance: During assembly, prune dead/missing members and allow deterministic replacement, or introduce an explicit failed/disbanding/recruiting fallback state. Add tests for assigned-member death/removal before rally completion and full-roster recovery/failure behavior.
+- Status: fixed
+
 ## 2026-05-15 - Wave 9 P6-A1 Campaign Query Boundary - Minor - Prove detached roster snapshots once rosters become non-empty
 
 - Track: Track B / Runtime campaign query boundary
@@ -33,7 +69,7 @@ Entries:
 - Finding: Empty-roster snapshot tests can prove the public query seam no longer exposes the live roster collection, but they do not prove copied roster contents remain stable after future assembly/rally mutation fills `MemberActorIds`.
 - Impact: P6-B will introduce real roster assignment/mutation; without a non-empty retained-snapshot regression, a later mapper refactor could accidentally re-expose live roster state while existing empty-roster tests still pass.
 - Resolution / guidance: When P6-B adds roster mutation, add a focused non-empty roster regression that captures a `CampaignRuntimeSnapshot`, mutates internal campaign/army roster state through runtime methods, and asserts the retained snapshot keeps the original copied member IDs.
-- Status: guidance
+- Status: fixed
 
 ## 2026-05-15 - Wave 9 P6-A Campaign Entities - Guidance - Keep runtime state query seams internal until read-model export
 

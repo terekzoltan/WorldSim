@@ -1945,7 +1945,7 @@ Split-status note:
 
 - ✅ **P6-A** Campaign and army entities (Track B)
 - ✅ **P6-A1** Campaign query boundary hardening (Track B mini-fix)
-- ⬜ **P6-B** Assembly and rally points (Track B)
+- ✅ **P6-B** Assembly and rally points (Track B)
 - ⬜ **P6-C** March system + encounters (Track B)
 - ⬜ **P6-D** Snapshot + overlays (Track B + A)
 - ⬜ **Wave 9 SMR campaign/supply prep** ScenarioRunner army supply + campaign skeleton evidence surface (Track B / SMR Analyst validation)
@@ -2053,11 +2053,17 @@ Wave 9 Step 7B progress note:
 P6-B requirement note:
 - Close the deferred P6-A1 roster-boundary finding when assembly creates non-empty army rosters: add a regression that captures a `CampaignRuntimeSnapshot` with at least one `MemberActorId`, mutates/advances roster state through runtime-owned assembly/rally methods, and asserts the retained snapshot keeps the original copied member IDs. This proves the P6-A1 detached query boundary under real roster mutation, not only empty-roster state.
 
+Wave 9 Step 8 progress note:
+- ✅ `P6-B` closed: runtime-owned campaign assembly/rally is now wired through `SimulationRuntime.AdvanceTick(...)` orchestration, with deterministic rally point selection near the origin colony, incremental roster fill (max one member per campaign/tick, including after pruning), strict eligible/assigned-member lifecycle filtering, and final post-update visible member movement toward the rally point before the P6-C march handoff. Campaign membership remains `ArmyState.MemberActorIds` only; no automatic `PersonRole.Warrior` assignment, Track C AI command, Track A UI, ScenarioRunner export, Refinery/Java, P6-D read-model, or `World.Update` campaign ticking was introduced. P6-B now prunes dead/missing/routing/combat/hard-job assigned members deterministically, clears stale supply-carrier binding when needed, and only completes assembly when all current members are valid and within Manhattan radius <= 1. P6-C route/march/encounter counters and supply/forage ticking remain untouched during assembly. The routed P6-A1 non-empty roster snapshot finding is closed by a retained `CampaignRuntimeSnapshot` regression that proves copied member IDs stay stable after later roster mutation.
+
 **Step 9 — opens when P6-B ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P6-C | P6-B ✅ | March and encounters need the assembly/rally flow to exist first |
+
+P6-C requirement note:
+- Before the first march movement/counter update, revalidate the assembled campaign roster using the P6-B lifecycle contract. Do not assume roster permanence after `CampaignPhase.Marching`; handle newly invalid members (health-zero/dead, missing, routing, in-combat, active battle/group, hard combat job) deterministically via prune/replacement/non-complete behavior before march semantics proceed. Add focused guard coverage for at least health-zero, isolated in-combat, world-update-induced invalidation, and max-one replacement after pruning with multiple candidates.
 
 **Step 10 — opens when P6-C ✅**
 

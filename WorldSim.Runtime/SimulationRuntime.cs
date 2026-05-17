@@ -137,7 +137,10 @@ public sealed class SimulationRuntime
 
     public void AdvanceTick(float dt)
     {
+        var blockedCampaignActorIds = CaptureCampaignAssemblyBlockedActorIds();
+        PruneInvalidCampaignAssemblyMembers(blockedCampaignActorIds);
         _world.Update(dt);
+        AdvanceCampaignAssemblies(blockedCampaignActorIds);
         EvaluatePendingDirectorCausalChains();
         _directorState.Tick();
         RefreshAiDebugSnapshot();
@@ -235,6 +238,243 @@ public sealed class SimulationRuntime
             army));
 
         return CampaignCreationResult.Created(campaignId, armyId);
+    }
+
+    private void AdvanceCampaignAssemblies(HashSet<int> blockedCampaignActorIds)
+    {
+        foreach (var campaign in _campaigns)
+        {
+            if (campaign.Phase is not CampaignPhase.AssemblingPending and not CampaignPhase.Assembling)
+                continue;
+
+            PruneInvalidCampaignAssemblyMembers(campaign, blockedCampaignActorIds);
+
+            if (!campaign.Army.HasRallyPoint && TryFindCampaignRallyPoint(campaign, out var rallyPoint))
+                campaign.Army.SetRallyPoint(rallyPoint.x, rallyPoint.y);
+
+            if (!campaign.Army.HasRallyPoint)
+                continue;
+
+            var candidate = FindNextCampaignAssemblyMember(campaign, blockedCampaignActorIds);
+            if (candidate != null)
+            {
+                campaign.BeginAssembly(Tick);
+                if (campaign.Army.TryAddMemberActorId(candidate.Id) && candidate.HasRole(PersonRole.SupplyCarrier))
+                    ArmySupplyCarrierModel.AssignCarrier(candidate, campaign.Army.CarrierState);
+            }
+            else if (campaign.Army.MemberCount == 0)
+            {
+                continue;
+            }
+            else
+            {
+                campaign.BeginAssembly(Tick);
+            }
+
+            MoveCampaignMembersToRally(campaign, blockedCampaignActorIds);
+
+            if (IsCampaignAssemblyComplete(campaign, blockedCampaignActorIds))
+                campaign.MarkAssemblyComplete(Tick);
+        }
+    }
+
+    private HashSet<int> CaptureCampaignAssemblyBlockedActorIds()
+        => _world._people
+            .Where(IsCampaignAssemblyBlockedByTransientOwnership)
+            .Select(person => person.Id)
+            .ToHashSet();
+
+    private void PruneInvalidCampaignAssemblyMembers(HashSet<int> blockedCampaignActorIds)
+    {
+        foreach (var campaign in _campaigns)
+        {
+            if (campaign.Phase is not CampaignPhase.AssemblingPending and not CampaignPhase.Assembling)
+                continue;
+
+            PruneInvalidCampaignAssemblyMembers(campaign, blockedCampaignActorIds);
+        }
+    }
+
+    private void PruneInvalidCampaignAssemblyMembers(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+    {
+        foreach (var actorId in campaign.Army.MemberActorIds)
+        {
+            var person = _world._people.FirstOrDefault(candidate => candidate.Id == actorId);
+            if (IsValidAssignedCampaignMember(person, blockedCampaignActorIds))
+                continue;
+
+            campaign.Army.RemoveMemberActorId(actorId);
+            ClearPrunedCampaignCarrier(campaign.Army, actorId, person);
+        }
+    }
+
+    private static bool IsValidAssignedCampaignMember(Person? person, HashSet<int> blockedCampaignActorIds)
+        => person != null
+           && person.Health > 0f
+           && !blockedCampaignActorIds.Contains(person.Id)
+           && !IsCampaignAssemblyBlockedByTransientOwnership(person);
+
+    private static bool IsCampaignAssemblyBlockedByTransientOwnership(Person person)
+        => person.IsRouting
+           || person.IsInCombat
+           || person.ActiveBattleId >= 0
+           || person.ActiveCombatGroupId >= 0
+           || person.Current is Job.Fight or Job.Flee or Job.RaidBorder or Job.AttackStructure;
+
+    private void ClearPrunedCampaignCarrier(ArmyState army, int actorId, Person? person)
+    {
+        if (army.CarrierState.AssignedCarrierActorId != actorId)
+            return;
+
+        bool liveAssignedCarrier = person != null
+            && person.Health > 0f
+            && _world._people.Any(candidate => ReferenceEquals(candidate, person));
+        if (liveAssignedCarrier)
+        {
+            ArmySupplyCarrierModel.ClearCarrier(person!, army.CarrierState);
+            return;
+        }
+
+        army.CarrierState.ClearCarrier();
+    }
+
+    private bool TryFindCampaignRallyPoint(CampaignState campaign, out (int x, int y) rallyPoint)
+    {
+        var origin = (x: campaign.RouteIntent.OriginX, y: campaign.RouteIntent.OriginY);
+        if (TryFindCampaignRallyPoint(campaign, origin, requireActorFree: true, out rallyPoint))
+            return true;
+
+        return TryFindCampaignRallyPoint(campaign, origin, requireActorFree: false, out rallyPoint);
+    }
+
+    private bool TryFindCampaignRallyPoint(
+        CampaignState campaign,
+        (int x, int y) origin,
+        bool requireActorFree,
+        out (int x, int y) rallyPoint)
+    {
+        int maxRadius = Math.Max(_world.Width, _world.Height);
+        for (var radius = 0; radius <= maxRadius; radius++)
+        {
+            for (var dy = -radius; dy <= radius; dy++)
+            {
+                for (var dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) > radius)
+                        continue;
+
+                    int x = origin.x + dx;
+                    int y = origin.y + dy;
+                    if (_world.IsMovementBlocked(x, y, campaign.OriginColonyId))
+                        continue;
+                    if (requireActorFree && _world.IsActorOccupied(x, y))
+                        continue;
+
+                    rallyPoint = (x, y);
+                    return true;
+                }
+            }
+        }
+
+        rallyPoint = default;
+        return false;
+    }
+
+    private Person? FindNextCampaignAssemblyMember(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+    {
+        var assignedActorIds = GetActiveCampaignActorIds(exclude: campaign);
+        return _world._people
+            .Where(person => IsEligibleCampaignAssemblyMember(person, campaign, assignedActorIds, blockedCampaignActorIds))
+            .OrderBy(GetCampaignAssemblyCandidatePriority)
+            .ThenByDescending(person => person.Strength + person.Defense)
+            .ThenBy(person => person.Id)
+            .FirstOrDefault();
+    }
+
+    private HashSet<int> GetActiveCampaignActorIds(CampaignState exclude)
+    {
+        var assignedActorIds = new HashSet<int>();
+        foreach (var campaign in _campaigns)
+        {
+            if (ReferenceEquals(campaign, exclude) || campaign.Phase == CampaignPhase.Resolved)
+                continue;
+
+            foreach (var actorId in campaign.Army.MemberActorIds)
+                assignedActorIds.Add(actorId);
+        }
+
+        return assignedActorIds;
+    }
+
+    private static bool IsEligibleCampaignAssemblyMember(
+        Person person,
+        CampaignState campaign,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        if (person.Health <= 0f || person.Home.Id != campaign.OriginColonyId)
+            return false;
+        if (campaign.Army.HasMemberActorId(person.Id) || assignedActorIds.Contains(person.Id))
+            return false;
+        if (blockedCampaignActorIds.Contains(person.Id) || IsCampaignAssemblyBlockedByTransientOwnership(person))
+            return false;
+
+        return IsCampaignAssemblyRoleCandidate(person);
+    }
+
+    private static bool IsCampaignAssemblyRoleCandidate(Person person)
+        => person.HasRole(PersonRole.Warrior)
+           || person.HasRole(PersonRole.SupplyCarrier)
+           || person.Profession == Profession.Hunter;
+
+    private static int GetCampaignAssemblyCandidatePriority(Person person)
+    {
+        if (person.HasRole(PersonRole.Warrior))
+            return 0;
+        if (person.HasRole(PersonRole.SupplyCarrier))
+            return 1;
+        return 2;
+    }
+
+    private void MoveCampaignMembersToRally(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+    {
+        var rally = (x: campaign.Army.RallyX, y: campaign.Army.RallyY);
+        foreach (var actorId in campaign.Army.MemberActorIds)
+        {
+            var person = _world._people.FirstOrDefault(candidate => candidate.Id == actorId);
+            if (!IsValidAssignedCampaignMember(person, blockedCampaignActorIds))
+                continue;
+
+            person?.MoveTowardCampaignRally(_world, rally);
+        }
+    }
+
+    private bool IsCampaignAssemblyComplete(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+    {
+        if (campaign.Army.MemberCount == 0)
+            return false;
+
+        bool rosterCanGrow = campaign.Army.MemberCount < campaign.Army.RequestedMemberCount
+            && FindNextCampaignAssemblyMember(campaign, blockedCampaignActorIds) != null;
+        if (rosterCanGrow)
+            return false;
+
+        var rally = (x: campaign.Army.RallyX, y: campaign.Army.RallyY);
+        var hasLivingMember = false;
+        foreach (var actorId in campaign.Army.MemberActorIds)
+        {
+            var person = _world._people.FirstOrDefault(candidate => candidate.Id == actorId);
+            if (!IsValidAssignedCampaignMember(person, blockedCampaignActorIds))
+                return false;
+
+            var validPerson = person!;
+            hasLivingMember = true;
+
+            if (Math.Abs(validPerson.Pos.x - rally.x) + Math.Abs(validPerson.Pos.y - rally.y) > 1)
+                return false;
+        }
+
+        return hasLivingMember;
     }
 
     private DirectorRenderState BuildDirectorRenderState()

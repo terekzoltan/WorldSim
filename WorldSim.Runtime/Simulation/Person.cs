@@ -2415,6 +2415,13 @@ public class Person
     public bool HasRole(PersonRole role)
         => role != PersonRole.None && (Roles & role) == role;
 
+    internal bool MoveTowardCampaignRally(World world, (int x, int y) target)
+    {
+        var before = Pos;
+        MoveTowards(world, target, 1);
+        return Pos != before;
+    }
+
     public void ApplyMoraleDelta(float delta)
     {
         var adjusted = delta;

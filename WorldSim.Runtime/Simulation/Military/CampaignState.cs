@@ -76,6 +76,24 @@ public sealed class CampaignState
     public CampaignRouteIntent RouteIntent { get; }
     public CampaignRouteCounters RouteCounters { get; } = new();
     public ArmyState Army { get; }
+
+    internal void BeginAssembly(long tick)
+    {
+        if (Phase == CampaignPhase.AssemblingPending)
+            Phase = CampaignPhase.Assembling;
+
+        if (Phase == CampaignPhase.Assembling)
+            Army.BeginAssembly(tick);
+    }
+
+    internal void MarkAssemblyComplete(long tick)
+    {
+        if (Phase is not CampaignPhase.AssemblingPending and not CampaignPhase.Assembling)
+            return;
+
+        Army.MarkAssemblyComplete(tick);
+        Phase = CampaignPhase.Marching;
+    }
 }
 
 public sealed record CampaignCreationResult(
