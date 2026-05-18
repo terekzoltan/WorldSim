@@ -84,4 +84,10 @@ public sealed class ArmyState
         if (AssemblyCompletedTick < 0)
             AssemblyCompletedTick = Math.Max(0, tick);
     }
+
+    internal void MarkAssemblyInvalidatedForReassembly()
+    {
+        IsAssembled = false;
+        AssemblyCompletedTick = -1;
+    }
 }

@@ -582,6 +582,371 @@ public sealed class Wave9CampaignRuntimeTests
     }
 
     [Fact]
+    public void AdvanceTick_MarchingHealthZeroMemberReturnsToAssemblyBeforeMarch()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        fixture.Members[0].Health = 0f;
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
+        Assert.False(campaign.Army.IsAssembled);
+        Assert.Equal(-1, campaign.Army.AssemblyCompletedTick);
+        Assert.Empty(campaign.Army.MemberActorIds);
+        AssertAssemblyDoesNotRunMarchOrSupply(campaign);
+    }
+
+    [Fact]
+    public void AdvanceTick_MarchingIsolatedInCombatMemberReturnsToAssemblyBeforeMarch()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        fixture.Members[0].MarkCombatPresence(fixture.World);
+
+        fixture.Runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
+        Assert.False(campaign.Army.IsAssembled);
+        Assert.Empty(campaign.Army.MemberActorIds);
+        AssertAssemblyDoesNotRunMarchOrSupply(campaign);
+    }
+
+    [Fact]
+    public void AdvanceTick_WorldUpdateInducedCombatInvalidationReturnsToAssemblyBeforeMarch()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        fixture.World.EnableCombatPrimitives = true;
+        fixture.Runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "campaign invalidation test");
+        var hostile = GetPeople(fixture.World, Faction.Aetheri).First();
+        hostile.Pos = FindAdjacentLand(fixture.World, fixture.Members[0].Pos);
+
+        fixture.Runtime.AdvanceTick(0.25f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
+        Assert.False(campaign.Army.IsAssembled);
+        Assert.Empty(campaign.Army.MemberActorIds);
+        AssertAssemblyDoesNotRunMarchOrSupply(campaign);
+    }
+
+    [Fact]
+    public void AdvanceTick_MarchingPruneAddsAtMostOneReplacementBeforeNextMarchTick()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 3);
+        var original = fixture.Runtime.Campaigns.Single().Army.MemberActorIds.ToArray();
+        var assigned = fixture.Members.Single(member => member.Id == original[0]);
+        assigned.BeginRouting(ticks: 4);
+
+        fixture.Runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        var replacementIds = fixture.Members.Where(member => member.Id != assigned.Id).Select(member => member.Id).ToArray();
+        Assert.DoesNotContain(assigned.Id, campaign.Army.MemberActorIds);
+        var replacement = Assert.Single(campaign.Army.MemberActorIds, replacementIds.Contains);
+        Assert.Contains(replacement, replacementIds);
+        Assert.Equal(1, campaign.Army.AssignedMemberCount);
+        Assert.Equal(original[0], assigned.Id);
+        AssertAssemblyDoesNotRunMarchOrSupply(campaign);
+    }
+
+    [Fact]
+    public void AdvanceTick_MarchingUpdatesRouteCountersAndUsesCampaignCache()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+
+        fixture.Runtime.AdvanceTick(1f);
+        var afterFirstMarch = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Marching, afterFirstMarch.Phase);
+        Assert.Equal(1, afterFirstMarch.RouteCounters.PathRequests);
+        Assert.Equal(1, afterFirstMarch.RouteCounters.RouteRecomputes);
+        Assert.True(afterFirstMarch.RouteCounters.BlockedMovementChecks >= 1);
+        Assert.Equal(1, afterFirstMarch.RouteCounters.MarchProgressTicks);
+
+        fixture.Runtime.AdvanceTick(1f);
+        var afterSecondMarch = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.True(afterSecondMarch.RouteCounters.PathCacheHits >= 1);
+    }
+
+    [Fact]
+    public void AdvanceTick_TopologyChangeInvalidatesCampaignRouteCacheAndAvoidsBlockedNextStep()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        fixture.Runtime.AdvanceTick(1f);
+        var live = GetLiveCampaignState(fixture.Runtime);
+        var blockedNext = live.RouteCache.PeekNext();
+        Assert.True(blockedNext.HasValue);
+        var targetColony = GetColony(fixture.World, Faction.Aetheri);
+        Assert.True(fixture.World.TryAddWoodWall(targetColony, blockedNext.Value));
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.True(campaign.RouteCounters.RouteRecomputes >= 2);
+        Assert.True(campaign.RouteCounters.BlockedMovementChecks >= 2);
+        Assert.NotEqual(blockedNext.Value, fixture.Members[0].Pos);
+    }
+
+    [Fact]
+    public void AdvanceTick_DelayedTopologyChangeInvalidatesCampaignRouteCacheBeforeBlockedStep()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        fixture.Runtime.AdvanceTick(1f);
+        var live = GetLiveCampaignState(fixture.Runtime);
+        var cachedDelayedStep = live.RouteCache.Steps
+            .Skip(live.RouteCache.NextIndex + 1)
+            .Select(step => ((int x, int y)?)step)
+            .FirstOrDefault();
+        Assert.True(cachedDelayedStep.HasValue);
+        var targetColony = GetColony(fixture.World, Faction.Aetheri);
+        var topologyBefore = fixture.World.NavigationTopologyVersion;
+        Assert.True(fixture.World.TryAddWoodWall(targetColony, cachedDelayedStep.Value));
+        Assert.True(fixture.World.NavigationTopologyVersion > topologyBefore);
+        var recomputesBefore = fixture.Runtime.Campaigns.Single().RouteCounters.RouteRecomputes;
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.True(campaign.RouteCounters.RouteRecomputes > recomputesBefore);
+        Assert.NotEqual(cachedDelayedStep.Value, fixture.Members[0].Pos);
+    }
+
+    [Fact]
+    public void AdvanceTick_MarchSupplyUsesRationPoolOrCarriedInventoryButNotBoth()
+    {
+        var carried = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        Assert.True(carried.Members[0].Inventory.TryAdd(ItemType.Food, 2));
+        carried.Runtime.AdvanceTick(1f);
+        var carriedCampaign = Assert.Single(carried.Runtime.Campaigns);
+        Assert.Equal(ArmySupplySourceMode.CarriedInventory, carriedCampaign.Army.Carrier.LastSupplySource);
+
+        var pooled = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        Assert.True(pooled.Members[0].Inventory.TryAdd(ItemType.Food, 2));
+        var live = GetLiveCampaignState(pooled.Runtime);
+        var origin = GetColony(pooled.World, Faction.Obsidari);
+        origin.Stock[Resource.Food] = 100;
+        _ = ArmyRationPoolSupplyModel.ReserveRations(origin, homePopulation: 12, armySize: 1, live.Army.RationPoolState);
+        Assert.True(live.Army.RationPoolState.RationPoolFood > 0);
+
+        pooled.Runtime.AdvanceTick(1f);
+
+        var pooledCampaign = Assert.Single(pooled.Runtime.Campaigns);
+        Assert.Equal(ArmySupplySourceMode.RationPool, pooledCampaign.Army.Carrier.LastSupplySource);
+        Assert.True(pooledCampaign.Army.Carrier.LastSupplyTick >= 0);
+        Assert.Equal(2, pooled.Members[0].Inventory.GetCount(ItemType.Food));
+    }
+
+    [Fact]
+    public void AdvanceTick_NoProgressMarchingTickConsumesExactlyOneSupplySource()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        var member = fixture.Members[0];
+        Assert.True(member.Inventory.TryAdd(ItemType.Food, 3));
+        PrimeOneUnitSupplyDemand(GetLiveCampaignState(fixture.Runtime), member);
+        fixture.World.MovementSpeedMultiplier = 0f;
+        var beforeFood = member.Inventory.GetCount(ItemType.Food);
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Marching, campaign.Phase);
+        Assert.Equal(1, campaign.RouteCounters.NoProgressTicks);
+        Assert.Equal(ArmySupplySourceMode.CarriedInventory, campaign.Army.Carrier.LastSupplySource);
+        Assert.True(campaign.Army.Carrier.LastSupplyTick >= 0);
+        Assert.Equal(beforeFood - 1, member.Inventory.GetCount(ItemType.Food));
+        Assert.Equal(0, campaign.Army.RationPool.RationPoolFood);
+    }
+
+    [Fact]
+    public void AdvanceTick_MovementSuccessMarchingTickDoesNotDoubleConsumeSupply()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        var member = fixture.Members[0];
+        Assert.True(member.Inventory.TryAdd(ItemType.Food, 3));
+        PrimeOneUnitSupplyDemand(GetLiveCampaignState(fixture.Runtime), member);
+        var beforeFood = member.Inventory.GetCount(ItemType.Food);
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(1, campaign.RouteCounters.MarchProgressTicks);
+        Assert.Equal(ArmySupplySourceMode.CarriedInventory, campaign.Army.Carrier.LastSupplySource);
+        Assert.Equal(beforeFood - 1, member.Inventory.GetCount(ItemType.Food));
+        Assert.Equal(0, campaign.Army.RationPool.RationPoolFood);
+    }
+
+    [Fact]
+    public void AdvanceTick_ZeroDtMarchingTickDoesNotConsumeSupply()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        var member = fixture.Members[0];
+        Assert.True(member.Inventory.TryAdd(ItemType.Food, 3));
+
+        fixture.Runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(ArmySupplySourceMode.None, campaign.Army.Carrier.LastSupplySource);
+        Assert.Equal(-1, campaign.Army.Carrier.LastSupplyTick);
+        Assert.Equal(3, member.Inventory.GetCount(ItemType.Food));
+        Assert.Equal(0, campaign.Army.RationPool.RationPoolFood);
+    }
+
+    [Fact]
+    public void AdvanceTick_UnderstrengthMarchingTickSkipsSupplyAndRouteWork()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        Assert.True(fixture.Members[0].Inventory.TryAdd(ItemType.Food, 3));
+        fixture.Members[0].Health = 0f;
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
+        Assert.Equal(0, campaign.RouteCounters.PathRequests);
+        Assert.Equal(0, campaign.RouteCounters.NoProgressTicks);
+        Assert.Equal(ArmySupplySourceMode.None, campaign.Army.Carrier.LastSupplySource);
+        Assert.Equal(3, fixture.Members[0].Inventory.GetCount(ItemType.Food));
+    }
+
+    [Fact]
+    public void AdvanceTick_SupplyInducedRoutingReturnsToAssemblyBeforeMovementOrEncounter()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        var member = fixture.Members[0];
+        PrimeSupplyRoutingThreshold(GetLiveCampaignState(fixture.Runtime), member);
+        Assert.False(member.IsRouting);
+        var beforePos = member.Pos;
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.True(member.IsRouting);
+        Assert.Equal(beforePos, member.Pos);
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
+        Assert.False(campaign.Army.IsAssembled);
+        Assert.Equal(-1, campaign.Army.AssemblyCompletedTick);
+        Assert.Empty(campaign.Army.MemberActorIds);
+        Assert.Equal(ArmySupplySourceMode.CarriedInventory, campaign.Army.Carrier.LastSupplySource);
+        Assert.True(campaign.Army.Carrier.LastSupplyTick >= 0);
+        Assert.Equal(0, campaign.RouteCounters.PathRequests);
+        Assert.Equal(0, campaign.RouteCounters.BlockedMovementChecks);
+        Assert.Equal(0, campaign.RouteCounters.RouteRecomputes);
+        Assert.Equal(0, campaign.RouteCounters.MarchProgressTicks);
+        Assert.Equal(0, campaign.RouteCounters.EncounterTicks);
+        Assert.Equal(0, campaign.RouteCounters.NoProgressTicks);
+    }
+
+    [Fact]
+    public void AdvanceTick_PositiveDtAtEncounterObjectiveTicksSupplyBeforeEncounter()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        var member = fixture.Members[0];
+        var owner = GetColony(fixture.World, Faction.Obsidari);
+        var target = GetColony(fixture.World, Faction.Aetheri);
+        Assert.False(fixture.World.IsMovementBlocked(target.Origin.x, target.Origin.y, owner.Id));
+        member.Pos = target.Origin;
+        PrimeSupplyRoutingThreshold(GetLiveCampaignState(fixture.Runtime), member);
+        Assert.True(Manhattan(member.Pos, target.Origin) <= 1);
+        var beforePos = member.Pos;
+        var expectedSupplyTick = (int)fixture.Runtime.Tick;
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.True(member.IsRouting);
+        Assert.Equal(beforePos, member.Pos);
+        Assert.NotEqual(CampaignPhase.Encounter, campaign.Phase);
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
+        Assert.False(campaign.Army.IsAssembled);
+        Assert.Equal(-1, campaign.Army.AssemblyCompletedTick);
+        Assert.Empty(campaign.Army.MemberActorIds);
+        Assert.Equal(ArmySupplySourceMode.CarriedInventory, campaign.Army.Carrier.LastSupplySource);
+        Assert.Equal(expectedSupplyTick, campaign.Army.Carrier.LastSupplyTick);
+        Assert.Equal(0, campaign.RouteCounters.PathRequests);
+        Assert.Equal(0, campaign.RouteCounters.BlockedMovementChecks);
+        Assert.Equal(0, campaign.RouteCounters.RouteRecomputes);
+        Assert.Equal(0, campaign.RouteCounters.MarchProgressTicks);
+        Assert.Equal(0, campaign.RouteCounters.EncounterTicks);
+        Assert.Equal(0, campaign.RouteCounters.NoProgressTicks);
+    }
+
+    [Fact]
+    public void AdvanceTick_FallbackResolvedObjectiveTriggersEncounterWhenOriginalTargetIsBlocked()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        var target = GetColony(fixture.World, Faction.Aetheri);
+        BlockCampaignTargetRadius(fixture.World, target, fixture.World._colonies.First(c => c.Faction == Faction.Obsidari), radius: 1);
+        var fallback = FindFirstPassableCampaignTarget(fixture.World, target, fixture.World._colonies.First(c => c.Faction == Faction.Obsidari));
+        Assert.True(Manhattan(fallback, target.Origin) > 1);
+        Assert.True(Manhattan(fallback, fixture.World._colonies.First(c => c.Faction == Faction.Obsidari).Origin) > 1);
+        fixture.Members[0].Pos = fallback;
+
+        fixture.Runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Encounter, campaign.Phase);
+        Assert.Equal(1, campaign.RouteCounters.EncounterTicks);
+        Assert.Equal(0, campaign.RouteCounters.NoProgressTicks);
+    }
+
+    [Fact]
+    public void AdvanceTick_NaturalMarchReachesEncounterAndRepeatedTicksRemainNonResolving()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        Assert.True(fixture.Members[0].Inventory.TryAdd(ItemType.Food, 3));
+        var target = GetColony(fixture.World, Faction.Aetheri);
+        var beforeStance = fixture.Runtime.GetSnapshot().FactionStances.First(entry =>
+            entry.LeftFactionId == Math.Min((int)Faction.Obsidari, (int)Faction.Aetheri)
+            && entry.RightFactionId == Math.Max((int)Faction.Obsidari, (int)Faction.Aetheri)).Stance;
+        fixture.World.EnableDiplomacy = false;
+        var wallPos = FindBuildableNear(fixture.World, target, minDistanceFromOrigin: 3);
+        Assert.True(fixture.World.TryAddWoodWall(target, wallPos));
+        var wall = Assert.Single(fixture.World.DefensiveStructures, structure => structure.Pos == wallPos);
+        var wallHp = wall.Hp;
+
+        for (var i = 0; i < 96 && fixture.Runtime.Campaigns.Single().Phase == CampaignPhase.Marching; i++)
+            fixture.Runtime.AdvanceTick(1f);
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        var afterStance = fixture.Runtime.GetSnapshot().FactionStances.First(entry =>
+            entry.LeftFactionId == Math.Min((int)Faction.Obsidari, (int)Faction.Aetheri)
+            && entry.RightFactionId == Math.Max((int)Faction.Obsidari, (int)Faction.Aetheri)).Stance;
+        Assert.Equal(CampaignPhase.Encounter, campaign.Phase);
+        Assert.True(campaign.RouteCounters.EncounterTicks >= 2);
+        Assert.Equal(beforeStance, afterStance);
+        Assert.Equal(wallHp, wall.Hp);
+    }
+
+    [Fact]
+    public void AdvanceTick_EncounterTicksWithoutResolutionDiplomacyOrSiegeSideEffects()
+    {
+        var fixture = CreateMarchingCampaign(requestedMemberCount: 1, candidateCount: 1);
+        var target = GetColony(fixture.World, Faction.Aetheri);
+        var beforeStance = fixture.Runtime.GetSnapshot().FactionStances.First(entry =>
+            entry.LeftFactionId == Math.Min((int)Faction.Obsidari, (int)Faction.Aetheri)
+            && entry.RightFactionId == Math.Max((int)Faction.Obsidari, (int)Faction.Aetheri)).Stance;
+        var wallPos = FindBuildableNear(fixture.World, target, minDistanceFromOrigin: 3);
+        Assert.True(fixture.World.TryAddWoodWall(target, wallPos));
+        var wall = Assert.Single(fixture.World.DefensiveStructures, structure => structure.Pos == wallPos);
+        var wallHp = wall.Hp;
+        fixture.Members[0].Pos = (target.Origin.x, target.Origin.y);
+
+        fixture.Runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        var afterStance = fixture.Runtime.GetSnapshot().FactionStances.First(entry =>
+            entry.LeftFactionId == Math.Min((int)Faction.Obsidari, (int)Faction.Aetheri)
+            && entry.RightFactionId == Math.Max((int)Faction.Obsidari, (int)Faction.Aetheri)).Stance;
+        Assert.Equal(CampaignPhase.Encounter, campaign.Phase);
+        Assert.Equal(1, campaign.RouteCounters.EncounterTicks);
+        Assert.Equal(0, campaign.RouteCounters.MarchProgressTicks);
+        Assert.Equal(-1, campaign.Army.Carrier.LastSupplyTick);
+        Assert.Equal(beforeStance, afterStance);
+        Assert.Equal(wallHp, wall.Hp);
+    }
+
+    [Fact]
     public void ExistingCampaignDirectorCommands_AreNotRegressed()
     {
         var runtime = CreateRuntime();
@@ -602,6 +967,32 @@ public sealed class Wave9CampaignRuntimeTests
         var repoRoot = FindRepoRoot();
         var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
         return new SimulationRuntime(32, 32, 12, techPath, aiOptions: null, randomSeed: 9601);
+    }
+
+    private static MarchingCampaignFixture CreateMarchingCampaign(int requestedMemberCount, int candidateCount)
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var world = GetWorld(runtime);
+        var owner = GetColony(world, Faction.Obsidari);
+        SetAllCampaignCandidatesIneligible(runtime);
+        var members = GetPeople(world, Faction.Obsidari).Take(candidateCount).ToArray();
+        Assert.True(members.Length >= candidateCount);
+        foreach (var member in members)
+            member.Profession = Profession.Hunter;
+
+        var result = runtime.TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount);
+        Assert.True(result.Success);
+        DisableCombatResolutionForCampaignTest(runtime);
+
+        for (var i = 0; i < 80 && runtime.Campaigns.Single().Phase != CampaignPhase.Marching; i++)
+            runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Marching, campaign.Phase);
+        Assert.Equal(requestedMemberCount, campaign.Army.AssignedMemberCount);
+        Assert.True(campaign.Army.IsAssembled);
+        return new MarchingCampaignFixture(runtime, world, members);
     }
 
     private static string FindRepoRoot()
@@ -652,6 +1043,35 @@ public sealed class Wave9CampaignRuntimeTests
             .OrderBy(person => person.Id)
             .ToArray();
 
+    private static void PrimeOneUnitSupplyDemand(CampaignState campaign, Person member)
+    {
+        var result = ArmySupplyModel.Tick(
+            new[] { member },
+            campaign.Army.SupplyState,
+            dt: 49.5f);
+        Assert.Equal(0, result.FoodConsumed);
+        Assert.True(campaign.Army.SupplyState.FractionalFoodDemand > 0.98f);
+    }
+
+    private static void PrimeSupplyRoutingThreshold(CampaignState campaign, Person member)
+    {
+        member.ApplyStaminaDelta(-100f);
+        SetSupplyState(campaign.Army.SupplyState, fractionalFoodDemand: 0.99f, sustainedOutOfSupplyTicks: 4);
+        Assert.Equal(4, campaign.Army.SupplyState.SustainedOutOfSupplyTicks);
+        Assert.True(campaign.Army.SupplyState.FractionalFoodDemand > 0.98f);
+        Assert.False(member.IsRouting);
+    }
+
+    private static void SetSupplyState(ArmySupplyState state, float fractionalFoodDemand, int sustainedOutOfSupplyTicks)
+    {
+        var fractionalField = typeof(ArmySupplyState).GetField("<FractionalFoodDemand>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+        var sustainedField = typeof(ArmySupplyState).GetField("<SustainedOutOfSupplyTicks>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(fractionalField);
+        Assert.NotNull(sustainedField);
+        fractionalField!.SetValue(state, fractionalFoodDemand);
+        sustainedField!.SetValue(state, sustainedOutOfSupplyTicks);
+    }
+
     private static void PlaceActor(World world, Person person, Colony colony, int minDistanceFromOrigin)
     {
         for (var radius = Math.Max(1, minDistanceFromOrigin); radius <= Math.Max(world.Width, world.Height); radius++)
@@ -675,6 +1095,96 @@ public sealed class Wave9CampaignRuntimeTests
         }
 
         throw new InvalidOperationException("Could not find a passable campaign test tile.");
+    }
+
+    private static (int x, int y) FindBuildableNear(World world, Colony colony, int minDistanceFromOrigin)
+    {
+        for (var radius = Math.Max(1, minDistanceFromOrigin); radius <= Math.Max(world.Width, world.Height); radius++)
+        {
+            for (var dy = -radius; dy <= radius; dy++)
+            {
+                for (var dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) < minDistanceFromOrigin)
+                        continue;
+
+                    int x = colony.Origin.x + dx;
+                    int y = colony.Origin.y + dy;
+                    if (world.CanPlaceStructureAt(x, y))
+                        return (x, y);
+                }
+            }
+        }
+
+        throw new InvalidOperationException("Could not find a buildable campaign test tile.");
+    }
+
+    private static void BlockCampaignTargetRadius(World world, Colony target, Colony mover, int radius)
+    {
+        for (var dy = -radius; dy <= radius; dy++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                if (Math.Abs(dx) + Math.Abs(dy) > radius)
+                    continue;
+
+                var pos = (x: target.Origin.x + dx, y: target.Origin.y + dy);
+                if (world.IsMovementBlocked(pos.x, pos.y, mover.Id))
+                    continue;
+
+                Assert.True(world.TryAddWoodWall(target, pos));
+                Assert.True(world.IsMovementBlocked(pos.x, pos.y, mover.Id));
+            }
+        }
+    }
+
+    private static (int x, int y) FindFirstPassableCampaignTarget(World world, Colony target, Colony mover)
+    {
+        var blockedOrigin = target.Origin;
+        int maxRadius = Math.Max(world.Width, world.Height);
+        for (var radius = 0; radius <= maxRadius; radius++)
+        {
+            for (var dy = -radius; dy <= radius; dy++)
+            {
+                for (var dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) > radius)
+                        continue;
+
+                    var candidate = (x: blockedOrigin.x + dx, y: blockedOrigin.y + dy);
+                    if (candidate != blockedOrigin && Manhattan(candidate, mover.Origin) <= 1)
+                        continue;
+                    if (world.IsMovementBlocked(candidate.x, candidate.y, mover.Id))
+                        continue;
+
+                    return candidate;
+                }
+            }
+        }
+
+        throw new InvalidOperationException("Could not resolve campaign fallback target.");
+    }
+
+    private static (int x, int y) FindAdjacentLand(World world, (int x, int y) origin)
+    {
+        var candidates = new[]
+        {
+            (x: origin.x + 1, y: origin.y),
+            (x: origin.x - 1, y: origin.y),
+            (x: origin.x, y: origin.y + 1),
+            (x: origin.x, y: origin.y - 1)
+        };
+
+        foreach (var candidate in candidates)
+        {
+            if (candidate.x < 0 || candidate.y < 0 || candidate.x >= world.Width || candidate.y >= world.Height)
+                continue;
+            if (world.GetTile(candidate.x, candidate.y).Ground == Ground.Water)
+                continue;
+            return candidate;
+        }
+
+        throw new InvalidOperationException("Could not find adjacent land campaign test tile.");
     }
 
     private static int Manhattan((int x, int y) left, (int x, int y) right)
@@ -707,6 +1217,14 @@ public sealed class Wave9CampaignRuntimeTests
         return world!;
     }
 
+    private static CampaignState GetLiveCampaignState(SimulationRuntime runtime)
+    {
+        var campaignsField = typeof(SimulationRuntime).GetField("_campaigns", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(campaignsField);
+        var campaigns = Assert.IsAssignableFrom<IReadOnlyList<CampaignState>>(campaignsField!.GetValue(runtime));
+        return Assert.Single(campaigns);
+    }
+
     private static IReadOnlyList<ActorSnapshot> SnapshotActors(SimulationRuntime runtime)
         => GetWorld(runtime)._people
             .OrderBy(person => person.Id)
@@ -728,4 +1246,9 @@ public sealed class Wave9CampaignRuntimeTests
         int CarriedFood,
         float CombatMorale,
         float Stamina);
+
+    private sealed record MarchingCampaignFixture(
+        SimulationRuntime Runtime,
+        World World,
+        IReadOnlyList<Person> Members);
 }

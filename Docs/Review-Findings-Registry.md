@@ -26,6 +26,42 @@ Severity guide:
 
 Entries:
 
+## 2026-05-17 - Wave 9 P6-C March Supply - Blocking - Revalidate roster after supply-induced routing
+
+- Track: Track B / Runtime campaign march lifecycle
+- Source: Meta + Swarm re-review synthesis for Wave 9 `P6-C` targeted fix pass
+- Finding: March supply ticks before route/path/movement work, and `ArmySupplyModel` can route members via `BeginRouting(...)`; the current march loop can then keep using the pre-supply member list for same-tick movement/encounter checks.
+- Impact: A member made invalid by supply attrition can still march or trigger encounter in the same tick, violating the P6-C lifecycle invariant that routing/invalid members must not march.
+- Resolution / guidance: Before P6-C closeout, revalidate/recompute march-capable members immediately after supply ticking and before pathing, movement, or encounter transition. If supply causes understrength/invalid roster, return to assembly or skip movement for that tick. Add carried-inventory/no-supply regression and either add ration-pool/multi-member variants or document why focused coverage is sufficient.
+- Status: fixed in P6-C after Meta + Swarm re-review
+
+## 2026-05-17 - Wave 9 P6-C March Supply - Blocking - No-progress marching ticks skip logistics cost
+
+- Track: Track B / Runtime campaign march lifecycle
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-C`
+- Finding: Current march supply ticking happens only after successful march progress; valid `Marching` campaigns that hit no-target/no-path/no-move branches record `NoProgress` and skip `TickCampaignMarchSupply(...)`.
+- Impact: A blocked or stuck marching army can avoid supply consumption indefinitely, contradicting the submitted P6-C contract that march supply uses exactly one source per campaign tick.
+- Resolution / guidance: Before P6-C closeout, either tick exactly one supply source after roster validation on every eligible positive-dt marching tick, independent of movement success, or explicitly change the contract/docs/tests to progress-only logistics. Add a deterministic no-progress supply regression.
+- Status: fixed in P6-C after Meta + Swarm re-review
+
+## 2026-05-17 - Wave 9 P6-C Route Cache - Blocking - Cache validity must use persistent world topology
+
+- Track: Track B / Runtime campaign route lifecycle
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-C`
+- Finding: Campaign route cache validation is based on a newly constructed `NavigationGrid` per call, whose topology version is instance-local rather than tied to persistent world topology.
+- Impact: Cached routes can remain apparently valid across topology changes until the immediate next-step blocked check catches them, weakening deterministic recompute/cache-hit semantics and delayed blocked-route coverage.
+- Resolution / guidance: Before P6-C closeout, tie campaign route cache validity to persistent world topology or an equivalent persisted topology signature, and add delayed blocked cached-step coverage beyond `PeekNext`.
+- Status: fixed in P6-C after Meta + Swarm re-review
+
+## 2026-05-17 - Wave 9 P6-C Encounter Target - Major - Fallback route target can diverge from encounter trigger
+
+- Track: Track B / Runtime campaign encounter lifecycle
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-C`
+- Finding: `TryGetCampaignMarchTarget(...)` can choose a fallback passable tile around the target colony, while encounter detection still checks only original route target proximity.
+- Impact: If fallback radius exceeds encounter proximity, a campaign can reach the resolved route target but never enter `Encounter`, then stall as path-to-current-target returns no usable path.
+- Resolution / guidance: Before P6-C closeout, either store/use the resolved march objective for encounter proximity or constrain fallback selection to encounter-valid proximity. Add a regression for blocked target/proximity with fallback radius greater than one.
+- Status: fixed in P6-C after Meta + Swarm re-review
+
 ## 2026-05-17 - Wave 9 P6-B Lifecycle Fix - Minor - Add adversarial roster lifecycle coverage before march semantics harden
 
 - Track: Track B / Runtime campaign lifecycle
@@ -33,7 +69,7 @@ Entries:
 - Finding: Shared predicates cover assigned-member invalidation broadly, but explicit regressions are still sparse for individual edge states such as `Health <= 0`, isolated `IsInCombat`, invalidation caused during `_world.Update`, and max-one replacement after pruning with multiple candidates.
 - Impact: P6-C will add march semantics on top of assembled rosters; without adversarial coverage, later refactors could assume roster permanence or miss a specific invalidation path even though the shared helper currently handles it.
 - Resolution / guidance: Before or during P6-C march start, add focused guard tests for health-zero assigned members, isolated in-combat invalidation, world-update-induced invalidation, multi-candidate max-one replacement after pruning, and roster revalidation before first march step.
-- Status: guidance
+- Status: fixed in P6-C
 
 ## 2026-05-17 - Wave 9 P6-C March Handoff - Guidance - Revalidate roster before first march step
 
@@ -42,7 +78,7 @@ Entries:
 - Finding: P6-B now assembles rosters and hands off with `CampaignPhase.Marching`, but P6-C must not assume roster permanence between assembly completion and first march tick.
 - Impact: Actors can die, route, enter combat, or otherwise become unavailable after assembly; starting march without revalidation could reintroduce the same lifecycle class of bugs fixed in P6-B.
 - Resolution / guidance: P6-C must revalidate campaign roster before the first march movement/counter update and define deterministic prune/replacement/non-complete behavior for newly invalid members.
-- Status: guidance
+- Status: fixed in P6-C
 
 ## 2026-05-17 - Wave 9 P6-B Campaign Assembly - Blocking - Revalidate assigned members before movement and completion
 

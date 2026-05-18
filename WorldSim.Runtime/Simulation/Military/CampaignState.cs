@@ -1,4 +1,5 @@
 using System;
+using WorldSim.Simulation.Navigation;
 
 namespace WorldSim.Simulation.Military;
 
@@ -40,6 +41,14 @@ public sealed class CampaignRouteCounters
     public int MarchProgressTicks { get; private set; }
     public int EncounterTicks { get; private set; }
     public int NoProgressTicks { get; private set; }
+
+    internal void RecordPathRequest() => PathRequests++;
+    internal void RecordPathCacheHit() => PathCacheHits++;
+    internal void RecordBlockedMovementCheck() => BlockedMovementChecks++;
+    internal void RecordRouteRecompute() => RouteRecomputes++;
+    internal void RecordMarchProgress() => MarchProgressTicks++;
+    internal void RecordEncounterTick() => EncounterTicks++;
+    internal void RecordNoProgress() => NoProgressTicks++;
 }
 
 public sealed class CampaignState
@@ -75,6 +84,7 @@ public sealed class CampaignState
     public long CreatedTick { get; }
     public CampaignRouteIntent RouteIntent { get; }
     public CampaignRouteCounters RouteCounters { get; } = new();
+    internal NavigationPathCache RouteCache { get; } = new();
     public ArmyState Army { get; }
 
     internal void BeginAssembly(long tick)
@@ -93,6 +103,26 @@ public sealed class CampaignState
 
         Army.MarkAssemblyComplete(tick);
         Phase = CampaignPhase.Marching;
+    }
+
+    internal void ReturnToAssemblyAfterRosterInvalidation(long tick)
+    {
+        if (Phase is not CampaignPhase.Marching)
+            return;
+
+        RouteCache.Invalidate();
+        Army.MarkAssemblyInvalidatedForReassembly();
+        Phase = CampaignPhase.Assembling;
+        Army.BeginAssembly(tick);
+    }
+
+    internal void BeginEncounter(long tick)
+    {
+        if (Phase is not CampaignPhase.Marching)
+            return;
+
+        RouteCache.Invalidate();
+        Phase = CampaignPhase.Encounter;
     }
 }
 

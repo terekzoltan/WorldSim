@@ -1946,7 +1946,7 @@ Split-status note:
 - ✅ **P6-A** Campaign and army entities (Track B)
 - ✅ **P6-A1** Campaign query boundary hardening (Track B mini-fix)
 - ✅ **P6-B** Assembly and rally points (Track B)
-- ⬜ **P6-C** March system + encounters (Track B)
+- ✅ **P6-C** March system + encounters (Track B)
 - ⬜ **P6-D** Snapshot + overlays (Track B + A)
 - ⬜ **Wave 9 SMR campaign/supply prep** ScenarioRunner army supply + campaign skeleton evidence surface (Track B / SMR Analyst validation)
 - ⬜ **Wave 9 SMR evidence** Army supply + campaign skeleton closeout package (SMR Analyst)
@@ -2064,6 +2064,9 @@ Wave 9 Step 8 progress note:
 
 P6-C requirement note:
 - Before the first march movement/counter update, revalidate the assembled campaign roster using the P6-B lifecycle contract. Do not assume roster permanence after `CampaignPhase.Marching`; handle newly invalid members (health-zero/dead, missing, routing, in-combat, active battle/group, hard combat job) deterministically via prune/replacement/non-complete behavior before march semantics proceed. Add focused guard coverage for at least health-zero, isolated in-combat, world-update-induced invalidation, and max-one replacement after pruning with multiple candidates.
+
+Wave 9 Step 9 progress note:
+- ✅ `P6-C` closed after Meta + Swarm re-review: march and encounter runtime now runs through `SimulationRuntime.AdvanceTick(...)` with lifecycle-safe roster pruning, route cache/counter instrumentation, persistent `World.NavigationTopologyVersion` route-cache validity, fallback objective alignment, and non-resolving encounter ticks. For positive-dt march ticks, march supply and post-supply prune/recompute run before route/path/movement/encounter decisions, including the already-at-encounter-objective branch; supply-induced routing returns an understrength campaign to `Assembling` with `IsAssembled=false` and `AssemblyCompletedTick=-1`; no same-tick movement, encounter, route/path counters, or march/encounter progress counters occur after supply-induced invalidation. Zero-dt encounter transition remains intentionally supported. Focused campaign tests, Wave9 runtime regression, full runtime tests, full solution build, diff check, and scope checks were green. `.gitignore` remains unrelated dirty local state and must not be staged with P6-C.
 
 **Step 10 — opens when P6-C ✅**
 

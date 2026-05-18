@@ -8,6 +8,7 @@ using WorldSim.Simulation;
 using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
 using WorldSim.Simulation.Military;
+using WorldSim.Simulation.Navigation;
 
 namespace WorldSim.Runtime;
 
@@ -43,7 +44,10 @@ public sealed class SimulationRuntime
 
     private const int MinCausalWindowTicks = 10;
     private const int MaxCausalWindowTicks = 100;
+    private const int CampaignPathMaxExpansions = 4096;
     private const double FloatingCausalEqTolerance = 0.0001d;
+
+    private readonly record struct CampaignMarchObjective((int x, int y) MovementTarget, bool UsesFallback);
 
     private readonly World _world;
     private readonly double _directorDampeningFactor;
@@ -137,10 +141,18 @@ public sealed class SimulationRuntime
 
     public void AdvanceTick(float dt)
     {
-        var blockedCampaignActorIds = CaptureCampaignAssemblyBlockedActorIds();
-        PruneInvalidCampaignAssemblyMembers(blockedCampaignActorIds);
+        var blockedCampaignActorIds = CaptureCampaignBlockedActorIds();
+        PruneInvalidCampaignMembers(blockedCampaignActorIds);
         _world.Update(dt);
+        blockedCampaignActorIds.UnionWith(CaptureCampaignBlockedActorIds());
+        PruneInvalidCampaignMembers(blockedCampaignActorIds);
+        var marchEligibleCampaignIds = _campaigns
+            .Where(campaign => campaign.Phase == CampaignPhase.Marching)
+            .Select(campaign => campaign.CampaignId)
+            .ToHashSet();
         AdvanceCampaignAssemblies(blockedCampaignActorIds);
+        AdvanceCampaignMarches(marchEligibleCampaignIds, dt, blockedCampaignActorIds);
+        AdvanceCampaignEncounters();
         EvaluatePendingDirectorCausalChains();
         _directorState.Tick();
         RefreshAiDebugSnapshot();
@@ -247,7 +259,7 @@ public sealed class SimulationRuntime
             if (campaign.Phase is not CampaignPhase.AssemblingPending and not CampaignPhase.Assembling)
                 continue;
 
-            PruneInvalidCampaignAssemblyMembers(campaign, blockedCampaignActorIds);
+            PruneInvalidCampaignMembers(campaign, blockedCampaignActorIds);
 
             if (!campaign.Army.HasRallyPoint && TryFindCampaignRallyPoint(campaign, out var rallyPoint))
                 campaign.Army.SetRallyPoint(rallyPoint.x, rallyPoint.y);
@@ -278,25 +290,26 @@ public sealed class SimulationRuntime
         }
     }
 
-    private HashSet<int> CaptureCampaignAssemblyBlockedActorIds()
+    private HashSet<int> CaptureCampaignBlockedActorIds()
         => _world._people
             .Where(IsCampaignAssemblyBlockedByTransientOwnership)
             .Select(person => person.Id)
             .ToHashSet();
 
-    private void PruneInvalidCampaignAssemblyMembers(HashSet<int> blockedCampaignActorIds)
+    private void PruneInvalidCampaignMembers(HashSet<int> blockedCampaignActorIds)
     {
         foreach (var campaign in _campaigns)
         {
-            if (campaign.Phase is not CampaignPhase.AssemblingPending and not CampaignPhase.Assembling)
+            if (campaign.Phase is not CampaignPhase.AssemblingPending and not CampaignPhase.Assembling and not CampaignPhase.Marching)
                 continue;
 
-            PruneInvalidCampaignAssemblyMembers(campaign, blockedCampaignActorIds);
+            PruneInvalidCampaignMembers(campaign, blockedCampaignActorIds);
         }
     }
 
-    private void PruneInvalidCampaignAssemblyMembers(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+    private void PruneInvalidCampaignMembers(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
     {
+        var wasMarching = campaign.Phase == CampaignPhase.Marching;
         foreach (var actorId in campaign.Army.MemberActorIds)
         {
             var person = _world._people.FirstOrDefault(candidate => candidate.Id == actorId);
@@ -306,6 +319,9 @@ public sealed class SimulationRuntime
             campaign.Army.RemoveMemberActorId(actorId);
             ClearPrunedCampaignCarrier(campaign.Army, actorId, person);
         }
+
+        if (wasMarching && campaign.Army.MemberCount < campaign.Army.RequestedMemberCount)
+            campaign.ReturnToAssemblyAfterRosterInvalidation(Tick);
     }
 
     private static bool IsValidAssignedCampaignMember(Person? person, HashSet<int> blockedCampaignActorIds)
@@ -475,6 +491,234 @@ public sealed class SimulationRuntime
         }
 
         return hasLivingMember;
+    }
+
+    private void AdvanceCampaignMarches(HashSet<int> marchEligibleCampaignIds, float dt, HashSet<int> blockedCampaignActorIds)
+    {
+        foreach (var campaign in _campaigns)
+        {
+            if (campaign.Phase != CampaignPhase.Marching || !marchEligibleCampaignIds.Contains(campaign.CampaignId))
+                continue;
+
+            PruneInvalidCampaignMembers(campaign, blockedCampaignActorIds);
+            if (campaign.Phase != CampaignPhase.Marching)
+                continue;
+
+            var members = GetValidCampaignMembers(campaign, blockedCampaignActorIds);
+            if (members.Count < campaign.Army.RequestedMemberCount)
+            {
+                campaign.ReturnToAssemblyAfterRosterInvalidation(Tick);
+                continue;
+            }
+
+            if (dt <= 0f)
+            {
+                var zeroDtAnchor = members[0];
+                if (TryResolveCampaignMarchObjective(campaign, out var zeroDtObjective)
+                    && IsCampaignAtEncounterObjective(zeroDtAnchor.Pos, zeroDtObjective))
+                {
+                    campaign.BeginEncounter(Tick);
+                    continue;
+                }
+            }
+
+            TickCampaignMarchSupply(campaign, members, dt, Tick);
+
+            PruneInvalidCampaignMembers(campaign, blockedCampaignActorIds);
+            if (campaign.Phase != CampaignPhase.Marching)
+                continue;
+
+            members = GetValidCampaignMembers(campaign, blockedCampaignActorIds);
+            if (members.Count < campaign.Army.RequestedMemberCount)
+            {
+                campaign.ReturnToAssemblyAfterRosterInvalidation(Tick);
+                continue;
+            }
+
+            var anchor = members[0];
+            var hasObjective = TryResolveCampaignMarchObjective(campaign, out var objective);
+
+            if (hasObjective && IsCampaignAtEncounterObjective(anchor.Pos, objective))
+            {
+                campaign.BeginEncounter(Tick);
+                continue;
+            }
+
+            if (!hasObjective)
+            {
+                campaign.RouteCounters.RecordNoProgress();
+                continue;
+            }
+
+            var nextStep = GetNextCampaignMarchStep(campaign, anchor.Pos, objective.MovementTarget);
+            if (!nextStep.HasValue)
+            {
+                campaign.RouteCounters.RecordNoProgress();
+                continue;
+            }
+
+            bool moved = false;
+            foreach (var member in members)
+            {
+                if (member.MoveTowardCampaignMarch(_world, nextStep.Value))
+                    moved = true;
+            }
+
+            if (anchor.Pos == nextStep.Value)
+                campaign.RouteCache.Advance();
+
+            if (!moved)
+            {
+                campaign.RouteCounters.RecordNoProgress();
+                continue;
+            }
+
+            campaign.RouteCounters.RecordMarchProgress();
+
+            if (members.Any(member => IsCampaignAtEncounterObjective(member.Pos, objective)))
+                campaign.BeginEncounter(Tick);
+        }
+    }
+
+    private void AdvanceCampaignEncounters()
+    {
+        foreach (var campaign in _campaigns)
+        {
+            if (campaign.Phase == CampaignPhase.Encounter)
+                campaign.RouteCounters.RecordEncounterTick();
+        }
+    }
+
+    private IReadOnlyList<Person> GetValidCampaignMembers(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+        => campaign.Army.MemberActorIds
+            .Select(actorId => _world._people.FirstOrDefault(person => person.Id == actorId))
+            .Where(person => IsValidAssignedCampaignMember(person, blockedCampaignActorIds))
+            .Select(person => person!)
+            .OrderBy(person => person.Id)
+            .ToArray();
+
+    private (int x, int y)? GetNextCampaignMarchStep(CampaignState campaign, (int x, int y) start, (int x, int y) target)
+    {
+        var grid = new NavigationGrid(_world);
+        int topologyVersion = _world.NavigationTopologyVersion;
+        campaign.RouteCounters.RecordPathRequest();
+
+        if (campaign.RouteCache.IsValid(target, topologyVersion))
+        {
+            campaign.RouteCounters.RecordPathCacheHit();
+        }
+        else
+        {
+            BuildCampaignRouteCache(campaign, grid, start, target, topologyVersion);
+        }
+
+        var next = campaign.RouteCache.PeekNext();
+        if (!next.HasValue)
+            return null;
+
+        campaign.RouteCounters.RecordBlockedMovementCheck();
+        if (!_world.IsMovementBlocked(next.Value.x, next.Value.y, campaign.OriginColonyId))
+            return next;
+
+        campaign.RouteCache.Invalidate();
+        BuildCampaignRouteCache(campaign, grid, start, target, _world.NavigationTopologyVersion);
+        next = campaign.RouteCache.PeekNext();
+        if (!next.HasValue)
+            return null;
+
+        campaign.RouteCounters.RecordBlockedMovementCheck();
+        return _world.IsMovementBlocked(next.Value.x, next.Value.y, campaign.OriginColonyId)
+            ? null
+            : next;
+    }
+
+    private void BuildCampaignRouteCache(
+        CampaignState campaign,
+        NavigationGrid grid,
+        (int x, int y) start,
+        (int x, int y) target,
+        int topologyVersion)
+    {
+        campaign.RouteCounters.RecordRouteRecompute();
+        var path = NavigationPathfinder.FindPath(
+            grid,
+            start,
+            target,
+            campaign.OriginColonyId,
+            CampaignPathMaxExpansions,
+            out var budgetExceeded);
+
+        if (budgetExceeded || path.Count <= 1)
+        {
+            campaign.RouteCache.Invalidate();
+            return;
+        }
+
+        campaign.RouteCache.Set(target, topologyVersion, path);
+    }
+
+    private bool TryResolveCampaignMarchObjective(CampaignState campaign, out CampaignMarchObjective objective)
+    {
+        var origin = (x: campaign.RouteIntent.TargetX, y: campaign.RouteIntent.TargetY);
+        int maxRadius = Math.Max(_world.Width, _world.Height);
+        for (var radius = 0; radius <= maxRadius; radius++)
+        {
+            for (var dy = -radius; dy <= radius; dy++)
+            {
+                for (var dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) > radius)
+                        continue;
+
+                    int x = origin.x + dx;
+                    int y = origin.y + dy;
+                    var candidate = (x, y);
+                    if (candidate != origin && !IsCampaignFallbackObjectiveAllowed(campaign, candidate))
+                        continue;
+                    if (_world.IsMovementBlocked(x, y, campaign.OriginColonyId))
+                        continue;
+
+                    objective = new CampaignMarchObjective(candidate, UsesFallback: candidate != origin);
+                    return true;
+                }
+            }
+        }
+
+        objective = default;
+        return false;
+    }
+
+    private static bool IsCampaignFallbackObjectiveAllowed(CampaignState campaign, (int x, int y) candidate)
+        => Math.Abs(candidate.x - campaign.RouteIntent.OriginX) + Math.Abs(candidate.y - campaign.RouteIntent.OriginY) > 1;
+
+    private static bool IsCampaignAtEncounterObjective((int x, int y) position, CampaignMarchObjective objective)
+        => Math.Abs(position.x - objective.MovementTarget.x) + Math.Abs(position.y - objective.MovementTarget.y) <= 1;
+
+    private static void TickCampaignMarchSupply(CampaignState campaign, IReadOnlyList<Person> members, float dt, long tick)
+    {
+        if (dt <= 0f || members.Count == 0)
+            return;
+
+        int supplyTick = tick > int.MaxValue ? int.MaxValue : (int)Math.Max(0, tick);
+
+        if (campaign.Army.RationPoolState.RationPoolFood > 0)
+        {
+            ArmySupplyCarrierModel.TickRationPool(
+                members,
+                campaign.Army.SupplyState,
+                campaign.Army.CarrierState,
+                campaign.Army.RationPoolState,
+                supplyTick,
+                dt);
+            return;
+        }
+
+        ArmySupplyCarrierModel.TickCarriedInventory(
+            members,
+            campaign.Army.SupplyState,
+            campaign.Army.CarrierState,
+            supplyTick,
+            dt);
     }
 
     private DirectorRenderState BuildDirectorRenderState()

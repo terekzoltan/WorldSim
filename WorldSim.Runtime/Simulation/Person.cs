@@ -2422,6 +2422,13 @@ public class Person
         return Pos != before;
     }
 
+    internal bool MoveTowardCampaignMarch(World world, (int x, int y) target)
+    {
+        var before = Pos;
+        MoveTowards(world, target, 1);
+        return Pos != before;
+    }
+
     public void ApplyMoraleDelta(float delta)
     {
         var adjusted = delta;
