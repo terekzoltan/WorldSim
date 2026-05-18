@@ -2072,7 +2072,7 @@ Wave 9 Step 9 progress note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P6-D (B part) | P6-C ✅ | Snapshot/export should reflect the actual campaign loop, not an incomplete placeholder |
+| Track B agent | P6-D(B-part) | P6-C ✅ | Snapshot/export should reflect the actual campaign loop, not an incomplete placeholder |
 
 **Step 11 — opens when P6-D (B part) ✅**
 
