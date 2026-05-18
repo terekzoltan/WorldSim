@@ -64,13 +64,59 @@ public sealed record WorldRenderSnapshot(
     IReadOnlyList<BattleRenderData> Battles,
     IReadOnlyList<SiegeRenderData> Sieges,
     IReadOnlyList<BreachRenderData> Breaches,
+    IReadOnlyList<CampaignRenderData> Campaigns,
     IReadOnlyList<FactionStanceRenderData> FactionStances,
     EcoHudData Ecology,
     SeasonView CurrentSeason,
     bool IsDroughtActive,
     IReadOnlyList<string> RecentEvents,
     DirectorRenderState Director
-);
+)
+{
+    public WorldRenderSnapshot(
+        int Width,
+        int Height,
+        IReadOnlyList<TileRenderData> Tiles,
+        IReadOnlyList<HouseRenderData> Houses,
+        IReadOnlyList<SpecializedBuildingRenderData> SpecializedBuildings,
+        IReadOnlyList<DefensiveStructureRenderData> DefensiveStructures,
+        IReadOnlyList<PersonRenderData> People,
+        IReadOnlyList<AnimalRenderData> Animals,
+        IReadOnlyList<ColonyHudData> Colonies,
+        IReadOnlyList<CombatGroupRenderData> CombatGroups,
+        IReadOnlyList<BattleRenderData> Battles,
+        IReadOnlyList<SiegeRenderData> Sieges,
+        IReadOnlyList<BreachRenderData> Breaches,
+        IReadOnlyList<FactionStanceRenderData> FactionStances,
+        EcoHudData Ecology,
+        SeasonView CurrentSeason,
+        bool IsDroughtActive,
+        IReadOnlyList<string> RecentEvents,
+        DirectorRenderState Director)
+        : this(
+            Width,
+            Height,
+            Tiles,
+            Houses,
+            SpecializedBuildings,
+            DefensiveStructures,
+            People,
+            Animals,
+            Colonies,
+            CombatGroups,
+            Battles,
+            Sieges,
+            Breaches,
+            Array.Empty<CampaignRenderData>(),
+            FactionStances,
+            Ecology,
+            CurrentSeason,
+            IsDroughtActive,
+            RecentEvents,
+            Director)
+    {
+    }
+}
 
 public sealed record DirectorRenderState(
     string StageMarker,
@@ -269,6 +315,95 @@ public sealed record BreachRenderData(
     int Y,
     int CreatedTick,
     DefensiveStructureKindView StructureKind);
+
+public sealed record CampaignRenderData(
+    int CampaignId,
+    int ArmyId,
+    int OwnerFactionId,
+    int TargetFactionId,
+    int OriginColonyId,
+    int TargetColonyId,
+    string Phase,
+    string Status,
+    long CreatedTick,
+    CampaignRouteRenderData Route,
+    ArmyRenderData Army,
+    ArmySupplyRenderData Supply,
+    IReadOnlyList<CampaignRouteWaypointRenderData> RouteWaypoints,
+    IReadOnlyList<CampaignEncounterRenderData> Encounters);
+
+public sealed record CampaignRouteRenderData(
+    int OriginX,
+    int OriginY,
+    int TargetX,
+    int TargetY,
+    bool HasResolvedObjective,
+    int ResolvedObjectiveX,
+    int ResolvedObjectiveY,
+    bool UsesFallbackObjective,
+    int PathRequests,
+    int PathCacheHits,
+    int BlockedMovementChecks,
+    int RouteRecomputes,
+    int MarchProgressTicks,
+    int EncounterTicks,
+    int NoProgressTicks,
+    int CachedWaypointCount,
+    int NextWaypointIndex);
+
+public sealed record CampaignRouteWaypointRenderData(
+    int Index,
+    int X,
+    int Y,
+    bool IsNext);
+
+public sealed record CampaignEncounterRenderData(
+    int CampaignId,
+    int SourceX,
+    int SourceY,
+    int TargetX,
+    int TargetY,
+    string Status,
+    string Outcome,
+    int EncounterTicks);
+
+public sealed record ArmyRenderData(
+    int ArmyId,
+    int HomeColonyId,
+    int OriginX,
+    int OriginY,
+    int TargetX,
+    int TargetY,
+    int RequestedMemberCount,
+    int AssignedMemberCount,
+    IReadOnlyList<int> MemberActorIds,
+    bool HasRallyPoint,
+    int RallyX,
+    int RallyY,
+    bool IsAssembled,
+    long AssemblyStartedTick,
+    long AssemblyCompletedTick,
+    int AnchorActorId,
+    int AnchorX,
+    int AnchorY);
+
+public sealed record ArmySupplyRenderData(
+    float FractionalFoodDemand,
+    int SustainedOutOfSupplyTicks,
+    int RationPoolFood,
+    int AssignedCarrierActorId,
+    bool HasAssignedCarrier,
+    int LastSupplyTick,
+    string LastSupplySource,
+    int ForageAttempts,
+    int ForageSuccesses,
+    int ForageFailures,
+    int ForageFoodGained,
+    int LastForageSourceX,
+    int LastForageSourceY,
+    string LastForageConsumerKey,
+    string LastForageStatus,
+    string LastForageFailureReason);
 
 public sealed record FactionStanceRenderData(int LeftFactionId, int RightFactionId, string Stance);
 

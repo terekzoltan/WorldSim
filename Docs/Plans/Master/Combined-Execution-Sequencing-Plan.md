@@ -2074,6 +2074,9 @@ Wave 9 Step 9 progress note:
 |---------|---------|--------|-------|
 | Track B agent | P6-D(B-part) | P6-C ✅ | Snapshot/export should reflect the actual campaign loop, not an incomplete placeholder |
 
+Wave 9 Step 10 progress note:
+- ✅ `P6-D(B-part)` closed after Meta re-review: Track B runtime read-model fixes landed with stable lower_snake_case mapping helpers for campaign phase/supply/forage strings, route intent/resolved objective/next-waypoint assertions, and `GetSnapshot()` no-mutation coverage. The authorized first-gate Graphics handoff fix also landed: `WorldSnapshotInterpolator.Interpolate(...)` preserves `current.Campaigns` with focused regression coverage so populated campaign read-model data is not dropped before Track A consume. Normal Track A overlay/UI implementation, ScenarioRunner/SMR export, campaign resolution, and `World.Update` campaign orchestration remain out of scope; `.gitignore` remains unrelated dirty local state and must not be staged with P6-D.
+
 **Step 11 — opens when P6-D (B part) ✅**
 
 | Session | Epic(s) | Prereq | Notes |

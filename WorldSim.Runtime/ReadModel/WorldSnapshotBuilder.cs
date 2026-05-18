@@ -283,6 +283,7 @@ public static class WorldSnapshotBuilder
             battles,
             sieges,
             breaches,
+            Array.Empty<CampaignRenderData>(),
             factionStances,
             ecology,
             MapSeason(world.CurrentSeason),

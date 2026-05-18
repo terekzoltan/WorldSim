@@ -164,9 +164,177 @@ public sealed class SimulationRuntime
         var snapshot = WorldSnapshotBuilder.Build(_world);
         return snapshot with
         {
+            Campaigns = BuildCampaignRenderData(),
             Director = BuildDirectorRenderState()
         };
     }
+
+    private IReadOnlyList<CampaignRenderData> BuildCampaignRenderData()
+        => _campaigns
+            .Select(BuildCampaignRenderData)
+            .ToArray();
+
+    private CampaignRenderData BuildCampaignRenderData(CampaignState campaign)
+    {
+        bool hasObjective = TryResolveCampaignMarchObjective(campaign, out var objective);
+        var routeCache = campaign.RouteCache;
+        var waypoints = routeCache.Steps
+            .Select((step, index) => new CampaignRouteWaypointRenderData(
+                index,
+                step.x,
+                step.y,
+                index == routeCache.NextIndex))
+            .ToArray();
+        var memberActorIds = campaign.Army.MemberActorIds.ToArray();
+        var anchor = memberActorIds
+            .Select(actorId => _world._people.FirstOrDefault(person => person.Id == actorId))
+            .Where(person => person != null)
+            .Select(person => person!)
+            .OrderBy(person => person.Id)
+            .FirstOrDefault();
+        var source = anchor?.Pos ?? (x: campaign.RouteIntent.OriginX, y: campaign.RouteIntent.OriginY);
+        var target = hasObjective
+            ? objective.MovementTarget
+            : (x: campaign.RouteIntent.TargetX, y: campaign.RouteIntent.TargetY);
+        var encounters = campaign.Phase == CampaignPhase.Encounter
+            ? new[]
+            {
+                new CampaignEncounterRenderData(
+                    campaign.CampaignId,
+                    source.x,
+                    source.y,
+                    target.x,
+                    target.y,
+                    "active",
+                    "non_resolving",
+                    campaign.RouteCounters.EncounterTicks)
+            }
+            : Array.Empty<CampaignEncounterRenderData>();
+
+        return new CampaignRenderData(
+            campaign.CampaignId,
+            campaign.ArmyId,
+            (int)campaign.OwnerFaction,
+            (int)campaign.TargetFaction,
+            campaign.OriginColonyId,
+            campaign.TargetColonyId,
+            MapCampaignPhaseForReadModel(campaign.Phase),
+            MapCampaignStatusForReadModel(campaign),
+            campaign.CreatedTick,
+            new CampaignRouteRenderData(
+                campaign.RouteIntent.OriginX,
+                campaign.RouteIntent.OriginY,
+                campaign.RouteIntent.TargetX,
+                campaign.RouteIntent.TargetY,
+                hasObjective,
+                hasObjective ? objective.MovementTarget.x : -1,
+                hasObjective ? objective.MovementTarget.y : -1,
+                hasObjective && objective.UsesFallback,
+                campaign.RouteCounters.PathRequests,
+                campaign.RouteCounters.PathCacheHits,
+                campaign.RouteCounters.BlockedMovementChecks,
+                campaign.RouteCounters.RouteRecomputes,
+                campaign.RouteCounters.MarchProgressTicks,
+                campaign.RouteCounters.EncounterTicks,
+                campaign.RouteCounters.NoProgressTicks,
+                waypoints.Length,
+                routeCache.HasPath ? routeCache.NextIndex : -1),
+            new ArmyRenderData(
+                campaign.Army.ArmyId,
+                campaign.Army.HomeColonyId,
+                campaign.Army.OriginX,
+                campaign.Army.OriginY,
+                campaign.Army.TargetX,
+                campaign.Army.TargetY,
+                campaign.Army.RequestedMemberCount,
+                campaign.Army.MemberCount,
+                memberActorIds,
+                campaign.Army.HasRallyPoint,
+                campaign.Army.RallyX,
+                campaign.Army.RallyY,
+                campaign.Army.IsAssembled,
+                campaign.Army.AssemblyStartedTick,
+                campaign.Army.AssemblyCompletedTick,
+                anchor?.Id ?? -1,
+                anchor?.Pos.x ?? -1,
+                anchor?.Pos.y ?? -1),
+            new ArmySupplyRenderData(
+                campaign.Army.SupplyState.FractionalFoodDemand,
+                campaign.Army.SupplyState.SustainedOutOfSupplyTicks,
+                campaign.Army.RationPoolState.RationPoolFood,
+                campaign.Army.CarrierState.AssignedCarrierActorId,
+                campaign.Army.CarrierState.HasAssignedCarrier,
+                campaign.Army.CarrierState.LastSupplyTick,
+                MapArmySupplySourceForReadModel(campaign.Army.CarrierState.LastSupplySource),
+                campaign.Army.ForagingState.Attempts,
+                campaign.Army.ForagingState.Successes,
+                campaign.Army.ForagingState.Failures,
+                campaign.Army.ForagingState.FoodGained,
+                campaign.Army.ForagingState.LastSourceX,
+                campaign.Army.ForagingState.LastSourceY,
+                campaign.Army.ForagingState.LastConsumerKey,
+                MapArmyForageStatusForReadModel(campaign.Army.ForagingState.LastStatus),
+                MapArmyForageFailureReasonForReadModel(campaign.Army.ForagingState.LastFailureReason)),
+            waypoints,
+            encounters);
+    }
+
+    private static string MapCampaignPhaseForReadModel(CampaignPhase phase)
+        => phase switch
+        {
+            CampaignPhase.AssemblingPending => "assembling_pending",
+            CampaignPhase.Assembling => "assembling",
+            CampaignPhase.Marching => "marching",
+            CampaignPhase.Encounter => "encounter",
+            CampaignPhase.Resolved => "resolved",
+            _ => "unknown"
+        };
+
+    private static string MapCampaignStatusForReadModel(CampaignState campaign)
+        => campaign.Phase switch
+        {
+            CampaignPhase.AssemblingPending => "pending_assembly",
+            CampaignPhase.Assembling => "assembling",
+            CampaignPhase.Marching => "marching",
+            CampaignPhase.Encounter => "encounter_active",
+            CampaignPhase.Resolved => "resolved",
+            _ => "unknown"
+        };
+
+    private static string MapArmySupplySourceForReadModel(ArmySupplySourceMode source)
+        => source switch
+        {
+            ArmySupplySourceMode.None => "none",
+            ArmySupplySourceMode.CarriedInventory => "carried_inventory",
+            ArmySupplySourceMode.RationPool => "ration_pool",
+            _ => "unknown"
+        };
+
+    private static string MapArmyForageStatusForReadModel(ArmyForageStatus status)
+        => status switch
+        {
+            ArmyForageStatus.Succeeded => "succeeded",
+            ArmyForageStatus.Failed => "failed",
+            _ => "unknown"
+        };
+
+    private static string MapArmyForageFailureReasonForReadModel(ArmyForageFailureReason reason)
+        => reason switch
+        {
+            ArmyForageFailureReason.None => "none",
+            ArmyForageFailureReason.InvalidConsumerKey => "invalid_consumer_key",
+            ArmyForageFailureReason.ForagerDead => "forager_dead",
+            ArmyForageFailureReason.SourceOutOfBounds => "source_out_of_bounds",
+            ArmyForageFailureReason.SourceOutOfRange => "source_out_of_range",
+            ArmyForageFailureReason.WaterTile => "water_tile",
+            ArmyForageFailureReason.NoResourceNode => "no_resource_node",
+            ArmyForageFailureReason.WrongResource => "wrong_resource",
+            ArmyForageFailureReason.DepletedFood => "depleted_food",
+            ArmyForageFailureReason.ConsumerCapReached => "consumer_cap_reached",
+            ArmyForageFailureReason.NoYield => "no_yield",
+            ArmyForageFailureReason.HarvestFailed => "harvest_failed",
+            _ => "unknown"
+        };
 
     public CampaignCreationResult TryCreateCampaign(Faction ownerFaction, Faction targetFaction, int requestedMemberCount)
     {

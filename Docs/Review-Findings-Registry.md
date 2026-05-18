@@ -26,6 +26,33 @@ Severity guide:
 
 Entries:
 
+## 2026-05-18 - Wave 9 P6-D(B) Snapshot Handoff - Blocking - Interpolated snapshots must preserve Campaigns
+
+- Track: Track A / Graphics snapshot consume, discovered during Track B P6-D(B) handoff review
+- Source: Meta internal correctness lane + Swarm step-review synthesis for Wave 9 `P6-D(B-part)`
+- Finding: `WorldSnapshotInterpolator.Interpolate(...)` constructs `WorldRenderSnapshot` through the compatibility constructor, which defaults `Campaigns` to `Array.Empty<CampaignRenderData>()`, so interpolated snapshots drop populated campaign read-model data.
+- Impact: Track A can receive an apparently stable P6-D(B) campaign snapshot from runtime but lose it in the existing Graphics interpolation path before overlay consume.
+- Resolution / guidance: Before P6-D handoff closeout / Track A overlay consume, preserve `current.Campaigns` in `WorldSnapshotInterpolator.Interpolate(...)` and add a focused regression proving interpolation keeps non-interpolated campaign collections. This requires explicit Graphics/Track A scope approval if fixed before Step 11.
+- Status: fixed in P6-D(B) after authorized first-gate Graphics handoff patch and Meta re-review
+
+## 2026-05-18 - Wave 9 P6-D(B) Read Model - Blocking - Public strings must not leak simulation enum names
+
+- Track: Track B / Runtime campaign read-model contract
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-D(B-part)`
+- Finding: `SimulationRuntime.BuildCampaignRenderData(...)` exports public read-model strings via simulation enum `.ToString()` for campaign phase, supply source, forage status, and forage failure reason, and tests assert those PascalCase enum names.
+- Impact: Track A would couple to C# enum member names/casing before the UI consume step, making the snapshot contract brittle and violating the P6-D acceptance that phase/status/source/failure fields be read-model-safe.
+- Resolution / guidance: Before P6-D(B) closeout, replace enum `.ToString()` exports with explicit stable read-model mapping helpers (prefer lower_snake_case strings or dedicated read-model enums) and update tests to assert those stable contract literals.
+- Status: fixed in P6-D(B) after Meta re-review
+
+## 2026-05-18 - Wave 9 P6-D(B) Read Model - Major - Prove route fields and snapshot no-mutation contract
+
+- Track: Track B / Runtime campaign read-model tests
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-D(B-part)`
+- Finding: Current tests cover campaign presence, detachment, supply, counters, waypoint count, and encounter marker, but do not directly assert route intent coordinates, resolved objective coordinates, `NextWaypointIndex` to `IsNext` consistency, or before/after `GetSnapshot()` counter/cache immutability.
+- Impact: P6-D(B) is the Track A handoff contract; without these checks, later consumers may rely on unpinned fields or miss accidental side effects in snapshot mapping.
+- Resolution / guidance: Before P6-D(B) closeout, add focused assertions for route intent/resolved objective/next waypoint consistency and a before/after `GetSnapshot()` no-mutation check for route counters/cache state. Keep mapping side-effect free.
+- Status: fixed in P6-D(B) after Meta re-review
+
 ## 2026-05-17 - Wave 9 P6-C March Supply - Blocking - Revalidate roster after supply-induced routing
 
 - Track: Track B / Runtime campaign march lifecycle
