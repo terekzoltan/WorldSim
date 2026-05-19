@@ -49,6 +49,7 @@ public sealed class ArmyState
     public ArmyRationPoolState RationPoolState { get; } = new();
     public ArmySupplyCarrierState CarrierState { get; } = new();
     public ArmyForagingState ForagingState { get; } = new();
+    public ArmyWave9EvidenceCounters Wave9Evidence { get; } = new();
 
     internal bool HasMemberActorId(int actorId)
         => _memberActorIds.Contains(actorId);
@@ -89,5 +90,69 @@ public sealed class ArmyState
     {
         IsAssembled = false;
         AssemblyCompletedTick = -1;
+    }
+}
+
+public sealed class ArmyWave9EvidenceCounters
+{
+    public int MemberInventoryConsumed { get; private set; }
+    public int RationPoolConsumed { get; private set; }
+    public int CarriedInventorySupplyTicks { get; private set; }
+    public int RationPoolSupplyTicks { get; private set; }
+    public int LowSupplyTicks { get; private set; }
+    public int OutOfSupplyTicks { get; private set; }
+    public int SupplyAttritionEvents { get; private set; }
+    public int SupplyRoutingEvents { get; private set; }
+    public int CarrierAssignments { get; private set; }
+    public int CarrierDeliveries { get; private set; }
+    public int ResupplyDelivered { get; private set; }
+
+    internal void RecordCarrierAssignment()
+        => CarrierAssignments++;
+
+    internal void RecordSupplyTick(ArmySupplyCarrierTickResult result)
+    {
+        if (result.Status != ArmySupplyCarrierTickStatus.Processed)
+            return;
+
+        var consumed = 0;
+        switch (result.ActiveSource)
+        {
+            case ArmySupplySourceMode.CarriedInventory:
+                CarriedInventorySupplyTicks++;
+                consumed = result.CarriedInventoryResult?.FoodConsumed ?? 0;
+                MemberInventoryConsumed += consumed;
+                break;
+
+            case ArmySupplySourceMode.RationPool:
+                RationPoolSupplyTicks++;
+                consumed = result.RationPoolResult?.FoodConsumed ?? 0;
+                RationPoolConsumed += consumed;
+                break;
+        }
+
+        var isLowSupply = result.CarriedInventoryResult?.IsLowSupply
+                          ?? result.RationPoolResult?.IsLowSupply
+                          ?? false;
+        var isOutOfSupply = result.CarriedInventoryResult?.IsOutOfSupply
+                            ?? result.RationPoolResult?.IsOutOfSupply
+                            ?? false;
+        if (isLowSupply)
+            LowSupplyTicks++;
+        if (isOutOfSupply)
+            OutOfSupplyTicks++;
+
+        SupplyAttritionEvents += result.CarriedInventoryResult?.AttritionEventCount
+                                 ?? result.RationPoolResult?.AttritionEventCount
+                                 ?? 0;
+        SupplyRoutingEvents += result.CarriedInventoryResult?.RoutedMemberCount
+                               ?? result.RationPoolResult?.RoutedMemberCount
+                               ?? 0;
+
+        if (consumed > 0)
+        {
+            CarrierDeliveries++;
+            ResupplyDelivered += consumed;
+        }
     }
 }

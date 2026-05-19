@@ -86,11 +86,15 @@ public sealed class CampaignState
     public CampaignRouteCounters RouteCounters { get; } = new();
     internal NavigationPathCache RouteCache { get; } = new();
     public ArmyState Army { get; }
+    public CampaignWave9EvidenceCounters Wave9Evidence { get; } = new();
 
     internal void BeginAssembly(long tick)
     {
         if (Phase == CampaignPhase.AssemblingPending)
+        {
             Phase = CampaignPhase.Assembling;
+            Wave9Evidence.RecordAssemblyStarted();
+        }
 
         if (Phase == CampaignPhase.Assembling)
             Army.BeginAssembly(tick);
@@ -103,6 +107,8 @@ public sealed class CampaignState
 
         Army.MarkAssemblyComplete(tick);
         Phase = CampaignPhase.Marching;
+        Wave9Evidence.RecordAssemblyCompleted();
+        Wave9Evidence.RecordMarchStarted();
     }
 
     internal void ReturnToAssemblyAfterRosterInvalidation(long tick)
@@ -114,6 +120,7 @@ public sealed class CampaignState
         Army.MarkAssemblyInvalidatedForReassembly();
         Phase = CampaignPhase.Assembling;
         Army.BeginAssembly(tick);
+        Wave9Evidence.RecordReturnedOrAborted();
     }
 
     internal void BeginEncounter(long tick)
@@ -123,7 +130,12 @@ public sealed class CampaignState
 
         RouteCache.Invalidate();
         Phase = CampaignPhase.Encounter;
+        Wave9Evidence.RecordMarchCompleted();
+        Wave9Evidence.RecordEncounterStarted();
     }
+
+    internal void RecordWave9PhaseTick()
+        => Wave9Evidence.RecordPhaseTick(Phase);
 }
 
 public sealed record CampaignCreationResult(
@@ -148,4 +160,43 @@ public sealed record CampaignCreationResult(
             CampaignId: null,
             ArmyId: null,
             message);
+}
+
+public sealed class CampaignWave9EvidenceCounters
+{
+    public int AssemblyStartedCount { get; private set; }
+    public int AssemblyCompletedCount { get; private set; }
+    public int MarchStartedCount { get; private set; }
+    public int MarchCompletedCount { get; private set; }
+    public int CampaignsReturnedOrAborted { get; private set; }
+    public int EncounterCount { get; private set; }
+    public int AssemblingTicks { get; private set; }
+    public int MarchingTicks { get; private set; }
+    public int EncounterTicks { get; private set; }
+
+    internal void RecordAssemblyStarted() => AssemblyStartedCount++;
+    internal void RecordAssemblyCompleted() => AssemblyCompletedCount++;
+    internal void RecordMarchStarted() => MarchStartedCount++;
+    internal void RecordMarchCompleted() => MarchCompletedCount++;
+    internal void RecordReturnedOrAborted() => CampaignsReturnedOrAborted++;
+    internal void RecordEncounterStarted() => EncounterCount++;
+
+    internal void RecordPhaseTick(CampaignPhase phase)
+    {
+        switch (phase)
+        {
+            case CampaignPhase.AssemblingPending:
+            case CampaignPhase.Assembling:
+                AssemblingTicks++;
+                break;
+
+            case CampaignPhase.Marching:
+                MarchingTicks++;
+                break;
+
+            case CampaignPhase.Encounter:
+                EncounterTicks++;
+                break;
+        }
+    }
 }

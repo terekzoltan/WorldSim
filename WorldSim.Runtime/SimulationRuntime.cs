@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.Json.Nodes;
 using WorldSim.AI;
+using WorldSim.Runtime.Diagnostics;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
 using WorldSim.Simulation.Diplomacy;
@@ -153,6 +154,7 @@ public sealed class SimulationRuntime
         AdvanceCampaignAssemblies(blockedCampaignActorIds);
         AdvanceCampaignMarches(marchEligibleCampaignIds, dt, blockedCampaignActorIds);
         AdvanceCampaignEncounters();
+        RecordCampaignWave9PhaseTicks();
         EvaluatePendingDirectorCausalChains();
         _directorState.Tick();
         RefreshAiDebugSnapshot();
@@ -173,6 +175,62 @@ public sealed class SimulationRuntime
         => _campaigns
             .Select(BuildCampaignRenderData)
             .ToArray();
+
+    public ScenarioWave9TelemetrySnapshot BuildScenarioWave9TelemetrySnapshot(string? wave9Scenario = null)
+    {
+        if (_campaigns.Count == 0)
+        {
+            return string.IsNullOrWhiteSpace(wave9Scenario)
+                ? ScenarioWave9TelemetrySnapshot.Empty
+                : (ScenarioWave9TelemetrySnapshot.Empty with { Wave9Scenario = NormalizeWave9ScenarioName(wave9Scenario) }).AsDeterministicProbe();
+        }
+
+        var latestSupply = _campaigns
+            .Select(campaign => campaign.Army.CarrierState)
+            .OrderByDescending(state => state.LastSupplyTick)
+            .FirstOrDefault();
+        var latestCampaign = _campaigns
+            .OrderByDescending(campaign => campaign.CampaignId)
+            .First();
+
+        return new ScenarioWave9TelemetrySnapshot(
+            Wave9Scenario: NormalizeWave9ScenarioName(wave9Scenario),
+            EvidenceKind: "deterministic_probe",
+            TimelineSemantics: "not_tick_sampled",
+            ActiveCampaigns: _campaigns.Count(campaign => campaign.Phase != CampaignPhase.Resolved),
+            ActiveArmies: _campaigns.Count(campaign => campaign.Phase != CampaignPhase.Resolved && campaign.Army.MemberCount > 0),
+            TotalArmyMembers: _campaigns.Sum(campaign => campaign.Army.MemberCount),
+            TotalRationPoolFood: _campaigns.Sum(campaign => campaign.Army.RationPoolState.RationPoolFood),
+            CampaignLaunches: _campaigns.Count,
+            AssemblyStartedCount: _campaigns.Sum(campaign => campaign.Wave9Evidence.AssemblyStartedCount),
+            AssemblyCompletedCount: _campaigns.Sum(campaign => campaign.Wave9Evidence.AssemblyCompletedCount),
+            MarchStartedCount: _campaigns.Sum(campaign => campaign.Wave9Evidence.MarchStartedCount),
+            MarchCompletedCount: _campaigns.Sum(campaign => campaign.Wave9Evidence.MarchCompletedCount),
+            CampaignsReturnedOrAborted: _campaigns.Sum(campaign => campaign.Wave9Evidence.CampaignsReturnedOrAborted),
+            SupplySourceMode: latestSupply == null ? "none" : MapArmySupplySourceForReadModel(latestSupply.LastSupplySource),
+            MemberInventoryConsumed: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.MemberInventoryConsumed),
+            RationPoolConsumed: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.RationPoolConsumed),
+            CarriedInventorySupplyTicks: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.CarriedInventorySupplyTicks),
+            RationPoolSupplyTicks: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.RationPoolSupplyTicks),
+            LowSupplyTicks: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.LowSupplyTicks),
+            OutOfSupplyTicks: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.OutOfSupplyTicks),
+            SupplyAttritionEvents: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.SupplyAttritionEvents),
+            SupplyRoutingEvents: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.SupplyRoutingEvents),
+            CarrierAssignments: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.CarrierAssignments),
+            CarrierDeliveries: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.CarrierDeliveries),
+            ResupplyDelivered: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.ResupplyDelivered),
+            CampaignForageAttempts: _campaigns.Sum(campaign => campaign.Army.ForagingState.Attempts),
+            CampaignForageSuccesses: _campaigns.Sum(campaign => campaign.Army.ForagingState.Successes),
+            CampaignForageFoodGained: _campaigns.Sum(campaign => campaign.Army.ForagingState.FoodGained),
+            CampaignForageCapReached: _campaigns.Sum(campaign => campaign.Army.ForagingState.LastFailureReason == ArmyForageFailureReason.ConsumerCapReached ? 1 : 0),
+            CampaignPhase: MapCampaignPhaseForReadModel(latestCampaign.Phase),
+            CampaignAssemblingTicks: _campaigns.Sum(campaign => campaign.Wave9Evidence.AssemblingTicks),
+            CampaignMarchingTicks: _campaigns.Sum(campaign => campaign.Wave9Evidence.MarchingTicks),
+            CampaignEncounterTicks: _campaigns.Sum(campaign => campaign.Wave9Evidence.EncounterTicks),
+            CampaignRouteProgress: _campaigns.Sum(campaign => campaign.RouteCounters.MarchProgressTicks),
+            CampaignEncounterCount: _campaigns.Sum(campaign => campaign.Wave9Evidence.EncounterCount),
+            PeakMarchDistance: _campaigns.Max(campaign => campaign.RouteCounters.MarchProgressTicks));
+    }
 
     private CampaignRenderData BuildCampaignRenderData(CampaignState campaign)
     {
@@ -336,6 +394,9 @@ public sealed class SimulationRuntime
             _ => "unknown"
         };
 
+    private static string NormalizeWave9ScenarioName(string? wave9Scenario)
+        => string.IsNullOrWhiteSpace(wave9Scenario) ? "none" : wave9Scenario.Trim();
+
     public CampaignCreationResult TryCreateCampaign(Faction ownerFaction, Faction targetFaction, int requestedMemberCount)
     {
         if (!IsCampaignRuntimeAvailable())
@@ -420,6 +481,34 @@ public sealed class SimulationRuntime
         return CampaignCreationResult.Created(campaignId, armyId);
     }
 
+    public int PrepareWave9CampaignScenario(Faction ownerFaction, int candidateCount, int carriedFoodPerCandidate)
+    {
+        if (!Enum.IsDefined(typeof(Faction), ownerFaction))
+            return 0;
+
+        var prepared = 0;
+        foreach (var person in _world._people
+                     .Where(person => person.Health > 0f && person.Home.Faction == ownerFaction)
+                     .OrderBy(person => person.Id))
+        {
+            person.Profession = Profession.Hunter;
+            for (var i = 0; i < Math.Max(0, carriedFoodPerCandidate); i++)
+            {
+                if (!person.Inventory.TryAdd(ItemType.Food, 1))
+                    break;
+            }
+
+            prepared++;
+            if (prepared >= Math.Max(0, candidateCount))
+                break;
+        }
+
+        return prepared;
+    }
+
+    public void DisableWave9CampaignScenarioCombatInvalidation()
+        => _world.EnableCombatPrimitives = false;
+
     private void AdvanceCampaignAssemblies(HashSet<int> blockedCampaignActorIds)
     {
         foreach (var campaign in _campaigns)
@@ -440,7 +529,10 @@ public sealed class SimulationRuntime
             {
                 campaign.BeginAssembly(Tick);
                 if (campaign.Army.TryAddMemberActorId(candidate.Id) && candidate.HasRole(PersonRole.SupplyCarrier))
+                {
                     ArmySupplyCarrierModel.AssignCarrier(candidate, campaign.Army.CarrierState);
+                    campaign.Army.Wave9Evidence.RecordCarrierAssignment();
+                }
             }
             else if (campaign.Army.MemberCount == 0)
             {
@@ -871,22 +963,30 @@ public sealed class SimulationRuntime
 
         if (campaign.Army.RationPoolState.RationPoolFood > 0)
         {
-            ArmySupplyCarrierModel.TickRationPool(
+            var result = ArmySupplyCarrierModel.TickRationPool(
                 members,
                 campaign.Army.SupplyState,
                 campaign.Army.CarrierState,
                 campaign.Army.RationPoolState,
                 supplyTick,
                 dt);
+            campaign.Army.Wave9Evidence.RecordSupplyTick(result);
             return;
         }
 
-        ArmySupplyCarrierModel.TickCarriedInventory(
+        var carriedResult = ArmySupplyCarrierModel.TickCarriedInventory(
             members,
             campaign.Army.SupplyState,
             campaign.Army.CarrierState,
             supplyTick,
             dt);
+        campaign.Army.Wave9Evidence.RecordSupplyTick(carriedResult);
+    }
+
+    private void RecordCampaignWave9PhaseTicks()
+    {
+        foreach (var campaign in _campaigns)
+            campaign.RecordWave9PhaseTick();
     }
 
     private DirectorRenderState BuildDirectorRenderState()

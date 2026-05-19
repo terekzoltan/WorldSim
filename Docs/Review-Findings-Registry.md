@@ -26,6 +26,33 @@ Severity guide:
 
 Entries:
 
+## 2026-05-19 - Wave 9 SMR Prep Export/Config - Blocking - Drilldown timeline must not stamp final Wave9 counters onto every sample
+
+- Track: Track B / ScenarioRunner Wave 9 SMR evidence surface
+- Source: Meta + Swarm step-review synthesis for Wave 9 `Wave-9-SMR-prep-export/config`
+- Finding: `Program.cs` captures drilldown timeline samples during the normal run, builds Wave9 telemetry only after the run, then applies one final `ScenarioWave9TimelineSnapshot` to every sample. The focused test asserts positive carrier evidence in the first timeline sample, locking in retroactive final-counter stamping.
+- Impact: Drilldown artifacts appear temporal but can report future/final Wave9 evidence at tick 1 or every tick, creating false-green SMR validation risk for the exact evidence surface Step 12A is supposed to prepare.
+- Resolution / guidance: Before Step 12A closeout, either capture tick-accurate Wave9 telemetry at sample time or keep Wave9 evidence run-level only and leave timeline `wave9` empty/default unless values are tick-accurate. Update tests so early timeline samples cannot validate retroactively stamped final counters.
+- Status: fixed and accepted in Step 12A Meta + Swarm re-review; SMR Analyst validation remains the next active gate
+
+## 2026-05-19 - Wave 9 SMR Prep Export/Config - Major - Synthetic Wave9 probes must not be mislabeled as run telemetry
+
+- Track: Track B / ScenarioRunner Wave 9 SMR evidence semantics
+- Source: Meta internal step-review for Wave 9 `Wave-9-SMR-prep-export/config`
+- Finding: Several Wave9 deterministic lanes build telemetry from separate mini-worlds or a separate `SimulationRuntime` after the normal ScenarioRunner run and attach the result to the run artifact.
+- Impact: If these outputs are presented as ordinary run telemetry, SMR Analyst may believe the actual reported run executed the mechanics. This is acceptable only if clearly separated or explicitly documented as deterministic prep/probe evidence, not final organic run proof.
+- Resolution / guidance: Before Step 12A closeout, either execute Wave9 lanes inside the reported run/runtime state or label/route them as deterministic probe evidence with clear docs/tests and SMR Analyst validation caveat. Do not use sidecar probes as final Wave 9 acceptance.
+- Status: fixed and accepted in Step 12A Meta + Swarm re-review via explicit `deterministic_probe` / `not_tick_sampled` metadata and docs; SMR Analyst validation remains the next active gate
+
+## 2026-05-19 - Wave 9 SMR Prep Export/Config - Minor - Wave9Scenario alias matrix should be explicit
+
+- Track: Track B / ScenarioRunner config surface
+- Source: Swarm step-review for Wave 9 `Wave-9-SMR-prep-export/config`
+- Finding: The closeout-plan alias `foraging-extension` normalizes to `campaign_foraging`, while `campaign-foraging` returns config error. This may be intentional, but the implementation brief phrase "hyphen aliases" can be read as accepting `campaign-foraging`.
+- Impact: Operator confusion or inconsistent evidence recipe usage can create avoidable config errors during SMR prep/validation.
+- Resolution / guidance: Before Step 12A closeout, either explicitly document that `campaign-foraging` is intentionally invalid or accept it as an additional harmless alias. Add alias matrix coverage for all canonical lanes.
+- Status: fixed and accepted in Step 12A Meta + Swarm re-review by accepting `campaign-foraging` as an alias and adding alias matrix coverage; SMR Analyst validation remains the next active gate
+
 ## 2026-05-18 - Wave 9 P6-D(A) Campaign Overlay - Blocking - Invalid army anchor sentinel must not render as map coordinate
 
 - Track: Track A / Graphics campaign overlay and panel consume

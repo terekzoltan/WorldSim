@@ -2093,6 +2093,10 @@ Wave 9 Step 11 progress note:
 | Track B agent | Wave-9-SMR-prep-export/config | P5-G (B part) ✅ + P5-H (B part) ✅ + P6-D (B+A parts) ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for army supply, carrier/resupply, foraging, and campaign skeleton evidence per `Wave9-10-SMR-Closeout-Plan.md` |
 | SMR Analyst | Wave 9 SMR prep - validation | Track B export/config ✅ + P5-G (C part) ✅ + P5-H (C part) ✅ | Validate that the new artifact surface and deterministic lanes can prove runtime and AI-side Wave 9 behavior before the final closeout package |
 
+Wave 9 Step 12A progress note:
+- ✅ `Wave-9-SMR-prep-export/config` targeted review fix accepted by Meta + Swarm re-review: ScenarioRunner keeps the normalized `Wave9Scenario` config surface (underscore canonical names plus documented aliases including `campaign-foraging`), a nullable/default-safe run-level `wave9` artifact block, and deterministic prep lanes for army supply depletion, carrier/resupply, campaign foraging, and campaign assembly/march/encounter. This remains Track B prep evidence only; SMR Analyst validation and final Wave 9 closeout evidence are still separate steps.
+- ✅ Step-review fix gate closed: run-level Wave9 deterministic probes are explicitly labeled with `evidenceKind=deterministic_probe` and `timelineSemantics=not_tick_sampled`; drilldown timeline `wave9` samples remain empty/default unless tick-accurate sampling exists, so final run-level counters are not retroactively stamped onto every sample. Commit/staging must exclude the unrelated `.gitignore` dirty diff.
+
 **Step 12B — final Wave 9 closeout evidence**
 
 | Session | Epic(s) | Prereq | Notes |

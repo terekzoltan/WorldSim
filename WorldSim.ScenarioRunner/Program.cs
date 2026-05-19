@@ -3,9 +3,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using WorldSim.ScenarioRunner.Refinery;
+using WorldSim.Runtime;
 using WorldSim.Runtime.Diagnostics;
 using WorldSim.Runtime.Profiles;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Military;
 
 var outputMode = ParseOutputMode(Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_OUTPUT"));
 var runLogBuffer = new StringBuilder();
@@ -51,6 +53,7 @@ foreach (var warning in parsedConfigs.Warnings)
     LogWarning(warning);
 var configs = parsedConfigs.Configs;
 var artifactDir = Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_ARTIFACT_DIR");
+const string InvalidWave9Scenario = "__invalid_wave9_scenario__";
 
 if (configs.Count == 0 && string.IsNullOrWhiteSpace(rawConfigsJson))
 {
@@ -172,12 +175,15 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 peakRoutingPeople = Math.Max(peakRoutingPeople, routingPeople);
             }
 
+            var wave9Telemetry = BuildWave9ScenarioTelemetry(config, planner, seed);
+
             var runResult = BuildRunResult(
                 world,
                 config,
                 planner,
                 seed,
                 visualLaneResolution.Effective,
+                wave9Telemetry,
                 tickTimesMs,
                 peakEntities,
                 peakActiveBattles,
@@ -253,6 +259,7 @@ static ScenarioRunResult BuildRunResult(
     NpcPlannerMode planner,
     int seed,
     LowCostProfileLane visualLane,
+    ScenarioWave9TelemetrySnapshot wave9Telemetry,
     List<double>? tickTimesMs,
     long peakEntities,
     int peakActiveBattles,
@@ -338,6 +345,7 @@ static ScenarioRunResult BuildRunResult(
         LastTickDenseActors: world.LastTickDenseActors,
         Contact: contactTelemetry,
         Ai: aiTelemetry,
+        Wave9: wave9Telemetry,
         PerfAvgTickMs: perfAvgTickMs,
         PerfMaxTickMs: perfMaxTickMs,
         PerfP99TickMs: perfP99TickMs,
@@ -361,6 +369,203 @@ static void ApplyEcologyBalanceConfig(World world, ScenarioConfig config)
 
     if (config.FoodRegrowthJitterSeconds.HasValue)
         world.FoodRegrowthJitterSeconds = config.FoodRegrowthJitterSeconds.Value;
+}
+
+static ScenarioWave9TelemetrySnapshot BuildWave9ScenarioTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    if (string.IsNullOrWhiteSpace(config.Wave9Scenario))
+        return ScenarioWave9TelemetrySnapshot.Empty;
+
+    return config.Wave9Scenario switch
+    {
+        "army_supply_depletion" => BuildArmySupplyDepletionTelemetry(config.Wave9Scenario, seed),
+        "carrier_resupply" => BuildCarrierResupplyTelemetry(config.Wave9Scenario, seed),
+        "campaign_foraging" => BuildCampaignForagingTelemetry(config.Wave9Scenario, seed),
+        "campaign_assembly_march_encounter" => BuildCampaignAssemblyMarchEncounterTelemetry(config, planner, seed),
+        _ => ScenarioWave9TelemetrySnapshot.Empty with { Wave9Scenario = config.Wave9Scenario }
+    };
+}
+
+static ScenarioWave9TelemetrySnapshot BuildArmySupplyDepletionTelemetry(string scenario, int seed)
+{
+    var world = new World(width: 16, height: 16, initialPop: 4, randomSeed: seed);
+    var members = world._people.Take(2).ToArray();
+    var state = new ArmySupplyState();
+    var options = new ArmySupplyOptions(
+        FoodConsumedPerPersonPerSecond: 1f,
+        OutOfSupplyMoraleLossPerSecond: 100f,
+        OutOfSupplyStaminaLossPerSecond: 100f,
+        RouteAfterOutOfSupplyTicks: 1,
+        RouteMoraleThreshold: 99f,
+        RouteStaminaThreshold: 99f,
+        RoutingTicks: 3);
+
+    var result = ArmySupplyModel.Tick(members, state, dt: 1f, options);
+    return (ScenarioWave9TelemetrySnapshot.Empty with
+    {
+        Wave9Scenario = scenario,
+        ActiveArmies = 1,
+        TotalArmyMembers = result.ActiveMemberCount,
+        SupplySourceMode = "carried_inventory",
+        OutOfSupplyTicks = result.IsOutOfSupply ? 1 : 0,
+        LowSupplyTicks = result.IsLowSupply ? 1 : 0,
+        SupplyAttritionEvents = result.AttritionEventCount,
+        SupplyRoutingEvents = result.RoutedMemberCount,
+        CampaignPhase = "none"
+    }).AsDeterministicProbe();
+}
+
+static ScenarioWave9TelemetrySnapshot BuildCarrierResupplyTelemetry(string scenario, int seed)
+{
+    var world = new World(width: 16, height: 16, initialPop: 4, randomSeed: seed);
+    var members = world._people.Take(2).ToArray();
+    foreach (var member in members)
+        _ = member.Inventory.TryAdd(ItemType.Food, 2);
+
+    var supplyState = new ArmySupplyState();
+    var carrierState = new ArmySupplyCarrierState();
+    var assigned = ArmySupplyCarrierModel.AssignCarrier(members[0], carrierState);
+    var carriedResult = ArmySupplyCarrierModel.TickCarriedInventory(
+        members,
+        supplyState,
+        carrierState,
+        tick: 1,
+        dt: 1f,
+        new ArmySupplyOptions(FoodConsumedPerPersonPerSecond: 1f));
+    var rationPool = new ArmyRationPoolState(rationPoolFood: 5);
+    var rationResult = ArmySupplyCarrierModel.TickRationPool(
+        members,
+        supplyState,
+        carrierState,
+        rationPool,
+        tick: 2,
+        dt: 1f,
+        new ArmySupplyOptions(FoodConsumedPerPersonPerSecond: 1f));
+
+    var carriedConsumed = carriedResult.CarriedInventoryResult?.FoodConsumed ?? 0;
+    var rationConsumed = rationResult.RationPoolResult?.FoodConsumed ?? 0;
+    return (ScenarioWave9TelemetrySnapshot.Empty with
+    {
+        Wave9Scenario = scenario,
+        ActiveArmies = 1,
+        TotalArmyMembers = members.Length,
+        TotalRationPoolFood = rationPool.RationPoolFood,
+        SupplySourceMode = "ration_pool",
+        MemberInventoryConsumed = carriedConsumed,
+        RationPoolConsumed = rationConsumed,
+        CarriedInventorySupplyTicks = carriedResult.Status == ArmySupplyCarrierTickStatus.Processed ? 1 : 0,
+        RationPoolSupplyTicks = rationResult.Status == ArmySupplyCarrierTickStatus.Processed ? 1 : 0,
+        CarrierAssignments = assigned.IsAssigned ? 1 : 0,
+        CarrierDeliveries = (carriedConsumed > 0 ? 1 : 0) + (rationConsumed > 0 ? 1 : 0),
+        ResupplyDelivered = carriedConsumed + rationConsumed,
+        CampaignPhase = "none"
+    }).AsDeterministicProbe();
+}
+
+static ScenarioWave9TelemetrySnapshot BuildCampaignForagingTelemetry(string scenario, int seed)
+{
+    var world = new World(width: 16, height: 16, initialPop: 2, randomSeed: seed);
+    var forager = world._people.OrderBy(person => person.Id).First();
+    var source = FindNearestForageSource(world, forager.Pos);
+    world.GetTile(source.x, source.y).ReplaceNode(new ResourceNode(Resource.Food, 6));
+    forager.Pos = source;
+
+    var pool = new ArmyRationPoolState();
+    var state = new ArmyForagingState();
+    var options = new ArmyForagingOptions(MaxFoodPerAttempt: 2, MaxFoodPerConsumer: 2);
+    var first = ArmyForagingModel.TryForageToRationPool(world, forager, pool, state, source.x, source.y, "army:wave9", options);
+    var second = ArmyForagingModel.TryForageToRationPool(world, forager, pool, state, source.x, source.y, "army:wave9", options);
+
+    return (ScenarioWave9TelemetrySnapshot.Empty with
+    {
+        Wave9Scenario = scenario,
+        ActiveArmies = 1,
+        TotalArmyMembers = 1,
+        TotalRationPoolFood = pool.RationPoolFood,
+        SupplySourceMode = "ration_pool",
+        CampaignForageAttempts = state.Attempts,
+        CampaignForageSuccesses = state.Successes,
+        CampaignForageFoodGained = state.FoodGained,
+        CampaignForageCapReached = second.FailureReason == ArmyForageFailureReason.ConsumerCapReached ? 1 : 0,
+        RationPoolConsumed = 0,
+        CampaignPhase = first.Status == ArmyForageStatus.Succeeded ? "none" : "unknown"
+    }).AsDeterministicProbe();
+}
+
+static (int x, int y) FindNearestForageSource(World world, (int x, int y) origin)
+{
+    for (var radius = 0; radius <= Math.Max(world.Width, world.Height); radius++)
+    {
+        for (var dy = -radius; dy <= radius; dy++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                if (Math.Abs(dx) + Math.Abs(dy) > radius)
+                    continue;
+
+                var x = origin.x + dx;
+                var y = origin.y + dy;
+                if (x < 0 || y < 0 || x >= world.Width || y >= world.Height)
+                    continue;
+                if (world.GetTile(x, y).Ground == Ground.Water)
+                    continue;
+                return (x, y);
+            }
+        }
+    }
+
+    throw new InvalidOperationException("Could not find a land tile for Wave 9 foraging scenario.");
+}
+
+static ScenarioWave9TelemetrySnapshot BuildCampaignAssemblyMarchEncounterTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = WithTemporaryEnvironment(
+        new Dictionary<string, string?>
+        {
+            ["WORLDSIM_ENABLE_DIPLOMACY"] = "true",
+            ["WORLDSIM_ENABLE_COMBAT_PRIMITIVES"] = "true"
+        },
+        () => new SimulationRuntime(
+            width: Math.Max(config.Width, 32),
+            height: Math.Max(config.Height, 32),
+            initialPopulation: Math.Max(config.InitialPop, 80),
+            technologyFilePath: FindTechPath(),
+            aiOptions: new RuntimeAiOptions { PlannerMode = planner },
+            randomSeed: seed));
+
+    _ = runtime.PrepareWave9CampaignScenario(Faction.Obsidari, candidateCount: 64, carriedFoodPerCandidate: 3);
+    var creation = runtime.TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1);
+    if (!creation.Success)
+        return (ScenarioWave9TelemetrySnapshot.Empty with { Wave9Scenario = config.Wave9Scenario ?? "campaign_assembly_march_encounter" }).AsDeterministicProbe();
+    runtime.DisableWave9CampaignScenarioCombatInvalidation();
+
+    var maxTicks = Math.Max(config.Ticks, 600);
+    for (var tick = 0; tick < maxTicks; tick++)
+    {
+        runtime.AdvanceTick(config.Dt);
+        var campaign = runtime.Campaigns.FirstOrDefault();
+        if (campaign?.Phase == CampaignPhase.Encounter)
+            break;
+    }
+
+    _ = runtime.GetSnapshot();
+    return runtime.BuildScenarioWave9TelemetrySnapshot(config.Wave9Scenario);
+}
+
+static T WithTemporaryEnvironment<T>(IReadOnlyDictionary<string, string?> values, Func<T> action)
+{
+    var previous = values.ToDictionary(pair => pair.Key, pair => Environment.GetEnvironmentVariable(pair.Key), StringComparer.Ordinal);
+    try
+    {
+        foreach (var pair in values)
+            Environment.SetEnvironmentVariable(pair.Key, pair.Value);
+        return action();
+    }
+    finally
+    {
+        foreach (var pair in previous)
+            Environment.SetEnvironmentVariable(pair.Key, pair.Value);
+    }
 }
 
 static void ApplySupplyScenarioConfig(World world, ScenarioConfig config)
@@ -1360,6 +1565,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
     var aiTelemetry = world.BuildScenarioAiTelemetrySnapshot().ToTimelineSnapshot();
     var ecologyTelemetry = world.BuildScenarioEcologyTelemetrySnapshot().ToTimelineSnapshot();
     var supplyTelemetry = world.BuildScenarioSupplyTelemetrySnapshot().ToTimelineSnapshot();
+    var wave9Telemetry = ScenarioWave9TimelineSnapshot.Empty;
 
     return new ScenarioTimelineSample(
         Tick: tick,
@@ -1382,6 +1588,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
         AiResearchTechDecisions: world.TotalAiResearchTechDecisions,
         Contact: contactTelemetry,
         Ai: aiTelemetry,
+        Wave9: wave9Telemetry,
         Ecology: ecologyTelemetry,
         Supply: supplyTelemetry,
         PerfTickMs: perfTickMs);
@@ -1539,9 +1746,17 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
                 continue;
             }
 
+            var normalizedWave9Scenario = NormalizeWave9Scenario(config.Wave9Scenario);
+            if (normalizedWave9Scenario == InvalidWave9Scenario)
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (Wave9Scenario must be null or one of: army_supply_depletion, carrier_resupply, campaign_foraging, campaign_assembly_march_encounter, or documented aliases). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
             configs.Add(config with
             {
-                Name = string.IsNullOrWhiteSpace(config.Name) ? $"config_{index + 1}" : config.Name
+                Name = string.IsNullOrWhiteSpace(config.Name) ? $"config_{index + 1}" : config.Name,
+                Wave9Scenario = normalizedWave9Scenario
             });
         }
 
@@ -1565,6 +1780,21 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
 static bool IsKnownSupplyScenario(string? supplyScenario)
     => string.IsNullOrWhiteSpace(supplyScenario)
        || string.Equals(supplyScenario, "storehouse_refill_consumption", StringComparison.OrdinalIgnoreCase);
+
+static string? NormalizeWave9Scenario(string? raw)
+{
+    if (string.IsNullOrWhiteSpace(raw))
+        return null;
+
+    return raw.Trim().ToLowerInvariant() switch
+    {
+        "army_supply_depletion" or "army-supply-depletion" => "army_supply_depletion",
+        "carrier_resupply" or "carrier-resupply" => "carrier_resupply",
+        "campaign_foraging" or "foraging-extension" or "campaign-foraging" => "campaign_foraging",
+        "campaign_assembly_march_encounter" or "campaign-assembly-march-encounter" => "campaign_assembly_march_encounter",
+        _ => InvalidWave9Scenario
+    };
+}
 
 static bool IsCoreScenarioLane(string? rawLane)
     => string.IsNullOrWhiteSpace(rawLane)
@@ -1665,7 +1895,8 @@ sealed record ScenarioConfig(
     float? PredatorReplenishmentChance = null,
     float? FoodRegrowthMinSeconds = null,
     float? FoodRegrowthJitterSeconds = null,
-    string? SupplyScenario = null);
+    string? SupplyScenario = null,
+    string? Wave9Scenario = null);
 
 sealed record ScenarioRunResult(
     string ConfigName,
@@ -1718,6 +1949,7 @@ sealed record ScenarioRunResult(
     int LastTickDenseActors,
     ScenarioContactTelemetrySnapshot Contact,
     ScenarioAiTelemetrySnapshot Ai,
+    ScenarioWave9TelemetrySnapshot? Wave9,
     double PerfAvgTickMs,
     double PerfMaxTickMs,
     double PerfP99TickMs,
@@ -1903,6 +2135,7 @@ sealed record ScenarioTimelineSample(
     int AiResearchTechDecisions,
     ScenarioContactTimelineSnapshot Contact,
     ScenarioAiTimelineSnapshot Ai,
+    ScenarioWave9TimelineSnapshot? Wave9,
     ScenarioEcologyTimelineSnapshot? Ecology,
     ScenarioSupplyTimelineSnapshot? Supply,
     double PerfTickMs);
