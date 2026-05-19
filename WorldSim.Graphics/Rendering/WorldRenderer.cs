@@ -13,6 +13,7 @@ public sealed class WorldRenderer
     private readonly IReadOnlyList<IRenderPass> _passes;
     private readonly RenderStats _renderStats = new();
     private readonly TerritoryOverlayPass _territoryOverlayPass = new();
+    private readonly CampaignOverlayPass _campaignOverlayPass = new();
     private readonly CombatOverlayPass _combatOverlayPass = new();
 
     public WorldRenderSettings Settings { get; }
@@ -21,6 +22,7 @@ public sealed class WorldRenderer
     public string RequestedVisualLane { get; private set; } = "DevLite";
     public PostFxSettings CurrentPostFxSettings { get; private set; } = new(false, PostFxQuality.Low);
     public bool TerritoryOverlayEnabled { get; set; }
+    public bool CampaignOverlayEnabled { get; set; }
     public bool CombatOverlayEnabled { get; set; }
 
     public WorldRenderer(WorldRenderSettings? settings = null, WorldRenderTheme? theme = null)
@@ -67,6 +69,7 @@ public sealed class WorldRenderer
         var visualPolicy = ResolveVisualPolicy(RequestedVisualLane);
 
         _territoryOverlayPass.Enabled = TerritoryOverlayEnabled;
+        _campaignOverlayPass.Enabled = CampaignOverlayEnabled;
         _combatOverlayPass.Enabled = CombatOverlayEnabled;
 
         var context = new RenderFrameContext(spriteBatch, snapshot, textures, Settings, Theme, _renderStats, visibleTileBounds, visualPolicy);
@@ -80,6 +83,10 @@ public sealed class WorldRenderer
         var territoryStarted = _renderStats.BeginPass();
         _territoryOverlayPass.Draw(in context);
         _renderStats.EndPass(_territoryOverlayPass.Name, territoryStarted);
+
+        var campaignStarted = _renderStats.BeginPass();
+        _campaignOverlayPass.Draw(in context);
+        _renderStats.EndPass(_campaignOverlayPass.Name, campaignStarted);
 
         var combatStarted = _renderStats.BeginPass();
         _combatOverlayPass.Draw(in context);

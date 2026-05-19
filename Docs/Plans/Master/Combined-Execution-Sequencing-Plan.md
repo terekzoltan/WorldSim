@@ -1947,7 +1947,7 @@ Split-status note:
 - ✅ **P6-A1** Campaign query boundary hardening (Track B mini-fix)
 - ✅ **P6-B** Assembly and rally points (Track B)
 - ✅ **P6-C** March system + encounters (Track B)
-- ⬜ **P6-D** Snapshot + overlays (Track B + A)
+- ✅ **P6-D** Snapshot + overlays (Track B + A)
 - ⬜ **Wave 9 SMR campaign/supply prep** ScenarioRunner army supply + campaign skeleton evidence surface (Track B / SMR Analyst validation)
 - ⬜ **Wave 9 SMR evidence** Army supply + campaign skeleton closeout package (SMR Analyst)
 
@@ -2081,13 +2081,16 @@ Wave 9 Step 10 progress note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent | P6-D (A part) | P6-D (B part) ✅ | Overlays consume the campaign snapshot once it is stable |
+| Track A agent | P6-D(A_part) ✅ | P6-D (B part) ✅ | Overlays consume the campaign snapshot once it is stable |
+
+Wave 9 Step 11 progress note:
+- ✅ `P6-D(A-part)` closed after manual smoke PASS: Track A campaign consume uses the structured `WorldRenderSnapshot.Campaigns` read model only. `Ctrl+F2` intentionally toggles both the Campaign panel and the campaign map overlay for this slice; empty-state panel/overlay smoke passed, and the invalid-anchor sentinel fix is in place (`AnchorActorId < 0` displays `anchor:none` and no bogus anchor-tied map marker is drawn at `(-1,-1)`). The low-cost map overlay uses no custom/content texture assets; it uses only the shared pixel texture for primitive drawing, without parsing `RecentEvents`, querying `SimulationRuntime.Campaigns`, or adding runtime/ScenarioRunner/AI/Refinery scope. Exact ETA and supply percentage remain out of scope until a future read-model expansion. Top-level `P6-D` is closed; Wave 9 SMR prep may open next.
 
 **Step 12A — SMR evidence surface before closeout**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | Wave 9 SMR prep - export/config | P5-G (B part) ✅ + P5-H (B part) ✅ + P6-D (B part) ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for army supply, carrier/resupply, foraging, and campaign skeleton evidence per `Wave9-10-SMR-Closeout-Plan.md` |
+| Track B agent | Wave 9 SMR prep - export/config | P5-G (B part) ✅ + P5-H (B part) ✅ + P6-D (B+A parts) ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for army supply, carrier/resupply, foraging, and campaign skeleton evidence per `Wave9-10-SMR-Closeout-Plan.md` |
 | SMR Analyst | Wave 9 SMR prep - validation | Track B export/config ✅ + P5-G (C part) ✅ + P5-H (C part) ✅ | Validate that the new artifact surface and deterministic lanes can prove runtime and AI-side Wave 9 behavior before the final closeout package |
 
 **Step 12B — final Wave 9 closeout evidence**

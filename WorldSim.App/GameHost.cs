@@ -771,6 +771,7 @@ public class GameHost : Game
         GraphicsDevice.Clear(_worldRenderer.Theme.Background);
 
         var snapshot = _runtime.GetSnapshot();
+        _worldRenderer.CampaignOverlayEnabled = _showCampaignPanel;
         _worldRenderer.Draw(_spriteBatch, snapshot, _camera, _textures);
 
         TechMenuView? techMenu = null;
@@ -880,7 +881,8 @@ public class GameHost : Game
                 _font,
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height,
-                _hudRenderer.Theme);
+                _hudRenderer.Theme,
+                snapshot);
             _spriteBatch.End();
         }
 

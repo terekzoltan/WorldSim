@@ -72,6 +72,24 @@ public class BoundaryRulesTests
     }
 
     [Fact]
+    public void CampaignGraphicsConsume_UsesSnapshotBoundaryOnly()
+    {
+        var files = new[]
+        {
+            "WorldSim.Graphics/Rendering/CampaignOverlayPass.cs",
+            "WorldSim.Graphics/UI/Panels/CampaignPanelRenderer.cs"
+        };
+
+        foreach (var file in files)
+        {
+            var content = Read(file);
+            Assert.DoesNotContain("RecentEvents", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("SimulationRuntime", content, StringComparison.Ordinal);
+            Assert.DoesNotContain("WorldSim.Simulation", content, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void AppGameHost_DoesNotUseDirectWorldOrTechTreeMutation()
     {
         var gameHost = Read("WorldSim.App/Game1.cs");

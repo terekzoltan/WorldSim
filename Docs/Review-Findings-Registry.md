@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-05-18 - Wave 9 P6-D(A) Campaign Overlay - Blocking - Invalid army anchor sentinel must not render as map coordinate
+
+- Track: Track A / Graphics campaign overlay and panel consume
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-D(A-part)`
+- Finding: `CampaignOverlayPass.DrawArmyMarker(...)` renders `ArmyRenderData.AnchorX/AnchorY` unconditionally, and `CampaignPanelRenderer` displays `anchor(x,y)` unconditionally. P6-D(B) read-model can validly export `AnchorActorId=-1`, `AnchorX=-1`, `AnchorY=-1` when no assigned/living anchor exists.
+- Impact: Pending/memberless campaigns can draw a bogus off-map/top-left marker and show misleading `anchor(-1,-1)` text, violating safe snapshot consume for default/sentinel campaign states.
+- Resolution / guidance: Before P6-D(A) closeout, guard `AnchorActorId < 0`; skip the army marker or use an explicit valid fallback such as route origin/rally with distinct pending styling, and display `anchor:none` in the panel. Include this case in focused review/manual smoke.
+- Status: fixed in P6-D(A) targeted Track A follow-up; manual smoke remains a separate closeout gate
+
+## 2026-05-18 - Wave 9 P6-D(A) Campaign Overlay - Minor - Low-cost wording should distinguish shared pixel texture from content textures
+
+- Track: Track A / Graphics campaign overlay documentation and handoff wording
+- Source: Meta + Swarm step-review synthesis for Wave 9 `P6-D(A-part)`
+- Finding: The handoff wording says the overlay uses "no textures", but `CampaignOverlayPass` correctly draws simple primitives with the shared `context.Textures.Pixel` texture.
+- Impact: The implementation remains low-cost, but the literal claim is imprecise and can confuse future reviewers about allowed primitive rendering.
+- Resolution / guidance: Use precise wording: "no custom/content texture assets; uses only the shared pixel texture for primitive drawing."
+- Status: fixed in P6-D(A) targeted Track A follow-up; wording now distinguishes shared pixel primitive drawing from custom/content texture assets
+
 ## 2026-05-18 - Wave 9 P6-D(B) Snapshot Handoff - Blocking - Interpolated snapshots must preserve Campaigns
 
 - Track: Track A / Graphics snapshot consume, discovered during Track B P6-D(B) handoff review
