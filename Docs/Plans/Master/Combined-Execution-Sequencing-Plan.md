@@ -2090,7 +2090,7 @@ Wave 9 Step 11 progress note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | Wave 9 SMR prep - export/config | P5-G (B part) ✅ + P5-H (B part) ✅ + P6-D (B+A parts) ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for army supply, carrier/resupply, foraging, and campaign skeleton evidence per `Wave9-10-SMR-Closeout-Plan.md` |
+| Track B agent | Wave-9-SMR-prep-export/config | P5-G (B part) ✅ + P5-H (B part) ✅ + P6-D (B+A parts) ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for army supply, carrier/resupply, foraging, and campaign skeleton evidence per `Wave9-10-SMR-Closeout-Plan.md` |
 | SMR Analyst | Wave 9 SMR prep - validation | Track B export/config ✅ + P5-G (C part) ✅ + P5-H (C part) ✅ | Validate that the new artifact surface and deterministic lanes can prove runtime and AI-side Wave 9 behavior before the final closeout package |
 
 **Step 12B — final Wave 9 closeout evidence**
