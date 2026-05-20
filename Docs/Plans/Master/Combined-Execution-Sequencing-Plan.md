@@ -2102,7 +2102,7 @@ Wave 9 Step 12A progress note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst | Wave 9 SMR evidence | P5-G (C part) ✅ + P5-H (B+C parts) ✅ + P6-D (A part) ✅ + Wave 9 SMR prep ✅ | Run and review Wave 9 all-around + targeted campaign/supply packages before Wave 10 kickoff; generic smoke alone is not sufficient |
+| SMR Analyst | Wave-9-SMR-evidence | P5-G (C part) ✅ + P5-H (B+C parts) ✅ + P6-D (A part) ✅ + Wave 9 SMR prep ✅ | Run and review Wave 9 all-around + targeted campaign/supply packages before Wave 10 kickoff; generic smoke alone is not sufficient |
 
 ---
 
