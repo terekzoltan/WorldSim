@@ -1949,7 +1949,7 @@ Split-status note:
 - ✅ **P6-C** March system + encounters (Track B)
 - ✅ **P6-D** Snapshot + overlays (Track B + A)
 - ✅ **Wave 9 SMR campaign/supply prep** ScenarioRunner army supply + campaign skeleton evidence surface (Track B / SMR Analyst validation)
-- ⬜ **Wave 9 SMR evidence** Army supply + campaign skeleton closeout package (SMR Analyst)
+- ✅ **Wave 9 SMR evidence** Army supply + campaign skeleton closeout package (SMR Analyst)
 
 **Parallelism:** C9 and C10 are **sequential** (C10 depends on supply model from C9).
 
@@ -2103,6 +2103,10 @@ Wave 9 Step 12A progress note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | SMR Analyst | Wave-9-SMR-evidence | P5-G (C part) ✅ + P5-H (B+C parts) ✅ + P6-D (A part) ✅ + Wave 9 SMR prep ✅ | Run and review Wave 9 all-around + targeted campaign/supply packages before Wave 10 kickoff; generic smoke alone is not sufficient |
+
+Wave 9 Step 12B closeout note:
+- ✅ `Wave-9-SMR-evidence` accepted by Meta after SMR Analyst GREEN recommendation: Package A `.artifacts/smr/all-around-smoke-wave9-001/` ran 27 peaceful all-around runs (`exitCode=0`, `assertionFailures=0`) and Package B `.artifacts/smr/wave9-campaign-supply-final-001/` ran 36 targeted Wave9 campaign/supply runs (`exitCode=0`, `assertionFailures=0`, `anomalyCount=0`, positive counters for supply depletion, carrier/resupply, bounded foraging, and campaign assembly/march/encounter). Evidence taxonomy is locked: Package A is organic peaceful regression pressure, Package B is deterministic Wave9 feature proof, and organic tick-sampled campaign/supply behavior remains outside the current evidence surface. Wave 9 closeout is accepted; Wave 10/P6-E is unblocked.
+- Residual monitoring route: Package A reported 12 non-blocking `ANOM-CLUSTER-HIGH-BACKOFF` warnings concentrated in medium/standard peaceful lanes. This did not block Wave 9 because survival/economy/AI health and targeted Wave9 proof were green, but Wave 10 SMR packages must continue ranking clustering/backoff signals and treat worsening movement/occupancy regressions as in-scope review evidence.
 
 ---
 
