@@ -1,6 +1,6 @@
 # Wave 9 Campaign/Supply SMR Prep
 
-Status: Track B prep surface implemented locally; SMR Analyst validation still required.
+Status: Step 12A prep surface implemented and SMR Analyst validation closed GREEN. This remains prep evidence only; final Wave 9 acceptance still requires Step 12B closeout evidence and Meta acceptance.
 
 ## Purpose
 
@@ -52,6 +52,12 @@ In particular, final run-level counters must not be retroactively stamped onto e
 
 This prep surface makes deterministic probes inspectable. It does not validate final Wave 9 behavior, organic AI endurance/foraging behavior, or full campaign closeout. SMR Analyst validation remains the required gate before any final Wave 9 acceptance claim.
 
+Validation result for Step 12A:
+- Artifact: `.artifacts/smr/wave9-campaign-supply-focused-001/` (local raw artifact, ignored; do not commit unless explicitly requested).
+- Matrix: 36 runs (`101,202,303` seeds x `simple,goap,htn` planners x 4 Wave9 configs).
+- Result: `exitCode=0`, `anomalyCount=0`, metadata mismatches `0`, positive lane evidence failures `0`, selected timeline bad Wave9 samples `0`, secrets findings `0`.
+- Decision: sufficient to unblock Step 12B final Wave 9 closeout evidence; not final Wave 9 acceptance.
+
 ## Semantics
 
 - `carrierDeliveries` means successful Wave 9 army supply application through the current carried-inventory/ration-pool model. It is not a Wave 10 convoy or supply-line delivery metric.
@@ -90,4 +96,4 @@ Expected inspection result:
 
 ## Closeout Boundary
 
-Track B prep evidence is not final Wave 9 acceptance. Final closeout requires SMR Analyst review per `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md` and Meta Coordinator acceptance.
+Track B prep evidence and Step 12A SMR validation are not final Wave 9 acceptance. Final closeout requires Step 12B SMR Analyst evidence per `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md` and Meta Coordinator acceptance.

@@ -1948,7 +1948,7 @@ Split-status note:
 - ✅ **P6-B** Assembly and rally points (Track B)
 - ✅ **P6-C** March system + encounters (Track B)
 - ✅ **P6-D** Snapshot + overlays (Track B + A)
-- ⬜ **Wave 9 SMR campaign/supply prep** ScenarioRunner army supply + campaign skeleton evidence surface (Track B / SMR Analyst validation)
+- ✅ **Wave 9 SMR campaign/supply prep** ScenarioRunner army supply + campaign skeleton evidence surface (Track B / SMR Analyst validation)
 - ⬜ **Wave 9 SMR evidence** Army supply + campaign skeleton closeout package (SMR Analyst)
 
 **Parallelism:** C9 and C10 are **sequential** (C10 depends on supply model from C9).
@@ -2096,6 +2096,7 @@ Wave 9 Step 11 progress note:
 Wave 9 Step 12A progress note:
 - ✅ `Wave-9-SMR-prep-export/config` targeted review fix accepted by Meta + Swarm re-review: ScenarioRunner keeps the normalized `Wave9Scenario` config surface (underscore canonical names plus documented aliases including `campaign-foraging`), a nullable/default-safe run-level `wave9` artifact block, and deterministic prep lanes for army supply depletion, carrier/resupply, campaign foraging, and campaign assembly/march/encounter. This remains Track B prep evidence only; SMR Analyst validation and final Wave 9 closeout evidence are still separate steps.
 - ✅ Step-review fix gate closed: run-level Wave9 deterministic probes are explicitly labeled with `evidenceKind=deterministic_probe` and `timelineSemantics=not_tick_sampled`; drilldown timeline `wave9` samples remain empty/default unless tick-accurate sampling exists, so final run-level counters are not retroactively stamped onto every sample. Commit/staging must exclude the unrelated `.gitignore` dirty diff.
+- ✅ SMR Analyst prep validation closed GREEN: local raw artifact `.artifacts/smr/wave9-campaign-supply-focused-001/` ran the 36-run matrix (3 seeds x 3 planners x 4 Wave9 configs) with `exitCode=0`, `anomalyCount=0`, metadata mismatches `0`, positive lane evidence failures `0`, selected timeline bad Wave9 samples `0`, and secrets findings `0`. This unblocks Step 12B final Wave 9 closeout evidence, but is not final Wave 9 acceptance.
 
 **Step 12B — final Wave 9 closeout evidence**
 
