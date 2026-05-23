@@ -218,6 +218,7 @@ public sealed class SimulationRuntime
             SupplyRoutingEvents: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.SupplyRoutingEvents),
             CarrierAssignments: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.CarrierAssignments),
             CarrierDeliveries: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.CarrierDeliveries),
+            CarrierSupplyApplications: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.CarrierDeliveries),
             ResupplyDelivered: _campaigns.Sum(campaign => campaign.Army.Wave9Evidence.ResupplyDelivered),
             CampaignForageAttempts: _campaigns.Sum(campaign => campaign.Army.ForagingState.Attempts),
             CampaignForageSuccesses: _campaigns.Sum(campaign => campaign.Army.ForagingState.Successes),
@@ -730,9 +731,7 @@ public sealed class SimulationRuntime
         if (campaign.Army.MemberCount == 0)
             return false;
 
-        bool rosterCanGrow = campaign.Army.MemberCount < campaign.Army.RequestedMemberCount
-            && FindNextCampaignAssemblyMember(campaign, blockedCampaignActorIds) != null;
-        if (rosterCanGrow)
+        if (campaign.Army.MemberCount < campaign.Army.RequestedMemberCount)
             return false;
 
         var rally = (x: campaign.Army.RallyX, y: campaign.Army.RallyY);

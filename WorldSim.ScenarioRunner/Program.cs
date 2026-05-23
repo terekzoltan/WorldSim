@@ -444,6 +444,7 @@ static ScenarioWave9TelemetrySnapshot BuildCarrierResupplyTelemetry(string scena
 
     var carriedConsumed = carriedResult.CarriedInventoryResult?.FoodConsumed ?? 0;
     var rationConsumed = rationResult.RationPoolResult?.FoodConsumed ?? 0;
+    var supplyApplications = (carriedConsumed > 0 ? 1 : 0) + (rationConsumed > 0 ? 1 : 0);
     return (ScenarioWave9TelemetrySnapshot.Empty with
     {
         Wave9Scenario = scenario,
@@ -456,7 +457,8 @@ static ScenarioWave9TelemetrySnapshot BuildCarrierResupplyTelemetry(string scena
         CarriedInventorySupplyTicks = carriedResult.Status == ArmySupplyCarrierTickStatus.Processed ? 1 : 0,
         RationPoolSupplyTicks = rationResult.Status == ArmySupplyCarrierTickStatus.Processed ? 1 : 0,
         CarrierAssignments = assigned.IsAssigned ? 1 : 0,
-        CarrierDeliveries = (carriedConsumed > 0 ? 1 : 0) + (rationConsumed > 0 ? 1 : 0),
+        CarrierDeliveries = supplyApplications,
+        CarrierSupplyApplications = supplyApplications,
         ResupplyDelivered = carriedConsumed + rationConsumed,
         CampaignPhase = "none"
     }).AsDeterministicProbe();

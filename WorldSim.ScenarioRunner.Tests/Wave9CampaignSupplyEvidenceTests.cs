@@ -210,7 +210,8 @@ public sealed class Wave9CampaignSupplyEvidenceTests
         var carrier = Wave9For(runs, "carrier_resupply");
         AssertDeterministicProbeMetadata(carrier);
         Assert.True(carrier.GetProperty("carrierAssignments").GetInt32() > 0);
-        Assert.True(carrier.GetProperty("carrierDeliveries").GetInt32() > 0);
+        Assert.True(carrier.GetProperty("carrierSupplyApplications").GetInt32() > 0);
+        Assert.Equal(carrier.GetProperty("carrierSupplyApplications").GetInt32(), carrier.GetProperty("carrierDeliveries").GetInt32());
         Assert.True(carrier.GetProperty("memberInventoryConsumed").GetInt32() > 0);
         Assert.True(carrier.GetProperty("rationPoolConsumed").GetInt32() > 0);
 
@@ -250,6 +251,7 @@ public sealed class Wave9CampaignSupplyEvidenceTests
         Assert.True(wave9.TryGetProperty("rationPoolConsumed", out _));
         Assert.True(wave9.TryGetProperty("carrierAssignments", out _));
         Assert.True(wave9.TryGetProperty("carrierDeliveries", out _));
+        Assert.True(wave9.TryGetProperty("carrierSupplyApplications", out _));
         Assert.True(wave9.TryGetProperty("campaignForageAttempts", out _));
         Assert.True(wave9.TryGetProperty("campaignForageFoodGained", out _));
         Assert.True(wave9.TryGetProperty("campaignAssemblingTicks", out _));

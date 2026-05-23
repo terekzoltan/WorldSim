@@ -333,6 +333,36 @@ public sealed class Wave9CampaignRuntimeTests
     }
 
     [Fact]
+    public void AdvanceTick_IncompleteRosterDoesNotCompleteAssemblyOrChurnLifecycleCounters()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetAllCampaignCandidatesIneligible(runtime);
+        var candidate = GetPeople(GetWorld(runtime), Faction.Obsidari).First();
+        candidate.Profession = Profession.Hunter;
+
+        var result = runtime.TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 3);
+        Assert.True(result.Success);
+        DisableCombatResolutionForCampaignTest(runtime);
+
+        for (var i = 0; i < 80; i++)
+            runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(runtime.Campaigns);
+        var wave9 = runtime.BuildScenarioWave9TelemetrySnapshot("partial_roster_regression");
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
+        Assert.False(campaign.Army.IsAssembled);
+        Assert.Equal(1, campaign.Army.AssignedMemberCount);
+        Assert.Equal(3, campaign.Army.RequestedMemberCount);
+        Assert.Equal(-1, campaign.Army.AssemblyCompletedTick);
+        Assert.Equal(0, wave9.AssemblyCompletedCount);
+        Assert.Equal(0, wave9.MarchStartedCount);
+        Assert.Equal(0, wave9.CampaignsReturnedOrAborted);
+        Assert.Equal(0, campaign.RouteCounters.MarchProgressTicks);
+        Assert.Equal(0, wave9.CampaignRouteProgress);
+    }
+
+    [Fact]
     public void AdvanceTick_AssemblyExcludesAssignedRoutingAndCombatActors()
     {
         var runtime = CreateRuntime();

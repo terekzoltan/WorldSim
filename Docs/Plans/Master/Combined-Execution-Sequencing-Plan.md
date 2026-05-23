@@ -2105,8 +2105,12 @@ Wave 9 Step 12A progress note:
 | SMR Analyst | Wave-9-SMR-evidence | P5-G (C part) ✅ + P5-H (B+C parts) ✅ + P6-D (A part) ✅ + Wave 9 SMR prep ✅ | Run and review Wave 9 all-around + targeted campaign/supply packages before Wave 10 kickoff; generic smoke alone is not sufficient |
 
 Wave 9 Step 12B closeout note:
-- ✅ `Wave-9-SMR-evidence` accepted by Meta after SMR Analyst GREEN recommendation: Package A `.artifacts/smr/all-around-smoke-wave9-001/` ran 27 peaceful all-around runs (`exitCode=0`, `assertionFailures=0`) and Package B `.artifacts/smr/wave9-campaign-supply-final-001/` ran 36 targeted Wave9 campaign/supply runs (`exitCode=0`, `assertionFailures=0`, `anomalyCount=0`, positive counters for supply depletion, carrier/resupply, bounded foraging, and campaign assembly/march/encounter). Evidence taxonomy is locked: Package A is organic peaceful regression pressure, Package B is deterministic Wave9 feature proof, and organic tick-sampled campaign/supply behavior remains outside the current evidence surface. Wave 9 closeout is accepted; Wave 10/P6-E is unblocked.
+- ✅ `Wave-9-SMR-evidence` accepted by Meta after SMR Analyst GREEN recommendation: Package A `.artifacts/smr/all-around-smoke-wave9-001/` ran 27 peaceful all-around runs (`exitCode=0`, `assertionFailures=0`) and Package B `.artifacts/smr/wave9-campaign-supply-final-001/` ran 36 targeted Wave9 campaign/supply runs (`exitCode=0`, `assertionFailures=0`, `anomalyCount=0`, positive counters for supply depletion, carrier/resupply, bounded foraging, and campaign assembly/march/encounter). Evidence taxonomy is locked: Package A is organic peaceful regression pressure, Package B is deterministic Wave9 feature proof, and organic tick-sampled campaign/supply behavior remains outside the current evidence surface. Wave 9 closeout was accepted at Step 12B, and the subsequent deep-review preflight gate below is now closed GREEN.
 - Residual monitoring route: Package A reported 12 non-blocking `ANOM-CLUSTER-HIGH-BACKOFF` warnings concentrated in medium/standard peaceful lanes. This did not block Wave 9 because survival/economy/AI health and targeted Wave9 proof were green, but Wave 10 SMR packages must continue ranking clustering/backoff signals and treat worsening movement/occupancy regressions as in-scope review evidence.
+
+Post-Wave9 deep-review preflight gate for Wave 10/P6-E:
+- ✅ Preflight fix accepted by Meta re-review: strict requested-strength semantics are now the Wave9/Wave10 preflight invariant, so campaigns with `requestedMemberCount > eligible candidates` remain in assembly and cannot mark assembly complete, enter marching, increment returned/aborted churn, or record route progress until the requested roster is filled. Focused runtime regression covers `AssemblyCompletedCount`, `MarchStartedCount`, `CampaignsReturnedOrAborted`, and `MarchProgressTicks` staying zero for incomplete rosters.
+- ✅ Preflight evidence semantics cleanup accepted by Meta re-review: Wave 9 carrier/resupply evidence is documented and tested as carrier assignment plus model-level supply-source application (`carrierSupplyApplications` / compatibility `carrierDeliveries`), not actual actor command/path delivery. Actual carrier delivery command/path remains unproven and out of Wave9 scope unless separately implemented. `P6-E` proper is unblocked.
 
 ---
 
@@ -2155,7 +2159,7 @@ Audit hardening source:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P6-E | Wave 9 ✅ | Campaign siege flow must exist before resolution or campaign-AI/UI follow-ups |
+| Track B agent | P6-E | Wave 9 ✅ + post-Wave9 deep-review preflight findings closed/downgraded | Campaign siege flow must exist before resolution or campaign-AI/UI follow-ups |
 
 **Step 2 — opens when P6-E ✅**
 

@@ -1,6 +1,8 @@
 # Wave 9 Final SMR Closeout
 
-Status: GREEN. Wave 9 closeout accepted by Meta after SMR Analyst evidence review. Wave 10 / P6-E may start.
+Status at Step 12B closeout: GREEN. Wave 9 closeout was accepted by Meta after SMR Analyst evidence review.
+
+Post-closeout deep-review note: subsequent Meta deep review routed two Wave 10 / P6-E preflight findings into the Combined plan: partial-roster campaign lifecycle churn, and carrier/resupply evidence semantics. Track B implemented the preflight fix and Meta re-review accepted it GREEN. Treat this README as Step 12B evidence history plus caveats; Wave 10 / P6-E readiness is governed by the Combined plan.
 
 This is final Wave 9 closeout evidence, not a baseline-compare claim. Baseline path: none.
 
@@ -26,7 +28,7 @@ Package B: `.artifacts/smr/wave9-campaign-supply-final-001/` (local raw artifact
 
 - Did armies consume supply? Yes, targeted package counters were positive.
 - Did low supply affect morale, stamina, retreat, route, or campaign behavior? Yes, supply depletion produced positive out-of-supply, attrition, and routing counters.
-- Did carrier/resupply behavior execute? Yes, carrier assignments, deliveries, member inventory consumption, ration pool consumption, and resupply delivered counters were positive.
+- Did carrier/resupply proof execute? Carrier assignment plus carried-inventory/ration-pool model-level supply-source application probes executed and counters were positive (`carrierSupplyApplications`; compatibility field `carrierDeliveries`). Actual carrier delivery command/path behavior was not proven by Wave 9 and remains out of Wave9 scope unless separately implemented.
 - Did foraging extend campaigns without becoming infinite food? Bounded foraging proof was positive: attempts, successes, food gained, and cap-reached evidence were present.
 - Did campaigns assemble, march, and encounter targets? Yes, campaign launch, assembly completion, march start/progress, and encounter counters were positive.
 - Did campaign state remain deterministic and non-stuck? Targeted package completed all 36 runs with no anomalies and positive lifecycle counters across all seeds/planners.
@@ -36,9 +38,11 @@ Package B: `.artifacts/smr/wave9-campaign-supply-final-001/` (local raw artifact
 
 - Organic campaign/supply tick-sampled behavior remains unknown; current Wave9 proof combines organic peaceful regression pressure with deterministic feature probes.
 - Package A is peaceful and does not fully cover combat/siege side effects.
+- Partial-roster campaign churn was accepted fixed by Meta preflight re-review: requested member count is required march strength, incomplete rosters remain in assembly, and abort/timeout policy is a later Wave 10 design decision.
+- Carrier/resupply evidence was accepted fixed by Meta preflight re-review as model-level supply application proof, not actual actor command/path delivery proof.
 - Package A reported 12 `ANOM-CLUSTER-HIGH-BACKOFF` warnings concentrated in medium/standard lanes. This is not a Wave9 blocker because survival/economy/AI health stayed green and targeted Wave9 proof passed. Route: Wave 10 SMR packages must continue ranking clustering/backoff signals and treat worsening movement/occupancy regressions as in-scope review evidence.
 - Raw artifacts remain local-only and ignored.
 
 ## Decision
 
-Wave 9 closeout is accepted. Wave 10 / P6-E may start. Final Wave 10 acceptance will require its own SMR prep and closeout gates.
+Wave 9 Step 12B evidence was accepted, and the post-Wave9 deep-review preflight gate for `W9-DR-001/002` is now closed GREEN. Wave 10 / P6-E may start. Final Wave 10 acceptance will require its own SMR prep and closeout gates.

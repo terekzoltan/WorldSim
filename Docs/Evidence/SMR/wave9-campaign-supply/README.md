@@ -36,7 +36,7 @@ Run-level and per-run JSON include a nullable/default-safe `wave9` block. When `
 
 The run-level block has dedicated counters for:
 - army supply depletion and source-specific consumption
-- carrier assignments and Wave 9 carrier delivery semantics
+- carrier assignments and Wave 9 model-level carrier supply application semantics
 - campaign foraging attempts/success/food gained/cap evidence
 - campaign launch, assembly, march, route progress, and encounter evidence
 
@@ -60,7 +60,7 @@ Validation result for Step 12A:
 
 ## Semantics
 
-- `carrierDeliveries` means successful Wave 9 army supply application through the current carried-inventory/ration-pool model. It is not a Wave 10 convoy or supply-line delivery metric.
+- `carrierSupplyApplications` means successful Wave 9 army supply application through the current carried-inventory/ration-pool model. The compatibility field `carrierDeliveries` reports the same application count but does not prove actual actor command/path delivery, Wave 10 convoy delivery, or supply-line delivery.
 - `supplySourceMode` is the last/effective source mode; source-specific counters (`memberInventoryConsumed`, `rationPoolConsumed`, `carriedInventorySupplyTicks`, `rationPoolSupplyTicks`) are the stronger multi-tick proof.
 - `campaign_foraging` is a deterministic model/runtime evidence hook. It is not a claim that organic AI foraging or campaign endurance extension is validated; that belongs to the SMR Analyst validation matrix.
 - `campaign_assembly_march_encounter` uses the `SimulationRuntime` campaign path (`TryCreateCampaign`, `AdvanceTick`, `Campaigns`, `GetSnapshot`) and avoids raw `World.Update` as campaign proof.

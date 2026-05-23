@@ -26,6 +26,33 @@ Severity guide:
 
 Entries:
 
+## 2026-05-21 - Wave 9 Deep Review - Major - Partial campaign rosters must not complete then churn
+
+- Track: Track B / Runtime campaign lifecycle
+- Source: Meta deep-review synthesis for Wave 9, after external Swarm GREEN review
+- Finding: `IsCampaignAssemblyComplete(...)` can mark assembly complete when a non-empty roster cannot grow, even if `MemberCount < RequestedMemberCount`; marching validation then immediately returns understrength campaigns to assembly. This can create assembly-complete / march-start / returned-or-aborted churn with no real route progress for campaigns that requested more members than are eligible.
+- Impact: Wave 10 siege integration could inherit misleading campaign lifecycle counters or a stuck campaign loop, especially once larger campaign rosters become common.
+- Resolution / guidance: Before Wave 10 `P6-E` starts, add a focused regression with `requestedMemberCount > eligible candidates` and align the invariant: either require full requested roster before `MarkAssemblyComplete(...)`, or explicitly support partial campaigns and update marching validation/counters accordingly.
+- Status: fixed and accepted in Meta P6-E preflight re-review; strict requested-strength regression added; `P6-E` proper unblocked
+
+## 2026-05-21 - Wave 9 Deep Review - Major - Carrier/resupply evidence must not overclaim delivery semantics
+
+- Track: Track B + SMR/Meta / ScenarioRunner Wave 9 SMR evidence semantics
+- Source: Meta deep-review synthesis for Wave 9, after external Swarm GREEN review
+- Finding: The deterministic `carrier_resupply` lane proves carrier assignment plus direct carried-inventory/ration-pool supply-source consumption, but the final evidence wording and counters use delivery/resupply language. Runtime AI still leaves `SupplyCarrierCanDeliver=false`, so actual carrier delivery command/path behavior is not proven by Wave 9.
+- Impact: Wave 10 planning may incorrectly treat carrier delivery/resupply as proven runtime behavior and build logistics or convoy assumptions on an evidence overclaim.
+- Resolution / guidance: Before Wave 10 `P6-E` starts, reword/additively clarify Wave 9 evidence and counters as carrier assignment + supply-source consumption probes, or add a focused probe that proves actual delivery semantics before claiming delivery/resupply executed.
+- Status: fixed and accepted in Meta P6-E preflight re-review via additive `carrierSupplyApplications` evidence and wording cleanup; actual actor command/path delivery remains unproven/out of Wave9 scope
+
+## 2026-05-21 - Wave 9 Deep Review - Minor - Retired hardening plan should not look like active frontier
+
+- Track: Meta / documentation state
+- Source: Meta deep-review synthesis for Wave 9
+- Finding: `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md` still says the implementation frontier is `P5-G (B part)` and uses unchecked task scaffolding, while Combined and evidence docs mark Wave 9 closed.
+- Impact: External reviewers or future Track agents may mistake a retired acceptance-detail plan for current sequence authority.
+- Resolution / guidance: Mark the hardening plan as historical/retired or add a top-level pointer to Combined as the current source of truth during the next docs cleanup.
+- Status: open; routed to Meta docs cleanup after P6-E preflight blockers are handled
+
 ## 2026-05-19 - Wave 9 SMR Prep Export/Config - Blocking - Drilldown timeline must not stamp final Wave9 counters onto every sample
 
 - Track: Track B / ScenarioRunner Wave 9 SMR evidence surface
