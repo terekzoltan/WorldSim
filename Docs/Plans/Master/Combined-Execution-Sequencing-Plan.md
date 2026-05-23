@@ -2122,6 +2122,9 @@ SMR closeout source of truth:
 Audit hardening source:
 - `Docs/Plans/Master/Wave10-Campaign-Logistics-Hardening-Plan.md`
 
+Wave 10 SMR evidence guardrail:
+- Every Wave 10 SMR prep surface must include a lane manifest: for each lane/config, document purpose, proof type (`organic` vs `deterministic_probe`), required counters, expected positive/zero assertions, and explicit non-claims. Do not use deterministic probes as organic campaign/siege proof.
+
 ### Sprint C11: Campaign Siege + Resolution (Track B -> C -> A)
 
 > Combat Plan > Phase 6 Sprint 11

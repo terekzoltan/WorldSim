@@ -55,7 +55,7 @@ At a wave boundary, after a major review, or when the user asks, Meta should tri
 ```text
 ### YYYY-MM-DD - Short Title
 
-Status: inbox
+Status: merged into `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` Wave 10 SMR evidence guardrail
 Area: SMR | process | tooling | runtime | graphics | AI | refinery | docs | other
 Source context: <where this came from>
 Idea: <what to consider>
@@ -74,8 +74,8 @@ Area: SMR
 Source context: Wave 9 Step 12A SMR prep validation used a compact `3 seeds x 3 planners x 4 scenarios = 36 runs` matrix.
 Idea: Add a standard lane manifest section to future SMR package docs explaining why each matrix axis exists: seeds, planners, configs, duration, world size, and expected proof counters.
 Why it matters: Makes SMR packages easier to review and prevents accidental over- or under-sampling.
-Suggested Meta action: merge into `Docs/Plans/Master/SMR-Minimum-Ops-Checklist.md` or future Wave 9/10 SMR evidence docs if useful.
-Suggested revisit trigger: before Step 12B final Wave 9 closeout evidence.
+Suggested Meta action: merged as a Wave 10 guardrail; broader checklist/tooling polish remains optional later work.
+Suggested revisit trigger: during Wave 10 SMR prep review, verify each new lane/config has purpose, proof type, required counters, expected positive/zero assertions, and explicit non-claims.
 Evidence pointers: `Docs/Evidence/SMR/wave9-campaign-supply/README.md`, `.artifacts/smr/wave9-campaign-supply-focused-001/`.
 
 ### 2026-05-20 - Automatic SMR Coverage Summary
@@ -121,3 +121,59 @@ Why it matters: Keeps prep validation cheap while preserving stronger final acce
 Suggested Meta action: defer until after Wave 9 final evidence, then decide whether to make it a general Wave 10+ SMR pattern.
 Suggested revisit trigger: after Step 12B final Wave 9 closeout review.
 Evidence pointers: `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`, `.artifacts/smr/wave9-campaign-supply-focused-001/`.
+
+### 2026-05-20 - SMR Balance Lab As First-Class Headless Workflow
+
+Status: inbox
+Area: SMR / tooling / process / runtime
+Source context: Wave 9 Step 12B SMR evidence showed that SMR now supports broad health packages plus targeted deterministic feature proof, but deeper balance diagnosis still depends on manual review. Existing docs already contain partial balance infrastructure (`Balance-Loop-Specification.md`, `Session-Balance-QA-Plan.md`, `SMR-M2-Evidence-Review-Protocol.md`, `balance-surface.md`), but there is no active Combined-plan slice that makes "SMR as Balance Lab" a first-class near-future goal.
+Idea: Promote SMR from evidence runner into a headless-first Balance Lab. The first useful version should not be a visual dashboard and should not auto-tune. It should consume existing SMR artifacts and produce analyst-grade scorecards plus human-reviewed tuning suggestions.
+Why it matters: The highest-value use of SMR is not only pass/fail regression gating, but balance diagnosis: identifying unstable seeds/planners/configs, explaining why a lane is unhealthy, comparing against baseline or holdout runs, and suggesting bounded tuning candidates without masking structural bugs as "balance changes".
+Suggested Meta action: promote into a dedicated future addendum or Combined-plan slice after current Wave 9/10 closeout pressure stabilizes. Likely placement: after Wave 10 closeout or as Wave 11 ecology-prep, because the first domain focus should be ecology plus general health.
+Suggested revisit trigger: after Wave 9 final closeout acceptance, or before Wave 11 closed-loop ecology planning.
+Evidence pointers: `Docs/Plans/Master/Balance-Loop-Specification.md`, `Docs/Plans/Session-Balance-QA-Plan.md`, `Docs/Plans/Master/SMR-M2-Evidence-Review-Protocol.md`, `Docs/Plans/Master/balance-surface.md`, `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md`, `.artifacts/smr/all-around-smoke-wave9-001/`, `.artifacts/smr/wave9-campaign-supply-final-001/`.
+
+Proposed scope:
+- Headless-first Balance Lab; visual lab much later only if artifact/replay leverage is proven.
+- First domains: ecology plus general health.
+- Inputs: existing SMR artifact bundles (`summary.json`, `assertions.json`, `anomalies.json`, `compare.json`, `perf.json`, `drilldown/index.json`).
+- Outputs: `balance-scorecard.json`, optional `balance-suggestions.json`, and a standard analyst report section.
+- Suggestions are advisory only. Meta decides whether a finding is bug, tuning candidate, threshold/policy update, baseline refresh, or insufficient evidence.
+- No auto-tuning, no automatic config writes, and no baseline refresh coupling.
+
+Proposed phased plan:
+- `BL-0`: consolidate existing balance docs into one current source-of-truth note; mark stale parts of `Session-Balance-QA-Plan.md` as superseded where needed.
+- `BL-1`: define a Balance Lab scorecard schema over existing SMR artifacts. Include survival, economy, ecology, clustering/backoff, AI no-plan/replan, planner variance, seed variance, and scenario coverage.
+- `BL-2`: add a headless analyzer mode or standalone artifact analyzer that reads one or more artifact dirs and produces ranked findings plus "why this matters" summaries.
+- `BL-3`: add human-reviewed tuning suggestion rules. Example: if predator zero windows improve but herbivore zero windows regress, classify as ecology tradeoff, not automatic success.
+- `BL-4`: add holdout validation policy. Every tuning suggestion must name the trigger matrix, proposed tuning surface, expected metric movement, and holdout matrix.
+- `BL-5`: connect to `balance-surface.md`. Only suggest changes for parameters classified `safe` or explicitly approved `guarded`; never suggest changes for `blocked` structural logic.
+- `BL-6`: optional later visual lab. Only after headless scorecards prove useful, add replay/drilldown viewer or dashboard consuming existing artifacts.
+
+Initial acceptance criteria:
+- The analyzer can consume at least two existing SMR packages and emit a ranked scorecard without rerunning the sim.
+- The scorecard distinguishes hard failures, warnings, advisory drift, and unknowns.
+- The scorecard explicitly separates regression evidence from balance interpretation.
+- Suggestions include confidence, affected domain, candidate parameter surface, expected direction, and required holdout.
+- No suggestion mutates code/config automatically.
+- Baseline path and compare availability are explicit.
+- The ecology/general-health first matrix is documented with seeds/planners/configs.
+- Meta can use the output to decide: bug fix, tuning candidate, threshold update, baseline refresh, or more evidence needed.
+
+Non-goals:
+- No visual dashboard in the first slice.
+- No auto-tuning loop.
+- No LLM/Director-driven balance writes.
+- No broad gameplay rebalance.
+- No treating deterministic feature probes as organic balance proof.
+- No canonical baseline update without Meta review.
+
+Risks:
+- False authority: the scorecard may look more objective than the underlying metrics justify.
+- Overfitting: suggestions optimized to one matrix may regress holdout lanes.
+- Bug masking: structural bugs could be mislabeled as tuning candidates.
+- Scope creep: a visual lab/dashboard can consume Track A bandwidth before headless value is proven.
+- Baseline drift: canonical baseline refresh must remain a Meta-owned decision.
+
+Suggested first concrete slice:
+- Create a headless `balance-lab` artifact-analysis plan focused on ecology plus general health. It should read existing artifact dirs, compute a balance scorecard, rank worst runs, classify evidence gaps, and produce human-reviewed tuning suggestions without changing runtime behavior.
