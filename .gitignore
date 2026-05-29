@@ -37,6 +37,7 @@ packages/
 
 # Other
 .opencode/
+.opencode-router/
 *.tmp
 *.bak
 *.swp
