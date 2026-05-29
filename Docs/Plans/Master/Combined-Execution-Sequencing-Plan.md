@@ -2129,7 +2129,7 @@ Wave 10 SMR evidence guardrail:
 
 > Combat Plan > Phase 6 Sprint 11
 
-- ⬜ **P6-E** Siege integration in campaign flow (Track B)
+- ✅ **P6-E** Siege integration in campaign flow (Track B)
 - ⬜ **P6-F** Resolution — loot, war score, peace (Track B)
 - ⬜ **P6-G** Strategic campaign AI (Track C)
 - ⬜ **P6-H** Campaign UI polish (Track A)
@@ -2164,11 +2164,13 @@ Wave 10 SMR evidence guardrail:
 |---------|---------|--------|-------|
 | Track B agent | P6-E | Wave 9 ✅ + post-Wave9 deep-review preflight findings closed/downgraded | Campaign siege flow must exist before resolution or campaign-AI/UI follow-ups |
 
+- ✅ `P6-E` accepted GREEN by Meta + external Swarm deep-review synthesis. Campaign encounters integrate with World siege state while preserving Track B boundaries: non-breached suppression clears campaign target identity (`TargetStructureId`, `DefenderColonyId`, `ObservedSiegeId`), breached state remains sticky, same-pair driver/takeover behavior is deterministic, and focused regressions cover disabled-after-target-acquired -> breach while disabled -> re-enable plus same-pair suppressed prior driver inheritance. P6-F is now unblocked for Track B kickoff. Unrelated `AGENTS.md` and `.opencode-router/` must not be staged with the scoped P6-E commit.
+
 **Step 2 — opens when P6-E ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P6-F | P6-E ✅ | Resolution rules depend on the campaign reaching siege/engagement outcomes |
+| Track B agent | P6-F | P6-E ✅ | Resolution rules depend on campaign-owned siege/engagement outcomes; do not treat raw pair-keyed World active siege `Status` as independent target-level campaign truth |
 
 **Step 3 — opens when P6-F ✅**
 

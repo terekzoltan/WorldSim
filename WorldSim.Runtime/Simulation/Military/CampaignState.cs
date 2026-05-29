@@ -12,6 +12,15 @@ public enum CampaignPhase
     Resolved
 }
 
+public enum CampaignSiegeStatus
+{
+    None,
+    SeekingTarget,
+    Active,
+    Breached,
+    NoTarget
+}
+
 public enum CampaignCreationStatus
 {
     Created,
@@ -86,6 +95,7 @@ public sealed class CampaignState
     public CampaignRouteCounters RouteCounters { get; } = new();
     internal NavigationPathCache RouteCache { get; } = new();
     public ArmyState Army { get; }
+    public CampaignSiegeState Siege { get; } = new();
     public CampaignWave9EvidenceCounters Wave9Evidence { get; } = new();
 
     internal void BeginAssembly(long tick)
@@ -136,6 +146,89 @@ public sealed class CampaignState
 
     internal void RecordWave9PhaseTick()
         => Wave9Evidence.RecordPhaseTick(Phase);
+}
+
+public sealed class CampaignSiegeState
+{
+    public CampaignSiegeStatus Status { get; private set; } = CampaignSiegeStatus.None;
+    public int TargetStructureId { get; private set; } = -1;
+    public int DefenderColonyId { get; private set; } = -1;
+    public int ObservedSiegeId { get; private set; } = -1;
+    public int BreachCount { get; private set; }
+    public long SiegeEnteredTick { get; private set; } = -1;
+    public long LastObservedTick { get; private set; } = -1;
+    internal long LastPressureTick { get; private set; } = -1;
+    public int SiegesEntered { get; private set; }
+    public int SiegePressureTicks { get; private set; }
+    public int BreachesObserved { get; private set; }
+    public int LastObservedBreachStructureId { get; private set; } = -1;
+    public long LastObservedBreachTick { get; private set; } = -1;
+
+    internal void MarkNoTarget(long tick)
+    {
+        if (Status == CampaignSiegeStatus.Breached)
+            return;
+
+        Status = CampaignSiegeStatus.NoTarget;
+        LastObservedTick = Math.Max(0, tick);
+    }
+
+    internal void SuppressActivePressure(long tick)
+    {
+        if (Status == CampaignSiegeStatus.Breached)
+            return;
+
+        Status = CampaignSiegeStatus.None;
+        TargetStructureId = -1;
+        DefenderColonyId = -1;
+        ObservedSiegeId = -1;
+        LastObservedTick = Math.Max(0, tick);
+    }
+
+    internal void RecordPressure(int targetStructureId, int defenderColonyId, long tick)
+    {
+        if (Status == CampaignSiegeStatus.Breached)
+            return;
+
+        TargetStructureId = Math.Max(0, targetStructureId);
+        DefenderColonyId = Math.Max(0, defenderColonyId);
+        LastPressureTick = Math.Max(0, tick);
+        LastObservedTick = LastPressureTick;
+        SiegePressureTicks++;
+
+        if (SiegesEntered == 0)
+        {
+            SiegeEnteredTick = Math.Max(0, tick);
+            SiegesEntered = 1;
+        }
+
+        if (Status is CampaignSiegeStatus.None or CampaignSiegeStatus.NoTarget)
+            Status = CampaignSiegeStatus.SeekingTarget;
+    }
+
+    internal void ObserveActiveSiege(int siegeId, int breachCount, long tick)
+    {
+        if (Status == CampaignSiegeStatus.Breached)
+            return;
+
+        ObservedSiegeId = Math.Max(0, siegeId);
+        LastObservedTick = Math.Max(0, tick);
+        Status = CampaignSiegeStatus.Active;
+    }
+
+    internal void ObserveBreach(int structureId, long breachTick, long tick)
+    {
+        if (LastObservedBreachStructureId != structureId || LastObservedBreachTick != breachTick)
+        {
+            LastObservedBreachStructureId = structureId;
+            LastObservedBreachTick = breachTick;
+            BreachesObserved++;
+        }
+
+        BreachCount = Math.Max(BreachCount, BreachesObserved);
+        LastObservedTick = Math.Max(0, tick);
+        Status = CampaignSiegeStatus.Breached;
+    }
 }
 
 public sealed record CampaignCreationResult(

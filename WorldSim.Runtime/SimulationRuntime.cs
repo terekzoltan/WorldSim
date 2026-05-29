@@ -6,6 +6,7 @@ using WorldSim.AI;
 using WorldSim.Runtime.Diagnostics;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
 using WorldSim.Simulation.Military;
@@ -49,6 +50,11 @@ public sealed class SimulationRuntime
     private const double FloatingCausalEqTolerance = 0.0001d;
 
     private readonly record struct CampaignMarchObjective((int x, int y) MovementTarget, bool UsesFallback);
+
+    private readonly record struct CampaignSiegePressureCandidate(
+        CampaignState Campaign,
+        Colony Attacker,
+        DefensiveStructure Target);
 
     private readonly World _world;
     private readonly double _directorDampeningFactor;
@@ -144,8 +150,11 @@ public sealed class SimulationRuntime
     {
         var blockedCampaignActorIds = CaptureCampaignBlockedActorIds();
         PruneInvalidCampaignMembers(blockedCampaignActorIds);
+        QueueCampaignSiegePressureForActiveEncounters(dt, blockedCampaignActorIds);
         _world.Update(dt);
-        blockedCampaignActorIds.UnionWith(CaptureCampaignBlockedActorIds());
+        SyncCampaignSiegeStates(blockedCampaignActorIds);
+        var postWorldBlockedCampaignActorIds = CaptureCampaignBlockedActorIds();
+        blockedCampaignActorIds.UnionWith(postWorldBlockedCampaignActorIds);
         PruneInvalidCampaignMembers(blockedCampaignActorIds);
         var marchEligibleCampaignIds = _campaigns
             .Where(campaign => campaign.Phase == CampaignPhase.Marching)
@@ -265,7 +274,7 @@ public sealed class SimulationRuntime
                     target.x,
                     target.y,
                     "active",
-                    "non_resolving",
+                    MapCampaignEncounterOutcomeForReadModel(campaign),
                     campaign.RouteCounters.EncounterTicks)
             }
             : Array.Empty<CampaignEncounterRenderData>();
@@ -358,6 +367,16 @@ public sealed class SimulationRuntime
             CampaignPhase.Encounter => "encounter_active",
             CampaignPhase.Resolved => "resolved",
             _ => "unknown"
+        };
+
+    private static string MapCampaignEncounterOutcomeForReadModel(CampaignState campaign)
+        => campaign.Siege.Status switch
+        {
+            CampaignSiegeStatus.SeekingTarget => "siege_seeking_target",
+            CampaignSiegeStatus.Active => "siege_active",
+            CampaignSiegeStatus.Breached => "siege_breached",
+            CampaignSiegeStatus.NoTarget => "no_siege_target",
+            _ => "non_resolving"
         };
 
     private static string MapArmySupplySourceForReadModel(ArmySupplySourceMode source)
@@ -847,6 +866,183 @@ public sealed class SimulationRuntime
                 campaign.RouteCounters.RecordEncounterTick();
         }
     }
+
+    private void QueueCampaignSiegePressureForActiveEncounters(float dt, HashSet<int> blockedCampaignActorIds)
+    {
+        if (dt <= 0f)
+            return;
+
+        var encounterCampaigns = _campaigns
+            .Where(campaign => campaign.Phase == CampaignPhase.Encounter)
+            .OrderBy(campaign => campaign.CreatedTick)
+            .ThenBy(campaign => campaign.CampaignId)
+            .ToArray();
+        if (encounterCampaigns.Length == 0)
+            return;
+
+        if (!IsCampaignSiegeResolverEnabled())
+        {
+            foreach (var campaign in encounterCampaigns)
+                campaign.Siege.SuppressActivePressure(Tick);
+            return;
+        }
+
+        var pressureCandidates = new List<CampaignSiegePressureCandidate>();
+        var noTargetCandidates = new List<CampaignState>();
+        foreach (var campaign in encounterCampaigns)
+        {
+            if (campaign.Siege.Status == CampaignSiegeStatus.Breached)
+                continue;
+
+            if (!HasCompletePressureCapableEncounterRoster(campaign, blockedCampaignActorIds))
+            {
+                campaign.Siege.SuppressActivePressure(Tick);
+                continue;
+            }
+
+            var attacker = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.OriginColonyId);
+            if (attacker == null)
+            {
+                campaign.Siege.SuppressActivePressure(Tick);
+                continue;
+            }
+
+            if (!TrySelectCampaignSiegeTarget(campaign, out var target))
+            {
+                if (TryObserveRecentCampaignBreach(campaign))
+                    continue;
+
+                noTargetCandidates.Add(campaign);
+                continue;
+            }
+
+            pressureCandidates.Add(new CampaignSiegePressureCandidate(campaign, attacker, target));
+        }
+
+        var pressurePairs = new HashSet<(int attackerColonyId, int defenderColonyId)>();
+        foreach (var group in pressureCandidates.GroupBy(candidate => GetCampaignSiegePair(candidate.Campaign)))
+        {
+            var driver = group
+                .OrderBy(candidate => candidate.Campaign.CreatedTick)
+                .ThenBy(candidate => candidate.Campaign.CampaignId)
+                .First();
+            pressurePairs.Add(group.Key);
+
+            driver.Campaign.Siege.RecordPressure(driver.Target.Id, driver.Target.Owner.Id, Tick);
+            _world.QueueExternalSiegePressure(driver.Attacker, driver.Target);
+
+            foreach (var nonDriver in group.Where(candidate => !ReferenceEquals(candidate.Campaign, driver.Campaign)))
+                nonDriver.Campaign.Siege.SuppressActivePressure(Tick);
+        }
+
+        foreach (var group in noTargetCandidates.GroupBy(GetCampaignSiegePair))
+        {
+            if (pressurePairs.Contains(group.Key))
+            {
+                foreach (var campaign in group)
+                    campaign.Siege.SuppressActivePressure(Tick);
+                continue;
+            }
+
+            var reporter = group
+                .OrderBy(campaign => campaign.CreatedTick)
+                .ThenBy(campaign => campaign.CampaignId)
+                .First();
+            reporter.Siege.MarkNoTarget(Tick);
+
+            foreach (var nonReporter in group.Where(campaign => !ReferenceEquals(campaign, reporter)))
+                nonReporter.Siege.SuppressActivePressure(Tick);
+        }
+    }
+
+    private bool IsCampaignSiegeResolverEnabled()
+        => _world.EnableSiege && _world.EnableCombatPrimitives;
+
+    private bool HasCompletePressureCapableEncounterRoster(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+        => campaign.Army.MemberActorIds
+               .Select(actorId => _world._people.FirstOrDefault(person => person.Id == actorId))
+               .Count(person => IsValidAssignedCampaignMember(person, blockedCampaignActorIds)) >= campaign.Army.RequestedMemberCount;
+
+    private bool TrySelectCampaignSiegeTarget(CampaignState campaign, out DefensiveStructure target)
+    {
+        var reference = (x: campaign.RouteIntent.TargetX, y: campaign.RouteIntent.TargetY);
+        var selected = _world.DefensiveStructures
+            .Where(structure => !structure.IsDestroyed && structure.Owner.Id == campaign.TargetColonyId)
+            .OrderBy(structure => Math.Abs(structure.Pos.x - reference.x) + Math.Abs(structure.Pos.y - reference.y))
+            .ThenBy(structure => structure.Id)
+            .FirstOrDefault();
+
+        target = selected!;
+        return selected != null;
+    }
+
+    private void SyncCampaignSiegeStates(HashSet<int> blockedCampaignActorIds)
+    {
+        if (!IsCampaignSiegeResolverEnabled())
+        {
+            foreach (var campaign in _campaigns.Where(campaign => campaign.Phase == CampaignPhase.Encounter))
+                campaign.Siege.SuppressActivePressure(Tick);
+            return;
+        }
+
+        var activeSieges = _world.GetActiveSieges();
+        var recentBreaches = _world.GetRecentBreaches();
+
+        foreach (var campaign in _campaigns)
+        {
+            if (campaign.Phase != CampaignPhase.Encounter)
+                continue;
+
+            if (campaign.Siege.LastPressureTick == Tick)
+            {
+                var matchingSiege = activeSieges
+                    .Where(siege => IsMatchingCampaignActiveSiege(campaign, siege))
+                    .OrderBy(siege => siege.TargetStructureId == campaign.Siege.TargetStructureId ? 0 : 1)
+                    .ThenBy(siege => siege.SiegeId)
+                    .FirstOrDefault();
+                if (matchingSiege != null)
+                    campaign.Siege.ObserveActiveSiege(matchingSiege.SiegeId, matchingSiege.BreachCount, Tick);
+            }
+
+            if (campaign.Siege.Status == CampaignSiegeStatus.Breached
+                || !HasCompletePressureCapableEncounterRoster(campaign, blockedCampaignActorIds))
+                continue;
+
+            TryObserveRecentCampaignBreach(campaign, recentBreaches);
+        }
+    }
+
+    private bool TryObserveRecentCampaignBreach(CampaignState campaign)
+        => TryObserveRecentCampaignBreach(campaign, _world.GetRecentBreaches());
+
+    private bool TryObserveRecentCampaignBreach(CampaignState campaign, IReadOnlyList<BreachState> recentBreaches)
+    {
+        var observed = false;
+        foreach (var breach in recentBreaches
+                     .Where(breach => IsMatchingCampaignBreach(campaign, breach))
+                     .OrderBy(breach => breach.CreatedTick)
+                     .ThenBy(breach => breach.StructureId))
+        {
+            campaign.Siege.ObserveBreach(breach.StructureId, breach.CreatedTick, Tick);
+            observed = true;
+        }
+
+        return observed;
+    }
+
+    private static (int attackerColonyId, int defenderColonyId) GetCampaignSiegePair(CampaignState campaign)
+        => (campaign.OriginColonyId, campaign.TargetColonyId);
+
+    private static bool IsMatchingCampaignActiveSiege(CampaignState campaign, SiegeState siege)
+        => siege.AttackerColonyId == campaign.OriginColonyId
+           && siege.DefenderColonyId == campaign.TargetColonyId
+           && siege.TargetStructureId == campaign.Siege.TargetStructureId;
+
+    private static bool IsMatchingCampaignBreach(CampaignState campaign, BreachState breach)
+        => breach.AttackerColonyId == campaign.OriginColonyId
+           && breach.DefenderColonyId == campaign.TargetColonyId
+           && campaign.Siege.TargetStructureId >= 0
+           && breach.StructureId == campaign.Siege.TargetStructureId;
 
     private IReadOnlyList<Person> GetValidCampaignMembers(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
         => campaign.Army.MemberActorIds

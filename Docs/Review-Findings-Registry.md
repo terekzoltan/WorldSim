@@ -26,6 +26,45 @@ Severity guide:
 
 Entries:
 
+## 2026-05-28 - Wave 10 P6-E Step Review - Blocking - Encounter campaigns must not create ghost siege pressure
+
+- Track: Track B / Runtime campaign-siege integration
+- Source: Meta + Swarm step-review synthesis for Wave 10 `P6-E`
+- Finding: `QueueCampaignSiegePressureForActiveEncounters(...)` queues siege pressure for every `Encounter` campaign, while `PruneInvalidCampaignMembers(...)` skips `CampaignPhase.Encounter`. A campaign that entered encounter validly can later lose/invalid members and still feed World siege pressure.
+- Impact: Creates ghost campaign siege pressure, can keep World siege sessions active with no valid campaign attackers, and overclaims the P6-E understrength guard.
+- Resolution / guidance: Before P6-E closeout, revalidate encounter campaign roster/living members against `RequestedMemberCount` before recording/queueing siege pressure, or transition/suppress invalid encounter campaigns deterministically. Add a regression where an encounter campaign loses its member before the next positive tick and asserts no further siege pressure/active siege/outcome.
+- Re-review note: P6-E fix-loop re-review accepted that the dead-member case is covered, but found the fix still only counts `Health > 0f`; alive-but-invalid members (`IsRouting`, `IsInCombat`, active battle/group, `Fight`/`Flee`/`RaidBorder`/`AttackStructure`) can still be pressure-capable unless the stricter campaign-member validity model is reused.
+- Status: fixed and accepted in final P6-E Meta + external Swarm deep-review synthesis; P6-E closeout GREEN
+
+## 2026-05-28 - Wave 10 P6-E Step Review - Blocking - Breach/no-target sync must preserve campaign-owned truth
+
+- Track: Track B / Runtime campaign-siege integration
+- Source: Meta + Swarm step-review synthesis for Wave 10 `P6-E`
+- Finding: `MarkNoTarget(...)` can overwrite campaign siege status after a breach/target destruction, and breach sync can match same-pair recent breaches when `TargetStructureId < 0`, allowing no-target encounters to inherit stale same-pair breach evidence.
+- Impact: Campaign encounter read-model can flip from `siege_breached` to `no_siege_target`, or report `siege_breached` for a campaign that has no current target. This weakens P6-E observability and can mislead P6-F resolution.
+- Resolution / guidance: Before P6-E closeout, make breached campaign state/read-model outcome persistent for the campaign target, and require known/current campaign target identity before observing breaches. Add regressions for post-breach target disappearance and prior same-pair breach followed by a no-target campaign.
+- Status: fixed and accepted in final P6-E Meta + external Swarm deep-review synthesis; P6-E closeout GREEN
+
+## 2026-05-28 - Wave 10 P6-E Step Review - Major - Same-pair campaign siege aliasing needs policy or guard
+
+- Track: Track B / Runtime campaign-siege integration
+- Source: Meta + Swarm step-review synthesis for Wave 10 `P6-E`
+- Finding: `TryCreateCampaign(...)` can create multiple campaigns with the same attacker/defender pair, while World siege sessions and campaign sync match by attacker/defender pair. Multiple same-pair campaigns can observe the same world siege and overclaim independent campaign progress.
+- Impact: Creates ambiguous campaign-to-siege attribution and hidden coupling to World's pair-keyed siege identity.
+- Resolution / guidance: Before P6-E closeout or as part of the same fix loop, either enforce one active encounter siege per attacker/defender campaign pair, or explicitly document and test shared pair-level siege semantics so counters/read-models cannot overclaim independent sieges.
+- Status: fixed and accepted in final P6-E Meta + external Swarm deep-review synthesis; P6-E closeout GREEN
+
+## 2026-05-28 - Wave 10 P6-E Step Review - Minor - Disabled siege mode must not overclaim campaign pressure
+
+- Track: Track B / Runtime campaign-siege integration
+- Source: Swarm step-review for Wave 10 `P6-E`, accepted by Meta synthesis as non-blocking fix-loop item
+- Finding: Campaign siege pressure can be recorded when `World.EnableSiege` or `EnableCombatPrimitives` disables the existing World siege resolver.
+- Impact: Campaign state can report seeking/pressure semantics even though World intentionally refuses to create active siege state, weakening the claim that campaign siege state mirrors World siege flow.
+- Resolution / guidance: In the P6-E fix loop, either gate campaign pressure recording on the same World siege enablement semantics or explicitly document/test disabled-mode behavior so no read-model/counter overclaim occurs.
+- Re-review note: P6-E fix-loop re-review accepted the disabled-from-start regression, but found `SyncCampaignSiegeStates(...)` can still observe a matching recent breach after a campaign previously recorded a target and the resolver is later disabled. Disabled flow must not promote that path to `siege_breached`.
+- Second re-review note: the local narrow fix suppresses breach sync while the resolver remains disabled, but `TargetStructureId` survives suppression. If the target is breached while disabled and the resolver is re-enabled before the 120-tick recent-breach window expires, or if a same-pair takeover driver breaches the retained target, the suppressed campaign can still inherit stale breach evidence.
+- Status: fixed and accepted in final P6-E Meta + external Swarm deep-review synthesis; non-breached suppression clears retained target identity, and focused regressions cover disabled re-enable stale breach inheritance for both resolver flags plus same-pair suppressed prior driver inheritance.
+
 ## 2026-05-21 - Wave 9 Deep Review - Major - Partial campaign rosters must not complete then churn
 
 - Track: Track B / Runtime campaign lifecycle

@@ -11,6 +11,7 @@ public sealed record CampaignRuntimeSnapshot(
     long CreatedTick,
     CampaignRouteIntent RouteIntent,
     CampaignRouteCountersSnapshot RouteCounters,
+    CampaignSiegeRuntimeSnapshot Siege,
     ArmyRuntimeSnapshot Army)
 {
     public static CampaignRuntimeSnapshot From(CampaignState state)
@@ -25,7 +26,34 @@ public sealed record CampaignRuntimeSnapshot(
             state.CreatedTick,
             state.RouteIntent,
             CampaignRouteCountersSnapshot.From(state.RouteCounters),
+            CampaignSiegeRuntimeSnapshot.From(state.Siege),
             ArmyRuntimeSnapshot.From(state.Army));
+}
+
+public sealed record CampaignSiegeRuntimeSnapshot(
+    CampaignSiegeStatus Status,
+    int TargetStructureId,
+    int DefenderColonyId,
+    int ObservedSiegeId,
+    int BreachCount,
+    long SiegeEnteredTick,
+    long LastObservedTick,
+    int SiegesEntered,
+    int SiegePressureTicks,
+    int BreachesObserved)
+{
+    public static CampaignSiegeRuntimeSnapshot From(CampaignSiegeState state)
+        => new(
+            state.Status,
+            state.TargetStructureId,
+            state.DefenderColonyId,
+            state.ObservedSiegeId,
+            state.BreachCount,
+            state.SiegeEnteredTick,
+            state.LastObservedTick,
+            state.SiegesEntered,
+            state.SiegePressureTicks,
+            state.BreachesObserved);
 }
 
 public sealed record ArmyRuntimeSnapshot(

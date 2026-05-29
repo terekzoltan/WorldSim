@@ -496,6 +496,7 @@ namespace WorldSim.Simulation
         readonly HashSet<int> _contactAdjacentActorsThisTick = new();
         readonly List<RuntimeBreachState> _recentBreaches = new();
         readonly List<RuntimeSiegePressure> _siegePressureThisTick = new();
+        readonly List<RuntimeSiegePressure> _queuedExternalSiegePressure = new();
         readonly Dictionary<(int attackerColonyId, int defenderColonyId), RuntimeSiegeSession> _siegeSessions = new();
         int _navigationTopologyVersion;
         int _nextDefenseStructureId = 1;
@@ -657,6 +658,11 @@ namespace WorldSim.Simulation
             _tickCounter++;
             _softReservations.Clear();
             _siegePressureThisTick.Clear();
+            if (_queuedExternalSiegePressure.Count > 0)
+            {
+                _siegePressureThisTick.AddRange(_queuedExternalSiegePressure);
+                _queuedExternalSiegePressure.Clear();
+            }
             _contactHostileSensedActorsThisTick.Clear();
             _contactPursueActorsThisTick.Clear();
             _contactAdjacentActorsThisTick.Clear();
@@ -1199,6 +1205,19 @@ namespace WorldSim.Simulation
                 return;
 
             _siegePressureThisTick.Add(new RuntimeSiegePressure(
+                attackerColonyId: attacker.Id,
+                defenderColonyId: target.Owner.Id,
+                targetStructureId: target.Id,
+                targetKind: target.Kind,
+                targetPos: target.Pos));
+        }
+
+        internal void QueueExternalSiegePressure(Colony attacker, DefensiveStructure target)
+        {
+            if (attacker == null || target == null)
+                return;
+
+            _queuedExternalSiegePressure.Add(new RuntimeSiegePressure(
                 attackerColonyId: attacker.Id,
                 defenderColonyId: target.Owner.Id,
                 targetStructureId: target.Id,
