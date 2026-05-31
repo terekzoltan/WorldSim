@@ -2130,7 +2130,7 @@ Wave 10 SMR evidence guardrail:
 > Combat Plan > Phase 6 Sprint 11
 
 - ✅ **P6-E** Siege integration in campaign flow (Track B)
-- ⬜ **P6-F** Resolution — loot, war score, peace (Track B)
+- ✅ **P6-F** Resolution — loot, war score, peace (Track B)
 - ⬜ **P6-G** Strategic campaign AI (Track C)
 - ⬜ **P6-H** Campaign UI polish (Track A)
 
@@ -2171,6 +2171,8 @@ Wave 10 SMR evidence guardrail:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P6-F | P6-E ✅ | Resolution rules depend on campaign-owned siege/engagement outcomes; do not treat raw pair-keyed World active siege `Status` as independent target-level campaign truth |
+
+- ✅ `P6-F` accepted GREEN by Meta re-review. Track B closed the same-pair contradictory scoring path, historical resolved-breach suppression bug, pair-scoped signed war-score contract, and direct read-model resolution export coverage while keeping campaign-owned siege truth and pair-keyed World siege identity unchanged. Step 3 (`P6-G`/`P6-H`) and Step 4 (`P7-A`) are now READY. ScenarioRunner event/counter-key evidence remains deferred to Wave 10 SMR prep Step 10A.
 
 **Step 3 — opens when P6-F ✅**
 

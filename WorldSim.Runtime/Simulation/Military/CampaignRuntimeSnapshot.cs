@@ -12,6 +12,7 @@ public sealed record CampaignRuntimeSnapshot(
     CampaignRouteIntent RouteIntent,
     CampaignRouteCountersSnapshot RouteCounters,
     CampaignSiegeRuntimeSnapshot Siege,
+    CampaignResolutionRuntimeSnapshot Resolution,
     ArmyRuntimeSnapshot Army)
 {
     public static CampaignRuntimeSnapshot From(CampaignState state)
@@ -27,6 +28,7 @@ public sealed record CampaignRuntimeSnapshot(
             state.RouteIntent,
             CampaignRouteCountersSnapshot.From(state.RouteCounters),
             CampaignSiegeRuntimeSnapshot.From(state.Siege),
+            CampaignResolutionRuntimeSnapshot.From(state.Resolution),
             ArmyRuntimeSnapshot.From(state.Army));
 }
 
@@ -54,6 +56,48 @@ public sealed record CampaignSiegeRuntimeSnapshot(
             state.SiegesEntered,
             state.SiegePressureTicks,
             state.BreachesObserved);
+}
+
+public sealed record CampaignResolutionRuntimeSnapshot(
+    bool IsResolved,
+    CampaignResolutionKind Kind,
+    string Reason,
+    long ResolvedTick,
+    Faction AttackerFaction,
+    Faction DefenderFaction,
+    int OriginColonyId,
+    int TargetColonyId,
+    int TargetStructureId,
+    int LootFood,
+    int LootWood,
+    int LootStone,
+    int LootGold,
+    int WarScoreDelta,
+    int CumulativeWarScore,
+    bool PeaceEligible,
+    bool PeaceApplied,
+    string TreatyKind)
+{
+    public static CampaignResolutionRuntimeSnapshot From(CampaignResolutionState state)
+        => new(
+            state.IsResolved,
+            state.Kind,
+            state.Reason,
+            state.ResolvedTick,
+            state.AttackerFaction,
+            state.DefenderFaction,
+            state.OriginColonyId,
+            state.TargetColonyId,
+            state.TargetStructureId,
+            state.LootFood,
+            state.LootWood,
+            state.LootStone,
+            state.LootGold,
+            state.WarScoreDelta,
+            state.CumulativeWarScore,
+            state.PeaceEligible,
+            state.PeaceApplied,
+            state.TreatyKind);
 }
 
 public sealed record ArmyRuntimeSnapshot(

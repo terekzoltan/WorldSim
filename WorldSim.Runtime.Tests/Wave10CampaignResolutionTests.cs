@@ -206,6 +206,7 @@ public sealed class Wave10CampaignResolutionTests
         var world = fixtures[0].World;
         var campaigns = runtime.Campaigns.OrderBy(campaign => campaign.CampaignId).ToArray();
 
+        MakePressureCapable(fixtures[1].Member);
         runtime.AdvanceTick(1f);
         campaigns = runtime.Campaigns.OrderBy(campaign => campaign.CampaignId).ToArray();
         Assert.Equal(CampaignSiegeStatus.Active, campaigns[0].Siege.Status);
@@ -217,6 +218,7 @@ public sealed class Wave10CampaignResolutionTests
         Assert.Equal("non_resolving", GetEncounterOutcome(runtime, campaigns[1].CampaignId));
 
         fixtures[0].Member.Health = 0f;
+        MakePressureCapable(fixtures[1].Member);
         MakePressureCapable(fixtures[1].Member);
         runtime.AdvanceTick(1f);
 
@@ -365,6 +367,311 @@ public sealed class Wave10CampaignResolutionTests
     }
 
     [Fact]
+    public void CampaignResolution_AttackerVictoryTransfersLootWarScoreAndCeasefireOnce()
+    {
+        var fixture = CreateEncounterCampaign(addTargetWall: true);
+        fixture.Owner.Stock[Resource.Food] = 1;
+        fixture.Owner.Stock[Resource.Wood] = 2;
+        fixture.Owner.Stock[Resource.Stone] = 3;
+        fixture.Owner.Stock[Resource.Gold] = 4;
+        fixture.Target.Stock[Resource.Food] = 10;
+        fixture.Target.Stock[Resource.Wood] = 9;
+        fixture.Target.Stock[Resource.Stone] = 8;
+        fixture.Target.Stock[Resource.Gold] = 7;
+        Assert.True(fixture.World.DeclareWar(Faction.Obsidari, Faction.Aetheri, out _, out _));
+        var directorStatusBefore = fixture.Runtime.LastDirectorActionStatus;
+
+        fixture.Runtime.AdvanceTick(1f);
+        MakePressureCapable(fixture.Member);
+        Assert.True(fixture.World.TryDamageDefensiveStructure(
+            fixture.TargetWall!.Pos,
+            fixture.TargetWall.Hp + 1f,
+            fixture.Owner));
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        var resolution = campaign.Resolution;
+        Assert.Equal(CampaignPhase.Resolved, campaign.Phase);
+        Assert.True(resolution.IsResolved);
+        Assert.Equal(CampaignResolutionKind.AttackerVictory, resolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.SiegeBreached, resolution.Reason);
+        Assert.Equal(fixture.TargetWall.Id, resolution.TargetStructureId);
+        Assert.Equal(CampaignResolutionPolicy.LootFoodCap, resolution.LootFood);
+        Assert.Equal(CampaignResolutionPolicy.LootWoodCap, resolution.LootWood);
+        Assert.Equal(CampaignResolutionPolicy.LootStoneCap, resolution.LootStone);
+        Assert.Equal(CampaignResolutionPolicy.LootGoldCap, resolution.LootGold);
+        Assert.Equal(CampaignResolutionPolicy.AttackerVictoryWarScoreDelta, resolution.WarScoreDelta);
+        Assert.Equal(CampaignResolutionPolicy.AttackerVictoryWarScoreDelta, resolution.CumulativeWarScore);
+        Assert.True(resolution.PeaceEligible);
+        Assert.True(resolution.PeaceApplied);
+        Assert.Equal(CampaignResolutionPolicy.CeasefireTreatyKind, resolution.TreatyKind);
+        Assert.Equal(Stance.Hostile, fixture.World.GetFactionStance(Faction.Obsidari, Faction.Aetheri));
+        Assert.Equal(directorStatusBefore, fixture.Runtime.LastDirectorActionStatus);
+
+        var renderCampaign = Assert.Single(fixture.Runtime.GetSnapshot().Campaigns);
+        Assert.Equal((int)Faction.Obsidari, renderCampaign.OwnerFactionId);
+        Assert.Equal((int)Faction.Aetheri, renderCampaign.TargetFactionId);
+        Assert.True(renderCampaign.Resolution.IsResolved);
+        Assert.Equal("attacker_victory", renderCampaign.Resolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.SiegeBreached, renderCampaign.Resolution.Reason);
+        Assert.Equal(resolution.ResolvedTick, renderCampaign.Resolution.ResolvedTick);
+        Assert.Equal(fixture.TargetWall.Id, renderCampaign.Resolution.TargetStructureId);
+        Assert.Equal(CampaignResolutionPolicy.LootFoodCap, renderCampaign.Resolution.LootFood);
+        Assert.Equal(CampaignResolutionPolicy.LootWoodCap, renderCampaign.Resolution.LootWood);
+        Assert.Equal(CampaignResolutionPolicy.LootStoneCap, renderCampaign.Resolution.LootStone);
+        Assert.Equal(CampaignResolutionPolicy.LootGoldCap, renderCampaign.Resolution.LootGold);
+        Assert.Equal(CampaignResolutionPolicy.AttackerVictoryWarScoreDelta, renderCampaign.Resolution.WarScoreDelta);
+        Assert.Equal(CampaignResolutionPolicy.AttackerVictoryWarScoreDelta, renderCampaign.Resolution.CumulativeWarScore);
+        Assert.True(renderCampaign.Resolution.PeaceEligible);
+        Assert.True(renderCampaign.Resolution.PeaceApplied);
+        Assert.Equal(CampaignResolutionPolicy.CeasefireTreatyKind, renderCampaign.Resolution.TreatyKind);
+
+        Assert.Equal(7, fixture.Owner.Stock[Resource.Food]);
+        Assert.Equal(6, fixture.Owner.Stock[Resource.Wood]);
+        Assert.Equal(6, fixture.Owner.Stock[Resource.Stone]);
+        Assert.Equal(5, fixture.Owner.Stock[Resource.Gold]);
+        Assert.Equal(4, fixture.Target.Stock[Resource.Food]);
+        Assert.Equal(5, fixture.Target.Stock[Resource.Wood]);
+        Assert.Equal(5, fixture.Target.Stock[Resource.Stone]);
+        Assert.Equal(6, fixture.Target.Stock[Resource.Gold]);
+
+        var stockAfterResolutionOwner = SnapshotStock(fixture.Owner);
+        var stockAfterResolutionTarget = SnapshotStock(fixture.Target);
+        var resolvedTick = resolution.ResolvedTick;
+        fixture.Runtime.AdvanceTick(1f);
+        fixture.Runtime.AdvanceTick(1f);
+
+        var repeated = Assert.Single(fixture.Runtime.Campaigns).Resolution;
+        Assert.Equal(stockAfterResolutionOwner, SnapshotStock(fixture.Owner));
+        Assert.Equal(stockAfterResolutionTarget, SnapshotStock(fixture.Target));
+        Assert.Equal(resolvedTick, repeated.ResolvedTick);
+        Assert.Equal(CampaignResolutionPolicy.AttackerVictoryWarScoreDelta, repeated.CumulativeWarScore);
+        Assert.True(repeated.PeaceApplied);
+        Assert.Equal(directorStatusBefore, fixture.Runtime.LastDirectorActionStatus);
+    }
+
+    [Fact]
+    public void CampaignResolution_SamePairNonDriverNoTargetDoesNotScoreWhenDriverBreaches()
+    {
+        var fixtures = CreateEncounterCampaigns(campaignCount: 2, addTargetWall: true);
+        var runtime = fixtures[0].Runtime;
+        var world = fixtures[0].World;
+        var owner = fixtures[0].Owner;
+        var target = fixtures[0].Target;
+        owner.Stock[Resource.Food] = 1;
+        owner.Stock[Resource.Wood] = 2;
+        owner.Stock[Resource.Stone] = 3;
+        owner.Stock[Resource.Gold] = 4;
+        target.Stock[Resource.Food] = 10;
+        target.Stock[Resource.Wood] = 9;
+        target.Stock[Resource.Stone] = 8;
+        target.Stock[Resource.Gold] = 7;
+        Assert.True(world.DeclareWar(Faction.Obsidari, Faction.Aetheri, out _, out _));
+
+        runtime.AdvanceTick(1f);
+        MakePressureCapable(fixtures[0].Member);
+        MakePressureCapable(fixtures[1].Member);
+        var targetWall = fixtures[0].TargetWall!;
+        Assert.True(world.TryDamageDefensiveStructure(
+            targetWall.Pos,
+            targetWall.Hp + 1f,
+            owner));
+
+        runtime.AdvanceTick(1f);
+
+        var campaigns = runtime.Campaigns.OrderBy(campaign => campaign.CampaignId).ToArray();
+        Assert.Equal(CampaignPhase.Resolved, campaigns[0].Phase);
+        Assert.Equal(CampaignResolutionKind.AttackerVictory, campaigns[0].Resolution.Kind);
+        Assert.Equal(CampaignResolutionPolicy.AttackerVictoryWarScoreDelta, campaigns[0].Resolution.WarScoreDelta);
+        Assert.Equal(CampaignResolutionPolicy.AttackerVictoryWarScoreDelta, campaigns[0].Resolution.CumulativeWarScore);
+        Assert.True(campaigns[0].Resolution.PeaceApplied);
+
+        Assert.Equal(CampaignPhase.Encounter, campaigns[1].Phase);
+        Assert.Equal(CampaignSiegeStatus.NoTarget, campaigns[1].Siege.Status);
+        Assert.False(campaigns[1].Resolution.IsResolved);
+        Assert.Equal(CampaignResolutionKind.None, campaigns[1].Resolution.Kind);
+        Assert.Equal(0, campaigns[1].Resolution.LootFood + campaigns[1].Resolution.LootWood + campaigns[1].Resolution.LootStone + campaigns[1].Resolution.LootGold);
+        Assert.Equal(0, campaigns[1].Resolution.WarScoreDelta);
+        Assert.Equal(0, campaigns[1].Resolution.CumulativeWarScore);
+        Assert.False(campaigns[1].Resolution.PeaceEligible);
+        Assert.False(campaigns[1].Resolution.PeaceApplied);
+        Assert.Equal(CampaignResolutionReasons.None, campaigns[1].Resolution.TreatyKind);
+        Assert.Equal(Stance.Hostile, world.GetFactionStance(Faction.Obsidari, Faction.Aetheri));
+        Assert.Equal(7, owner.Stock[Resource.Food]);
+        Assert.Equal(6, owner.Stock[Resource.Wood]);
+        Assert.Equal(6, owner.Stock[Resource.Stone]);
+        Assert.Equal(5, owner.Stock[Resource.Gold]);
+        Assert.Equal(4, target.Stock[Resource.Food]);
+        Assert.Equal(5, target.Stock[Resource.Wood]);
+        Assert.Equal(5, target.Stock[Resource.Stone]);
+        Assert.Equal(6, target.Stock[Resource.Gold]);
+
+        MakePressureCapable(fixtures[1].Member);
+        runtime.AdvanceTick(1f);
+
+        campaigns = runtime.Campaigns.OrderBy(campaign => campaign.CampaignId).ToArray();
+        Assert.Equal(CampaignPhase.Resolved, campaigns[1].Phase);
+        Assert.Equal(CampaignSiegeStatus.NoTarget, campaigns[1].Siege.Status);
+        Assert.True(campaigns[1].Resolution.IsResolved);
+        Assert.Equal(CampaignResolutionKind.DefenderHeld, campaigns[1].Resolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.NoTarget, campaigns[1].Resolution.Reason);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, campaigns[1].Resolution.WarScoreDelta);
+        Assert.Equal(
+            CampaignResolutionPolicy.AttackerVictoryWarScoreDelta + CampaignResolutionPolicy.DefenderHeldWarScoreDelta,
+            campaigns[1].Resolution.CumulativeWarScore);
+        Assert.False(campaigns[1].Resolution.PeaceEligible);
+        Assert.False(campaigns[1].Resolution.PeaceApplied);
+        Assert.Equal(7, owner.Stock[Resource.Food]);
+        Assert.Equal(6, owner.Stock[Resource.Wood]);
+        Assert.Equal(6, owner.Stock[Resource.Stone]);
+        Assert.Equal(5, owner.Stock[Resource.Gold]);
+        Assert.Equal(4, target.Stock[Resource.Food]);
+        Assert.Equal(5, target.Stock[Resource.Wood]);
+        Assert.Equal(5, target.Stock[Resource.Stone]);
+        Assert.Equal(6, target.Stock[Resource.Gold]);
+    }
+
+    [Fact]
+    public void CampaignResolution_HistoricalResolvedBreachDoesNotSuppressLaterSamePairNoTargetCampaign()
+    {
+        var fixture = CreateEncounterCampaign(addTargetWall: true);
+        fixture.Runtime.AdvanceTick(1f);
+        MakePressureCapable(fixture.Member);
+        Assert.True(fixture.World.TryDamageDefensiveStructure(
+            fixture.TargetWall!.Pos,
+            fixture.TargetWall.Hp + 1f,
+            fixture.Owner));
+        fixture.Runtime.AdvanceTick(1f);
+        var first = Assert.Single(fixture.Runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Resolved, first.Phase);
+        Assert.Equal(CampaignResolutionKind.AttackerVictory, first.Resolution.Kind);
+        Assert.Equal(CampaignResolutionPolicy.AttackerVictoryWarScoreDelta, first.Resolution.CumulativeWarScore);
+
+        var later = CreateLaterSamePairNoTargetEncounterCampaign(fixture);
+        MakePressureCapable(later.Member);
+        fixture.Runtime.AdvanceTick(1f);
+
+        var resolvedLater = fixture.Runtime.Campaigns.Single(campaign => campaign.CampaignId == later.CampaignId);
+        Assert.Equal(CampaignPhase.Resolved, resolvedLater.Phase);
+        Assert.Equal(CampaignSiegeStatus.NoTarget, resolvedLater.Siege.Status);
+        Assert.Equal(CampaignResolutionKind.DefenderHeld, resolvedLater.Resolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.NoTarget, resolvedLater.Resolution.Reason);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, resolvedLater.Resolution.WarScoreDelta);
+        Assert.Equal(
+            CampaignResolutionPolicy.AttackerVictoryWarScoreDelta + CampaignResolutionPolicy.DefenderHeldWarScoreDelta,
+            resolvedLater.Resolution.CumulativeWarScore);
+        Assert.False(resolvedLater.Resolution.PeaceEligible);
+        Assert.False(resolvedLater.Resolution.PeaceApplied);
+    }
+
+    [Fact]
+    public void CampaignResolution_OppositeDirectionCampaignsUsePairScopedSignedWarScore()
+    {
+        var runtime = CreateBidirectionalNoTargetEncounterCampaigns();
+
+        runtime.AdvanceTick(1f);
+
+        var campaigns = runtime.Campaigns.OrderBy(campaign => campaign.CampaignId).ToArray();
+        Assert.Equal(2, campaigns.Length);
+        Assert.Equal(CampaignPhase.Resolved, campaigns[0].Phase);
+        Assert.Equal(CampaignResolutionKind.DefenderHeld, campaigns[0].Resolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.NoTarget, campaigns[0].Resolution.Reason);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, campaigns[0].Resolution.WarScoreDelta);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, campaigns[0].Resolution.CumulativeWarScore);
+        Assert.False(campaigns[0].Resolution.PeaceEligible);
+        Assert.False(campaigns[0].Resolution.PeaceApplied);
+
+        Assert.Equal(CampaignPhase.Resolved, campaigns[1].Phase);
+        Assert.Equal(CampaignResolutionKind.DefenderHeld, campaigns[1].Resolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.NoTarget, campaigns[1].Resolution.Reason);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, campaigns[1].Resolution.WarScoreDelta);
+        Assert.Equal(0, campaigns[1].Resolution.CumulativeWarScore);
+        Assert.False(campaigns[1].Resolution.PeaceEligible);
+        Assert.False(campaigns[1].Resolution.PeaceApplied);
+
+        var renderResolution = runtime.GetSnapshot()
+            .Campaigns
+            .Single(campaign => campaign.CampaignId == campaigns[1].CampaignId)
+            .Resolution;
+        Assert.True(renderResolution.IsResolved);
+        Assert.Equal("defender_held", renderResolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.NoTarget, renderResolution.Reason);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, renderResolution.WarScoreDelta);
+        Assert.Equal(0, renderResolution.CumulativeWarScore);
+        Assert.False(renderResolution.PeaceEligible);
+        Assert.False(renderResolution.PeaceApplied);
+    }
+
+    [Fact]
+    public void CampaignResolution_DefenderHeldTimeoutResolvesWithoutLoot()
+    {
+        var fixture = CreateEncounterCampaign(addTargetWall: true);
+        var ownerBefore = SnapshotStock(fixture.Owner);
+        var targetBefore = SnapshotStock(fixture.Target);
+
+        fixture.Runtime.AdvanceTick(1f);
+        for (var i = 0; i < CampaignResolutionPolicy.DefenderHeldEncounterTimeoutTicks + 2
+                        && Assert.Single(fixture.Runtime.Campaigns).Phase != CampaignPhase.Resolved; i++)
+        {
+            MakePressureCapable(fixture.Member);
+            fixture.Runtime.AdvanceTick(1f);
+        }
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        var resolution = campaign.Resolution;
+        Assert.Equal(CampaignPhase.Resolved, campaign.Phase);
+        Assert.True(resolution.IsResolved);
+        Assert.Equal(CampaignResolutionKind.DefenderHeld, resolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.DefenderTimeout, resolution.Reason);
+        Assert.Equal(0, resolution.LootFood + resolution.LootWood + resolution.LootStone + resolution.LootGold);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, resolution.WarScoreDelta);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, resolution.CumulativeWarScore);
+        Assert.False(resolution.PeaceApplied);
+        Assert.Equal(ownerBefore, SnapshotStock(fixture.Owner));
+        Assert.Equal(targetBefore, SnapshotStock(fixture.Target));
+    }
+
+    [Fact]
+    public void CampaignResolution_NoTargetResolvesDefenderHeldWithoutLoot()
+    {
+        var fixture = CreateEncounterCampaign(addTargetWall: false);
+        var ownerBefore = SnapshotStock(fixture.Owner);
+        var targetBefore = SnapshotStock(fixture.Target);
+
+        fixture.Runtime.AdvanceTick(1f);
+
+        var campaign = Assert.Single(fixture.Runtime.Campaigns);
+        var resolution = campaign.Resolution;
+        Assert.Equal(CampaignPhase.Resolved, campaign.Phase);
+        Assert.Equal(CampaignSiegeStatus.NoTarget, campaign.Siege.Status);
+        Assert.True(resolution.IsResolved);
+        Assert.Equal(CampaignResolutionKind.DefenderHeld, resolution.Kind);
+        Assert.Equal(CampaignResolutionReasons.NoTarget, resolution.Reason);
+        Assert.Equal(0, resolution.LootFood + resolution.LootWood + resolution.LootStone + resolution.LootGold);
+        Assert.Equal(CampaignResolutionPolicy.DefenderHeldWarScoreDelta, resolution.WarScoreDelta);
+        Assert.Equal(ownerBefore, SnapshotStock(fixture.Owner));
+        Assert.Equal(targetBefore, SnapshotStock(fixture.Target));
+        Assert.Equal("no_siege_target", GetEncounterOutcome(fixture.Runtime));
+    }
+
+    [Fact]
+    public void CampaignResolution_RawWorldActiveSiegeDoesNotResolveNonDriverCampaign()
+    {
+        var fixtures = CreateEncounterCampaigns(campaignCount: 2, addTargetWall: true);
+        var runtime = fixtures[0].Runtime;
+        var world = fixtures[0].World;
+
+        runtime.AdvanceTick(1f);
+
+        var campaigns = runtime.Campaigns.OrderBy(campaign => campaign.CampaignId).ToArray();
+        Assert.NotEmpty(world.GetActiveSieges());
+        Assert.Equal(CampaignSiegeStatus.Active, campaigns[0].Siege.Status);
+        Assert.False(campaigns[0].Resolution.IsResolved);
+        Assert.Equal(CampaignSiegeStatus.None, campaigns[1].Siege.Status);
+        Assert.False(campaigns[1].Resolution.IsResolved);
+    }
+
+    [Fact]
     public void AdvanceTick_UnderstrengthCampaignCannotReachEncounterOrSiegePressure()
     {
         var runtime = CreateRuntime();
@@ -465,6 +772,104 @@ public sealed class Wave10CampaignResolutionTests
         return members
             .Select(member => new EncounterCampaignFixture(runtime, world, owner, target, member, wall))
             .ToArray();
+    }
+
+    private static SimulationRuntime CreateBidirectionalNoTargetEncounterCampaigns()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyCombatAndSiege(runtime);
+        var world = GetWorld(runtime);
+        world.BirthRateMultiplier = 0f;
+        world._animals.Clear();
+        SetAllCampaignCandidatesIneligible(runtime);
+        Assert.Equal(1, runtime.PrepareWave9CampaignScenario(Faction.Obsidari, candidateCount: 1, carriedFoodPerCandidate: 2));
+        Assert.Equal(1, runtime.PrepareWave9CampaignScenario(Faction.Aetheri, candidateCount: 1, carriedFoodPerCandidate: 2));
+
+        Assert.True(runtime.TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1).Success);
+        Assert.True(runtime.TryCreateCampaign(Faction.Aetheri, Faction.Obsidari, requestedMemberCount: 1).Success);
+        world.EnableCombatPrimitives = false;
+
+        for (var i = 0; i < 80 && runtime.Campaigns.Any(campaign => campaign.Army.AssignedMemberCount < 1); i++)
+            runtime.AdvanceTick(0f);
+
+        Assert.All(runtime.Campaigns, campaign => Assert.Equal(1, campaign.Army.AssignedMemberCount));
+        foreach (var campaign in runtime.Campaigns)
+        {
+            var member = world._people.Single(person => campaign.Army.MemberActorIds.Contains(person.Id));
+            member.Pos = (campaign.Army.RallyX, campaign.Army.RallyY);
+        }
+
+        for (var i = 0; i < 8 && runtime.Campaigns.Any(campaign => campaign.Phase != CampaignPhase.Marching); i++)
+            runtime.AdvanceTick(0f);
+
+        Assert.All(runtime.Campaigns, campaign => Assert.Equal(CampaignPhase.Marching, campaign.Phase));
+        var memberIds = new HashSet<int>();
+        foreach (var campaign in runtime.Campaigns.OrderBy(campaign => campaign.CampaignId))
+        {
+            var target = world._colonies.Single(colony => colony.Id == campaign.TargetColonyId);
+            var member = world._people.Single(person => campaign.Army.MemberActorIds.Contains(person.Id));
+            member.Pos = FindEncounterTestPosition(world, target, index: 0);
+            memberIds.Add(member.Id);
+        }
+
+        runtime.AdvanceTick(0f);
+        Assert.All(runtime.Campaigns, campaign => Assert.Equal(CampaignPhase.Encounter, campaign.Phase));
+        NeutralizeNonCampaignActors(world, memberIds);
+        foreach (var member in world._people.Where(person => memberIds.Contains(person.Id)))
+        {
+            member.Profession = Profession.Generalist;
+            member.Current = Job.Idle;
+            member.Needs["Hunger"] = 0f;
+            member.ApplyStaminaDelta(100f);
+        }
+
+        world.EnableCombatPrimitives = true;
+        world.EnableSiege = true;
+        world.SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Neutral);
+        return runtime;
+    }
+
+    private static LaterCampaignFixture CreateLaterSamePairNoTargetEncounterCampaign(EncounterCampaignFixture fixture)
+    {
+        var runtime = fixture.Runtime;
+        var world = fixture.World;
+        var existingCampaignIds = runtime.Campaigns.Select(campaign => campaign.CampaignId).ToHashSet();
+        fixture.Member.Health = 100f;
+        MakePressureCapable(fixture.Member);
+        Assert.Equal(1, runtime.PrepareWave9CampaignScenario(Faction.Obsidari, candidateCount: 1, carriedFoodPerCandidate: 2));
+        var result = runtime.TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1);
+        Assert.True(result.Success);
+        Assert.NotNull(result.CampaignId);
+        int campaignId = result.CampaignId!.Value;
+        world.EnableCombatPrimitives = false;
+
+        for (var i = 0; i < 80 && runtime.Campaigns.Single(campaign => campaign.CampaignId == campaignId).Army.AssignedMemberCount < 1; i++)
+            runtime.AdvanceTick(0f);
+
+        var campaign = runtime.Campaigns.Single(campaign => campaign.CampaignId == campaignId);
+        Assert.DoesNotContain(campaign.CampaignId, existingCampaignIds);
+        Assert.Equal(1, campaign.Army.AssignedMemberCount);
+        var member = world._people.Single(person => campaign.Army.MemberActorIds.Contains(person.Id));
+        member.Pos = (campaign.Army.RallyX, campaign.Army.RallyY);
+        MakePressureCapable(member);
+
+        for (var i = 0; i < 8 && runtime.Campaigns.Single(campaign => campaign.CampaignId == campaignId).Phase != CampaignPhase.Marching; i++)
+            runtime.AdvanceTick(0f);
+
+        campaign = runtime.Campaigns.Single(campaign => campaign.CampaignId == campaignId);
+        Assert.Equal(CampaignPhase.Marching, campaign.Phase);
+        member.Pos = FindEncounterTestPosition(world, fixture.Target, index: 0);
+        runtime.AdvanceTick(0f);
+        campaign = runtime.Campaigns.Single(campaign => campaign.CampaignId == campaignId);
+        Assert.Equal(CampaignPhase.Encounter, campaign.Phase);
+
+        member.Profession = Profession.Generalist;
+        member.Current = Job.Idle;
+        member.Needs["Hunger"] = 0f;
+        member.ApplyStaminaDelta(100f);
+        world.EnableCombatPrimitives = true;
+        world.EnableSiege = true;
+        return new LaterCampaignFixture(campaignId, member);
     }
 
     private static SimulationRuntime CreateRuntime()
@@ -618,4 +1023,6 @@ public sealed class Wave10CampaignResolutionTests
         Colony Target,
         Person Member,
         DefensiveStructure? TargetWall);
+
+    private sealed record LaterCampaignFixture(int CampaignId, Person Member);
 }

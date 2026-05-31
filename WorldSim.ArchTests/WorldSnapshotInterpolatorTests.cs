@@ -133,6 +133,7 @@ public class WorldSnapshotInterpolatorTests
                 new CampaignRouteWaypointRenderData(0, 1, 2, IsNext: false),
                 new CampaignRouteWaypointRenderData(1, 12, 14, IsNext: true)
             },
+            Resolution: CampaignResolutionRenderData.Empty,
             Encounters: Array.Empty<CampaignEncounterRenderData>());
 
     private static EcoHudData CreateEcoHudData()

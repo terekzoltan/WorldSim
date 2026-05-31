@@ -330,6 +330,7 @@ public sealed record CampaignRenderData(
     ArmyRenderData Army,
     ArmySupplyRenderData Supply,
     IReadOnlyList<CampaignRouteWaypointRenderData> RouteWaypoints,
+    CampaignResolutionRenderData Resolution,
     IReadOnlyList<CampaignEncounterRenderData> Encounters);
 
 public sealed record CampaignRouteRenderData(
@@ -366,6 +367,39 @@ public sealed record CampaignEncounterRenderData(
     string Status,
     string Outcome,
     int EncounterTicks);
+
+public sealed record CampaignResolutionRenderData(
+    bool IsResolved,
+    string Kind,
+    string Reason,
+    long ResolvedTick,
+    int TargetStructureId,
+    int LootFood,
+    int LootWood,
+    int LootStone,
+    int LootGold,
+    int WarScoreDelta,
+    int CumulativeWarScore,
+    bool PeaceEligible,
+    bool PeaceApplied,
+    string TreatyKind)
+{
+    public static CampaignResolutionRenderData Empty { get; } = new(
+        IsResolved: false,
+        Kind: "none",
+        Reason: "none",
+        ResolvedTick: -1,
+        TargetStructureId: -1,
+        LootFood: 0,
+        LootWood: 0,
+        LootStone: 0,
+        LootGold: 0,
+        WarScoreDelta: 0,
+        CumulativeWarScore: 0,
+        PeaceEligible: false,
+        PeaceApplied: false,
+        TreatyKind: "none");
+}
 
 public sealed record ArmyRenderData(
     int ArmyId,

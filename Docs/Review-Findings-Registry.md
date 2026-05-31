@@ -26,6 +26,51 @@ Severity guide:
 
 Entries:
 
+## 2026-05-31 - Wave 10 P6-F Re-review - Blocking - Historical breached campaigns must not suppress future same-pair resolution
+
+- Track: Track B / Runtime campaign resolution
+- Source: Meta + external Swarm re-review synthesis for Wave 10 `P6-F`
+- Finding: The same-pair suppression helper can consider any historical same ordered-pair campaign with sticky `Siege.Status == Breached`, including campaigns already resolved as attacker victory.
+- Impact: A later same ordered-pair campaign that legitimately reaches `NoTarget` or defender-held timeout can be suppressed forever and remain stuck in `Encounter`, converting a shared-flow fix into hidden lifecycle coupling across future campaigns.
+- Resolution / guidance: Before P6-F closeout, restrict suppression to the intended current shared-flow/current resolution context, not historical resolved campaigns. Add a regression where a later same ordered-pair campaign after an earlier resolved breach can resolve no-target or timeout normally.
+- Status: fixed and accepted in final P6-F Meta re-review; P6-F closeout GREEN
+
+## 2026-05-31 - Wave 10 P6-F Re-review - Major - Opposite-direction score and peace need end-to-end campaign coverage
+
+- Track: Track B / Runtime campaign resolution
+- Source: External Swarm re-review synthesis for Wave 10 `P6-F`, accepted by Meta synthesis as verification gap
+- Finding: Opposite-direction pair-scoped score coverage currently exercises the private `RecordCampaignWarScore` helper via reflection rather than actual campaign resolution, state export, treaty direction, and peace eligibility behavior.
+- Impact: Private ledger math can pass while runtime campaign resolution or peace eligibility diverges from the locked pair-scoped signed contract.
+- Resolution / guidance: Before P6-F closeout, add an end-to-end opposite-direction campaign resolution test proving signed cumulative score and attacker-perspective peace eligibility through `CampaignResolutionState` and, where relevant, read-model export.
+- Status: fixed and accepted in final P6-F Meta re-review; P6-F closeout GREEN
+
+## 2026-05-31 - Wave 10 P6-F Step Review - Blocking - Same-pair resolution must not score contradictory outcomes
+
+- Track: Track B / Runtime campaign resolution
+- Source: Meta internal step-review synthesis for Wave 10 `P6-F`, before external Swarm synthesis
+- Finding: A same-pair campaign flow can resolve one campaign as attacker victory from campaign-owned `Siege.Breached` while another same-pair non-driver/no-target campaign resolves as defender-held in the same resolution pass.
+- Impact: The same attacker/defender pair can receive contradictory campaign-resolution side effects from one shared World siege path, including a positive victory delta and a negative defender-held delta. This overclaims independent campaign truth across the accepted pair-keyed World siege constraint.
+- Resolution / guidance: Before P6-F closeout, suppress or non-score same-pair non-driver/no-target resolution when another same-pair campaign owns breach/driver truth for the shared flow. Add a regression asserting the non-driver does not receive defender-held resolution or war-score delta in the driver-breach path.
+- Status: fixed and accepted in final P6-F Meta re-review; P6-F closeout GREEN
+
+## 2026-05-31 - Wave 10 P6-F Step Review - Major - War-score ledger must match pair-scoped contract or be renamed
+
+- Track: Track B / Runtime campaign resolution
+- Source: Meta internal step-review synthesis for Wave 10 `P6-F`
+- Finding: The implementation/Combined note claims a pair-scoped campaign war-score ledger, but the observed implementation keys score directionally by `(attacker, defender)`.
+- Impact: Opposite-direction campaigns in the same war relation can accumulate separate score truth, which can make peace eligibility and downstream read-model/SMR interpretation diverge from the documented pair-scoped contract.
+- Resolution / guidance: Before P6-F closeout, either normalize the faction pair with signed score semantics and add opposite-direction coverage, or explicitly narrow the model/wording/tests to directional campaign score.
+- Status: fixed and accepted in final P6-F Meta re-review; P6-F closeout GREEN
+
+## 2026-05-31 - Wave 10 P6-F Step Review - Minor - Read-model resolution export needs direct assertion
+
+- Track: Track B / Runtime/read-model campaign resolution
+- Source: External Swarm Assistant step-review input for Wave 10 `P6-F`, accepted by Meta synthesis as valid test hardening
+- Finding: The implementation maps `CampaignResolutionState` into `CampaignResolutionRenderData`, but focused tests do not directly assert `runtime.GetSnapshot().Campaigns.Single().Resolution.*` fields.
+- Impact: P6-F explicitly creates read-model surface for P6-G/P6-H/SMR consumers; a mapping regression could compile and pass current runtime-state assertions.
+- Resolution / guidance: Add direct focused snapshot assertions for resolved campaign `Resolution` fields, preferably in an existing attacker-victory or defender-held test.
+- Status: fixed and accepted in final P6-F Meta re-review; P6-F closeout GREEN
+
 ## 2026-05-28 - Wave 10 P6-E Step Review - Blocking - Encounter campaigns must not create ghost siege pressure
 
 - Track: Track B / Runtime campaign-siege integration

@@ -56,11 +56,23 @@ public sealed class SimulationRuntime
         Colony Attacker,
         DefensiveStructure Target);
 
+    private readonly record struct CampaignWarScoreKey(Faction First, Faction Second)
+    {
+        public static CampaignWarScoreKey From(Faction left, Faction right)
+            => (int)left <= (int)right
+                ? new CampaignWarScoreKey(left, right)
+                : new CampaignWarScoreKey(right, left);
+
+        public int SignFor(Faction faction)
+            => faction == First ? 1 : -1;
+    }
+
     private readonly World _world;
     private readonly double _directorDampeningFactor;
     private readonly Queue<string> _recentAiDecisions = new();
     private readonly DirectorState _directorState = new();
     private readonly List<CampaignState> _campaigns = new();
+    private readonly Dictionary<CampaignWarScoreKey, int> _campaignWarScores = new();
     private DirectorExecutionState _directorExecutionState = DirectorExecutionState.NotTriggered;
     private int _lastObservedDecisionTick = -1;
     private int _nextCampaignId = 1;
@@ -153,6 +165,7 @@ public sealed class SimulationRuntime
         QueueCampaignSiegePressureForActiveEncounters(dt, blockedCampaignActorIds);
         _world.Update(dt);
         SyncCampaignSiegeStates(blockedCampaignActorIds);
+        ResolveCampaignEncounters();
         var postWorldBlockedCampaignActorIds = CaptureCampaignBlockedActorIds();
         blockedCampaignActorIds.UnionWith(postWorldBlockedCampaignActorIds);
         PruneInvalidCampaignMembers(blockedCampaignActorIds);
@@ -264,7 +277,7 @@ public sealed class SimulationRuntime
         var target = hasObjective
             ? objective.MovementTarget
             : (x: campaign.RouteIntent.TargetX, y: campaign.RouteIntent.TargetY);
-        var encounters = campaign.Phase == CampaignPhase.Encounter
+        var encounters = campaign.Phase == CampaignPhase.Encounter || campaign.Resolution.IsResolved
             ? new[]
             {
                 new CampaignEncounterRenderData(
@@ -273,7 +286,7 @@ public sealed class SimulationRuntime
                     source.y,
                     target.x,
                     target.y,
-                    "active",
+                    campaign.Resolution.IsResolved ? "resolved" : "active",
                     MapCampaignEncounterOutcomeForReadModel(campaign),
                     campaign.RouteCounters.EncounterTicks)
             }
@@ -344,8 +357,39 @@ public sealed class SimulationRuntime
                 MapArmyForageStatusForReadModel(campaign.Army.ForagingState.LastStatus),
                 MapArmyForageFailureReasonForReadModel(campaign.Army.ForagingState.LastFailureReason)),
             waypoints,
+            BuildCampaignResolutionRenderData(campaign.Resolution),
             encounters);
     }
+
+    private static CampaignResolutionRenderData BuildCampaignResolutionRenderData(CampaignResolutionState resolution)
+    {
+        if (!resolution.IsResolved)
+            return CampaignResolutionRenderData.Empty;
+
+        return new CampaignResolutionRenderData(
+            resolution.IsResolved,
+            MapCampaignResolutionKindForReadModel(resolution.Kind),
+            resolution.Reason,
+            resolution.ResolvedTick,
+            resolution.TargetStructureId,
+            resolution.LootFood,
+            resolution.LootWood,
+            resolution.LootStone,
+            resolution.LootGold,
+            resolution.WarScoreDelta,
+            resolution.CumulativeWarScore,
+            resolution.PeaceEligible,
+            resolution.PeaceApplied,
+            resolution.TreatyKind);
+    }
+
+    private static string MapCampaignResolutionKindForReadModel(CampaignResolutionKind kind)
+        => kind switch
+        {
+            CampaignResolutionKind.AttackerVictory => "attacker_victory",
+            CampaignResolutionKind.DefenderHeld => "defender_held",
+            _ => "none"
+        };
 
     private static string MapCampaignPhaseForReadModel(CampaignPhase phase)
         => phase switch
@@ -1010,6 +1054,162 @@ public sealed class SimulationRuntime
 
             TryObserveRecentCampaignBreach(campaign, recentBreaches);
         }
+    }
+
+    private void ResolveCampaignEncounters()
+    {
+        var currentBreachedPairs = _campaigns
+            .Where(campaign => campaign.Phase == CampaignPhase.Encounter
+                && campaign.Siege.Status == CampaignSiegeStatus.Breached)
+            .Select(campaign => (campaign.OwnerFaction, campaign.TargetFaction))
+            .ToHashSet();
+
+        foreach (var campaign in _campaigns
+                     .Where(campaign => campaign.Phase == CampaignPhase.Encounter)
+                     .OrderBy(campaign => campaign.CreatedTick)
+                     .ThenBy(campaign => campaign.CampaignId))
+        {
+            if (!TryBuildCampaignResolution(campaign, currentBreachedPairs, out var resolution))
+                continue;
+
+            campaign.Resolve(resolution);
+        }
+    }
+
+    private bool TryBuildCampaignResolution(
+        CampaignState campaign,
+        HashSet<(Faction OwnerFaction, Faction TargetFaction)> currentBreachedPairs,
+        out CampaignResolutionApplication resolution)
+    {
+        resolution = null!;
+        if (campaign.Resolution.IsResolved)
+            return false;
+
+        var attacker = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.OriginColonyId);
+        var defender = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.TargetColonyId);
+        if (attacker == null || defender == null)
+            return false;
+
+        CampaignResolutionKind kind;
+        string reason;
+        if (campaign.Siege.Status == CampaignSiegeStatus.Breached)
+        {
+            kind = CampaignResolutionKind.AttackerVictory;
+            reason = CampaignResolutionReasons.SiegeBreached;
+        }
+        else if (campaign.Siege.Status == CampaignSiegeStatus.NoTarget)
+        {
+            if (HasCurrentSameOrderedPairBreach(campaign, currentBreachedPairs))
+                return false;
+
+            kind = CampaignResolutionKind.DefenderHeld;
+            reason = CampaignResolutionReasons.NoTarget;
+        }
+        else if (campaign.RouteCounters.EncounterTicks >= CampaignResolutionPolicy.DefenderHeldEncounterTimeoutTicks)
+        {
+            if (HasCurrentSameOrderedPairBreach(campaign, currentBreachedPairs))
+                return false;
+
+            kind = CampaignResolutionKind.DefenderHeld;
+            reason = CampaignResolutionReasons.DefenderTimeout;
+        }
+        else
+        {
+            return false;
+        }
+
+        int lootFood = 0;
+        int lootWood = 0;
+        int lootStone = 0;
+        int lootGold = 0;
+        int warScoreDelta;
+        if (kind == CampaignResolutionKind.AttackerVictory)
+        {
+            lootFood = TransferCampaignLoot(defender, attacker, Resource.Food, CampaignResolutionPolicy.LootFoodCap);
+            lootWood = TransferCampaignLoot(defender, attacker, Resource.Wood, CampaignResolutionPolicy.LootWoodCap);
+            lootStone = TransferCampaignLoot(defender, attacker, Resource.Stone, CampaignResolutionPolicy.LootStoneCap);
+            lootGold = TransferCampaignLoot(defender, attacker, Resource.Gold, CampaignResolutionPolicy.LootGoldCap);
+            warScoreDelta = CampaignResolutionPolicy.AttackerVictoryWarScoreDelta;
+        }
+        else
+        {
+            warScoreDelta = CampaignResolutionPolicy.DefenderHeldWarScoreDelta;
+        }
+
+        int cumulativeWarScore = RecordCampaignWarScore(campaign.OwnerFaction, campaign.TargetFaction, warScoreDelta);
+        bool peaceEligible = _world.GetFactionStance(campaign.OwnerFaction, campaign.TargetFaction) == Stance.War
+            && cumulativeWarScore >= CampaignResolutionPolicy.PeaceEligibilityWarScoreThreshold;
+        bool peaceApplied = false;
+        var treatyKind = CampaignResolutionReasons.None;
+        if (peaceEligible)
+        {
+            treatyKind = CampaignResolutionPolicy.CeasefireTreatyKind;
+            peaceApplied = TryApplyCampaignResolutionCeasefire(campaign.OwnerFaction, campaign.TargetFaction, out _, out _);
+        }
+
+        resolution = new CampaignResolutionApplication(
+            kind,
+            reason,
+            Tick,
+            campaign.OwnerFaction,
+            campaign.TargetFaction,
+            campaign.OriginColonyId,
+            campaign.TargetColonyId,
+            campaign.Siege.TargetStructureId,
+            lootFood,
+            lootWood,
+            lootStone,
+            lootGold,
+            warScoreDelta,
+            cumulativeWarScore,
+            peaceEligible,
+            peaceApplied,
+            treatyKind);
+        return true;
+    }
+
+    private static bool HasCurrentSameOrderedPairBreach(
+        CampaignState campaign,
+        HashSet<(Faction OwnerFaction, Faction TargetFaction)> currentBreachedPairs)
+        => currentBreachedPairs.Contains((campaign.OwnerFaction, campaign.TargetFaction));
+
+    private int RecordCampaignWarScore(Faction attacker, Faction defender, int delta)
+    {
+        var key = CampaignWarScoreKey.From(attacker, defender);
+        int next = _campaignWarScores.GetValueOrDefault(key, 0) + key.SignFor(attacker) * delta;
+        _campaignWarScores[key] = next;
+        return next * key.SignFor(attacker);
+    }
+
+    private bool TryApplyCampaignResolutionCeasefire(Faction proposer, Faction receiver, out Stance previous, out Stance current)
+    {
+        previous = _world.GetFactionStance(proposer, receiver);
+        current = previous;
+        if (previous != Stance.War)
+            return false;
+
+        var changed = _world.ProposeTreaty(
+            proposer,
+            receiver,
+            CampaignResolutionPolicy.CeasefireTreatyKind,
+            out previous,
+            out current);
+        if (changed)
+            _world.AddExternalEvent($"[Campaign] Ceasefire after decisive campaign resolution: {proposer} -> {receiver}");
+
+        return changed;
+    }
+
+    private static int TransferCampaignLoot(Colony source, Colony destination, Resource resource, int cap)
+    {
+        int available = Math.Max(0, source.Stock.GetValueOrDefault(resource, 0));
+        int amount = Math.Min(Math.Max(0, cap), available);
+        if (amount <= 0)
+            return 0;
+
+        source.Stock[resource] = available - amount;
+        destination.Stock[resource] = destination.Stock.GetValueOrDefault(resource, 0) + amount;
+        return amount;
     }
 
     private bool TryObserveRecentCampaignBreach(CampaignState campaign)

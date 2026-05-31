@@ -96,6 +96,7 @@ public sealed class CampaignState
     internal NavigationPathCache RouteCache { get; } = new();
     public ArmyState Army { get; }
     public CampaignSiegeState Siege { get; } = new();
+    public CampaignResolutionState Resolution { get; } = new();
     public CampaignWave9EvidenceCounters Wave9Evidence { get; } = new();
 
     internal void BeginAssembly(long tick)
@@ -146,6 +147,16 @@ public sealed class CampaignState
 
     internal void RecordWave9PhaseTick()
         => Wave9Evidence.RecordPhaseTick(Phase);
+
+    internal bool Resolve(CampaignResolutionApplication application)
+    {
+        if (!Resolution.TryApply(application))
+            return false;
+
+        RouteCache.Invalidate();
+        Phase = CampaignPhase.Resolved;
+        return true;
+    }
 }
 
 public sealed class CampaignSiegeState
