@@ -19,17 +19,18 @@ public static class EventFeedClassifier
         if (string.IsNullOrWhiteSpace(evt))
             return EventFeedCategory.World;
 
+        if (evt.StartsWith("[Director", StringComparison.OrdinalIgnoreCase) || ContainsAny(evt, "director", "story beat", "nudge"))
+            return EventFeedCategory.Director;
+
         if (evt.StartsWith("[Combat]", StringComparison.OrdinalIgnoreCase) || ContainsAny(evt, "combat", "battle", "predator", "flee", "fight", "retaliat"))
             return EventFeedCategory.Combat;
 
         if (evt.StartsWith("[Siege]", StringComparison.OrdinalIgnoreCase) || ContainsAny(evt, "siege", "breach", "tower", "wall"))
             return EventFeedCategory.Siege;
 
-        if (evt.StartsWith("[Campaign]", StringComparison.OrdinalIgnoreCase) || ContainsAny(evt, "campaign", "march", "army", "expedition"))
+        if (evt.StartsWith("[Campaign]", StringComparison.OrdinalIgnoreCase)
+            || ContainsAny(evt, "campaign", "march", "army", "expedition", "victory", "retreat", "loot", "war score", "ceasefire", "supply low"))
             return EventFeedCategory.Campaign;
-
-        if (evt.StartsWith("[Director]", StringComparison.OrdinalIgnoreCase) || ContainsAny(evt, "director", "story beat", "nudge"))
-            return EventFeedCategory.Director;
 
         return EventFeedCategory.World;
     }

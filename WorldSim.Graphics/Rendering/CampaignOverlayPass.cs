@@ -26,6 +26,8 @@ public sealed class CampaignOverlayPass : IRenderPass
             DrawWaypoints(spriteBatch, pixel, campaign, tileSize);
             DrawArmyMarker(spriteBatch, pixel, campaign, tileSize);
             DrawEncounterMarkers(spriteBatch, pixel, campaign, tileSize);
+            DrawEncounterActivityCue(spriteBatch, pixel, campaign, tileSize);
+            DrawResolutionMarker(spriteBatch, pixel, campaign, tileSize);
         }
     }
 
@@ -113,6 +115,51 @@ public sealed class CampaignOverlayPass : IRenderPass
         }
     }
 
+    private static void DrawEncounterActivityCue(SpriteBatch spriteBatch, Texture2D pixel, CampaignRenderData campaign, int tileSize)
+    {
+        if (campaign.Resolution.IsResolved)
+            return;
+
+        int encounterTicks = Math.Max(campaign.Route.EncounterTicks, campaign.Encounters.Select(e => e.EncounterTicks).DefaultIfEmpty(0).Max());
+        if (encounterTicks <= 0)
+            return;
+
+        var center = ResolveObjectiveCenter(campaign.Route, tileSize);
+        int pulse = Math.Max(tileSize + 2, tileSize + Math.Clamp(encounterTicks / 12, 1, 5) * Math.Max(1, tileSize / 3));
+        var cue = CenteredRect(center, pulse);
+        var color = new Color(239, 174, 92) * 0.68f;
+        DrawRectOutline(spriteBatch, pixel, cue, Math.Max(1, tileSize / 5), color);
+    }
+
+    private static void DrawResolutionMarker(SpriteBatch spriteBatch, Texture2D pixel, CampaignRenderData campaign, int tileSize)
+    {
+        var resolution = campaign.Resolution;
+        if (!resolution.IsResolved)
+            return;
+
+        var center = ResolveObjectiveCenter(campaign.Route, tileSize);
+        int size = Math.Max(tileSize + 4, tileSize * 2);
+        var marker = CenteredRect(center, size);
+        var color = GetResolutionColor(resolution);
+
+        DrawRectOutline(spriteBatch, pixel, marker, Math.Max(1, tileSize / 4), color * 0.92f);
+        if (string.Equals(resolution.Kind, "attacker_victory", StringComparison.OrdinalIgnoreCase))
+        {
+            DrawLine(spriteBatch, pixel, new Vector2(marker.X, marker.Bottom), new Vector2(marker.X + (marker.Width / 2f), marker.Y), color * 0.85f, Math.Max(1, tileSize / 5));
+            DrawLine(spriteBatch, pixel, new Vector2(marker.X + (marker.Width / 2f), marker.Y), new Vector2(marker.Right, marker.Bottom), color * 0.85f, Math.Max(1, tileSize / 5));
+        }
+        else
+        {
+            DrawLine(spriteBatch, pixel, new Vector2(marker.X, marker.Y), new Vector2(marker.Right, marker.Bottom), color * 0.82f, Math.Max(1, tileSize / 5));
+            DrawLine(spriteBatch, pixel, new Vector2(marker.X, marker.Bottom), new Vector2(marker.Right, marker.Y), color * 0.82f, Math.Max(1, tileSize / 5));
+        }
+    }
+
+    private static Vector2 ResolveObjectiveCenter(CampaignRouteRenderData route, int tileSize)
+        => route.HasResolvedObjective
+            ? TileCenter(route.ResolvedObjectiveX, route.ResolvedObjectiveY, tileSize)
+            : TileCenter(route.TargetX, route.TargetY, tileSize);
+
     private static Vector2 TileCenter(int x, int y, int tileSize)
         => new((x * tileSize) + (tileSize / 2f), (y * tileSize) + (tileSize / 2f));
 
@@ -151,5 +198,16 @@ public sealed class CampaignOverlayPass : IRenderPass
             3 => new Color(181, 140, 232),
             _ => new Color(180, 180, 180)
         };
+    }
+
+    private static Color GetResolutionColor(CampaignResolutionRenderData resolution)
+    {
+        if (string.Equals(resolution.Kind, "attacker_victory", StringComparison.OrdinalIgnoreCase))
+            return new Color(135, 232, 144);
+
+        if (string.Equals(resolution.Kind, "defender_held", StringComparison.OrdinalIgnoreCase))
+            return new Color(236, 158, 92);
+
+        return new Color(180, 180, 180);
     }
 }

@@ -9,6 +9,7 @@ namespace WorldSim.Graphics.UI.Panels;
 public sealed class CampaignPanelRenderer
 {
     private const int MaxVisibleCampaigns = 4;
+    private const int RowHeight = 72;
 
     public void Draw(
         SpriteBatch spriteBatch,
@@ -20,7 +21,7 @@ public sealed class CampaignPanelRenderer
         WorldRenderSnapshot snapshot)
     {
         int width = Math.Min(620, Math.Max(320, viewportWidth - 28));
-        int height = Math.Min(330, Math.Max(190, viewportHeight - 28));
+        int height = Math.Min(370, Math.Max(210, viewportHeight - 28));
         int x = viewportWidth - width - 14;
         int y = viewportHeight - height - 14;
         var rect = new Rectangle(x, y, width, height);
@@ -36,9 +37,10 @@ public sealed class CampaignPanelRenderer
         spriteBatch.DrawString(font, "Campaigns", new Vector2(x + pad, ty), theme.AccentText);
         ty += 24;
 
+        int availableRows = Math.Max(1, Math.Min(MaxVisibleCampaigns, (rect.Bottom - ty - 22) / RowHeight));
         var campaigns = snapshot.Campaigns
             .OrderBy(campaign => campaign.CampaignId)
-            .Take(MaxVisibleCampaigns)
+            .Take(availableRows)
             .ToList();
         if (campaigns.Count == 0)
         {
@@ -49,7 +51,7 @@ public sealed class CampaignPanelRenderer
         foreach (var campaign in campaigns)
         {
             DrawCampaignRow(spriteBatch, pixel, font, theme, campaign, x + pad, ty, width - (pad * 2));
-            ty += 66;
+            ty += RowHeight;
             if (ty > rect.Bottom - 28)
                 break;
         }
@@ -69,7 +71,7 @@ public sealed class CampaignPanelRenderer
         int y,
         int width)
     {
-        var rowRect = new Rectangle(x, y, width, 58);
+        var rowRect = new Rectangle(x, y, width, RowHeight - 4);
         spriteBatch.Draw(pixel, rowRect, theme.PanelBorder * 0.18f);
         spriteBatch.Draw(pixel, new Rectangle(rowRect.X, rowRect.Y, 3, rowRect.Height), GetFactionColor(campaign.OwnerFactionId));
 
@@ -77,11 +79,15 @@ public sealed class CampaignPanelRenderer
         string army = $"Army {campaign.Army.AssignedMemberCount}/{campaign.Army.RequestedMemberCount} {FormatAnchor(campaign.Army)} rally:{FormatRally(campaign.Army)}";
         string route = $"Route {FormatRouteProgress(campaign.Route)} march:{campaign.Route.MarchProgressTicks} stuck:{campaign.Route.NoProgressTicks} enc:{campaign.Encounters.Count}";
         string supply = $"Supply src:{campaign.Supply.LastSupplySource} ration:{campaign.Supply.RationPoolFood} demand:{campaign.Supply.FractionalFoodDemand:0.##} oos:{campaign.Supply.SustainedOutOfSupplyTicks} carrier:{FormatCarrier(campaign.Supply)} forage:{campaign.Supply.ForageSuccesses}/{campaign.Supply.ForageAttempts}+{campaign.Supply.ForageFoodGained}";
+        string result = FormatResolution(campaign.Resolution);
+        var resultColor = GetResolutionColor(theme, campaign.Resolution);
+        int textWidth = Math.Max(80, width - 16);
 
-        spriteBatch.DrawString(font, title, new Vector2(x + 8, y + 4), theme.PrimaryText);
-        spriteBatch.DrawString(font, army, new Vector2(x + 8, y + 20), theme.SecondaryText);
-        spriteBatch.DrawString(font, route, new Vector2(x + 8, y + 34), theme.SecondaryText);
-        spriteBatch.DrawString(font, supply, new Vector2(x + 8, y + 48), theme.SecondaryText);
+        spriteBatch.DrawString(font, TrimToWidth(font, title, textWidth), new Vector2(x + 8, y + 4), theme.PrimaryText);
+        spriteBatch.DrawString(font, TrimToWidth(font, army, textWidth), new Vector2(x + 8, y + 18), theme.SecondaryText);
+        spriteBatch.DrawString(font, TrimToWidth(font, route, textWidth), new Vector2(x + 8, y + 32), theme.SecondaryText);
+        spriteBatch.DrawString(font, TrimToWidth(font, supply, textWidth), new Vector2(x + 8, y + 46), theme.SecondaryText);
+        spriteBatch.DrawString(font, TrimToWidth(font, result, textWidth), new Vector2(x + 8, y + 60), resultColor);
     }
 
     private static string FormatRally(ArmyRenderData army)
@@ -101,6 +107,43 @@ public sealed class CampaignPanelRenderer
         int next = Math.Clamp(route.NextWaypointIndex + 1, 1, route.CachedWaypointCount);
         string fallback = route.UsesFallbackObjective ? " fallback" : string.Empty;
         return $"{next}/{route.CachedWaypointCount}{fallback}";
+    }
+
+    private static string FormatResolution(CampaignResolutionRenderData resolution)
+    {
+        if (!resolution.IsResolved)
+            return "Result pending";
+
+        string peace = resolution.PeaceApplied ? "yes" : "no";
+        string scoreDelta = resolution.WarScoreDelta >= 0 ? $"+{resolution.WarScoreDelta}" : resolution.WarScoreDelta.ToString();
+        return $"Result {resolution.Kind} {resolution.Reason} loot {resolution.LootFood}/{resolution.LootWood}/{resolution.LootStone}/{resolution.LootGold} score {scoreDelta} total {resolution.CumulativeWarScore} peace {peace} treaty {resolution.TreatyKind}";
+    }
+
+    private static Color GetResolutionColor(HudTheme theme, CampaignResolutionRenderData resolution)
+    {
+        if (!resolution.IsResolved)
+            return theme.SecondaryText;
+
+        if (string.Equals(resolution.Kind, "attacker_victory", StringComparison.OrdinalIgnoreCase))
+            return theme.SuccessText;
+
+        if (string.Equals(resolution.Kind, "defender_held", StringComparison.OrdinalIgnoreCase))
+            return theme.WarningText;
+
+        return theme.CampaignEventText;
+    }
+
+    private static string TrimToWidth(SpriteFont font, string text, int maxWidth)
+    {
+        if (font.MeasureString(text).X <= maxWidth)
+            return text;
+
+        const string ellipsis = "...";
+        int length = text.Length;
+        while (length > ellipsis.Length && font.MeasureString(text[..length] + ellipsis).X > maxWidth)
+            length--;
+
+        return length <= ellipsis.Length ? ellipsis : text[..length] + ellipsis;
     }
 
     private static string GetFactionAbbreviation(int factionId)

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use repo-valid workflow skills such as `implementation-execution` or `sequence-planning` when appropriate. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make Wave 10 campaign resolution, logistics, scout, siege-unit, and multi-front work bounded, observable, and snapshot-driven before Wave 10 closeout.
+**Goal:** Make Wave 10 campaign resolution, launch, logistics, scout, siege-unit, and multi-front work bounded, observable, and snapshot-driven before Wave 10 closeout.
 
 **Architecture:** Track B owns campaign resolution, route/cap budgets, convoy/base state, scout runtime state, siege-unit entities, and multi-front limits. Track C consumes explicit strategist/scout/siege-unit surfaces. Track A renders structured campaign/logistics records and does not compute routes or infer combat state.
 
@@ -14,6 +14,7 @@
 
 Wave 10 is blocked until Wave 9 closeout. This plan defines acceptance detail for the Wave 10 audit notes:
 - `P6-G` must be a faction/campaign strategist, not a per-person `RuntimeNpcBrain` branch.
+- `P6-I`/`P6-J` are tracked in the companion launch-catalyst plan: `Docs/Plans/Master/Wave10-Campaign-Launch-Catalyst-Plan.md`.
 - `P7-A`, `P7-B`, and `P7-G` must define logistics caps before multi-front work.
 - Wave 10 SMR closeout must require all implementation epics plus evidence, not only Track B runtime pieces.
 
@@ -43,6 +44,7 @@ Until Wave 10 is explicitly opened by Combined and `ops/PROJECT_STATE.md`, every
 ## Non-Negotiable Gates
 
 - The campaign strategist is faction/campaign level. It may choose campaign goals, targets, aborts, and reinforcements, but it must not become a new branch of per-person `RuntimeNpcBrain`.
+- Campaign launch must have both a manual/operator catalyst for app smoke and an organic runtime application path before Wave 10 can claim campaign gameplay completeness.
 - Every faction must have caps for active campaigns, active convoys, active forward bases, active siege units, and simultaneous fronts.
 - Home defense minimums must block campaign/convoy launches when a faction would empty its defended core.
 - Path and route budgets must be measurable and bounded in ScenarioRunner evidence.
