@@ -2134,7 +2134,7 @@ Wave 10 SMR evidence guardrail:
 - ✅ **P6-F** Resolution — loot, war score, peace (Track B)
 - ✅ **P6-G** Strategic campaign AI (Track C)
 - ✅ **P6-H** Campaign UI polish (Track A)
-- ⬜ **P6-I** Manual/operator campaign launch catalyst (Track B + App routing)
+- ✅ **P6-I** Manual/operator campaign launch catalyst (Track B + App routing)
 - ⬜ **P6-J** Organic campaign launch application (Track B + Track C)
 
 ### Sprint C12: Supply Lines + Forward Bases (Track B -> C -> A)
@@ -2208,6 +2208,9 @@ P6-I acceptance:
 - Success/failure is visible through toast/status, including `CampaignCreationStatus` and readable message.
 - `Ctrl+Q` followed by `Ctrl+F2` shows populated campaign panel/overlay when runtime gates allow launch.
 - No Graphics-owned state synthesis, no direct `World` mutation from App, and no runtime validation bypass.
+
+P6-I closeout note:
+- ✅ Track B manual/operator campaign launch catalyst accepted GREEN as `manual_operator` proof only: runtime-owned `ManualCampaignLaunchCommand.DefaultOperatorSmoke` (`Obsidari -> Aetheri`, requested members `1`) delegates through `SimulationRuntime.TryCreateManualCampaign(...)` -> `TryCreateCampaign(...)`, App `Ctrl+Q` only routes to Runtime and shows toast, and no Graphics/AI/ScenarioRunner scope was added. Automated wrapper/boundary/build gates are green, including the review follow-up arch test targeting the active `GameHost.cs`. Manual smoke passed: gates ON (`WORLDSIM_ENABLE_DIPLOMACY=true`, `WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true`) `Ctrl+Q` created real campaigns and `Ctrl+F2` showed populated campaign panel/overlay (`Obs->Aet`, `assembling_pending` / `pending_assembly`, `Result pending`); gates OFF `Ctrl+Q` showed visible `CampaignRuntimeUnavailable`. `Army 0/1` / `anchor:none` is accepted as non-blocking assembly state, not a P6-I failure. Organic campaign launch remains P6-J.
 
 **Step 3B — organic campaign launch application (opens when P6-I ✅)**
 

@@ -14,6 +14,90 @@ namespace WorldSim.Runtime.Tests;
 public sealed class Wave9CampaignRuntimeTests
 {
     [Fact]
+    public void TryCreateManualCampaign_DefaultOperatorSmoke_PersistsExpectedCampaignAndArmy()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+
+        var result = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+
+        Assert.True(result.Success);
+        Assert.Equal(CampaignCreationStatus.Created, result.Status);
+        Assert.Equal(1, result.CampaignId);
+        Assert.Equal(1, result.ArmyId);
+
+        var campaign = Assert.Single(runtime.Campaigns);
+        Assert.Equal(1, campaign.CampaignId);
+        Assert.Equal(1, campaign.ArmyId);
+        Assert.Equal(Faction.Obsidari, campaign.OwnerFaction);
+        Assert.Equal(Faction.Aetheri, campaign.TargetFaction);
+        Assert.Equal(CampaignPhase.AssemblingPending, campaign.Phase);
+        Assert.Equal(1, campaign.Army.RequestedMemberCount);
+        Assert.Empty(campaign.Army.MemberActorIds);
+    }
+
+    [Fact]
+    public void TryCreateManualCampaign_RuntimeUnavailable_PassesThroughStatusWithoutMutatingCampaigns()
+    {
+        var runtime = CreateRuntime();
+
+        var result = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+
+        Assert.False(result.Success);
+        Assert.Equal(CampaignCreationStatus.CampaignRuntimeUnavailable, result.Status);
+        Assert.Null(result.CampaignId);
+        Assert.Null(result.ArmyId);
+        Assert.Empty(runtime.Campaigns);
+    }
+
+    [Theory]
+    [InlineData(1, 1, 1, CampaignCreationStatus.SameFaction)]
+    [InlineData(1, 2, 0, CampaignCreationStatus.InvalidRequestedMemberCount)]
+    [InlineData(1, 2, -1, CampaignCreationStatus.InvalidRequestedMemberCount)]
+    public void TryCreateManualCampaign_InvalidInput_PassesThroughValidationStatus(
+        int ownerFaction,
+        int targetFaction,
+        int requestedMemberCount,
+        CampaignCreationStatus expectedStatus)
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var command = new ManualCampaignLaunchCommand((Faction)ownerFaction, (Faction)targetFaction, requestedMemberCount);
+
+        var result = runtime.TryCreateManualCampaign(command);
+
+        Assert.False(result.Success);
+        Assert.Equal(expectedStatus, result.Status);
+        Assert.Null(result.CampaignId);
+        Assert.Null(result.ArmyId);
+        Assert.Empty(runtime.Campaigns);
+    }
+
+    [Fact]
+    public void TryCreateManualCampaign_MissingOwnerOrTargetColony_PassesThroughStatusWhenCheapToSetUp()
+    {
+        var missingOwnerRuntime = CreateRuntime();
+        EnableDiplomacyAndCombat(missingOwnerRuntime);
+        GetWorld(missingOwnerRuntime)._colonies.RemoveAll(colony => colony.Faction == Faction.Obsidari);
+
+        var missingOwner = missingOwnerRuntime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+
+        Assert.False(missingOwner.Success);
+        Assert.Equal(CampaignCreationStatus.OwnerColonyNotFound, missingOwner.Status);
+        Assert.Empty(missingOwnerRuntime.Campaigns);
+
+        var missingTargetRuntime = CreateRuntime();
+        EnableDiplomacyAndCombat(missingTargetRuntime);
+        GetWorld(missingTargetRuntime)._colonies.RemoveAll(colony => colony.Faction == Faction.Aetheri);
+
+        var missingTarget = missingTargetRuntime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+
+        Assert.False(missingTarget.Success);
+        Assert.Equal(CampaignCreationStatus.TargetColonyNotFound, missingTarget.Status);
+        Assert.Empty(missingTargetRuntime.Campaigns);
+    }
+
+    [Fact]
     public void TryCreateCampaign_Success_PersistsOneCampaignAndOneArmy()
     {
         var runtime = CreateRuntime();

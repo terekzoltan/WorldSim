@@ -19,6 +19,17 @@ public readonly record struct RuntimeCommandResult(bool Success, string Message)
     public static RuntimeCommandResult Fail(string message) => new(false, message);
 }
 
+public readonly record struct ManualCampaignLaunchCommand(
+    Faction OwnerFaction,
+    Faction TargetFaction,
+    int RequestedMemberCount)
+{
+    public static ManualCampaignLaunchCommand DefaultOperatorSmoke { get; } = new(
+        Faction.Obsidari,
+        Faction.Aetheri,
+        RequestedMemberCount: 1);
+}
+
 public abstract record RuntimePatchCommand;
 
 public sealed record UnlockTechRuntimeCommand(string TechId) : RuntimePatchCommand;

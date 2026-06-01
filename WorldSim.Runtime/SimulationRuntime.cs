@@ -545,6 +545,9 @@ public sealed class SimulationRuntime
         return CampaignCreationResult.Created(campaignId, armyId);
     }
 
+    public CampaignCreationResult TryCreateManualCampaign(ManualCampaignLaunchCommand command)
+        => TryCreateCampaign(command.OwnerFaction, command.TargetFaction, command.RequestedMemberCount);
+
     public int PrepareWave9CampaignScenario(Faction ownerFaction, int candidateCount, int carriedFoodPerCandidate)
     {
         if (!Enum.IsDefined(typeof(Faction), ownerFaction))

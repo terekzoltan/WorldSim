@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-01 - Wave 10 P6-I Step Review - Minor - App host boundary test targeted stale shim
+
+- Track: Track B / App routing verification
+- Source: Swarm Assistant + Meta synthesis for Wave 10 `P6-I`
+- Finding: `BoundaryRulesTests.AppGameHost_DoesNotUseDirectWorldOrTechTreeMutation` claimed to verify the App host boundary but read `WorldSim.App/Game1.cs`, while P6-I modified `WorldSim.App/GameHost.cs`.
+- Impact: A boundary test can pass while the real host file that routes operator/debug commands is not checked, creating false confidence during App/Runtime seam reviews.
+- Resolution / guidance: Keep architecture tests pointed at the actual active host file, or explicitly cover both shim and active host when a compatibility shim remains.
+- Status: fixed now in P6-I review follow-up by targeting `WorldSim.App/GameHost.cs`
+
 ## 2026-06-01 - Wave 10 P6-H Manual Smoke - Major - App needs a real campaign launch catalyst
 
 - Track: Track B / Track C integration, discovered during Track A campaign UI smoke
@@ -33,7 +42,7 @@ Entries:
 - Finding: Runtime/tests/ScenarioRunner can create campaigns through `SimulationRuntime.TryCreateCampaign(...)`, but the interactive app has no operator or organic gameplay path that creates a campaign entity. `Ctrl+F2` only toggles the campaign panel/overlay, Director `declareWar` changes relations/events only, and P6-G strategist output is advisory/not runtime-applied.
 - Impact: P6-H can only smoke empty-state/static rendering in the live app, and the broader campaign stack cannot be claimed gameplay-complete because real campaigns do not emerge during normal interactive play.
 - Resolution / guidance: Add P6-I manual/operator launch (`Ctrl+Q`, runtime-owned command/API + App routing) for deterministic smoke, then P6-J organic strategist-to-runtime campaign launch application. Track A must keep rendering snapshot-only and must not synthesize campaign state.
-- Status: deferred to P6-I/P6-J active gates; P6-H closes with limited empty-state/static-render smoke caveat
+- Status: P6-I manual/operator launch and populated panel smoke fixed the manual catalyst portion; P6-J organic strategist-to-runtime application remains the active gate for gameplay-complete campaign launch
 
 ## 2026-05-31 - Wave 10 P6-H Step Review - Major - Broad event keywords must not override source-specific tags
 
@@ -42,7 +51,7 @@ Entries:
 - Finding: Display-only campaign keyword expansion can classify Director events containing words like victory, retreat, loot, or ceasefire as Campaign before Director severity handling runs.
 - Impact: Event feed colors and operator readability drift from the true event source, even though no runtime event emission changed.
 - Resolution / guidance: Prioritize explicit source tags/signals such as `[Director:*]` before broad generic keyword categories, and add a focused classifier regression when expanding shared event-feed keywords.
-- Status: fixed and accepted in P6-H closeout; populated/resolved app smoke deferred to P6-I/P6-J
+- Status: fixed and accepted in P6-H closeout; P6-I manual/operator populated smoke is now complete, organic launch proof remains deferred to P6-J
 
 ## 2026-05-31 - Wave 10 P6-G Step Review - Major - Advisory strategists must reject impossible launch outputs
 
@@ -60,7 +69,7 @@ Entries:
 - Finding: Build/syntax/scope tests prove the campaign UI compiles and stays in-bounds architecturally, but do not prove visible row readability, overlay marker placement, zoom/pan/order sanity, or resolved outcome visibility.
 - Impact: A visually broken or unreadable P6-H implementation could be marked complete based only on automated gates.
 - Resolution / guidance: Keep manual visual smoke as an active closeout gate for visible UI steps; if a resolved state cannot be reproduced manually, record that limitation and do not overclaim outcome visibility.
-- Status: deferred to P6-I/P6-J active gates; P6-H accepted with limited empty-state/static-render smoke caveat
+- Status: P6-I manual/operator populated smoke is now complete; P6-H remains accepted with organic launch proof deferred to P6-J
 
 ## 2026-05-31 - Wave 10 P6-F Re-review - Blocking - Historical breached campaigns must not suppress future same-pair resolution
 

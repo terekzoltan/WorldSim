@@ -252,6 +252,9 @@ public class GameHost : Game
             SetToast($"Campaign panel: {(_showCampaignPanel ? "ON" : "OFF")}");
         }
 
+        if (IsChordPressed(keys, Keys.Q, requireCtrl: true))
+            LaunchManualCampaign();
+
         if (IsPlainPressed(keys, Keys.F2))
         {
             FocusCameraOnTrackedNpc();
@@ -536,6 +539,18 @@ public class GameHost : Game
         }
 
         SetToast($"{prefix} #{ai.TrackedNpcIndex}/{Math.Max(1, ai.TrackedNpcCount)} A{ai.TrackedActorId} C{ai.TrackedColonyId} @({ai.TrackedX},{ai.TrackedY})");
+    }
+
+    private void LaunchManualCampaign()
+    {
+        var result = _runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+        if (result.Success)
+        {
+            SetToast($"Campaign launch: Created (campaign {result.CampaignId}, army {result.ArmyId})");
+            return;
+        }
+
+        SetToast($"Campaign launch failed ({result.Status}): {result.Message}");
     }
 
     private void AdjustSimulationSpeed(int delta)
