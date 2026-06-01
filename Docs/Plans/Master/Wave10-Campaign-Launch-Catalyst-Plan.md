@@ -73,7 +73,7 @@ Provide a deterministic local operator/debug path so a running app can create a 
 - `git diff --check`.
 - Manual smoke: launch app -> `Ctrl+Q` -> `Ctrl+F2` -> populated campaign panel/overlay visible.
 
-## P6-J - Organic Campaign Launch Application (Track B + Track C)
+## P6-J(B) - Organic Campaign Launch Runtime Application (Track B)
 
 ### Goal
 
@@ -81,8 +81,9 @@ Make campaigns form during normal gameplay under bounded conditions, rather than
 
 ### Ownership
 
-- Track C owns strategy intent and advisory decision logic.
-- Track B owns runtime fact mapping, validation, caps, application, and campaign creation.
+- Track B owns runtime fact mapping, cadence, validation, caps, suppression reasons, application, and campaign creation.
+- Track B consumes the already-accepted P6-G advisory strategist contract where sufficient.
+- Track C owns strategy intent and advisory decision logic only if P6-J(B) identifies a concrete contract gap and explicitly hands off P6-J(C).
 - Runtime remains authoritative for all campaign creation gates and side effects.
 
 ### Required Policy
@@ -101,7 +102,7 @@ Make campaigns form during normal gameplay under bounded conditions, rather than
   - route/path budget constraints,
   - future logistics constraints from P7-A/P7-B when those hooks exist.
 
-### Acceptance
+### P6-J(B) Acceptance
 
 - Under hostile/war conditions and sufficient eligible members, a civilization can autonomously launch at least one bounded campaign in normal app/runtime flow.
 - Peaceful or insufficient-force conditions do not launch campaigns.
@@ -111,9 +112,29 @@ Make campaigns form during normal gameplay under bounded conditions, rather than
 
 ### Suggested Sequencing
 
-- P6-J opens after P6-G and P6-I are accepted.
-- P6-J does not block P7-A initial supply-line foundation, but Wave 10 cannot claim campaign gameplay-complete without it.
-- If P7-A changes supply/logistics constraints first, P6-J must consume those caps rather than inventing parallel logistics rules.
+- P6-J(B) opens after P6-G and P6-I are accepted.
+- P6-J(B) does not block P7-A initial supply-line foundation, but Wave 10 cannot claim campaign gameplay-complete without it.
+- If P7-A changes supply/logistics constraints first, P6-J(B) must consume those caps rather than inventing parallel logistics rules.
+- P6-J(B) closeout must explicitly state one of: `P6-J(C) not needed - existing P6-G strategy contract was sufficient`, or `P6-J(C) needed - Track C must adjust/extend advisory strategy because <specific contract gap>`.
+
+## P6-J(C) - Organic Campaign Strategy Follow-Up, If Needed (Track C)
+
+### Goal
+
+Adjust the advisory campaign strategist only if P6-J(B) proves that the existing P6-G contract is insufficient for runtime-owned organic launch application.
+
+### Ownership
+
+- Track C owns advisory scoring/intent shape only.
+- Track B remains owner of runtime fact mapping, caps, validation, suppression reasons, and campaign creation.
+- P6-J(C) must not add Runtime/App/Graphics references to `WorldSim.AI`.
+
+### Acceptance, If Opened
+
+- The change directly addresses the named P6-J(B) handoff gap.
+- The advisory strategy remains pure/deterministic and covered by AI tests.
+- Runtime application remains owned by the P6-J(B) path.
+- If P6-J(B) says no Track C changes are needed, mark P6-J(C) N/A rather than opening a no-op implementation session.
 
 ### Verification
 
@@ -131,10 +152,10 @@ P6-H may close as a Track A snapshot-render UI slice with an explicit limited-sm
 - Static/render scope verification.
 - Automated build/test/scope checks.
 
-P6-H must not claim populated/resolved app smoke until real campaigns can be created from the running app. After P6-I, the deferred populated UI smoke should be rerun with `Ctrl+Q` followed by `Ctrl+F2`. After P6-J, organic campaign launch smoke/evidence should prove normal gameplay campaign formation separately from manual/operator launch.
+P6-H must not claim populated/resolved app smoke until real campaigns can be created from the running app. After P6-I, the deferred populated UI smoke should be rerun with `Ctrl+Q` followed by `Ctrl+F2`. After P6-J(B), organic campaign launch smoke/evidence should prove normal gameplay campaign formation separately from manual/operator launch; P6-J(C) is required only if P6-J(B) hands off a concrete Track C strategy gap.
 
 ## Wave 10 Closeout Policy
 
 - P6-I is required before claiming populated campaign UI app-smoke coverage.
-- P6-J is required before claiming campaign gameplay completeness or organic campaign behavior.
+- P6-J(B) is required before claiming campaign gameplay completeness or organic campaign behavior; P6-J(C) is required only when P6-J(B) explicitly opens it.
 - Wave 10 SMR prep must explicitly tag campaign-launch lanes by proof type and must not use manual/operator launch evidence as organic campaign proof.

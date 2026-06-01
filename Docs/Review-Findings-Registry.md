@@ -41,8 +41,8 @@ Entries:
 - Source: P6-H manual smoke discovery after P6-G/P6-H step-review fixups
 - Finding: Runtime/tests/ScenarioRunner can create campaigns through `SimulationRuntime.TryCreateCampaign(...)`, but the interactive app has no operator or organic gameplay path that creates a campaign entity. `Ctrl+F2` only toggles the campaign panel/overlay, Director `declareWar` changes relations/events only, and P6-G strategist output is advisory/not runtime-applied.
 - Impact: P6-H can only smoke empty-state/static rendering in the live app, and the broader campaign stack cannot be claimed gameplay-complete because real campaigns do not emerge during normal interactive play.
-- Resolution / guidance: Add P6-I manual/operator launch (`Ctrl+Q`, runtime-owned command/API + App routing) for deterministic smoke, then P6-J organic strategist-to-runtime campaign launch application. Track A must keep rendering snapshot-only and must not synthesize campaign state.
-- Status: P6-I manual/operator launch and populated panel smoke fixed the manual catalyst portion; P6-J organic strategist-to-runtime application remains the active gate for gameplay-complete campaign launch
+- Resolution / guidance: Add P6-I manual/operator launch (`Ctrl+Q`, runtime-owned command/API + App routing) for deterministic smoke, then P6-J(B) Track B organic strategist-to-runtime campaign launch application. P6-J(C) Track C opens only if P6-J(B) identifies a concrete advisory strategy contract gap. Track A must keep rendering snapshot-only and must not synthesize campaign state.
+- Status: P6-I manual/operator launch and populated panel smoke fixed the manual catalyst portion; P6-J(B) organic strategist-to-runtime application remains the active gate for gameplay-complete campaign launch, with P6-J(C) conditional on a Track B handoff gap
 
 ## 2026-05-31 - Wave 10 P6-H Step Review - Major - Broad event keywords must not override source-specific tags
 
@@ -60,7 +60,7 @@ Entries:
 - Finding: The advisory campaign strategist could emit launch decisions for self-target factions or zero-warrior target definitions unless the future runtime mapper sanitized those inputs.
 - Impact: A later Track B adapter could accidentally promote nonsensical strategy decisions into runtime campaign commands, creating hidden coupling between AI assumptions and runtime validation.
 - Resolution / guidance: AI strategy contracts should reject impossible outputs locally and test the boundary even when runtime remains the authoritative executor. Keep future-facing decisions advisory until Track B application hooks exist.
-- Status: fixed and accepted in P6-G closeout; runtime application deferred to P6-J Track B/C gate
+- Status: fixed and accepted in P6-G closeout; runtime application deferred to P6-J(B) Track B gate, with P6-J(C) Track C follow-up only if P6-J(B) identifies a concrete advisory contract gap
 
 ## 2026-05-31 - Wave 10 P6-H Step Review - Major - Visual UI polish needs manual smoke before closeout
 

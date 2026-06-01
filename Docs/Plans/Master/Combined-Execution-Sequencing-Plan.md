@@ -2135,7 +2135,8 @@ Wave 10 SMR evidence guardrail:
 - ✅ **P6-G** Strategic campaign AI (Track C)
 - ✅ **P6-H** Campaign UI polish (Track A)
 - ✅ **P6-I** Manual/operator campaign launch catalyst (Track B + App routing)
-- ⬜ **P6-J** Organic campaign launch application (Track B + Track C)
+- ⬜ **P6-J(B)** Organic campaign launch runtime application (Track B)
+- ⬜ **P6-J(C)** Organic campaign strategy follow-up, if needed (Track C)
 
 ### Sprint C12: Supply Lines + Forward Bases (Track B -> C -> A)
 
@@ -2189,13 +2190,13 @@ P6-G boundary note:
 - Strategic campaign AI should be a faction/campaign strategist surface over finalized campaign state, not another per-person `RuntimeNpcBrain` branch.
 
 P6-G closeout note:
-- ✅ Track C AI-only strategist slice accepted with explicit advisory scope: `WorldSim.AI/CampaignStrategy.cs` defines a campaign/faction strategist contract + deterministic default strategy, and `WorldSim.AI.Tests/CampaignStrategyTests.cs` covers launch/hold/tie-break/clamp plus capability-gated abort/convoy/reinforce decisions. Step-review fixups reject self-target and zero-force launch outputs and gate reinforcement against low home defense. Runtime application/context mapping is not part of P6-G and is deferred to P6-J Track B/C. Do not claim runtime-integrated strategic campaign AI from this slice alone. `RequestConvoy` and `ReinforceCampaign` remain advisory until Track B/P7 hooks exist.
+- ✅ Track C AI-only strategist slice accepted with explicit advisory scope: `WorldSim.AI/CampaignStrategy.cs` defines a campaign/faction strategist contract + deterministic default strategy, and `WorldSim.AI.Tests/CampaignStrategyTests.cs` covers launch/hold/tie-break/clamp plus capability-gated abort/convoy/reinforce decisions. Step-review fixups reject self-target and zero-force launch outputs and gate reinforcement against low home defense. Runtime application/context mapping is not part of P6-G and is deferred to P6-J(B) Track B. Track C only re-enters through P6-J(C) if P6-J(B) identifies a concrete advisory contract gap. Do not claim runtime-integrated strategic campaign AI from this slice alone. `RequestConvoy` and `ReinforceCampaign` remain advisory until Track B/P7 hooks exist.
 
 P6-H closeout note:
-- ✅ Track A campaign UI polish accepted with limited manual-smoke caveat: campaign panel surfaces compact P6-F resolution results from `WorldRenderSnapshot.Campaigns` including treaty kind, campaign overlay adds minimal resolved-objective markers plus coarse encounter activity cues, and event feed changes are display-only classifier keyword coverage with Director tag precedence preserved. Scope stayed Graphics-only: no Runtime/read-model, ScenarioRunner, AI, Refinery, Java, retention-policy, exact siege-progress, or runtime event-emission changes. Automated build/test/scope checks are green, and manual smoke verified empty-state/toggle coverage. Populated/resolved app smoke could not be exercised because no interactive path creates real campaigns; that missing catalyst is deferred to P6-I/P6-J and is not a Track A closeout blocker.
+- ✅ Track A campaign UI polish accepted with limited manual-smoke caveat: campaign panel surfaces compact P6-F resolution results from `WorldRenderSnapshot.Campaigns` including treaty kind, campaign overlay adds minimal resolved-objective markers plus coarse encounter activity cues, and event feed changes are display-only classifier keyword coverage with Director tag precedence preserved. Scope stayed Graphics-only: no Runtime/read-model, ScenarioRunner, AI, Refinery, Java, retention-policy, exact siege-progress, or runtime event-emission changes. Automated build/test/scope checks are green, and manual smoke verified empty-state/toggle coverage. Populated/resolved app smoke could not be exercised because no interactive path creates real campaigns; that missing catalyst is deferred to P6-I and organic gameplay proof to P6-J(B), so it is not a Track A closeout blocker.
 
 P6-H deferred smoke route:
-- P6-H is closed as a snapshot-render UI slice, but not as populated/resolved app-smoke proof. P6-I must later prove `Ctrl+Q` -> `Ctrl+F2` populated campaign panel/overlay from the running app. P6-J must later prove organic gameplay campaign launch; manual/operator launch evidence must not be overclaimed as organic proof.
+- P6-H is closed as a snapshot-render UI slice, but not as organic app-smoke proof. P6-I proved `Ctrl+Q` -> `Ctrl+F2` populated campaign panel/overlay from the running app. P6-J(B) must later prove organic gameplay campaign launch; manual/operator launch evidence must not be overclaimed as organic proof.
 
 **Step 3A — campaign launch catalyst for manual smoke (opens when P6-F ✅; required for full P6-H closeout)**
 
@@ -2210,26 +2211,40 @@ P6-I acceptance:
 - No Graphics-owned state synthesis, no direct `World` mutation from App, and no runtime validation bypass.
 
 P6-I closeout note:
-- ✅ Track B manual/operator campaign launch catalyst accepted GREEN as `manual_operator` proof only: runtime-owned `ManualCampaignLaunchCommand.DefaultOperatorSmoke` (`Obsidari -> Aetheri`, requested members `1`) delegates through `SimulationRuntime.TryCreateManualCampaign(...)` -> `TryCreateCampaign(...)`, App `Ctrl+Q` only routes to Runtime and shows toast, and no Graphics/AI/ScenarioRunner scope was added. Automated wrapper/boundary/build gates are green, including the review follow-up arch test targeting the active `GameHost.cs`. Manual smoke passed: gates ON (`WORLDSIM_ENABLE_DIPLOMACY=true`, `WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true`) `Ctrl+Q` created real campaigns and `Ctrl+F2` showed populated campaign panel/overlay (`Obs->Aet`, `assembling_pending` / `pending_assembly`, `Result pending`); gates OFF `Ctrl+Q` showed visible `CampaignRuntimeUnavailable`. `Army 0/1` / `anchor:none` is accepted as non-blocking assembly state, not a P6-I failure. Organic campaign launch remains P6-J.
+- ✅ Track B manual/operator campaign launch catalyst accepted GREEN as `manual_operator` proof only: runtime-owned `ManualCampaignLaunchCommand.DefaultOperatorSmoke` (`Obsidari -> Aetheri`, requested members `1`) delegates through `SimulationRuntime.TryCreateManualCampaign(...)` -> `TryCreateCampaign(...)`, App `Ctrl+Q` only routes to Runtime and shows toast, and no Graphics/AI/ScenarioRunner scope was added. Automated wrapper/boundary/build gates are green, including the review follow-up arch test targeting the active `GameHost.cs`. Manual smoke passed: gates ON (`WORLDSIM_ENABLE_DIPLOMACY=true`, `WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true`) `Ctrl+Q` created real campaigns and `Ctrl+F2` showed populated campaign panel/overlay (`Obs->Aet`, `assembling_pending` / `pending_assembly`, `Result pending`); gates OFF `Ctrl+Q` showed visible `CampaignRuntimeUnavailable`. `Army 0/1` / `anchor:none` is accepted as non-blocking assembly state, not a P6-I failure. Organic campaign launch remains P6-J(B).
 
-**Step 3B — organic campaign launch application (opens when P6-I ✅)**
+**Step 3B — organic campaign launch runtime application (Track B; opens when P6-I ✅)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B + Track C agents | P6-J | P6-G ✅ + P6-I ✅ | Wire campaign strategist intent into runtime-owned validation/application so civilizations can organically launch bounded campaigns during normal gameplay. Track C owns advisory intent; Track B owns runtime fact mapping, caps, validation, and `TryCreateCampaign(...)` application. Detailed plan: `Docs/Plans/Master/Wave10-Campaign-Launch-Catalyst-Plan.md`. |
+| Track B agent | P6-J(B) | P6-G ✅ + P6-I ✅ | Wire the already-accepted P6-G strategist output into runtime-owned validation/application so civilizations can organically launch bounded campaigns during normal gameplay. Track B owns runtime fact mapping, cadence, caps, validation, suppression reasons, and `TryCreateCampaign(...)` application. Do not change AI strategy internals unless a concrete contract gap is found; if a gap is found, hand it off to P6-J(C). Detailed plan: `Docs/Plans/Master/Wave10-Campaign-Launch-Catalyst-Plan.md`. |
 
-P6-J acceptance:
+P6-J(B) acceptance:
 - Under hostile/war conditions and sufficient eligible members, at least one civilization can autonomously launch a bounded campaign in normal app/runtime flow.
 - Peaceful, disabled, insufficient-force, same-faction, missing-colony, home-defense, active-campaign-cap, and route/path budget cases suppress launches deterministically.
 - The implementation is faction/campaign-level, not a new per-person `RuntimeNpcBrain` branch.
 - `RequestConvoy`/`ReinforceCampaign` remain advisory until Track B/P7 hooks exist, unless P7 logistics hooks are already available and explicitly consumed.
 - ScenarioRunner/SMR evidence must distinguish organic launches from deterministic/manual operator probes.
 
+P6-J(B) handoff requirement:
+- Track B must explicitly state one of: `P6-J(C) not needed - existing P6-G strategy contract was sufficient`, or `P6-J(C) needed - Track C must adjust/extend advisory strategy because <specific contract gap>`.
+
+**Step 3C — campaign strategy follow-up (Track C; opens only after P6-J(B) handoff)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track C agent | P6-J(C) | P6-J(B) ✅ + explicit B handoff requiring C work | Only adjust the advisory campaign strategist if P6-J(B) proves the existing P6-G contract is insufficient. Track C owns advisory scoring/intent shape only; Runtime application, caps, validation, and `TryCreateCampaign(...)` remain Track B-owned. If P6-J(B) says no Track C changes are needed, mark P6-J(C) N/A in the closeout note rather than opening a no-op implementation session. |
+
+P6-J(C) acceptance, if opened:
+- The advisory strategy change is isolated to `WorldSim.AI` / AI tests and does not reference Runtime/App/Graphics.
+- The change directly addresses the named P6-J(B) handoff gap and does not invent new campaign runtime policy.
+- Runtime application remains owned by the already-closed P6-J(B) path.
+
 **Step 4 — supply lines foundation (Track B)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | P7-A | P6-E ✅ + P6-F ✅ | Start Phase 7 after siege + resolution runtime ready; P6-G/P6-H/P6-I/P6-J are not true execution-dependencies for this step and may proceed in parallel as downstream / non-blocking work. If P7-A lands before P6-J, P6-J must consume P7 logistics caps instead of inventing parallel launch constraints. |
+| Track B agent | P7-A | P6-E ✅ + P6-F ✅ | Start Phase 7 after siege + resolution runtime ready; P6-G/P6-H/P6-I/P6-J(B)/P6-J(C) are not true execution-dependencies for this step and may proceed in parallel as downstream / non-blocking work. If P7-A lands before P6-J(B), P6-J(B) must consume P7 logistics caps instead of inventing parallel launch constraints. |
 
 **Step 5 — opens when P7-A ✅**
 
@@ -2272,14 +2287,14 @@ P7 logistics cap note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | Wave 10 SMR prep - export/config | P6-I ✅ + P6-J ✅ + P7-C (B part) ✅ + P7-E ✅ + P7-G ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for campaign resolution, manual/operator launch, organic launch, supply lines, forward bases, scouts, siege units, and multi-front constraints per `Wave9-10-SMR-Closeout-Plan.md`. Campaign-launch lanes must label proof type: `organic`, `deterministic_probe`, or `manual_operator`. |
+| Track B agent | Wave 10 SMR prep - export/config | P6-I ✅ + P6-J(B) ✅ + P6-J(C) ✅/N/A + P7-C (B part) ✅ + P7-E ✅ + P7-G ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for campaign resolution, manual/operator launch, organic launch, supply lines, forward bases, scouts, siege units, and multi-front constraints per `Wave9-10-SMR-Closeout-Plan.md`. Campaign-launch lanes must label proof type: `organic`, `deterministic_probe`, or `manual_operator`. |
 | SMR Analyst | Wave 10 SMR prep - validation | Track B export/config ✅ | Validate that the new artifact surface and deterministic lanes can prove Wave 10 behavior before the final closeout package |
 
 **Step 10B — final Wave 10 closeout evidence**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst | Wave 10 SMR evidence | All Wave 10 implementation epics ✅ (`P6-G`/`P6-H`/`P6-I`/`P6-J`/`P7-C B+C`/`P7-D`/`P7-F`/`P7-G`/`P7-H`) + Wave 10 SMR prep ✅ | Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient. Manual/operator launch evidence must not be overclaimed as organic campaign proof. |
+| SMR Analyst | Wave 10 SMR evidence | All Wave 10 implementation epics ✅ (`P6-G`/`P6-H`/`P6-I`/`P6-J(B)`/`P6-J(C) ✅ or N/A`/`P7-C B+C`/`P7-D`/`P7-F`/`P7-G`/`P7-H`) + Wave 10 SMR prep ✅ | Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient. Manual/operator launch evidence must not be overclaimed as organic campaign proof. |
 
 **Parallelism:** Wave 10 stays sequential across major phases (`C11 -> C12 -> C13`), but inside each phase the final consumer steps are grouped into the same step whenever cross-track work can proceed in parallel.
 
