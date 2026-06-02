@@ -2142,7 +2142,7 @@ Wave 10 SMR evidence guardrail:
 
 > Combat Plan > Phase 7 Sprint 12
 
-- ⬜ **P7-A** Supply line convoy entities (Track B)
+- ✅ **P7-A** Supply line convoy entities (Track B)
 - ⬜ **P7-B** Forward bases / camps (Track B)
 - ⬜ **P7-C** Scout role + intel (Track B + C)
 - ⬜ **P7-D** UI for supply lines and forward bases (Track A)
@@ -2248,6 +2248,9 @@ P6-J(C) acceptance, if opened:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P7-A | P6-E ✅ + P6-F ✅ | Start Phase 7 after siege + resolution runtime ready; P6-G/P6-H/P6-I/P6-J(B)/P6-J(C) are not true execution-dependencies for this step and may proceed in parallel as downstream / non-blocking work. If P7-A lands before P6-J(B), P6-J(B) must consume P7 logistics caps instead of inventing parallel launch constraints. |
+
+P7-A closeout note:
+- ✅ Track B supply line convoy foundation accepted GREEN after Meta+Swarm re-review. Runtime now owns non-actor `SupplyConvoyState` entities, `CampaignLogisticsOptions`/counters, organic-path-only campaign cap support, convoy cap/throttle/home-defense/route-budget validation, target-resolved failure, recipient-gated one-time ration-pool delivery, and minimal runtime/read-model snapshot export. The RED-review blocker was fixed: convoy delivery now requires a live assigned target-army recipient adjacent to the convoy before adding rations; static campaign-objective arrival without a recipient stalls/no-progress instead of remote delivery. The telemetry minor was fixed with `ConvoySpawnBlockedByHomeDefense`. Scope stayed Track B runtime/read-model/test plus Graphics interpolator pass-through regression only: no `ForwardBaseState`, no Track C AI contract changes, no App/operator controls, no Graphics rendering/UI, and no ScenarioRunner/SMR export. Verification passed via focused P7-A logistics tests (11/11), campaign regressions, arch/interpolator tests, full solution build, diff/static/security checks. Step 10A still owns durable ScenarioRunner/SMR logistics proof export.
 
 **Step 5 — opens when P7-A ✅**
 

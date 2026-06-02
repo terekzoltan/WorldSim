@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-06-02 - Wave 10 P7-A Step Review - Blocking - Supply convoy delivery must prove a live army recipient
+
+- Track: Track B / Runtime supply convoy logistics
+- Source: Meta internal step-review + Swarm Assistant review synthesis for Wave 10 `P7-A`
+- Finding: The initial P7-A convoy implementation resolved a static convoy target from the campaign objective / route target and delivered `PayloadFood` into `ArmyRationPoolState` once the convoy reached that tile, without proving that the target army or a live campaign recipient was actually at or adjacent to the convoy.
+- Impact: A supply convoy can remotely refill a campaign army when the convoy reaches the enemy objective while the army is still elsewhere, weakening the supply-line contract before P7-B/P7-D/P7-G build on this foundation.
+- Resolution / guidance: Before P7-A closeout, Track B must make convoy delivery require a deterministic live recipient condition, preferably a live target-army member/anchor adjacent to the convoy, or explicitly rename/redefine the behavior as objective cache delivery. Add a regression where the army is stationary/stalled away from the old static objective and ration pool does not increase until the convoy reaches the army/recipient.
+- Status: fixed in P7-A fix pass before closeout; delivery now requires a live assigned target-army recipient adjacent to the convoy, static-target/no-recipient arrival stalls without delivery, and focused regressions cover no-recipient, live-recipient, dead/missing-recipient, and resolved-target cases
+
+## 2026-06-02 - Wave 10 P7-A Step Review - Minor - Convoy home-defense telemetry must not be conflated with campaign launch blocks
+
+- Track: Track B / Runtime logistics counters and future SMR evidence
+- Source: Meta internal step-review + Swarm Assistant review synthesis for Wave 10 `P7-A`
+- Finding: Convoy request home-defense failure records `CampaignLaunchBlockedByHomeDefense`, and the focused test currently asserts the campaign-launch counter for a convoy spawn block.
+- Impact: Later Step 10A ScenarioRunner/SMR export can misclassify whether campaign launch or logistics convoy spawn was blocked by home-defense policy.
+- Resolution / guidance: Add a convoy-specific home-defense block counter, or explicitly document counter reuse if intentionally shared. Preferred fix before P7-A closeout: add `ConvoySpawnBlockedByHomeDefense` and update the focused test to assert the convoy-specific counter.
+- Status: fixed in P7-A fix pass before closeout; convoy home-defense blocks now use `ConvoySpawnBlockedByHomeDefense` with focused test coverage, leaving campaign-launch home-defense telemetry for launch-path failures
+
 ## 2026-06-02 - Wave 10 P6-J(B) Step Review - Blocking - Organic launch must enforce full launch-time campaign gates
 
 - Track: Track B / Runtime organic campaign launch

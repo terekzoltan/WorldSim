@@ -48,7 +48,7 @@ public sealed class SimulationRuntime
     private const int MaxCausalWindowTicks = 100;
     private const int CampaignPathMaxExpansions = 4096;
     private const int OrganicCampaignLaunchCadenceTicks = 20;
-    private const int OrganicCampaignMaxUnresolvedPerOwner = 1;
+    private const int OrganicCampaignMaxUnresolvedPerOwner = 2;
     private const int OrganicCampaignMaxUnresolvedPerUnorderedPair = 1;
     private const int OrganicCampaignMinimumHomeDefenseReserve = 1;
     private const double FloatingCausalEqTolerance = 0.0001d;
@@ -77,11 +77,15 @@ public sealed class SimulationRuntime
     private readonly DirectorState _directorState = new();
     private readonly ICampaignStrategist _campaignStrategist;
     private readonly List<CampaignState> _campaigns = new();
+    private readonly List<SupplyConvoyState> _supplyConvoys = new();
     private readonly Dictionary<CampaignWarScoreKey, int> _campaignWarScores = new();
+    private readonly CampaignLogisticsOptions _campaignLogisticsOptions = CampaignLogisticsOptions.Default.Normalized();
+    private readonly CampaignLogisticsCounters _campaignLogisticsCounters = new();
     private DirectorExecutionState _directorExecutionState = DirectorExecutionState.NotTriggered;
     private int _lastObservedDecisionTick = -1;
     private int _nextCampaignId = 1;
     private int _nextArmyId = 1;
+    private int _nextSupplyConvoyId = 1;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
     private int _trackedActorId = -1;
@@ -99,6 +103,9 @@ public sealed class SimulationRuntime
     public int ColonyCount => _world._colonies.Count;
     public IReadOnlyList<CampaignRuntimeSnapshot> Campaigns
         => _campaigns.Select(CampaignRuntimeSnapshot.From).ToArray();
+    public IReadOnlyList<SupplyConvoyRuntimeSnapshot> SupplyConvoys
+        => _supplyConvoys.Select(SupplyConvoyRuntimeSnapshot.From).ToArray();
+    public CampaignLogisticsCounters CampaignLogisticsCounters => _campaignLogisticsCounters;
 
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath)
         : this(width, height, initialPopulation, technologyFilePath, null)
@@ -194,6 +201,7 @@ public sealed class SimulationRuntime
             .ToHashSet();
         AdvanceCampaignAssemblies(blockedCampaignActorIds);
         AdvanceCampaignMarches(marchEligibleCampaignIds, dt, blockedCampaignActorIds);
+        AdvanceSupplyConvoys();
         AdvanceCampaignEncounters();
         RecordCampaignWave9PhaseTicks();
         EvaluatePendingDirectorCausalChains();
@@ -208,6 +216,7 @@ public sealed class SimulationRuntime
         return snapshot with
         {
             Campaigns = BuildCampaignRenderData(),
+            SupplyConvoys = BuildSupplyConvoyRenderData(),
             Director = BuildDirectorRenderState()
         };
     }
@@ -215,6 +224,30 @@ public sealed class SimulationRuntime
     private IReadOnlyList<CampaignRenderData> BuildCampaignRenderData()
         => _campaigns
             .Select(BuildCampaignRenderData)
+            .ToArray();
+
+    private IReadOnlyList<SupplyConvoyRenderData> BuildSupplyConvoyRenderData()
+        => _supplyConvoys
+            .OrderBy(convoy => convoy.ConvoyId)
+            .Select(convoy => new SupplyConvoyRenderData(
+                convoy.ConvoyId,
+                (int)convoy.OwnerFaction,
+                convoy.HomeColonyId,
+                convoy.TargetCampaignId,
+                convoy.TargetArmyId,
+                MapSupplyConvoyPhaseForReadModel(convoy.Phase),
+                convoy.CreatedTick,
+                convoy.CompletedTick,
+                convoy.CurrentX,
+                convoy.CurrentY,
+                convoy.TargetX,
+                convoy.TargetY,
+                convoy.PayloadFood,
+                convoy.RouteCounters.PathRequests,
+                convoy.RouteCounters.PathCacheHits,
+                convoy.RouteCounters.RouteRecomputes,
+                convoy.RouteCounters.ProgressTicks,
+                convoy.RouteCounters.NoProgressTicks))
             .ToArray();
 
     public ScenarioWave9TelemetrySnapshot BuildScenarioWave9TelemetrySnapshot(string? wave9Scenario = null)
@@ -477,6 +510,16 @@ public sealed class SimulationRuntime
             _ => "unknown"
         };
 
+    private static string MapSupplyConvoyPhaseForReadModel(SupplyConvoyPhase phase)
+        => phase switch
+        {
+            SupplyConvoyPhase.Pending => "pending",
+            SupplyConvoyPhase.Marching => "marching",
+            SupplyConvoyPhase.Delivered => "delivered",
+            SupplyConvoyPhase.Failed => "failed",
+            _ => "unknown"
+        };
+
     private static string NormalizeWave9ScenarioName(string? wave9Scenario)
         => string.IsNullOrWhiteSpace(wave9Scenario) ? "none" : wave9Scenario.Trim();
 
@@ -585,17 +628,16 @@ public sealed class SimulationRuntime
         {
             var context = BuildOrganicCampaignStrategyContext(ownerColony, assignedActorIds, blockedCampaignActorIds);
             var decision = _campaignStrategist.Decide(context);
-            if (decision.Kind != CampaignStrategyDecisionKind.LaunchCampaign)
-                continue;
-
-            var result = TryApplyOrganicCampaignLaunch(ownerColony, decision, assignedActorIds, blockedCampaignActorIds);
-            if (!result.Success)
-                continue;
-
-            if (result.CampaignId.HasValue)
+            if (decision.Kind == CampaignStrategyDecisionKind.LaunchCampaign)
             {
-                assignedActorIds = GetActiveCampaignActorIds();
+                var result = TryApplyOrganicCampaignLaunch(ownerColony, decision, assignedActorIds, blockedCampaignActorIds);
+                if (result.Success && result.CampaignId.HasValue)
+                    assignedActorIds = GetActiveCampaignActorIds();
+                continue;
             }
+
+            if (decision.Kind == CampaignStrategyDecisionKind.RequestConvoy)
+                TryApplySupplyConvoyRequest(ownerColony, decision, assignedActorIds, blockedCampaignActorIds);
         }
     }
 
@@ -613,7 +655,7 @@ public sealed class SimulationRuntime
             AvailableWarriors: availableForLaunch,
             AvailableCarriers: eligibleMembers.Count(person => person.HasRole(PersonRole.SupplyCarrier)),
             ActiveCampaignCount: activeCampaignCount,
-            MaxActiveCampaigns: OrganicCampaignMaxUnresolvedPerOwner,
+            MaxActiveCampaigns: _campaignLogisticsOptions.MaxActiveCampaignsPerFaction,
             HomeDefenseScore: availableForLaunch,
             MinimumHomeDefenseScore: OrganicCampaignMinimumHomeDefenseReserve,
             SupplyReadiness: 1.0f,
@@ -717,7 +759,10 @@ public sealed class SimulationRuntime
         }
 
         if (CountUnresolvedOwnerCampaigns(ownerColony.Faction) >= OrganicCampaignMaxUnresolvedPerOwner)
+        {
+            _campaignLogisticsCounters.RecordCampaignLaunchBlockedByCap();
             return CampaignCreationResult.Failed(CampaignCreationStatus.CampaignRuntimeUnavailable, "Organic campaign owner cap reached.");
+        }
 
         if (CountUnresolvedUnorderedPairCampaigns(ownerColony.Faction, targetFaction) >= OrganicCampaignMaxUnresolvedPerUnorderedPair)
             return CampaignCreationResult.Failed(CampaignCreationStatus.CampaignRuntimeUnavailable, "Organic campaign unordered faction-pair cap reached.");
@@ -728,7 +773,10 @@ public sealed class SimulationRuntime
         var eligibleMembers = GetOrganicCampaignEligibleMembers(ownerColony, assignedActorIds, blockedCampaignActorIds);
         var availableForLaunch = Math.Max(0, eligibleMembers.Count(person => person.HasRole(PersonRole.Warrior)) - OrganicCampaignMinimumHomeDefenseReserve);
         if (availableForLaunch <= 0)
+        {
+            _campaignLogisticsCounters.RecordCampaignLaunchBlockedByHomeDefense();
             return CampaignCreationResult.Failed(CampaignCreationStatus.InvalidRequestedMemberCount, "Organic campaign launch would violate home defense reserve.");
+        }
 
         var requestedMemberCount = Math.Max(1, decision.RequestedWarriors + decision.RequestedCarriers);
         requestedMemberCount = Math.Min(requestedMemberCount, availableForLaunch);
@@ -757,11 +805,140 @@ public sealed class SimulationRuntime
                 campaign.CampaignId,
                 (int)campaign.TargetFaction,
                 campaign.TargetColonyId,
-                SupplyReadiness: 1.0f,
+                SupplyReadiness: CalculateCampaignSupplyReadiness(campaign),
                 AdvantageScore: 0f,
                 StalledTicks: campaign.RouteCounters.NoProgressTicks,
                 IsRecoverable: true))
             .ToArray();
+
+    private bool TryApplySupplyConvoyRequest(
+        Colony ownerColony,
+        CampaignStrategyDecision decision,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        var targetCampaign = _campaigns.FirstOrDefault(campaign =>
+            campaign.CampaignId == decision.CampaignId
+            && campaign.OwnerFaction == ownerColony.Faction
+            && campaign.Phase != CampaignPhase.Resolved);
+        if (targetCampaign == null)
+            return false;
+
+        if (CountActiveSupplyConvoys(ownerColony.Faction) >= _campaignLogisticsOptions.MaxActiveConvoysPerFaction)
+        {
+            _campaignLogisticsCounters.RecordConvoySpawnBlockedByCap();
+            return false;
+        }
+
+        if (IsSupplyConvoySpawnThrottled(ownerColony.Faction))
+        {
+            _campaignLogisticsCounters.RecordConvoySpawnBlockedByThrottle();
+            return false;
+        }
+
+        if (CountAvailableHomeDefenseWarriors(ownerColony, assignedActorIds, blockedCampaignActorIds) < _campaignLogisticsOptions.MinimumHomeDefenseWarriors)
+        {
+            _campaignLogisticsCounters.RecordConvoySpawnBlockedByHomeDefense();
+            return false;
+        }
+
+        var target = ResolveSupplyConvoyTarget(targetCampaign);
+        if (!HasSupplyConvoyRoutePreflight(ownerColony, target))
+        {
+            _campaignLogisticsCounters.RecordConvoySpawnRouteBudgetExhausted();
+            return false;
+        }
+
+        var convoyId = _nextSupplyConvoyId++;
+        _supplyConvoys.Add(new SupplyConvoyState(
+            convoyId,
+            ownerColony.Faction,
+            ownerColony.Id,
+            targetCampaign.CampaignId,
+            targetCampaign.ArmyId,
+            Tick,
+            ownerColony.Origin.x,
+            ownerColony.Origin.y,
+            target.x,
+            target.y,
+            _campaignLogisticsOptions.ConvoyFoodPayload));
+        _campaignLogisticsCounters.RecordConvoySpawned();
+        return true;
+    }
+
+    private int CountActiveSupplyConvoys(Faction ownerFaction)
+        => _supplyConvoys.Count(convoy => convoy.OwnerFaction == ownerFaction && convoy.IsActive);
+
+    private bool IsSupplyConvoySpawnThrottled(Faction ownerFaction)
+    {
+        if (_campaignLogisticsOptions.ConvoySpawnCooldownTicks <= 0)
+            return false;
+
+        var lastSpawnTick = _supplyConvoys
+            .Where(convoy => convoy.OwnerFaction == ownerFaction)
+            .Select(convoy => convoy.CreatedTick)
+            .DefaultIfEmpty(-1)
+            .Max();
+        return lastSpawnTick >= 0 && Tick - lastSpawnTick < _campaignLogisticsOptions.ConvoySpawnCooldownTicks;
+    }
+
+    private int CountAvailableHomeDefenseWarriors(
+        Colony ownerColony,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+        => _world._people.Count(person =>
+            person.Health > 0f
+            && person.Home.Id == ownerColony.Id
+            && person.HasRole(PersonRole.Warrior)
+            && !assignedActorIds.Contains(person.Id)
+            && !blockedCampaignActorIds.Contains(person.Id)
+            && !IsCampaignAssemblyBlockedByTransientOwnership(person));
+
+    private (int x, int y) ResolveSupplyConvoyTarget(CampaignState campaign)
+    {
+        if (campaign.Phase == CampaignPhase.Marching && TryResolveCampaignMarchObjective(campaign, out var objective))
+            return objective.MovementTarget;
+
+        var memberActorId = campaign.Army.MemberActorIds
+            .OrderBy(actorId => actorId)
+            .FirstOrDefault();
+        if (memberActorId > 0)
+        {
+            var member = _world._people.FirstOrDefault(person => person.Id == memberActorId && person.Health > 0f);
+            if (member != null)
+                return member.Pos;
+        }
+
+        return (campaign.RouteIntent.TargetX, campaign.RouteIntent.TargetY);
+    }
+
+    private bool HasSupplyConvoyRoutePreflight(Colony ownerColony, (int x, int y) target)
+    {
+        var grid = new NavigationGrid(_world);
+        var path = NavigationPathfinder.FindPath(
+            grid,
+            ownerColony.Origin,
+            target,
+            ownerColony.Id,
+            _campaignLogisticsOptions.RoutePathMaxExpansions,
+            out var budgetExceeded);
+
+        return !budgetExceeded && path.Count > 1;
+    }
+
+    private static float CalculateCampaignSupplyReadiness(CampaignState campaign)
+    {
+        if (campaign.Phase is CampaignPhase.Resolved or CampaignPhase.AssemblingPending or CampaignPhase.Assembling)
+            return 1.0f;
+        if (campaign.Army.RationPoolState.RationPoolFood > 0)
+            return 1.0f;
+        if (campaign.Army.SupplyState.SustainedOutOfSupplyTicks >= 5)
+            return 0.1f;
+        if (campaign.Army.SupplyState.SustainedOutOfSupplyTicks > 0)
+            return 0.35f;
+
+        return 1.0f;
+    }
 
     private List<Person> GetOrganicCampaignEligibleMembers(
         Colony ownerColony,
@@ -1209,6 +1386,132 @@ public sealed class SimulationRuntime
             if (campaign.Phase == CampaignPhase.Encounter)
                 campaign.RouteCounters.RecordEncounterTick();
         }
+    }
+
+    private void AdvanceSupplyConvoys()
+    {
+        foreach (var convoy in _supplyConvoys.Where(convoy => convoy.IsActive).OrderBy(convoy => convoy.ConvoyId).ToArray())
+        {
+            var targetCampaign = _campaigns.FirstOrDefault(campaign =>
+                campaign.CampaignId == convoy.TargetCampaignId
+                && campaign.ArmyId == convoy.TargetArmyId
+                && campaign.OwnerFaction == convoy.OwnerFaction);
+            if (targetCampaign == null || targetCampaign.Phase == CampaignPhase.Resolved)
+            {
+                convoy.MarkFailed(Tick);
+                _campaignLogisticsCounters.RecordConvoyFailed();
+                continue;
+            }
+
+            if (IsSupplyConvoyAtTarget(convoy))
+            {
+                if (HasLiveSupplyConvoyRecipient(convoy, targetCampaign))
+                    DeliverSupplyConvoy(convoy, targetCampaign);
+                else
+                    convoy.RouteCounters.RecordNoProgress();
+                continue;
+            }
+
+            var nextStep = GetNextSupplyConvoyStep(convoy);
+            if (!nextStep.HasValue)
+            {
+                convoy.RouteCounters.RecordNoProgress();
+                convoy.MarkFailed(Tick);
+                _campaignLogisticsCounters.RecordConvoyRouteBudgetExhausted();
+                _campaignLogisticsCounters.RecordConvoyFailed();
+                continue;
+            }
+
+            convoy.BeginMarch();
+            convoy.MoveTo(nextStep.Value.x, nextStep.Value.y);
+            convoy.RouteCounters.RecordProgress();
+            if (convoy.RouteCache.PeekNext() == nextStep.Value)
+                convoy.RouteCache.Advance();
+
+            if (IsSupplyConvoyAtTarget(convoy) && HasLiveSupplyConvoyRecipient(convoy, targetCampaign))
+                DeliverSupplyConvoy(convoy, targetCampaign);
+        }
+    }
+
+    private bool IsSupplyConvoyAtTarget(SupplyConvoyState convoy)
+        => Math.Abs(convoy.CurrentX - convoy.TargetX) + Math.Abs(convoy.CurrentY - convoy.TargetY) <= 1;
+
+    private void DeliverSupplyConvoy(SupplyConvoyState convoy, CampaignState targetCampaign)
+    {
+        if (!convoy.IsActive || targetCampaign.Phase == CampaignPhase.Resolved || !HasLiveSupplyConvoyRecipient(convoy, targetCampaign))
+            return;
+
+        targetCampaign.Army.RationPoolState.AddRations(convoy.PayloadFood);
+        convoy.MarkDelivered(Tick);
+        _campaignLogisticsCounters.RecordConvoyDelivered();
+    }
+
+    private bool HasLiveSupplyConvoyRecipient(SupplyConvoyState convoy, CampaignState targetCampaign)
+    {
+        foreach (var actorId in targetCampaign.Army.MemberActorIds)
+        {
+            var member = _world._people.FirstOrDefault(person => person.Id == actorId && person.Health > 0f);
+            if (member == null)
+                continue;
+
+            if (Math.Abs(member.Pos.x - convoy.CurrentX) + Math.Abs(member.Pos.y - convoy.CurrentY) <= 1)
+                return true;
+        }
+
+        return false;
+    }
+
+    private (int x, int y)? GetNextSupplyConvoyStep(SupplyConvoyState convoy)
+    {
+        var target = (x: convoy.TargetX, y: convoy.TargetY);
+        var topologyVersion = _world.NavigationTopologyVersion;
+        if (convoy.RouteCache.IsValid(target, topologyVersion))
+        {
+            convoy.RouteCounters.RecordPathCacheHit();
+        }
+        else
+        {
+            BuildSupplyConvoyRouteCache(convoy, target, topologyVersion);
+        }
+
+        var next = convoy.RouteCache.PeekNext();
+        if (!next.HasValue)
+            return null;
+
+        if (!_world.IsMovementBlocked(next.Value.x, next.Value.y, convoy.HomeColonyId))
+            return next;
+
+        convoy.RouteCache.Invalidate();
+        BuildSupplyConvoyRouteCache(convoy, target, _world.NavigationTopologyVersion);
+        next = convoy.RouteCache.PeekNext();
+        if (!next.HasValue)
+            return null;
+
+        return _world.IsMovementBlocked(next.Value.x, next.Value.y, convoy.HomeColonyId)
+            ? null
+            : next;
+    }
+
+    private void BuildSupplyConvoyRouteCache(SupplyConvoyState convoy, (int x, int y) target, int topologyVersion)
+    {
+        convoy.RouteCounters.RecordPathRequest();
+        convoy.RouteCounters.RecordRouteRecompute();
+        var grid = new NavigationGrid(_world);
+        var path = NavigationPathfinder.FindPath(
+            grid,
+            (convoy.CurrentX, convoy.CurrentY),
+            target,
+            convoy.HomeColonyId,
+            _campaignLogisticsOptions.RoutePathMaxExpansions,
+            out var budgetExceeded);
+
+        if (budgetExceeded || path.Count <= 1)
+        {
+            convoy.RouteCache.Invalidate();
+            return;
+        }
+
+        convoy.RouteCache.Set(target, topologyVersion, path);
     }
 
     private void QueueCampaignSiegePressureForActiveEncounters(float dt, HashSet<int> blockedCampaignActorIds)

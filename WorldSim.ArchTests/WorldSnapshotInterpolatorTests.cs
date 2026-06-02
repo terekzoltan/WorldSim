@@ -26,7 +26,30 @@ public class WorldSnapshotInterpolatorTests
         Assert.Equal(5, Assert.Single(interpolated.People).X);
     }
 
+    [Fact]
+    public void Interpolate_PreservesSupplyConvoys()
+    {
+        var previous = CreateSnapshot(Array.Empty<CampaignRenderData>(), Array.Empty<SupplyConvoyRenderData>(), personX: 0);
+        var convoy = CreateSupplyConvoy();
+        var current = CreateSnapshot(Array.Empty<CampaignRenderData>(), new[] { convoy }, personX: 10);
+
+        var interpolated = WorldSnapshotInterpolator.Interpolate(previous, current, alpha: 0.5f);
+
+        var result = Assert.Single(interpolated.SupplyConvoys);
+        Assert.Equal(convoy.ConvoyId, result.ConvoyId);
+        Assert.Equal(convoy.TargetCampaignId, result.TargetCampaignId);
+        Assert.Equal(convoy.Phase, result.Phase);
+        Assert.Equal(convoy.PayloadFood, result.PayloadFood);
+        Assert.Equal(5, Assert.Single(interpolated.People).X);
+    }
+
     private static WorldRenderSnapshot CreateSnapshot(IReadOnlyList<CampaignRenderData> campaigns, int personX)
+        => CreateSnapshot(campaigns, Array.Empty<SupplyConvoyRenderData>(), personX);
+
+    private static WorldRenderSnapshot CreateSnapshot(
+        IReadOnlyList<CampaignRenderData> campaigns,
+        IReadOnlyList<SupplyConvoyRenderData> supplyConvoys,
+        int personX)
         => new(
             Width: 16,
             Height: 16,
@@ -42,6 +65,7 @@ public class WorldSnapshotInterpolatorTests
             Sieges: Array.Empty<SiegeRenderData>(),
             Breaches: Array.Empty<BreachRenderData>(),
             Campaigns: campaigns,
+            SupplyConvoys: supplyConvoys,
             FactionStances: Array.Empty<FactionStanceRenderData>(),
             Ecology: CreateEcoHudData(),
             CurrentSeason: SeasonView.Spring,
@@ -135,6 +159,27 @@ public class WorldSnapshotInterpolatorTests
             },
             Resolution: CampaignResolutionRenderData.Empty,
             Encounters: Array.Empty<CampaignEncounterRenderData>());
+
+    private static SupplyConvoyRenderData CreateSupplyConvoy()
+        => new(
+            ConvoyId: 8,
+            OwnerFactionId: 1,
+            HomeColonyId: 3,
+            TargetCampaignId: 42,
+            TargetArmyId: 77,
+            Phase: "marching",
+            CreatedTick: 30,
+            CompletedTick: -1,
+            CurrentX: 5,
+            CurrentY: 6,
+            TargetX: 12,
+            TargetY: 14,
+            PayloadFood: 6,
+            PathRequests: 1,
+            PathCacheHits: 0,
+            RouteRecomputes: 1,
+            ProgressTicks: 2,
+            NoProgressTicks: 0);
 
     private static EcoHudData CreateEcoHudData()
         => new(

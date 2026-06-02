@@ -219,3 +219,57 @@ public sealed record ArmyForagingRuntimeSnapshot(
             state.LastStatus,
             state.LastFailureReason);
 }
+
+public sealed record SupplyConvoyRuntimeSnapshot(
+    int ConvoyId,
+    Faction OwnerFaction,
+    int HomeColonyId,
+    int TargetCampaignId,
+    int TargetArmyId,
+    SupplyConvoyPhase Phase,
+    long CreatedTick,
+    long CompletedTick,
+    int OriginX,
+    int OriginY,
+    int CurrentX,
+    int CurrentY,
+    int TargetX,
+    int TargetY,
+    int PayloadFood,
+    SupplyConvoyRouteCountersSnapshot RouteCounters)
+{
+    public static SupplyConvoyRuntimeSnapshot From(SupplyConvoyState state)
+        => new(
+            state.ConvoyId,
+            state.OwnerFaction,
+            state.HomeColonyId,
+            state.TargetCampaignId,
+            state.TargetArmyId,
+            state.Phase,
+            state.CreatedTick,
+            state.CompletedTick,
+            state.OriginX,
+            state.OriginY,
+            state.CurrentX,
+            state.CurrentY,
+            state.TargetX,
+            state.TargetY,
+            state.PayloadFood,
+            SupplyConvoyRouteCountersSnapshot.From(state.RouteCounters));
+}
+
+public sealed record SupplyConvoyRouteCountersSnapshot(
+    int PathRequests,
+    int PathCacheHits,
+    int RouteRecomputes,
+    int ProgressTicks,
+    int NoProgressTicks)
+{
+    public static SupplyConvoyRouteCountersSnapshot From(SupplyConvoyRouteCounters counters)
+        => new(
+            counters.PathRequests,
+            counters.PathCacheHits,
+            counters.RouteRecomputes,
+            counters.ProgressTicks,
+            counters.NoProgressTicks);
+}

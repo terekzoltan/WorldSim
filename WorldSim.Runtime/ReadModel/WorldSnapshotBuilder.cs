@@ -284,6 +284,7 @@ public static class WorldSnapshotBuilder
             sieges,
             breaches,
             Array.Empty<CampaignRenderData>(),
+            Array.Empty<SupplyConvoyRenderData>(),
             factionStances,
             ecology,
             MapSeason(world.CurrentSeason),
