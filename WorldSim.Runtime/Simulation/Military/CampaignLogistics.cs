@@ -5,10 +5,16 @@ namespace WorldSim.Simulation.Military;
 public sealed record CampaignLogisticsOptions(
     int MaxActiveCampaignsPerFaction = 2,
     int MaxActiveConvoysPerFaction = 1,
+    int MaxActiveForwardBasesPerFaction = 1,
     int MinimumHomeDefenseWarriors = 1,
     int ConvoySpawnCooldownTicks = 30,
     int RoutePathMaxExpansions = 4096,
-    int ConvoyFoodPayload = 6)
+    int ConvoyFoodPayload = 6,
+    int ForwardBaseMinDistanceFromHome = 8,
+    int ForwardBaseRadius = 2,
+    int ForwardBaseLifetimeTicks = 240,
+    int ForwardBaseNoMemberAbandonTicks = 30,
+    float ForwardBaseRestStaminaPerTick = 2f)
 {
     public static CampaignLogisticsOptions Default { get; } = new();
 
@@ -17,10 +23,18 @@ public sealed record CampaignLogisticsOptions(
         {
             MaxActiveCampaignsPerFaction = Math.Max(0, MaxActiveCampaignsPerFaction),
             MaxActiveConvoysPerFaction = Math.Max(0, MaxActiveConvoysPerFaction),
+            MaxActiveForwardBasesPerFaction = Math.Max(0, MaxActiveForwardBasesPerFaction),
             MinimumHomeDefenseWarriors = Math.Max(0, MinimumHomeDefenseWarriors),
             ConvoySpawnCooldownTicks = Math.Max(0, ConvoySpawnCooldownTicks),
             RoutePathMaxExpansions = Math.Max(1, RoutePathMaxExpansions),
-            ConvoyFoodPayload = Math.Max(0, ConvoyFoodPayload)
+            ConvoyFoodPayload = Math.Max(0, ConvoyFoodPayload),
+            ForwardBaseMinDistanceFromHome = Math.Max(0, ForwardBaseMinDistanceFromHome),
+            ForwardBaseRadius = Math.Max(0, ForwardBaseRadius),
+            ForwardBaseLifetimeTicks = Math.Max(1, ForwardBaseLifetimeTicks),
+            ForwardBaseNoMemberAbandonTicks = Math.Max(1, ForwardBaseNoMemberAbandonTicks),
+            ForwardBaseRestStaminaPerTick = float.IsFinite(ForwardBaseRestStaminaPerTick)
+                ? Math.Clamp(ForwardBaseRestStaminaPerTick, 0f, 100f)
+                : 0f
         };
 }
 
@@ -36,6 +50,14 @@ public sealed class CampaignLogisticsCounters
     public int ConvoysSpawned { get; private set; }
     public int ConvoysDelivered { get; private set; }
     public int ConvoysFailed { get; private set; }
+    public int ForwardBasesEstablished { get; private set; }
+    public int ForwardBasesExpired { get; private set; }
+    public int ForwardBasesAbandoned { get; private set; }
+    public int ForwardBaseBuildBlockedByCap { get; private set; }
+    public int ForwardBaseBuildBlockedByPlacement { get; private set; }
+    public int ForwardBaseBuildBlockedByRouteBudget { get; private set; }
+    public int ForwardBaseRestTicks { get; private set; }
+    public int ForwardBaseRestedActorTicks { get; private set; }
 
     internal void RecordCampaignLaunchBlockedByCap() => CampaignLaunchBlockedByCap++;
     internal void RecordCampaignLaunchBlockedByHomeDefense() => CampaignLaunchBlockedByHomeDefense++;
@@ -47,4 +69,18 @@ public sealed class CampaignLogisticsCounters
     internal void RecordConvoySpawned() => ConvoysSpawned++;
     internal void RecordConvoyDelivered() => ConvoysDelivered++;
     internal void RecordConvoyFailed() => ConvoysFailed++;
+    internal void RecordForwardBaseEstablished() => ForwardBasesEstablished++;
+    internal void RecordForwardBaseExpired() => ForwardBasesExpired++;
+    internal void RecordForwardBaseAbandoned() => ForwardBasesAbandoned++;
+    internal void RecordForwardBaseBuildBlockedByCap() => ForwardBaseBuildBlockedByCap++;
+    internal void RecordForwardBaseBuildBlockedByPlacement() => ForwardBaseBuildBlockedByPlacement++;
+    internal void RecordForwardBaseBuildBlockedByRouteBudget() => ForwardBaseBuildBlockedByRouteBudget++;
+    internal void RecordForwardBaseRest(int actorCount)
+    {
+        if (actorCount <= 0)
+            return;
+
+        ForwardBaseRestTicks++;
+        ForwardBaseRestedActorTicks += actorCount;
+    }
 }

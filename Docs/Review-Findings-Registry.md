@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-02 - Wave 10 P7-B Step Review - Major - Forward-base liveness must not reuse rest eligibility filtering
+
+- Track: Track B / Runtime forward-base lifecycle
+- Source: Meta internal step-review + Swarm Assistant review synthesis for Wave 10 `P7-B`
+- Finding: The initial P7-B forward-base implementation uses `GetValidCampaignMembers(...)` for both nearby live-member liveness and stamina-rest eligibility. That helper rejects combat/routing/raid/attack/transient members, so a live assigned army member physically near the base can fail to refresh `LastLiveMemberNearTick` and the base can abandon as `no_live_member` after the window.
+- Impact: Combat-heavy encounter/siege phases can close a valid forward base even though live assigned campaign members are present nearby, creating incorrect lifecycle/counter evidence for later P7-D/P7-E/Step10A consumers.
+- Resolution / guidance: Before P7-B closeout, split forward-base liveness from rest eligibility. Liveness should count any assigned actor still present, `Health > 0`, and within base radius; rest may keep the stricter non-transient/non-blocked filter. Add a regression where a live assigned nearby member is combat/transient (`IsInCombat`, `Job.AttackStructure`, routing, etc.): base remains active/no abandonment, while stamina/rest counters do not increment if rest-ineligible.
+- Status: fixed in P7-B second fix pass before closeout; production `AdvanceTick(...)` pruning now preserves live assigned transient actors near an active matching forward base, rest remains strict via `GetValidCampaignMembers(...)`, and focused regression coverage proves member retention, active base liveness, and no rest/counter gain
+
 ## 2026-06-02 - Wave 10 P7-A Step Review - Blocking - Supply convoy delivery must prove a live army recipient
 
 - Track: Track B / Runtime supply convoy logistics

@@ -78,6 +78,7 @@ public sealed class SimulationRuntime
     private readonly ICampaignStrategist _campaignStrategist;
     private readonly List<CampaignState> _campaigns = new();
     private readonly List<SupplyConvoyState> _supplyConvoys = new();
+    private readonly List<ForwardBaseState> _forwardBases = new();
     private readonly Dictionary<CampaignWarScoreKey, int> _campaignWarScores = new();
     private readonly CampaignLogisticsOptions _campaignLogisticsOptions = CampaignLogisticsOptions.Default.Normalized();
     private readonly CampaignLogisticsCounters _campaignLogisticsCounters = new();
@@ -86,6 +87,7 @@ public sealed class SimulationRuntime
     private int _nextCampaignId = 1;
     private int _nextArmyId = 1;
     private int _nextSupplyConvoyId = 1;
+    private int _nextForwardBaseId = 1;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
     private int _trackedActorId = -1;
@@ -105,6 +107,8 @@ public sealed class SimulationRuntime
         => _campaigns.Select(CampaignRuntimeSnapshot.From).ToArray();
     public IReadOnlyList<SupplyConvoyRuntimeSnapshot> SupplyConvoys
         => _supplyConvoys.Select(SupplyConvoyRuntimeSnapshot.From).ToArray();
+    public IReadOnlyList<ForwardBaseRuntimeSnapshot> ForwardBases
+        => _forwardBases.Select(ForwardBaseRuntimeSnapshot.From).ToArray();
     public CampaignLogisticsCounters CampaignLogisticsCounters => _campaignLogisticsCounters;
 
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath)
@@ -201,6 +205,7 @@ public sealed class SimulationRuntime
             .ToHashSet();
         AdvanceCampaignAssemblies(blockedCampaignActorIds);
         AdvanceCampaignMarches(marchEligibleCampaignIds, dt, blockedCampaignActorIds);
+        AdvanceForwardBases(blockedCampaignActorIds);
         AdvanceSupplyConvoys();
         AdvanceCampaignEncounters();
         RecordCampaignWave9PhaseTicks();
@@ -217,6 +222,7 @@ public sealed class SimulationRuntime
         {
             Campaigns = BuildCampaignRenderData(),
             SupplyConvoys = BuildSupplyConvoyRenderData(),
+            ForwardBases = BuildForwardBaseRenderData(),
             Director = BuildDirectorRenderState()
         };
     }
@@ -248,6 +254,26 @@ public sealed class SimulationRuntime
                 convoy.RouteCounters.RouteRecomputes,
                 convoy.RouteCounters.ProgressTicks,
                 convoy.RouteCounters.NoProgressTicks))
+            .ToArray();
+
+    private IReadOnlyList<ForwardBaseRenderData> BuildForwardBaseRenderData()
+        => _forwardBases
+            .OrderBy(forwardBase => forwardBase.BaseId)
+            .Select(forwardBase => new ForwardBaseRenderData(
+                forwardBase.BaseId,
+                (int)forwardBase.OwnerFaction,
+                forwardBase.HomeColonyId,
+                forwardBase.CampaignId,
+                forwardBase.ArmyId,
+                MapForwardBasePhaseForReadModel(forwardBase.Phase),
+                forwardBase.CreatedTick,
+                forwardBase.EndedTick,
+                forwardBase.X,
+                forwardBase.Y,
+                forwardBase.Radius,
+                forwardBase.RestTicks,
+                forwardBase.RestedActorTicks,
+                forwardBase.CloseReason))
             .ToArray();
 
     public ScenarioWave9TelemetrySnapshot BuildScenarioWave9TelemetrySnapshot(string? wave9Scenario = null)
@@ -517,6 +543,15 @@ public sealed class SimulationRuntime
             SupplyConvoyPhase.Marching => "marching",
             SupplyConvoyPhase.Delivered => "delivered",
             SupplyConvoyPhase.Failed => "failed",
+            _ => "unknown"
+        };
+
+    private static string MapForwardBasePhaseForReadModel(ForwardBasePhase phase)
+        => phase switch
+        {
+            ForwardBasePhase.Active => "active",
+            ForwardBasePhase.Expired => "expired",
+            ForwardBasePhase.Abandoned => "abandoned",
             _ => "unknown"
         };
 
@@ -1116,6 +1151,8 @@ public sealed class SimulationRuntime
             var person = _world._people.FirstOrDefault(candidate => candidate.Id == actorId);
             if (IsValidAssignedCampaignMember(person, blockedCampaignActorIds))
                 continue;
+            if (IsLiveAssignedCampaignMemberNearActiveForwardBase(campaign, person))
+                continue;
 
             campaign.Army.RemoveMemberActorId(actorId);
             ClearPrunedCampaignCarrier(campaign.Army, actorId, person);
@@ -1137,6 +1174,19 @@ public sealed class SimulationRuntime
            || person.ActiveBattleId >= 0
            || person.ActiveCombatGroupId >= 0
            || person.Current is Job.Fight or Job.Flee or Job.RaidBorder or Job.AttackStructure;
+
+    private bool IsLiveAssignedCampaignMemberNearActiveForwardBase(CampaignState campaign, Person? person)
+    {
+        if (person == null || person.Health <= 0f || !campaign.Army.HasMemberActorId(person.Id))
+            return false;
+
+        return _forwardBases.Any(forwardBase =>
+            forwardBase.IsActive
+            && forwardBase.OwnerFaction == campaign.OwnerFaction
+            && forwardBase.CampaignId == campaign.CampaignId
+            && forwardBase.ArmyId == campaign.ArmyId
+            && IsWithinManhattanDistance(person.Pos, (forwardBase.X, forwardBase.Y), forwardBase.Radius));
+    }
 
     private void ClearPrunedCampaignCarrier(ArmyState army, int actorId, Person? person)
     {
@@ -1387,6 +1437,187 @@ public sealed class SimulationRuntime
                 campaign.RouteCounters.RecordEncounterTick();
         }
     }
+
+    private void AdvanceForwardBases(HashSet<int> blockedCampaignActorIds)
+    {
+        var closedCampaignIds = new HashSet<int>();
+        foreach (var forwardBase in _forwardBases.Where(forwardBase => forwardBase.IsActive).OrderBy(forwardBase => forwardBase.BaseId).ToArray())
+        {
+            var campaign = _campaigns.FirstOrDefault(candidate =>
+                candidate.CampaignId == forwardBase.CampaignId
+                && candidate.ArmyId == forwardBase.ArmyId
+                && candidate.OwnerFaction == forwardBase.OwnerFaction);
+            if (campaign == null || campaign.Phase == CampaignPhase.Resolved)
+            {
+                MarkForwardBaseAbandoned(forwardBase, ForwardBaseCloseReasons.CampaignResolved);
+                closedCampaignIds.Add(forwardBase.CampaignId);
+                continue;
+            }
+
+            if (Tick - forwardBase.CreatedTick >= _campaignLogisticsOptions.ForwardBaseLifetimeTicks)
+            {
+                forwardBase.MarkExpired(Tick);
+                _campaignLogisticsCounters.RecordForwardBaseExpired();
+                closedCampaignIds.Add(forwardBase.CampaignId);
+                continue;
+            }
+
+            var liveNearbyMembers = GetLiveAssignedCampaignMembersNearForwardBase(campaign, forwardBase);
+            if (liveNearbyMembers.Length > 0)
+                forwardBase.RecordLiveMemberNear(Tick);
+
+            var restEligibleMembers = GetValidCampaignMembers(campaign, blockedCampaignActorIds)
+                .Where(member => IsWithinManhattanDistance(member.Pos, (forwardBase.X, forwardBase.Y), forwardBase.Radius))
+                .ToArray();
+            if (restEligibleMembers.Length > 0)
+            {
+                foreach (var member in restEligibleMembers)
+                    member.ApplyStaminaDelta(_campaignLogisticsOptions.ForwardBaseRestStaminaPerTick);
+                forwardBase.RecordRest(restEligibleMembers.Length);
+                _campaignLogisticsCounters.RecordForwardBaseRest(restEligibleMembers.Length);
+                continue;
+            }
+
+            if (liveNearbyMembers.Length == 0
+                && Tick - forwardBase.LastLiveMemberNearTick >= _campaignLogisticsOptions.ForwardBaseNoMemberAbandonTicks)
+            {
+                MarkForwardBaseAbandoned(forwardBase, ForwardBaseCloseReasons.NoLiveMember);
+                closedCampaignIds.Add(forwardBase.CampaignId);
+            }
+        }
+
+        foreach (var campaign in _campaigns
+                     .Where(campaign => campaign.Phase is CampaignPhase.Marching or CampaignPhase.Encounter)
+                     .OrderBy(campaign => campaign.CampaignId))
+        {
+            if (closedCampaignIds.Contains(campaign.CampaignId))
+                continue;
+            if (HasActiveForwardBaseForCampaign(campaign))
+                continue;
+
+            TryEstablishForwardBase(campaign, blockedCampaignActorIds);
+        }
+    }
+
+    private void MarkForwardBaseAbandoned(ForwardBaseState forwardBase, string reason)
+    {
+        forwardBase.MarkAbandoned(Tick, reason);
+        _campaignLogisticsCounters.RecordForwardBaseAbandoned();
+    }
+
+    private bool HasActiveForwardBaseForCampaign(CampaignState campaign)
+        => _forwardBases.Any(forwardBase =>
+            forwardBase.IsActive
+            && forwardBase.CampaignId == campaign.CampaignId
+            && forwardBase.ArmyId == campaign.ArmyId);
+
+    private int CountActiveForwardBases(Faction ownerFaction)
+        => _forwardBases.Count(forwardBase => forwardBase.OwnerFaction == ownerFaction && forwardBase.IsActive);
+
+    private Person[] GetLiveAssignedCampaignMembersNearForwardBase(CampaignState campaign, ForwardBaseState forwardBase)
+        => campaign.Army.MemberActorIds
+            .Select(actorId => _world._people.FirstOrDefault(person => person.Id == actorId))
+            .Where(person => person != null
+                && person.Health > 0f
+                && IsWithinManhattanDistance(person.Pos, (forwardBase.X, forwardBase.Y), forwardBase.Radius))
+            .Select(person => person!)
+            .OrderBy(person => person.Id)
+            .ToArray();
+
+    private bool TryEstablishForwardBase(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+    {
+        if (CountActiveForwardBases(campaign.OwnerFaction) >= _campaignLogisticsOptions.MaxActiveForwardBasesPerFaction)
+        {
+            _campaignLogisticsCounters.RecordForwardBaseBuildBlockedByCap();
+            return false;
+        }
+
+        var members = GetValidCampaignMembers(campaign, blockedCampaignActorIds);
+        var anchor = members.OrderBy(member => member.Id).FirstOrDefault();
+        if (anchor == null)
+            return false;
+
+        var home = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.OriginColonyId);
+        if (home == null)
+            return false;
+
+        if (ManhattanDistance(home.Origin, anchor.Pos) < _campaignLogisticsOptions.ForwardBaseMinDistanceFromHome)
+            return false;
+
+        if (!TryResolveForwardBasePlacement(campaign, anchor.Pos, out var placement))
+        {
+            _campaignLogisticsCounters.RecordForwardBaseBuildBlockedByPlacement();
+            return false;
+        }
+
+        if (!HasForwardBaseRoutePreflight(home, placement))
+        {
+            _campaignLogisticsCounters.RecordForwardBaseBuildBlockedByRouteBudget();
+            return false;
+        }
+
+        var forwardBase = new ForwardBaseState(
+            _nextForwardBaseId++,
+            campaign.OwnerFaction,
+            campaign.OriginColonyId,
+            campaign.CampaignId,
+            campaign.ArmyId,
+            Tick,
+            placement.x,
+            placement.y,
+            _campaignLogisticsOptions.ForwardBaseRadius);
+        _forwardBases.Add(forwardBase);
+        campaign.Army.SetRallyPoint(placement.x, placement.y);
+        _campaignLogisticsCounters.RecordForwardBaseEstablished();
+        return true;
+    }
+
+    private bool TryResolveForwardBasePlacement(CampaignState campaign, (int x, int y) anchor, out (int x, int y) placement)
+    {
+        var maxRadius = Math.Max(0, _campaignLogisticsOptions.ForwardBaseRadius);
+        for (var radius = 0; radius <= maxRadius; radius++)
+        {
+            for (var dy = -radius; dy <= radius; dy++)
+            {
+                for (var dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) > radius)
+                        continue;
+
+                    int x = anchor.x + dx;
+                    int y = anchor.y + dy;
+                    if (_world.IsMovementBlocked(x, y, campaign.OriginColonyId))
+                        continue;
+
+                    placement = (x, y);
+                    return true;
+                }
+            }
+        }
+
+        placement = default;
+        return false;
+    }
+
+    private bool HasForwardBaseRoutePreflight(Colony ownerColony, (int x, int y) placement)
+    {
+        var grid = new NavigationGrid(_world);
+        var path = NavigationPathfinder.FindPath(
+            grid,
+            ownerColony.Origin,
+            placement,
+            ownerColony.Id,
+            _campaignLogisticsOptions.RoutePathMaxExpansions,
+            out var budgetExceeded);
+
+        return !budgetExceeded && path.Count > 1;
+    }
+
+    private static bool IsWithinManhattanDistance((int x, int y) left, (int x, int y) right, int maxDistance)
+        => ManhattanDistance(left, right) <= Math.Max(0, maxDistance);
+
+    private static int ManhattanDistance((int x, int y) left, (int x, int y) right)
+        => Math.Abs(left.x - right.x) + Math.Abs(left.y - right.y);
 
     private void AdvanceSupplyConvoys()
     {

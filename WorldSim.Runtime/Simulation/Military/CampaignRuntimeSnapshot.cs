@@ -273,3 +273,39 @@ public sealed record SupplyConvoyRouteCountersSnapshot(
             counters.ProgressTicks,
             counters.NoProgressTicks);
 }
+
+public sealed record ForwardBaseRuntimeSnapshot(
+    int BaseId,
+    Faction OwnerFaction,
+    int HomeColonyId,
+    int CampaignId,
+    int ArmyId,
+    ForwardBasePhase Phase,
+    long CreatedTick,
+    long EndedTick,
+    int X,
+    int Y,
+    int Radius,
+    string CloseReason,
+    long LastLiveMemberNearTick,
+    int RestTicks,
+    int RestedActorTicks)
+{
+    public static ForwardBaseRuntimeSnapshot From(ForwardBaseState state)
+        => new(
+            state.BaseId,
+            state.OwnerFaction,
+            state.HomeColonyId,
+            state.CampaignId,
+            state.ArmyId,
+            state.Phase,
+            state.CreatedTick,
+            state.EndedTick,
+            state.X,
+            state.Y,
+            state.Radius,
+            state.CloseReason,
+            state.LastLiveMemberNearTick,
+            state.RestTicks,
+            state.RestedActorTicks);
+}

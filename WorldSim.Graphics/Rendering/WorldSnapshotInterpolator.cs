@@ -25,6 +25,7 @@ public static class WorldSnapshotInterpolator
             current.Breaches,
             current.Campaigns,
             current.SupplyConvoys,
+            current.ForwardBases,
             current.FactionStances,
             current.Ecology,
             current.CurrentSeason,

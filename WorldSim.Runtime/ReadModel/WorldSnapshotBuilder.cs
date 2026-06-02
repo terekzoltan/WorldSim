@@ -285,6 +285,7 @@ public static class WorldSnapshotBuilder
             breaches,
             Array.Empty<CampaignRenderData>(),
             Array.Empty<SupplyConvoyRenderData>(),
+            Array.Empty<ForwardBaseRenderData>(),
             factionStances,
             ecology,
             MapSeason(world.CurrentSeason),

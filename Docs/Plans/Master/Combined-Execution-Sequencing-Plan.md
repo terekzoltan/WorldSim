@@ -2143,7 +2143,7 @@ Wave 10 SMR evidence guardrail:
 > Combat Plan > Phase 7 Sprint 12
 
 - ✅ **P7-A** Supply line convoy entities (Track B)
-- ⬜ **P7-B** Forward bases / camps (Track B)
+- ✅ **P7-B** Forward bases / camps (Track B)
 - ⬜ **P7-C** Scout role + intel (Track B + C)
 - ⬜ **P7-D** UI for supply lines and forward bases (Track A)
 
@@ -2257,6 +2257,9 @@ P7-A closeout note:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | P7-B | P7-A ✅ | Forward bases depend on convoy/supply-line structure existing first |
+
+P7-B closeout note:
+- ✅ Track B forward-base runtime foundation accepted GREEN after Meta+Swarm review/fix loop. Runtime now owns non-actor `ForwardBaseState` entities with active/expired/abandoned lifecycle, live assigned army-anchor placement, Manhattan home-distance gate, deterministic passable fallback, active-base cap, placement/route/cap/rest counters, TTL expiry, resolved/no-live-member abandonment, rally-point state foundation, and bounded stamina-only rest. The RED review blockers were fixed: liveness/abandonment is split from strict rest eligibility, and production `AdvanceTick(...)` pruning now preserves live assigned transient actors near active same owner/campaign/army forward bases while keeping combat/routing/transient actors rest-ineligible. Scope stayed Track B runtime/read-model/test plus Graphics interpolator pass-through regression only: no Track C AI, no App/operator controls, no Graphics rendering/UI, no ScenarioRunner/SMR export, no ration creation, and no supply-readiness contract changes. Verification passed via focused P7-B logistics tests (25/25), arch/interpolator tests, full solution build, diff/static/security checks. Step 10A still owns durable ScenarioRunner/SMR forward-base evidence export.
 
 **Step 6 — opens when P7-B ✅**
 

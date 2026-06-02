@@ -43,12 +43,36 @@ public class WorldSnapshotInterpolatorTests
         Assert.Equal(5, Assert.Single(interpolated.People).X);
     }
 
+    [Fact]
+    public void Interpolate_PreservesForwardBases()
+    {
+        var previous = CreateSnapshot(Array.Empty<CampaignRenderData>(), Array.Empty<SupplyConvoyRenderData>(), Array.Empty<ForwardBaseRenderData>(), personX: 0);
+        var forwardBase = CreateForwardBase();
+        var current = CreateSnapshot(Array.Empty<CampaignRenderData>(), Array.Empty<SupplyConvoyRenderData>(), new[] { forwardBase }, personX: 10);
+
+        var interpolated = WorldSnapshotInterpolator.Interpolate(previous, current, alpha: 0.5f);
+
+        var result = Assert.Single(interpolated.ForwardBases);
+        Assert.Equal(forwardBase.BaseId, result.BaseId);
+        Assert.Equal(forwardBase.CampaignId, result.CampaignId);
+        Assert.Equal(forwardBase.Phase, result.Phase);
+        Assert.Equal(forwardBase.CloseReason, result.CloseReason);
+        Assert.Equal(5, Assert.Single(interpolated.People).X);
+    }
+
     private static WorldRenderSnapshot CreateSnapshot(IReadOnlyList<CampaignRenderData> campaigns, int personX)
         => CreateSnapshot(campaigns, Array.Empty<SupplyConvoyRenderData>(), personX);
 
     private static WorldRenderSnapshot CreateSnapshot(
         IReadOnlyList<CampaignRenderData> campaigns,
         IReadOnlyList<SupplyConvoyRenderData> supplyConvoys,
+        int personX)
+        => CreateSnapshot(campaigns, supplyConvoys, Array.Empty<ForwardBaseRenderData>(), personX);
+
+    private static WorldRenderSnapshot CreateSnapshot(
+        IReadOnlyList<CampaignRenderData> campaigns,
+        IReadOnlyList<SupplyConvoyRenderData> supplyConvoys,
+        IReadOnlyList<ForwardBaseRenderData> forwardBases,
         int personX)
         => new(
             Width: 16,
@@ -66,6 +90,7 @@ public class WorldSnapshotInterpolatorTests
             Breaches: Array.Empty<BreachRenderData>(),
             Campaigns: campaigns,
             SupplyConvoys: supplyConvoys,
+            ForwardBases: forwardBases,
             FactionStances: Array.Empty<FactionStanceRenderData>(),
             Ecology: CreateEcoHudData(),
             CurrentSeason: SeasonView.Spring,
@@ -180,6 +205,23 @@ public class WorldSnapshotInterpolatorTests
             RouteRecomputes: 1,
             ProgressTicks: 2,
             NoProgressTicks: 0);
+
+    private static ForwardBaseRenderData CreateForwardBase()
+        => new(
+            BaseId: 3,
+            OwnerFactionId: 1,
+            HomeColonyId: 3,
+            CampaignId: 42,
+            ArmyId: 77,
+            Phase: "active",
+            CreatedTick: 40,
+            EndedTick: -1,
+            X: 8,
+            Y: 9,
+            Radius: 2,
+            RestTicks: 1,
+            RestedActorTicks: 2,
+            CloseReason: "none");
 
     private static EcoHudData CreateEcoHudData()
         => new(

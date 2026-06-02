@@ -8,6 +8,7 @@ using WorldSim.Simulation;
 using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Military;
+using WorldSim.Simulation.Navigation;
 using Xunit;
 
 namespace WorldSim.Runtime.Tests;
@@ -227,6 +228,285 @@ public sealed class Wave10CampaignLogisticsTests
         Assert.NotEqual("unknown", convoy.Phase);
     }
 
+    [Fact]
+    public void ForwardBaseEstablishesForDistantMarchingCampaignAndSetsRallyPoint()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        var member = GetAssignedMember(runtime, campaign);
+        var anchor = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+        member.Pos = anchor;
+
+        AdvanceForwardBases(runtime);
+
+        var forwardBase = Assert.Single(runtime.ForwardBases);
+        Assert.Equal(ForwardBasePhase.Active, forwardBase.Phase);
+        Assert.Equal(anchor, (forwardBase.X, forwardBase.Y));
+        Assert.True(campaign.Army.HasRallyPoint);
+        Assert.Equal(anchor, (campaign.Army.RallyX, campaign.Army.RallyY));
+        Assert.Equal(1, runtime.CampaignLogisticsCounters.ForwardBasesEstablished);
+    }
+
+    [Fact]
+    public void ForwardBaseDoesNotEstablishNearHome()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        GetAssignedMember(runtime, campaign).Pos = GetColony(GetWorld(runtime), Faction.Obsidari).Origin;
+
+        AdvanceForwardBases(runtime);
+
+        Assert.Empty(runtime.ForwardBases);
+        Assert.Equal(0, runtime.CampaignLogisticsCounters.ForwardBasesEstablished);
+    }
+
+    [Fact]
+    public void ForwardBaseDoesNotEstablishWithoutLiveAssignedArmyMember()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        var member = GetAssignedMember(runtime, campaign);
+        member.Pos = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+        member.Health = 0f;
+
+        AdvanceForwardBases(runtime);
+
+        Assert.Empty(runtime.ForwardBases);
+        Assert.Equal(0, runtime.CampaignLogisticsCounters.ForwardBasesEstablished);
+    }
+
+    [Fact]
+    public void ForwardBasePlacementFallsBackDeterministicallyFromBlockedAnchor()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var world = GetWorld(runtime);
+        var owner = GetColony(world, Faction.Obsidari);
+        var blocker = GetColony(world, Faction.Aetheri);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        var anchor = FindForwardBaseAnchorWithPassableNeighbor(world, owner);
+        GetAssignedMember(runtime, campaign).Pos = anchor;
+        Assert.True(world.TryAddWoodWall(blocker, anchor));
+
+        AdvanceForwardBases(runtime);
+
+        var forwardBase = Assert.Single(runtime.ForwardBases);
+        Assert.NotEqual(anchor, (forwardBase.X, forwardBase.Y));
+        Assert.False(world.IsMovementBlocked(forwardBase.X, forwardBase.Y, owner.Id));
+        Assert.Equal(1, Math.Abs(forwardBase.X - anchor.x) + Math.Abs(forwardBase.Y - anchor.y));
+    }
+
+    [Fact]
+    public void ForwardBasePlacementFailureDoesNotConsumeBaseId()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var world = GetWorld(runtime);
+        var owner = GetColony(world, Faction.Obsidari);
+        var blocker = GetColony(world, Faction.Aetheri);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        var member = GetAssignedMember(runtime, campaign);
+        var blockedAnchor = FindForwardBaseAnchor(world, owner);
+        member.Pos = blockedAnchor;
+        BlockForwardBasePlacementRadius(world, blocker, blockedAnchor, radius: 2);
+
+        AdvanceForwardBases(runtime);
+
+        Assert.Empty(runtime.ForwardBases);
+        Assert.Equal(1, runtime.CampaignLogisticsCounters.ForwardBaseBuildBlockedByPlacement);
+
+        member.Pos = FindForwardBaseAnchor(world, owner, excluded: blockedAnchor);
+        AdvanceForwardBases(runtime);
+
+        Assert.Equal(1, Assert.Single(runtime.ForwardBases).BaseId);
+    }
+
+    [Fact]
+    public void ForwardBaseCapBlocksSecondActiveBasePerFaction()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var world = GetWorld(runtime);
+        var owner = GetColony(world, Faction.Obsidari);
+        var first = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 2);
+        var second = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Chirita, requestedMemberCount: 1, reserveWarriors: 2);
+        GetAssignedMember(runtime, first).Pos = FindForwardBaseAnchor(world, owner);
+        GetAssignedMember(runtime, second).Pos = FindForwardBaseAnchor(world, owner, excluded: GetAssignedMember(runtime, first).Pos);
+
+        AdvanceForwardBases(runtime);
+
+        Assert.Single(runtime.ForwardBases, forwardBase => forwardBase.Phase == ForwardBasePhase.Active);
+        Assert.True(runtime.CampaignLogisticsCounters.ForwardBaseBuildBlockedByCap > 0);
+    }
+
+    [Fact]
+    public void ExpiredOrAbandonedForwardBaseDoesNotCountAgainstCap()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var world = GetWorld(runtime);
+        var owner = GetColony(world, Faction.Obsidari);
+        var first = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 2);
+        var second = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Chirita, requestedMemberCount: 1, reserveWarriors: 2);
+        GetAssignedMember(runtime, first).Pos = FindForwardBaseAnchor(world, owner);
+        GetAssignedMember(runtime, second).Pos = FindForwardBaseAnchor(world, owner, excluded: GetAssignedMember(runtime, first).Pos);
+        AdvanceForwardBases(runtime);
+        MarkForwardBaseExpired(GetLiveForwardBases(runtime).Single(), runtime.Tick);
+
+        AdvanceForwardBases(runtime);
+
+        Assert.Equal(2, runtime.ForwardBases.Count);
+        Assert.Equal(1, runtime.ForwardBases.Count(forwardBase => forwardBase.Phase == ForwardBasePhase.Active));
+    }
+
+    [Fact]
+    public void ForwardBaseExpiresAfterLifetime()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        GetAssignedMember(runtime, campaign).Pos = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+        AdvanceForwardBases(runtime);
+        SetRuntimeTick(runtime, runtime.Tick + 240);
+
+        AdvanceForwardBases(runtime);
+
+        var forwardBase = Assert.Single(runtime.ForwardBases);
+        Assert.Equal(ForwardBasePhase.Expired, forwardBase.Phase);
+        Assert.Equal("expired", forwardBase.CloseReason);
+        Assert.Equal(1, runtime.CampaignLogisticsCounters.ForwardBasesExpired);
+    }
+
+    [Fact]
+    public void ForwardBaseAbandonsWhenCampaignResolves()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        GetAssignedMember(runtime, campaign).Pos = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+        AdvanceForwardBases(runtime);
+        ResolveCampaign(campaign);
+
+        AdvanceForwardBases(runtime);
+
+        var forwardBase = Assert.Single(runtime.ForwardBases);
+        Assert.Equal(ForwardBasePhase.Abandoned, forwardBase.Phase);
+        Assert.Equal("campaign_resolved", forwardBase.CloseReason);
+        Assert.Equal(1, runtime.CampaignLogisticsCounters.ForwardBasesAbandoned);
+    }
+
+    [Fact]
+    public void ForwardBaseAbandonsAfterNoLiveMemberWindow()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        var member = GetAssignedMember(runtime, campaign);
+        member.Pos = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+        AdvanceForwardBases(runtime);
+        member.Health = 0f;
+        SetRuntimeTick(runtime, runtime.Tick + 30);
+
+        AdvanceForwardBases(runtime);
+
+        var forwardBase = Assert.Single(runtime.ForwardBases);
+        Assert.Equal(ForwardBasePhase.Abandoned, forwardBase.Phase);
+        Assert.Equal("no_live_member", forwardBase.CloseReason);
+    }
+
+    [Fact]
+    public void ForwardBaseLiveTransientAssignedMemberKeepsBaseActiveButDoesNotRest()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        var member = GetAssignedMember(runtime, campaign);
+        member.Pos = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+        AdvanceForwardBases(runtime);
+        var baseBeforeTransient = Assert.Single(runtime.ForwardBases);
+        SetStamina(member, 50f);
+        var baselineRestTicks = baseBeforeTransient.RestTicks;
+        var baselineRestedActorTicks = baseBeforeTransient.RestedActorTicks;
+        var baselineGlobalRestTicks = runtime.CampaignLogisticsCounters.ForwardBaseRestTicks;
+        var baselineGlobalRestedActorTicks = runtime.CampaignLogisticsCounters.ForwardBaseRestedActorTicks;
+        member.Current = Job.Fight;
+        SetRuntimeTick(runtime, baseBeforeTransient.CreatedTick + 30);
+
+        runtime.AdvanceTick(0f);
+
+        var forwardBase = Assert.Single(runtime.ForwardBases);
+        Assert.Contains(member.Id, campaign.Army.MemberActorIds);
+        Assert.Equal(ForwardBasePhase.Active, forwardBase.Phase);
+        Assert.Equal("none", forwardBase.CloseReason);
+        Assert.Equal(runtime.Tick - 1, forwardBase.LastLiveMemberNearTick);
+        Assert.Equal(50f, member.Stamina);
+        Assert.Equal(baselineRestTicks, forwardBase.RestTicks);
+        Assert.Equal(baselineRestedActorTicks, forwardBase.RestedActorTicks);
+        Assert.Equal(baselineGlobalRestTicks, runtime.CampaignLogisticsCounters.ForwardBaseRestTicks);
+        Assert.Equal(baselineGlobalRestedActorTicks, runtime.CampaignLogisticsCounters.ForwardBaseRestedActorTicks);
+    }
+
+    [Fact]
+    public void ForwardBaseRestAppliesOnlyToLiveAssignedMembersNearBaseAndClampsStamina()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 2);
+        var assigned = GetAssignedMember(runtime, campaign);
+        var unassigned = SelectPeople(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari), 2).Last();
+        var anchor = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+        assigned.Pos = anchor;
+        unassigned.Pos = anchor;
+        SetStamina(assigned, 99f);
+        SetStamina(unassigned, 50f);
+        AdvanceForwardBases(runtime);
+
+        AdvanceForwardBases(runtime);
+
+        Assert.Equal(100f, assigned.Stamina);
+        Assert.Equal(50f, unassigned.Stamina);
+        Assert.Equal(1, Assert.Single(runtime.ForwardBases).RestTicks);
+        Assert.Equal(1, runtime.CampaignLogisticsCounters.ForwardBaseRestedActorTicks);
+    }
+
+    [Fact]
+    public void ForwardBaseUsesCurrentArmyPositionNotStaticTarget()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        var currentAnchor = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+        GetAssignedMember(runtime, campaign).Pos = currentAnchor;
+
+        AdvanceForwardBases(runtime);
+
+        var forwardBase = Assert.Single(runtime.ForwardBases);
+        Assert.Equal(currentAnchor, (forwardBase.X, forwardBase.Y));
+        Assert.NotEqual((campaign.RouteIntent.TargetX, campaign.RouteIntent.TargetY), (forwardBase.X, forwardBase.Y));
+    }
+
+    [Fact]
+    public void SnapshotExportsForwardBaseReadModelWithoutGraphicsInference()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 1);
+        GetAssignedMember(runtime, campaign).Pos = FindForwardBaseAnchor(GetWorld(runtime), GetColony(GetWorld(runtime), Faction.Obsidari));
+
+        AdvanceForwardBases(runtime);
+
+        var forwardBase = Assert.Single(runtime.GetSnapshot().ForwardBases);
+        Assert.Equal(1, forwardBase.BaseId);
+        Assert.Equal((int)Faction.Obsidari, forwardBase.OwnerFactionId);
+        Assert.Equal(campaign.CampaignId, forwardBase.CampaignId);
+        Assert.Equal(campaign.ArmyId, forwardBase.ArmyId);
+        Assert.Equal("active", forwardBase.Phase);
+        Assert.Equal("none", forwardBase.CloseReason);
+    }
+
     private static SimulationRuntime CreateRuntime(ICampaignStrategist? strategist = null)
     {
         var repoRoot = FindRepoRoot();
@@ -368,6 +648,13 @@ public sealed class Wave10CampaignLogisticsTests
         Assert.True(predicate());
     }
 
+    private static void AdvanceForwardBases(SimulationRuntime runtime)
+    {
+        var method = typeof(SimulationRuntime).GetMethod("AdvanceForwardBases", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(runtime, new object[] { new HashSet<int>() });
+    }
+
     private static bool IsConvoyAtStaticTarget(SupplyConvoyRuntimeSnapshot convoy)
         => Math.Abs(convoy.CurrentX - convoy.TargetX) + Math.Abs(convoy.CurrentY - convoy.TargetY) <= 1;
 
@@ -391,6 +678,20 @@ public sealed class Wave10CampaignLogisticsTests
         var method = typeof(SupplyConvoyState).GetMethod("MarkDelivered", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(convoy, new object[] { tick });
+    }
+
+    private static void MarkForwardBaseExpired(ForwardBaseState forwardBase, long tick)
+    {
+        var method = typeof(ForwardBaseState).GetMethod("MarkExpired", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(forwardBase, new object[] { tick, "expired" });
+    }
+
+    private static void SetStamina(Person person, float value)
+    {
+        var property = typeof(Person).GetProperty(nameof(Person.Stamina));
+        Assert.NotNull(property);
+        property!.SetValue(person, value);
     }
 
     private static void AddFakeConvoy(SimulationRuntime runtime, CampaignState campaign, SupplyConvoyPhase phase)
@@ -452,6 +753,91 @@ public sealed class Wave10CampaignLogisticsTests
         }
     }
 
+    private static void BlockForwardBasePlacementRadius(World world, Colony blocker, (int x, int y) anchor, int radius)
+    {
+        for (var dy = -radius; dy <= radius; dy++)
+        {
+            for (var dx = -radius; dx <= radius; dx++)
+            {
+                if (Math.Abs(dx) + Math.Abs(dy) > radius)
+                    continue;
+
+                var pos = (x: anchor.x + dx, y: anchor.y + dy);
+                if (world.IsMovementBlocked(pos.x, pos.y, blocker.Id))
+                    continue;
+
+                Assert.True(world.TryAddWoodWall(blocker, pos));
+            }
+        }
+    }
+
+    private static (int x, int y) FindForwardBaseAnchor(World world, Colony owner, (int x, int y)? excluded = null)
+    {
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var candidate = (x, y);
+                if (excluded.HasValue && excluded.Value == candidate)
+                    continue;
+                if (Math.Abs(candidate.x - owner.Origin.x) + Math.Abs(candidate.y - owner.Origin.y) < 8)
+                    continue;
+                if (world.IsMovementBlocked(candidate.x, candidate.y, owner.Id))
+                    continue;
+                if (!HasRoute(world, owner, candidate))
+                    continue;
+
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException("Could not find a forward-base anchor for the test world.");
+    }
+
+    private static (int x, int y) FindForwardBaseAnchorWithPassableNeighbor(World world, Colony owner)
+    {
+        for (var y = 0; y < world.Height; y++)
+        {
+            for (var x = 0; x < world.Width; x++)
+            {
+                var candidate = (x, y);
+                if (Math.Abs(candidate.x - owner.Origin.x) + Math.Abs(candidate.y - owner.Origin.y) < 8)
+                    continue;
+                if (world.IsMovementBlocked(candidate.x, candidate.y, owner.Id))
+                    continue;
+                if (!HasRoute(world, owner, candidate))
+                    continue;
+                if (GetNeighborCandidates(candidate).Any(neighbor =>
+                        !world.IsMovementBlocked(neighbor.x, neighbor.y, owner.Id)
+                        && HasRoute(world, owner, neighbor)))
+                    return candidate;
+            }
+        }
+
+        throw new InvalidOperationException("Could not find a forward-base anchor with a passable neighbor for the test world.");
+    }
+
+    private static IEnumerable<(int x, int y)> GetNeighborCandidates((int x, int y) anchor)
+    {
+        yield return (anchor.x, anchor.y - 1);
+        yield return (anchor.x - 1, anchor.y);
+        yield return (anchor.x + 1, anchor.y);
+        yield return (anchor.x, anchor.y + 1);
+    }
+
+    private static bool HasRoute(World world, Colony owner, (int x, int y) target)
+    {
+        var path = NavigationPathfinder.FindPath(
+            new NavigationGrid(world),
+            owner.Origin,
+            target,
+            owner.Id,
+            maxExpansions: 4096,
+            out var budgetExceeded);
+
+        return !budgetExceeded && path.Count > 1;
+    }
+
     private static Colony GetColony(World world, Faction faction)
     {
         var colony = world._colonies.FirstOrDefault(candidate => candidate.Faction == faction);
@@ -471,6 +857,13 @@ public sealed class Wave10CampaignLogisticsTests
         var convoysField = typeof(SimulationRuntime).GetField("_supplyConvoys", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(convoysField);
         return Assert.IsAssignableFrom<List<SupplyConvoyState>>(convoysField!.GetValue(runtime));
+    }
+
+    private static List<ForwardBaseState> GetLiveForwardBases(SimulationRuntime runtime)
+    {
+        var basesField = typeof(SimulationRuntime).GetField("_forwardBases", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(basesField);
+        return Assert.IsAssignableFrom<List<ForwardBaseState>>(basesField!.GetValue(runtime));
     }
 
     private static World GetWorld(SimulationRuntime runtime)
