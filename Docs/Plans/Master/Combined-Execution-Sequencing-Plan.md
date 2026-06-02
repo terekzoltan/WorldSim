@@ -2135,8 +2135,8 @@ Wave 10 SMR evidence guardrail:
 - ✅ **P6-G** Strategic campaign AI (Track C)
 - ✅ **P6-H** Campaign UI polish (Track A)
 - ✅ **P6-I** Manual/operator campaign launch catalyst (Track B + App routing)
-- ⬜ **P6-J(B)** Organic campaign launch runtime application (Track B)
-- ⬜ **P6-J(C)** Organic campaign strategy follow-up, if needed (Track C)
+- ✅ **P6-J(B)** Organic campaign launch runtime application (Track B)
+- ✅ **P6-J(C)** Organic campaign strategy follow-up N/A - existing P6-G strategy contract sufficient (Track C)
 
 ### Sprint C12: Supply Lines + Forward Bases (Track B -> C -> A)
 
@@ -2228,6 +2228,9 @@ P6-J(B) acceptance:
 
 P6-J(B) handoff requirement:
 - Track B must explicitly state one of: `P6-J(C) not needed - existing P6-G strategy contract was sufficient`, or `P6-J(C) needed - Track C must adjust/extend advisory strategy because <specific contract gap>`.
+
+P6-J(B) closeout note:
+- ✅ Track B organic campaign launch runtime application accepted GREEN after Meta+Swarm review/fix loop. Runtime now evaluates organic campaign launches on a private faction-level cadence, consumes the existing P6-G `DefaultCampaignStrategist`, and applies only `LaunchCampaign` decisions through runtime-owned validation/application. Accepted review blockers were fixed: launch-time route/path preflight uses `CampaignPathMaxExpansions` before creation, preflight and creation share the same resolved target colony, selected `TargetColonyId` is preserved through a private resolved-colony creation helper while public/manual `TryCreateCampaign(Faction, Faction, int)` remains compatible, unresolved same-pair cap is unordered across faction pairs, `AvailableWarriors` means actual `PersonRole.Warrior`, carrier-only/hunter-only pools suppress, and injected same-faction launch decisions are rejected with `CampaignCreationStatus.SameFaction` before target lookup/application. Scope stayed Track B Runtime + Runtime tests: no App/Graphics/ScenarioRunner/AI/Track C implementation drift, no `RuntimeNpcBrain` campaign branch, and `RequestConvoy`/`ReinforceCampaign`/`AbortCampaign` remain advisory. Verification passed via focused organic launch tests (23/23), campaign runtime/regression tests, AI strategy tests, arch boundary tests, full solution build, diff/static/security checks. Proof type for this step is `organic` runtime-test proof only; durable ScenarioRunner/SMR proof-type export remains Wave 10 SMR prep Step 10A. Campaign runtime availability remains the existing diplomacy+combat gate for this slice. `P6-J(C) not needed - existing P6-G strategy contract was sufficient`.
 
 **Step 3C — campaign strategy follow-up (Track C; opens only after P6-J(B) handoff)**
 

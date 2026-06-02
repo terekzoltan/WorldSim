@@ -47,6 +47,10 @@ public sealed class SimulationRuntime
     private const int MinCausalWindowTicks = 10;
     private const int MaxCausalWindowTicks = 100;
     private const int CampaignPathMaxExpansions = 4096;
+    private const int OrganicCampaignLaunchCadenceTicks = 20;
+    private const int OrganicCampaignMaxUnresolvedPerOwner = 1;
+    private const int OrganicCampaignMaxUnresolvedPerUnorderedPair = 1;
+    private const int OrganicCampaignMinimumHomeDefenseReserve = 1;
     private const double FloatingCausalEqTolerance = 0.0001d;
 
     private readonly record struct CampaignMarchObjective((int x, int y) MovementTarget, bool UsesFallback);
@@ -71,6 +75,7 @@ public sealed class SimulationRuntime
     private readonly double _directorDampeningFactor;
     private readonly Queue<string> _recentAiDecisions = new();
     private readonly DirectorState _directorState = new();
+    private readonly ICampaignStrategist _campaignStrategist;
     private readonly List<CampaignState> _campaigns = new();
     private readonly Dictionary<CampaignWarScoreKey, int> _campaignWarScores = new();
     private DirectorExecutionState _directorExecutionState = DirectorExecutionState.NotTriggered;
@@ -106,10 +111,23 @@ public sealed class SimulationRuntime
     }
 
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath, RuntimeAiOptions? aiOptions, int? randomSeed)
+        : this(width, height, initialPopulation, technologyFilePath, aiOptions, randomSeed, null)
+    {
+    }
+
+    internal SimulationRuntime(
+        int width,
+        int height,
+        int initialPopulation,
+        string technologyFilePath,
+        RuntimeAiOptions? aiOptions,
+        int? randomSeed,
+        ICampaignStrategist? campaignStrategist)
     {
         var resolvedOptions = aiOptions ?? RuntimeAiOptions.FromEnvironment();
         PlannerMode = resolvedOptions.PlannerMode;
         PolicyMode = resolvedOptions.PolicyMode;
+        _campaignStrategist = campaignStrategist ?? new DefaultCampaignStrategist();
         _world = new World(width, height, initialPopulation, colony => CreateBrain(colony, resolvedOptions), randomSeed);
         _latestAiDebugSnapshot = AiDebugSnapshot.Empty(PlannerMode.ToString(), PolicyMode.ToString());
         TechTree.Load(technologyFilePath);
@@ -162,6 +180,7 @@ public sealed class SimulationRuntime
     {
         var blockedCampaignActorIds = CaptureCampaignBlockedActorIds();
         PruneInvalidCampaignMembers(blockedCampaignActorIds);
+        EvaluateOrganicCampaignLaunches(blockedCampaignActorIds);
         QueueCampaignSiegePressureForActiveEncounters(dt, blockedCampaignActorIds);
         _world.Update(dt);
         SyncCampaignSiegeStates(blockedCampaignActorIds);
@@ -514,6 +533,11 @@ public sealed class SimulationRuntime
                 $"No target colony found for faction {targetFaction}.");
         }
 
+        return CreateCampaignFromResolvedColonies(ownerColony, targetColony, requestedMemberCount);
+    }
+
+    private CampaignCreationResult CreateCampaignFromResolvedColonies(Colony ownerColony, Colony targetColony, int requestedMemberCount)
+    {
         var campaignId = _nextCampaignId++;
         var armyId = _nextArmyId++;
         var routeIntent = new CampaignRouteIntent(
@@ -525,7 +549,7 @@ public sealed class SimulationRuntime
             targetColony.Origin.y);
         var army = new ArmyState(
             armyId,
-            ownerFaction,
+            ownerColony.Faction,
             ownerColony.Id,
             ownerColony.Origin.x,
             ownerColony.Origin.y,
@@ -534,8 +558,8 @@ public sealed class SimulationRuntime
             requestedMemberCount);
         _campaigns.Add(new CampaignState(
             campaignId,
-            ownerFaction,
-            targetFaction,
+            ownerColony.Faction,
+            targetColony.Faction,
             ownerColony.Id,
             targetColony.Id,
             Tick,
@@ -547,6 +571,279 @@ public sealed class SimulationRuntime
 
     public CampaignCreationResult TryCreateManualCampaign(ManualCampaignLaunchCommand command)
         => TryCreateCampaign(command.OwnerFaction, command.TargetFaction, command.RequestedMemberCount);
+
+    private void EvaluateOrganicCampaignLaunches(HashSet<int> blockedCampaignActorIds)
+    {
+        if (!IsCampaignRuntimeAvailable() || Tick < OrganicCampaignLaunchCadenceTicks)
+            return;
+
+        if (Tick % OrganicCampaignLaunchCadenceTicks != 0)
+            return;
+
+        var assignedActorIds = GetActiveCampaignActorIds();
+        foreach (var ownerColony in _world._colonies.OrderBy(colony => (int)colony.Faction).ThenBy(colony => colony.Id))
+        {
+            var context = BuildOrganicCampaignStrategyContext(ownerColony, assignedActorIds, blockedCampaignActorIds);
+            var decision = _campaignStrategist.Decide(context);
+            if (decision.Kind != CampaignStrategyDecisionKind.LaunchCampaign)
+                continue;
+
+            var result = TryApplyOrganicCampaignLaunch(ownerColony, decision, assignedActorIds, blockedCampaignActorIds);
+            if (!result.Success)
+                continue;
+
+            if (result.CampaignId.HasValue)
+            {
+                assignedActorIds = GetActiveCampaignActorIds();
+            }
+        }
+    }
+
+    private CampaignStrategyContext BuildOrganicCampaignStrategyContext(
+        Colony ownerColony,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        var eligibleMembers = GetOrganicCampaignEligibleMembers(ownerColony, assignedActorIds, blockedCampaignActorIds);
+        var availableWarriors = eligibleMembers.Count(person => person.HasRole(PersonRole.Warrior));
+        var availableForLaunch = Math.Max(0, availableWarriors - OrganicCampaignMinimumHomeDefenseReserve);
+        var activeCampaignCount = CountUnresolvedOwnerCampaigns(ownerColony.Faction);
+        return new CampaignStrategyContext(
+            FactionId: (int)ownerColony.Faction,
+            AvailableWarriors: availableForLaunch,
+            AvailableCarriers: eligibleMembers.Count(person => person.HasRole(PersonRole.SupplyCarrier)),
+            ActiveCampaignCount: activeCampaignCount,
+            MaxActiveCampaigns: OrganicCampaignMaxUnresolvedPerOwner,
+            HomeDefenseScore: availableForLaunch,
+            MinimumHomeDefenseScore: OrganicCampaignMinimumHomeDefenseReserve,
+            SupplyReadiness: 1.0f,
+            VisibleEnemyPressure: CalculateVisibleEnemyPressure(ownerColony.Faction),
+            CanLaunchCampaign: true,
+            CanAbortCampaign: true,
+            CanRequestConvoy: true,
+            CanReinforceCampaign: true,
+            Targets: BuildOrganicCampaignTargetOptions(ownerColony, availableForLaunch, assignedActorIds, blockedCampaignActorIds),
+            ActiveCampaigns: BuildActiveCampaignStrategyFacts(ownerColony.Faction));
+    }
+
+    private IReadOnlyList<CampaignTargetOption> BuildOrganicCampaignTargetOptions(
+        Colony ownerColony,
+        int availableForLaunch,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        if (availableForLaunch <= 0)
+            return Array.Empty<CampaignTargetOption>();
+
+        var targetColonies = _world._colonies
+            .Where(colony => colony.Faction != ownerColony.Faction)
+            .Select(colony => (Colony: colony, Stance: _world.GetFactionStance(ownerColony.Faction, colony.Faction)))
+            .Where(candidate => candidate.Stance >= Stance.Hostile)
+            .ToArray();
+        if (targetColonies.Any(candidate => candidate.Stance == Stance.War))
+            targetColonies = targetColonies.Where(candidate => candidate.Stance == Stance.War).ToArray();
+
+        return targetColonies
+            .OrderBy(candidate => (int)candidate.Colony.Faction)
+            .ThenBy(candidate => candidate.Colony.Id)
+            .Select(candidate => BuildOrganicCampaignTargetOption(
+                ownerColony,
+                candidate.Colony,
+                candidate.Stance,
+                availableForLaunch,
+                assignedActorIds,
+                blockedCampaignActorIds))
+            .ToArray();
+    }
+
+    private CampaignTargetOption BuildOrganicCampaignTargetOption(
+        Colony ownerColony,
+        Colony targetColony,
+        Stance stance,
+        int availableForLaunch,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        var defenderCount = GetOrganicCampaignEligibleMembers(targetColony, assignedActorIds, blockedCampaignActorIds).Count;
+        var advantage = CalculateOrganicCampaignAdvantage(availableForLaunch, defenderCount);
+        var distancePenalty = CalculateOrganicCampaignDistancePenalty(ownerColony, targetColony)
+            + CalculateOrganicCampaignTieBreakPenalty(targetColony);
+        return new CampaignTargetOption(
+            TargetFactionId: (int)targetColony.Faction,
+            TargetColonyId: targetColony.Id,
+            PressureScore: stance == Stance.War ? 1.0f : 0.75f,
+            AdvantageScore: advantage,
+            MinimumWarriors: 1,
+            RequestedWarriors: Math.Min(2, availableForLaunch),
+            RequestedCarriers: 0,
+            DistancePenalty: distancePenalty,
+            IsKnown: true);
+    }
+
+    private CampaignCreationResult TryApplyOrganicCampaignLaunch(
+        Colony ownerColony,
+        CampaignStrategyDecision decision,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        if (!Enum.IsDefined(typeof(Faction), (Faction)decision.TargetFactionId))
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.InvalidTargetFaction,
+                $"Invalid organic target faction value: {decision.TargetFactionId}.");
+        }
+
+        var targetFaction = (Faction)decision.TargetFactionId;
+        if (ownerColony.Faction == targetFaction)
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.SameFaction,
+                "Organic campaign creation requires owner faction and target faction to differ.");
+        }
+
+        var targetColony = _world._colonies.FirstOrDefault(colony => colony.Id == decision.TargetColonyId && colony.Faction == targetFaction);
+        if (targetColony == null)
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.TargetColonyNotFound,
+                $"No organic target colony found for faction {targetFaction} and colony {decision.TargetColonyId}.");
+        }
+
+        if (_world.GetFactionStance(ownerColony.Faction, targetFaction) < Stance.Hostile)
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.TargetColonyNotFound,
+                $"Organic campaign target {targetFaction} is not hostile to {ownerColony.Faction}.");
+        }
+
+        if (CountUnresolvedOwnerCampaigns(ownerColony.Faction) >= OrganicCampaignMaxUnresolvedPerOwner)
+            return CampaignCreationResult.Failed(CampaignCreationStatus.CampaignRuntimeUnavailable, "Organic campaign owner cap reached.");
+
+        if (CountUnresolvedUnorderedPairCampaigns(ownerColony.Faction, targetFaction) >= OrganicCampaignMaxUnresolvedPerUnorderedPair)
+            return CampaignCreationResult.Failed(CampaignCreationStatus.CampaignRuntimeUnavailable, "Organic campaign unordered faction-pair cap reached.");
+
+        if (!HasOrganicCampaignRoutePreflight(ownerColony, targetColony))
+            return CampaignCreationResult.Failed(CampaignCreationStatus.CampaignRuntimeUnavailable, "Organic campaign route/path budget preflight failed.");
+
+        var eligibleMembers = GetOrganicCampaignEligibleMembers(ownerColony, assignedActorIds, blockedCampaignActorIds);
+        var availableForLaunch = Math.Max(0, eligibleMembers.Count(person => person.HasRole(PersonRole.Warrior)) - OrganicCampaignMinimumHomeDefenseReserve);
+        if (availableForLaunch <= 0)
+            return CampaignCreationResult.Failed(CampaignCreationStatus.InvalidRequestedMemberCount, "Organic campaign launch would violate home defense reserve.");
+
+        var requestedMemberCount = Math.Max(1, decision.RequestedWarriors + decision.RequestedCarriers);
+        requestedMemberCount = Math.Min(requestedMemberCount, availableForLaunch);
+        return CreateCampaignFromResolvedColonies(ownerColony, targetColony, requestedMemberCount);
+    }
+
+    private bool HasOrganicCampaignRoutePreflight(Colony ownerColony, Colony targetColony)
+    {
+        var grid = new NavigationGrid(_world);
+        var path = NavigationPathfinder.FindPath(
+            grid,
+            ownerColony.Origin,
+            targetColony.Origin,
+            ownerColony.Id,
+            CampaignPathMaxExpansions,
+            out var budgetExceeded);
+
+        return !budgetExceeded && path.Count > 1;
+    }
+
+    private IReadOnlyList<ActiveCampaignStrategyFact> BuildActiveCampaignStrategyFacts(Faction ownerFaction)
+        => _campaigns
+            .Where(campaign => campaign.OwnerFaction == ownerFaction && campaign.Phase != CampaignPhase.Resolved)
+            .OrderBy(campaign => campaign.CampaignId)
+            .Select(campaign => new ActiveCampaignStrategyFact(
+                campaign.CampaignId,
+                (int)campaign.TargetFaction,
+                campaign.TargetColonyId,
+                SupplyReadiness: 1.0f,
+                AdvantageScore: 0f,
+                StalledTicks: campaign.RouteCounters.NoProgressTicks,
+                IsRecoverable: true))
+            .ToArray();
+
+    private List<Person> GetOrganicCampaignEligibleMembers(
+        Colony ownerColony,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+        => _world._people
+            .Where(person => IsEligibleOrganicCampaignMember(person, ownerColony, assignedActorIds, blockedCampaignActorIds))
+            .OrderBy(person => GetCampaignAssemblyCandidatePriority(person))
+            .ThenByDescending(person => person.Strength + person.Defense)
+            .ThenBy(person => person.Id)
+            .ToList();
+
+    private static bool IsEligibleOrganicCampaignMember(
+        Person person,
+        Colony ownerColony,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        if (person.Health <= 0f || person.Home.Id != ownerColony.Id)
+            return false;
+        if (assignedActorIds.Contains(person.Id))
+            return false;
+        if (blockedCampaignActorIds.Contains(person.Id) || IsCampaignAssemblyBlockedByTransientOwnership(person))
+            return false;
+
+        return IsCampaignAssemblyRoleCandidate(person);
+    }
+
+    private HashSet<int> GetActiveCampaignActorIds()
+    {
+        var assignedActorIds = new HashSet<int>();
+        foreach (var campaign in _campaigns)
+        {
+            if (campaign.Phase == CampaignPhase.Resolved)
+                continue;
+
+            foreach (var actorId in campaign.Army.MemberActorIds)
+                assignedActorIds.Add(actorId);
+        }
+
+        return assignedActorIds;
+    }
+
+    private int CountUnresolvedOwnerCampaigns(Faction ownerFaction)
+        => _campaigns.Count(campaign => campaign.OwnerFaction == ownerFaction && campaign.Phase != CampaignPhase.Resolved);
+
+    private int CountUnresolvedUnorderedPairCampaigns(Faction firstFaction, Faction secondFaction)
+        => _campaigns.Count(campaign => campaign.Phase != CampaignPhase.Resolved
+            && IsSameUnorderedFactionPair(campaign.OwnerFaction, campaign.TargetFaction, firstFaction, secondFaction));
+
+    private static bool IsSameUnorderedFactionPair(Faction leftOwner, Faction leftTarget, Faction rightOwner, Faction rightTarget)
+        => Math.Min((int)leftOwner, (int)leftTarget) == Math.Min((int)rightOwner, (int)rightTarget)
+           && Math.Max((int)leftOwner, (int)leftTarget) == Math.Max((int)rightOwner, (int)rightTarget);
+
+    private float CalculateVisibleEnemyPressure(Faction ownerFaction)
+        => _world._colonies
+            .Where(colony => colony.Faction != ownerFaction)
+            .Select(colony => _world.GetFactionStance(ownerFaction, colony.Faction) switch
+            {
+                Stance.War => 1.0f,
+                Stance.Hostile => 0.75f,
+                _ => 0f
+            })
+            .DefaultIfEmpty(0f)
+            .Max();
+
+    private static float CalculateOrganicCampaignAdvantage(int attackerCount, int defenderCount)
+    {
+        var scale = Math.Max(1, Math.Max(attackerCount, defenderCount));
+        return Math.Clamp(0.5f + ((attackerCount - defenderCount) / (float)scale * 0.5f), 0f, 1f);
+    }
+
+    private float CalculateOrganicCampaignDistancePenalty(Colony ownerColony, Colony targetColony)
+    {
+        var distance = Math.Abs(ownerColony.Origin.x - targetColony.Origin.x)
+            + Math.Abs(ownerColony.Origin.y - targetColony.Origin.y);
+        var scale = Math.Max(1, _world.Width + _world.Height);
+        return Math.Clamp(distance / (float)scale, 0f, 1f) * 0.2f;
+    }
+
+    private static float CalculateOrganicCampaignTieBreakPenalty(Colony targetColony)
+        => (((int)targetColony.Faction * 1000) + targetColony.Id) * 0.000001f;
 
     public int PrepareWave9CampaignScenario(Faction ownerFaction, int candidateCount, int carriedFoodPerCandidate)
     {

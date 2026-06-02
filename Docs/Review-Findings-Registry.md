@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-06-02 - Wave 10 P6-J(B) Step Review - Blocking - Organic launch must enforce full launch-time campaign gates
+
+- Track: Track B / Runtime organic campaign launch
+- Source: Meta internal step-review + Swarm Assistant review synthesis for Wave 10 `P6-J(B)`
+- Finding: The initial organic launch implementation created campaigns before proving all active launch gates, including route/path budget suppression, unordered same-faction-pair active-cap semantics, and explicit owner/target distinctness on the organic internal application path. The implementation also risked contract drift by validating a specific `TargetColonyId` but applying through faction-only `TryCreateCampaign(...)` and by filling `CampaignStrategyContext.AvailableWarriors` from all assembly-eligible roles.
+- Impact: A campaign can be organically created even when the active P6-J(B) acceptance says it should be suppressed, or can route to a different target colony than the strategy selected once multi-colony states exist. This converts a runtime application slice into hidden policy drift across campaign creation, strategy facts, and future SMR proof.
+- Resolution / guidance: Before P6-J(B) closeout, Track B must add launch-time route/path budget suppression, unordered unresolved faction-pair cap coverage if same-pair semantics are intended unordered, explicit organic same-faction suppression, selected-colony-preserving runtime creation/application, and warrior/carrier semantic tests or explicit policy wording. Keep public/manual `TryCreateCampaign(...)` compatibility unless a separate approved contract change exists.
+- Status: fixed in P6-J(B) fix pass before closeout; route/path preflight, unordered pair cap, selected-colony creation, warrior/carrier semantics, and explicit organic same-faction suppression were covered by focused runtime tests
+
+## 2026-06-02 - Wave 10 P6-J(B) Step Review - Major - Organic proof-type and gate semantics must stay explicit
+
+- Track: Track B / Runtime and future SMR prep
+- Source: Meta internal step-review + Swarm Assistant review synthesis for Wave 10 `P6-J(B)`
+- Finding: The initial organic launch implementation kept manual/operator and organic paths behaviorally separate, but persisted campaigns through the same state shape without a visible source/proof seam. The review also found ambiguity around whether the campaign gate means existing diplomacy+combat availability or a distinct `EnableCampaigns` flag.
+- Impact: Future Wave 10 SMR prep could overclaim manual or deterministic campaign creation as organic if no active proof-type route exists, and gate wording can drift from implemented runtime availability semantics.
+- Resolution / guidance: P6-J(B) closeout must either add a lightweight runtime-owned source/evidence seam or actively route proof-type export to Wave 10 SMR prep Step 10A. It must also explicitly document whether `campaign runtime available` means the existing diplomacy+combat gates or a distinct campaign feature gate.
+- Status: deferred actively to Wave 10 SMR prep Step 10A for durable artifact/lane proof-type export; P6-J(B) closeout clarifies runtime proof is organic runtime-test proof only and campaign runtime availability remains diplomacy+combat in this slice
+
 ## 2026-06-01 - Wave 10 P6-I Step Review - Minor - App host boundary test targeted stale shim
 
 - Track: Track B / App routing verification
