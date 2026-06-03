@@ -14,7 +14,11 @@ public sealed record CampaignLogisticsOptions(
     int ForwardBaseRadius = 2,
     int ForwardBaseLifetimeTicks = 240,
     int ForwardBaseNoMemberAbandonTicks = 30,
-    float ForwardBaseRestStaminaPerTick = 2f)
+    float ForwardBaseRestStaminaPerTick = 2f,
+    int ScoutIntelBaseRadius = 5,
+    int ScoutIntelMaxRadius = 12,
+    int ScoutIntelTtlTicks = 60,
+    float ScoutIntelConfidence = 0.8f)
 {
     public static CampaignLogisticsOptions Default { get; } = new();
 
@@ -34,6 +38,12 @@ public sealed record CampaignLogisticsOptions(
             ForwardBaseNoMemberAbandonTicks = Math.Max(1, ForwardBaseNoMemberAbandonTicks),
             ForwardBaseRestStaminaPerTick = float.IsFinite(ForwardBaseRestStaminaPerTick)
                 ? Math.Clamp(ForwardBaseRestStaminaPerTick, 0f, 100f)
+                : 0f,
+            ScoutIntelBaseRadius = Math.Max(0, ScoutIntelBaseRadius),
+            ScoutIntelMaxRadius = Math.Max(0, ScoutIntelMaxRadius),
+            ScoutIntelTtlTicks = Math.Max(1, ScoutIntelTtlTicks),
+            ScoutIntelConfidence = float.IsFinite(ScoutIntelConfidence)
+                ? Math.Clamp(ScoutIntelConfidence, 0f, 1f)
                 : 0f
         };
 }
@@ -58,6 +68,9 @@ public sealed class CampaignLogisticsCounters
     public int ForwardBaseBuildBlockedByRouteBudget { get; private set; }
     public int ForwardBaseRestTicks { get; private set; }
     public int ForwardBaseRestedActorTicks { get; private set; }
+    public int ScoutIntelObserved { get; private set; }
+    public int ScoutIntelRefreshed { get; private set; }
+    public int ScoutIntelExpired { get; private set; }
 
     internal void RecordCampaignLaunchBlockedByCap() => CampaignLaunchBlockedByCap++;
     internal void RecordCampaignLaunchBlockedByHomeDefense() => CampaignLaunchBlockedByHomeDefense++;
@@ -83,4 +96,7 @@ public sealed class CampaignLogisticsCounters
         ForwardBaseRestTicks++;
         ForwardBaseRestedActorTicks += actorCount;
     }
+    internal void RecordScoutIntelObserved() => ScoutIntelObserved++;
+    internal void RecordScoutIntelRefreshed() => ScoutIntelRefreshed++;
+    internal void RecordScoutIntelExpired() => ScoutIntelExpired++;
 }

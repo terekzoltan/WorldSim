@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-06-03 - Wave 10 P7-C(B) Step Review - Major - Scout intel refresh identity must include owner faction coverage
+
+- Track: Track B / Runtime scout-intel lifecycle
+- Source: Meta + Swarm step-review synthesis for Wave 10 `P7-C(B)`
+- Finding: The initial P7-C(B) scout-intel tests proved same-owner multi-scout refresh de-duplication, but did not cover two different owner factions observing the same target colony. A future regression that keyed refresh only by observed colony and observation kind could collapse different factions' intel records into one.
+- Impact: Track C scout/strategy consume and later Step10A evidence could see incorrect faction-owned intel if owner-dimensional identity regressed.
+- Resolution / guidance: Refresh identity must include owner faction + observed colony + observation kind, and tests should assert different owners observing the same target produce separate active records.
+- Status: fixed in P7-C(B) fix pass; `DifferentOwnerFactionsObservingSameTargetKeepSeparateIntelRecords` covers separate owner records and the runtime refresh key includes owner faction
+
+## 2026-06-03 - Wave 10 P7-C(B) Step Review - Major - Scout intel freshness must be exported explicitly
+
+- Track: Track B / Runtime scout-intel read-model contract
+- Source: Meta step-review synthesis for Wave 10 `P7-C(B)`
+- Finding: The initial P7-C(B) export included `CreatedTick`, `LastRefreshTick`, and `ExpirationTick`, but did not expose a consumer-safe age/freshness field even though downstream read-model consumers do not receive the runtime tick needed to compute freshness.
+- Impact: Track C, Track A, and Step10A consumers could infer scout intel age inconsistently or ignore freshness entirely.
+- Resolution / guidance: Runtime-owned scout intel exports must include an explicit freshness field computed by Runtime; for refreshable records, prefer `TicksSinceRefresh` over ambiguous creation age.
+- Status: fixed in P7-C(B) fix pass; `ScoutIntelRuntimeSnapshot` and `ScoutIntelRenderData` expose `TicksSinceRefresh`, with focused tests for initial zero, stale active greater-than-zero, and refresh reset to zero
+
 ## 2026-06-02 - Wave 10 P7-B Step Review - Major - Forward-base liveness must not reuse rest eligibility filtering
 
 - Track: Track B / Runtime forward-base lifecycle

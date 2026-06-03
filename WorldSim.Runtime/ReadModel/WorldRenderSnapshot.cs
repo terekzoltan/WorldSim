@@ -67,6 +67,7 @@ public sealed record WorldRenderSnapshot(
     IReadOnlyList<CampaignRenderData> Campaigns,
     IReadOnlyList<SupplyConvoyRenderData> SupplyConvoys,
     IReadOnlyList<ForwardBaseRenderData> ForwardBases,
+    IReadOnlyList<ScoutIntelRenderData> ScoutIntel,
     IReadOnlyList<FactionStanceRenderData> FactionStances,
     EcoHudData Ecology,
     SeasonView CurrentSeason,
@@ -112,6 +113,7 @@ public sealed record WorldRenderSnapshot(
             Array.Empty<CampaignRenderData>(),
             Array.Empty<SupplyConvoyRenderData>(),
             Array.Empty<ForwardBaseRenderData>(),
+            Array.Empty<ScoutIntelRenderData>(),
             FactionStances,
             Ecology,
             CurrentSeason,
@@ -159,6 +161,7 @@ public sealed record WorldRenderSnapshot(
             Campaigns,
             Array.Empty<SupplyConvoyRenderData>(),
             Array.Empty<ForwardBaseRenderData>(),
+            Array.Empty<ScoutIntelRenderData>(),
             FactionStances,
             Ecology,
             CurrentSeason,
@@ -207,6 +210,7 @@ public sealed record WorldRenderSnapshot(
             Campaigns,
             SupplyConvoys,
             Array.Empty<ForwardBaseRenderData>(),
+            Array.Empty<ScoutIntelRenderData>(),
             FactionStances,
             Ecology,
             CurrentSeason,
@@ -502,6 +506,21 @@ public sealed record ForwardBaseRenderData(
     int RestTicks,
     int RestedActorTicks,
     string CloseReason);
+
+public sealed record ScoutIntelRenderData(
+    int IntelId,
+    int OwnerFactionId,
+    int ObservedFactionId,
+    int ObservedColonyId,
+    string ObservationKind,
+    int X,
+    int Y,
+    int SourceActorId,
+    long CreatedTick,
+    long LastRefreshTick,
+    long ExpirationTick,
+    int TicksSinceRefresh,
+    float Confidence);
 
 public sealed record CampaignResolutionRenderData(
     bool IsResolved,

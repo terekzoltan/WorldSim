@@ -1,3 +1,5 @@
+using System;
+
 namespace WorldSim.Simulation.Military;
 
 public sealed record CampaignRuntimeSnapshot(
@@ -308,4 +310,39 @@ public sealed record ForwardBaseRuntimeSnapshot(
             state.LastLiveMemberNearTick,
             state.RestTicks,
             state.RestedActorTicks);
+}
+
+public sealed record ScoutIntelRuntimeSnapshot(
+    int IntelId,
+    Faction OwnerFaction,
+    Faction ObservedFaction,
+    int ObservedColonyId,
+    ScoutIntelObservationKind ObservationKind,
+    int X,
+    int Y,
+    int SourceActorId,
+    long CreatedTick,
+    long LastRefreshTick,
+    long ExpirationTick,
+    int TicksSinceRefresh,
+    float Confidence)
+{
+    public static ScoutIntelRuntimeSnapshot From(ScoutIntelState state, long currentTick)
+        => new(
+            state.IntelId,
+            state.OwnerFaction,
+            state.ObservedFaction,
+            state.ObservedColonyId,
+            state.ObservationKind,
+            state.X,
+            state.Y,
+            state.SourceActorId,
+            state.CreatedTick,
+            state.LastRefreshTick,
+            state.ExpirationTick,
+            CalculateTicksSinceRefresh(state, currentTick),
+            state.Confidence);
+
+    private static int CalculateTicksSinceRefresh(ScoutIntelState state, long currentTick)
+        => (int)Math.Min(int.MaxValue, Math.Max(0, currentTick - state.LastRefreshTick));
 }

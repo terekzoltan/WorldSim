@@ -79,6 +79,7 @@ public sealed class SimulationRuntime
     private readonly List<CampaignState> _campaigns = new();
     private readonly List<SupplyConvoyState> _supplyConvoys = new();
     private readonly List<ForwardBaseState> _forwardBases = new();
+    private readonly List<ScoutIntelState> _scoutIntel = new();
     private readonly Dictionary<CampaignWarScoreKey, int> _campaignWarScores = new();
     private readonly CampaignLogisticsOptions _campaignLogisticsOptions = CampaignLogisticsOptions.Default.Normalized();
     private readonly CampaignLogisticsCounters _campaignLogisticsCounters = new();
@@ -88,6 +89,7 @@ public sealed class SimulationRuntime
     private int _nextArmyId = 1;
     private int _nextSupplyConvoyId = 1;
     private int _nextForwardBaseId = 1;
+    private int _nextScoutIntelId = 1;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
     private int _trackedActorId = -1;
@@ -109,6 +111,12 @@ public sealed class SimulationRuntime
         => _supplyConvoys.Select(SupplyConvoyRuntimeSnapshot.From).ToArray();
     public IReadOnlyList<ForwardBaseRuntimeSnapshot> ForwardBases
         => _forwardBases.Select(ForwardBaseRuntimeSnapshot.From).ToArray();
+    public IReadOnlyList<ScoutIntelRuntimeSnapshot> ScoutIntel
+        => _scoutIntel
+            .Where(intel => intel.IsActive(Tick))
+            .OrderBy(intel => intel.IntelId)
+            .Select(intel => ScoutIntelRuntimeSnapshot.From(intel, CurrentCompletedTick))
+            .ToArray();
     public CampaignLogisticsCounters CampaignLogisticsCounters => _campaignLogisticsCounters;
 
     public SimulationRuntime(int width, int height, int initialPopulation, string technologyFilePath)
@@ -206,6 +214,7 @@ public sealed class SimulationRuntime
         AdvanceCampaignAssemblies(blockedCampaignActorIds);
         AdvanceCampaignMarches(marchEligibleCampaignIds, dt, blockedCampaignActorIds);
         AdvanceForwardBases(blockedCampaignActorIds);
+        AdvanceScoutIntel();
         AdvanceSupplyConvoys();
         AdvanceCampaignEncounters();
         RecordCampaignWave9PhaseTicks();
@@ -223,6 +232,7 @@ public sealed class SimulationRuntime
             Campaigns = BuildCampaignRenderData(),
             SupplyConvoys = BuildSupplyConvoyRenderData(),
             ForwardBases = BuildForwardBaseRenderData(),
+            ScoutIntel = BuildScoutIntelRenderData(),
             Director = BuildDirectorRenderState()
         };
     }
@@ -275,6 +285,31 @@ public sealed class SimulationRuntime
                 forwardBase.RestedActorTicks,
                 forwardBase.CloseReason))
             .ToArray();
+
+    private IReadOnlyList<ScoutIntelRenderData> BuildScoutIntelRenderData()
+        => _scoutIntel
+            .Where(intel => intel.IsActive(Tick))
+            .OrderBy(intel => intel.IntelId)
+            .Select(intel => new ScoutIntelRenderData(
+                intel.IntelId,
+                (int)intel.OwnerFaction,
+                (int)intel.ObservedFaction,
+                intel.ObservedColonyId,
+                MapScoutIntelObservationKindForReadModel(intel.ObservationKind),
+                intel.X,
+                intel.Y,
+                intel.SourceActorId,
+                intel.CreatedTick,
+                intel.LastRefreshTick,
+                intel.ExpirationTick,
+                CalculateScoutIntelTicksSinceRefresh(intel),
+                intel.Confidence))
+            .ToArray();
+
+    private int CalculateScoutIntelTicksSinceRefresh(ScoutIntelState intel)
+        => (int)Math.Min(int.MaxValue, Math.Max(0, CurrentCompletedTick - intel.LastRefreshTick));
+
+    private long CurrentCompletedTick => Math.Max(0, Tick - 1);
 
     public ScenarioWave9TelemetrySnapshot BuildScenarioWave9TelemetrySnapshot(string? wave9Scenario = null)
     {
@@ -552,6 +587,13 @@ public sealed class SimulationRuntime
             ForwardBasePhase.Active => "active",
             ForwardBasePhase.Expired => "expired",
             ForwardBasePhase.Abandoned => "abandoned",
+            _ => "unknown"
+        };
+
+    private static string MapScoutIntelObservationKindForReadModel(ScoutIntelObservationKind kind)
+        => kind switch
+        {
+            ScoutIntelObservationKind.Colony => "colony",
             _ => "unknown"
         };
 
@@ -1618,6 +1660,94 @@ public sealed class SimulationRuntime
 
     private static int ManhattanDistance((int x, int y) left, (int x, int y) right)
         => Math.Abs(left.x - right.x) + Math.Abs(left.y - right.y);
+
+    private void AdvanceScoutIntel()
+    {
+        ExpireScoutIntel();
+
+        var scouts = _world._people
+            .Where(IsLiveScout)
+            .OrderBy(person => person.Id)
+            .ToArray();
+        if (scouts.Length == 0)
+            return;
+
+        var targetColonies = _world._colonies
+            .OrderBy(colony => (int)colony.Faction)
+            .ThenBy(colony => colony.Id)
+            .ToArray();
+
+        foreach (var scout in scouts)
+        {
+            var ownerFaction = scout.Home.Faction;
+            var radius = GetScoutIntelRadius(scout.Home);
+            foreach (var target in targetColonies)
+            {
+                if (target.Faction == ownerFaction || !IsScoutIntelTargetRelation(ownerFaction, target.Faction))
+                    continue;
+                if (!IsWithinManhattanDistance(scout.Pos, target.Origin, radius))
+                    continue;
+
+                RecordScoutColonyIntel(ownerFaction, target, scout.Id);
+            }
+        }
+    }
+
+    private void ExpireScoutIntel()
+    {
+        foreach (var intel in _scoutIntel.OrderBy(intel => intel.IntelId))
+        {
+            if (intel.TryMarkExpired(Tick))
+                _campaignLogisticsCounters.RecordScoutIntelExpired();
+        }
+    }
+
+    private static bool IsLiveScout(Person person)
+        => person.Health > 0f && person.HasRole(PersonRole.Scout);
+
+    private int GetScoutIntelRadius(Colony ownerColony)
+        => Math.Min(
+            _campaignLogisticsOptions.ScoutIntelMaxRadius,
+            _campaignLogisticsOptions.ScoutIntelBaseRadius + Math.Max(0, ownerColony.ScoutRadiusBonus));
+
+    private bool IsScoutIntelTargetRelation(Faction ownerFaction, Faction observedFaction)
+        => _world.GetFactionStance(ownerFaction, observedFaction) is Stance.Hostile or Stance.War;
+
+    private void RecordScoutColonyIntel(Faction ownerFaction, Colony target, int sourceActorId)
+    {
+        const ScoutIntelObservationKind observationKind = ScoutIntelObservationKind.Colony;
+        var existing = _scoutIntel.FirstOrDefault(intel =>
+            intel.IsActive(Tick)
+            && intel.OwnerFaction == ownerFaction
+            && intel.ObservedColonyId == target.Id
+            && intel.ObservationKind == observationKind);
+        if (existing != null)
+        {
+            existing.Refresh(
+                target.Origin.x,
+                target.Origin.y,
+                sourceActorId,
+                Tick,
+                _campaignLogisticsOptions.ScoutIntelTtlTicks,
+                _campaignLogisticsOptions.ScoutIntelConfidence);
+            _campaignLogisticsCounters.RecordScoutIntelRefreshed();
+            return;
+        }
+
+        _scoutIntel.Add(new ScoutIntelState(
+            _nextScoutIntelId++,
+            ownerFaction,
+            target.Faction,
+            target.Id,
+            observationKind,
+            target.Origin.x,
+            target.Origin.y,
+            sourceActorId,
+            Tick,
+            _campaignLogisticsOptions.ScoutIntelTtlTicks,
+            _campaignLogisticsOptions.ScoutIntelConfidence));
+        _campaignLogisticsCounters.RecordScoutIntelObserved();
+    }
 
     private void AdvanceSupplyConvoys()
     {

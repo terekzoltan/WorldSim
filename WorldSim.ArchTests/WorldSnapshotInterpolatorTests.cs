@@ -60,6 +60,23 @@ public class WorldSnapshotInterpolatorTests
         Assert.Equal(5, Assert.Single(interpolated.People).X);
     }
 
+    [Fact]
+    public void Interpolate_PreservesScoutIntel()
+    {
+        var previous = CreateSnapshot(Array.Empty<CampaignRenderData>(), Array.Empty<SupplyConvoyRenderData>(), Array.Empty<ForwardBaseRenderData>(), Array.Empty<ScoutIntelRenderData>(), personX: 0);
+        var intel = CreateScoutIntel();
+        var current = CreateSnapshot(Array.Empty<CampaignRenderData>(), Array.Empty<SupplyConvoyRenderData>(), Array.Empty<ForwardBaseRenderData>(), new[] { intel }, personX: 10);
+
+        var interpolated = WorldSnapshotInterpolator.Interpolate(previous, current, alpha: 0.5f);
+
+        var result = Assert.Single(interpolated.ScoutIntel);
+        Assert.Equal(intel.IntelId, result.IntelId);
+        Assert.Equal(intel.OwnerFactionId, result.OwnerFactionId);
+        Assert.Equal(intel.ObservedColonyId, result.ObservedColonyId);
+        Assert.Equal(intel.ObservationKind, result.ObservationKind);
+        Assert.Equal(5, Assert.Single(interpolated.People).X);
+    }
+
     private static WorldRenderSnapshot CreateSnapshot(IReadOnlyList<CampaignRenderData> campaigns, int personX)
         => CreateSnapshot(campaigns, Array.Empty<SupplyConvoyRenderData>(), personX);
 
@@ -73,6 +90,14 @@ public class WorldSnapshotInterpolatorTests
         IReadOnlyList<CampaignRenderData> campaigns,
         IReadOnlyList<SupplyConvoyRenderData> supplyConvoys,
         IReadOnlyList<ForwardBaseRenderData> forwardBases,
+        int personX)
+        => CreateSnapshot(campaigns, supplyConvoys, forwardBases, Array.Empty<ScoutIntelRenderData>(), personX);
+
+    private static WorldRenderSnapshot CreateSnapshot(
+        IReadOnlyList<CampaignRenderData> campaigns,
+        IReadOnlyList<SupplyConvoyRenderData> supplyConvoys,
+        IReadOnlyList<ForwardBaseRenderData> forwardBases,
+        IReadOnlyList<ScoutIntelRenderData> scoutIntel,
         int personX)
         => new(
             Width: 16,
@@ -91,6 +116,7 @@ public class WorldSnapshotInterpolatorTests
             Campaigns: campaigns,
             SupplyConvoys: supplyConvoys,
             ForwardBases: forwardBases,
+            ScoutIntel: scoutIntel,
             FactionStances: Array.Empty<FactionStanceRenderData>(),
             Ecology: CreateEcoHudData(),
             CurrentSeason: SeasonView.Spring,
@@ -222,6 +248,22 @@ public class WorldSnapshotInterpolatorTests
             RestTicks: 1,
             RestedActorTicks: 2,
             CloseReason: "none");
+
+    private static ScoutIntelRenderData CreateScoutIntel()
+        => new(
+            IntelId: 12,
+            OwnerFactionId: 1,
+            ObservedFactionId: 2,
+            ObservedColonyId: 3,
+            ObservationKind: "colony",
+            X: 6,
+            Y: 7,
+            SourceActorId: 9,
+            CreatedTick: 40,
+            LastRefreshTick: 41,
+            ExpirationTick: 100,
+            TicksSinceRefresh: 0,
+            Confidence: 0.8f);
 
     private static EcoHudData CreateEcoHudData()
         => new(

@@ -286,6 +286,7 @@ public static class WorldSnapshotBuilder
             Array.Empty<CampaignRenderData>(),
             Array.Empty<SupplyConvoyRenderData>(),
             Array.Empty<ForwardBaseRenderData>(),
+            Array.Empty<ScoutIntelRenderData>(),
             factionStances,
             ecology,
             MapSeason(world.CurrentSeason),
