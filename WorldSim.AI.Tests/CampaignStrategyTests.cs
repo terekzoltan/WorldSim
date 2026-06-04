@@ -149,6 +149,55 @@ public class CampaignStrategyTests
     }
 
     [Fact]
+    public void DefaultStrategist_RejectsUnknownHighScoreTarget()
+    {
+        var strategist = new DefaultCampaignStrategist();
+        var target = CreateTarget(
+            pressureScore: 1f,
+            advantageScore: 1f,
+            isKnown: false);
+
+        var decision = strategist.Decide(CreateContext(targets: new[] { target }));
+
+        Assert.Equal(CampaignStrategyDecisionKind.HoldDefensivePosture, decision.Kind);
+        Assert.Equal(CampaignStrategyReasonCode.NoViableTarget, decision.ReasonCode);
+    }
+
+    [Fact]
+    public void DefaultStrategist_KnownLowerScoreTargetBeatsUnknownHigherScoreTarget()
+    {
+        var strategist = new DefaultCampaignStrategist();
+        var unknownHighScore = CreateTarget(
+            targetFactionId: 1,
+            targetColonyId: 10,
+            pressureScore: 1f,
+            advantageScore: 1f,
+            isKnown: false);
+        var knownLowerScore = CreateTarget(
+            targetFactionId: 2,
+            targetColonyId: 20,
+            pressureScore: 0.65f,
+            advantageScore: 0.65f,
+            isKnown: true);
+
+        var decision = strategist.Decide(CreateContext(targets: new[] { unknownHighScore, knownLowerScore }));
+
+        Assert.Equal(CampaignStrategyDecisionKind.LaunchCampaign, decision.Kind);
+        Assert.Equal(2, decision.TargetFactionId);
+        Assert.Equal(20, decision.TargetColonyId);
+    }
+
+    [Fact]
+    public void CampaignTargetOption_ScoutIntelMetadataDefaultsRemainBackwardCompatible()
+    {
+        var target = CreateTarget();
+
+        Assert.False(target.HasScoutIntel);
+        Assert.Equal(int.MaxValue, target.ScoutIntelTicksSinceRefresh);
+        Assert.Equal(0f, target.ScoutIntelConfidence);
+    }
+
+    [Fact]
     public void DefaultStrategist_LaunchRequestsAtLeastOneWarrior_WhenTargetMinimumIsZero()
     {
         var strategist = new DefaultCampaignStrategist();
@@ -293,7 +342,10 @@ public class CampaignStrategyTests
         int requestedWarriors = 6,
         int requestedCarriers = 2,
         float distancePenalty = 0f,
-        bool isKnown = true)
+        bool isKnown = true,
+        bool hasScoutIntel = false,
+        int scoutIntelTicksSinceRefresh = int.MaxValue,
+        float scoutIntelConfidence = 0f)
         => new(
             targetFactionId,
             targetColonyId,
@@ -303,7 +355,10 @@ public class CampaignStrategyTests
             requestedWarriors,
             requestedCarriers,
             distancePenalty,
-            isKnown);
+            isKnown,
+            hasScoutIntel,
+            scoutIntelTicksSinceRefresh,
+            scoutIntelConfidence);
 
     private static ActiveCampaignStrategyFact CreateActiveCampaign(
         int campaignId = 100,

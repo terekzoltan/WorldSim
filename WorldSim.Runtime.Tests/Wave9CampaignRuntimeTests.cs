@@ -18,6 +18,8 @@ public sealed class Wave9CampaignRuntimeTests
     {
         var runtime = CreateRuntime();
         EnableDiplomacyAndCombat(runtime);
+        SetAllCampaignCandidatesIneligible(runtime);
+        GetPeople(GetWorld(runtime), Faction.Obsidari).First().AssignRole(PersonRole.Warrior);
 
         var result = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
 
@@ -31,9 +33,18 @@ public sealed class Wave9CampaignRuntimeTests
         Assert.Equal(1, campaign.ArmyId);
         Assert.Equal(Faction.Obsidari, campaign.OwnerFaction);
         Assert.Equal(Faction.Aetheri, campaign.TargetFaction);
-        Assert.Equal(CampaignPhase.AssemblingPending, campaign.Phase);
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
         Assert.Equal(1, campaign.Army.RequestedMemberCount);
-        Assert.Empty(campaign.Army.MemberActorIds);
+        Assert.Single(campaign.Army.MemberActorIds);
+        Assert.True(campaign.Army.HasRallyPoint);
+        Assert.True(campaign.Army.AssemblyStartedTick >= 0);
+        Assert.False(campaign.Army.IsAssembled);
+
+        var renderCampaign = Assert.Single(runtime.GetSnapshot().Campaigns);
+        Assert.Equal(1, renderCampaign.Army.AssignedMemberCount);
+        Assert.True(renderCampaign.Army.HasRallyPoint);
+        Assert.True(renderCampaign.Army.AnchorActorId >= 0);
+        Assert.True(renderCampaign.Route.CachedWaypointCount > 0);
     }
 
     [Fact]
@@ -80,7 +91,7 @@ public sealed class Wave9CampaignRuntimeTests
         EnableDiplomacyAndCombat(missingOwnerRuntime);
         GetWorld(missingOwnerRuntime)._colonies.RemoveAll(colony => colony.Faction == Faction.Obsidari);
 
-        var missingOwner = missingOwnerRuntime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+        var missingOwner = missingOwnerRuntime.TryCreateManualCampaign(new ManualCampaignLaunchCommand(Faction.Obsidari, Faction.Aetheri, 1));
 
         Assert.False(missingOwner.Success);
         Assert.Equal(CampaignCreationStatus.OwnerColonyNotFound, missingOwner.Status);
@@ -90,11 +101,86 @@ public sealed class Wave9CampaignRuntimeTests
         EnableDiplomacyAndCombat(missingTargetRuntime);
         GetWorld(missingTargetRuntime)._colonies.RemoveAll(colony => colony.Faction == Faction.Aetheri);
 
-        var missingTarget = missingTargetRuntime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+        var missingTarget = missingTargetRuntime.TryCreateManualCampaign(new ManualCampaignLaunchCommand(Faction.Obsidari, Faction.Aetheri, 1));
 
         Assert.False(missingTarget.Success);
         Assert.Equal(CampaignCreationStatus.TargetColonyNotFound, missingTarget.Status);
         Assert.Empty(missingTargetRuntime.Campaigns);
+    }
+
+    [Fact]
+    public void TryCreateManualCampaign_DefaultOperatorSmoke_DefaultPairUnavailable_SelectsViableFallbackPair()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var world = GetWorld(runtime);
+        world._colonies.RemoveAll(colony => colony.Faction == Faction.Aetheri);
+        SetAllCampaignCandidatesIneligible(runtime);
+        GetPeople(world, Faction.Obsidari).First().AssignRole(PersonRole.Warrior);
+
+        var result = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+
+        Assert.True(result.Success);
+        var campaign = Assert.Single(runtime.Campaigns);
+        Assert.NotEqual(Faction.Aetheri, campaign.TargetFaction);
+        Assert.NotEqual(campaign.OwnerFaction, campaign.TargetFaction);
+        Assert.Single(campaign.Army.MemberActorIds);
+
+        var renderCampaign = Assert.Single(runtime.GetSnapshot().Campaigns);
+        Assert.Equal(1, renderCampaign.Army.AssignedMemberCount);
+        Assert.True(renderCampaign.Route.CachedWaypointCount > 0);
+    }
+
+    [Fact]
+    public void TryCreateManualCampaign_DefaultOperatorSmoke_AppSizedWorld_CreatesRoutedCampaign()
+    {
+        var repoRoot = FindRepoRoot();
+        var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
+        var runtime = new SimulationRuntime(128, 128, 25, techPath, aiOptions: null, randomSeed: 9601);
+        EnableDiplomacyAndCombat(runtime);
+
+        var result = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+
+        Assert.True(result.Success, result.Message);
+        var campaign = Assert.Single(runtime.Campaigns);
+        Assert.Equal(CampaignPhase.Assembling, campaign.Phase);
+        Assert.Single(campaign.Army.MemberActorIds);
+
+        var renderCampaign = Assert.Single(runtime.GetSnapshot().Campaigns);
+        Assert.Equal(1, renderCampaign.Army.AssignedMemberCount);
+        Assert.True(renderCampaign.Route.CachedWaypointCount > 0);
+    }
+
+    [Fact]
+    public void TryCreateManualCampaign_DefaultOperatorSmoke_NoRoleCandidate_UsesHealthyHomeMemberFallback()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetAllCampaignCandidatesIneligible(runtime);
+
+        var result = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+
+        Assert.True(result.Success, result.Message);
+        var campaign = Assert.Single(runtime.Campaigns);
+        Assert.Single(campaign.Army.MemberActorIds);
+        Assert.True(runtime.GetSnapshot().Campaigns.Single().Route.CachedWaypointCount > 0);
+    }
+
+    [Fact]
+    public void TryCreateManualCampaign_NoEligibleMember_ReturnsExplicitFailureWithoutMutatingCampaigns()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetAllCampaignCandidatesIneligible(runtime);
+        foreach (var person in GetWorld(runtime)._people)
+            person.Health = 0f;
+
+        var result = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+
+        Assert.False(result.Success);
+        Assert.Equal(CampaignCreationStatus.CampaignRuntimeUnavailable, result.Status);
+        Assert.Contains("eligible member", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(runtime.Campaigns);
     }
 
     [Fact]

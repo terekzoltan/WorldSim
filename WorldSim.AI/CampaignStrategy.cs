@@ -60,7 +60,10 @@ public readonly record struct CampaignTargetOption(
     int RequestedWarriors,
     int RequestedCarriers,
     float DistancePenalty = 0f,
-    bool IsKnown = true);
+    bool IsKnown = true,
+    bool HasScoutIntel = false,
+    int ScoutIntelTicksSinceRefresh = int.MaxValue,
+    float ScoutIntelConfidence = 0f);
 
 public readonly record struct ActiveCampaignStrategyFact(
     int CampaignId,

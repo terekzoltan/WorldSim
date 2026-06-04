@@ -2145,7 +2145,7 @@ Wave 10 SMR evidence guardrail:
 - ✅ **P7-A** Supply line convoy entities (Track B)
 - ✅ **P7-B** Forward bases / camps (Track B)
 - ✅ **P7-C** Scout role + intel (Track B + C)
-- ⬜ **P7-D** UI for supply lines and forward bases (Track A)
+- ✅ **P7-D** UI for supply lines and forward bases (Track A)
 
 ### Sprint C13: Siege Units + Multi-Front (Track B -> C -> A)
 
@@ -2279,6 +2279,14 @@ P7-C (B part) closeout note:
 
 P7-C (C part) active consume gate:
 - P7-C(C) must classify stale-intel semantics as `in-scope now` at kickoff and explicitly decide how AI/strategy consumers treat runtime scout intel freshness: TTL-only, current-stance filtering, `TicksSinceRefresh` thresholding, or a documented combination. Track C must not assume that all active P7-C(B) intel is strategically actionable without this consume policy.
+
+P7-D progress note:
+- ✅ Track A snapshot-only logistics UI implementation is ready for review: the existing `Ctrl+F2` campaign overlay/panel now consumes `WorldRenderSnapshot.SupplyConvoys` and `WorldRenderSnapshot.ForwardBases` to draw convoy current markers, target lines, payload badges, forward-base markers, and radius/crosshair cues, plus a bounded Logistics panel section with summary counts and top-N convoy/base rows. Scope stayed Graphics/ArchTests/docs-only: no Runtime/read-model, App hotkey/control, AI, ScenarioRunner/SMR, Refinery, `Docs/Architecture/`, event-string parsing, or scout-intel UI changes. Manual smoke remains visual-consume proof only and must not be overclaimed as logistics runtime correctness or SMR evidence.
+
+P7-D closeout / residual evidence route:
+- ✅ Track A P7-D is closed as a snapshot-only UI/visual-consume slice. Manual smoke (`WORLDSIM_VISUAL_PROFILE=Showcase`, diplomacy/combat/siege enabled, `Ctrl+Q`, `Ctrl+F2`) confirmed that the campaign panel/overlay opens, the compact Logistics section renders, dense rows degrade with top-N fallback, and forward-base active/abandoned rows are visible when runtime reaches those states. This is visual consume evidence only: it must not be overclaimed as logistics runtime correctness, organic campaign proof, or SMR evidence.
+- Manual evidence log: `Docs/Evidence/Manual/P7-D-Manual-Smoke-Followup.md`. This captures the observed `Ctrl+Q` / `Ctrl+F2` attempts, including successful `Syl->Obs` / `Aet->Syl` campaigns, intermittent fresh-start launch failures, repeated-campaign spam, one-person-probe behavior, forward-base active/abandoned rows, and why Step 10A/SMR should later provide durable non-interactive proof types for campaign/logistics visualization.
+- Deferred residual route: Track B/operator-smoke stability and durable proof are routed to Wave 10 SMR prep Step 10A or later Track B campaign hardening. Do not block Step 8 (`P7-E`) on more manual P7-D smoke chasing.
 
 **Step 8 — dedicated siege units first (Track B)**
 

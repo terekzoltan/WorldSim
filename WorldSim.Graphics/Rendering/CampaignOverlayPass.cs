@@ -29,6 +29,57 @@ public sealed class CampaignOverlayPass : IRenderPass
             DrawEncounterActivityCue(spriteBatch, pixel, campaign, tileSize);
             DrawResolutionMarker(spriteBatch, pixel, campaign, tileSize);
         }
+
+        DrawSupplyConvoys(spriteBatch, pixel, context.Snapshot, tileSize);
+        DrawForwardBases(spriteBatch, pixel, context.Snapshot, tileSize);
+    }
+
+    private static void DrawSupplyConvoys(SpriteBatch spriteBatch, Texture2D pixel, WorldRenderSnapshot snapshot, int tileSize)
+    {
+        foreach (var convoy in snapshot.SupplyConvoys.OrderBy(convoy => convoy.ConvoyId))
+        {
+            var current = TileCenter(convoy.CurrentX, convoy.CurrentY, tileSize);
+            var target = TileCenter(convoy.TargetX, convoy.TargetY, tileSize);
+            var color = GetSupplyConvoyColor(convoy);
+            int thickness = Math.Max(1, tileSize / 5);
+
+            DrawLine(spriteBatch, pixel, current, target, color * 0.48f, thickness);
+
+            int markerSize = Math.Max(tileSize, 7) + Math.Clamp(convoy.PayloadFood, 0, 4);
+            var marker = CenteredRect(current, markerSize);
+            spriteBatch.Draw(pixel, marker, color * 0.34f);
+            DrawRectOutline(spriteBatch, pixel, marker, Math.Max(1, tileSize / 5), color * 0.9f);
+
+            int targetSize = Math.Max(4, tileSize / 2);
+            DrawRectOutline(spriteBatch, pixel, CenteredRect(target, targetSize), Math.Max(1, tileSize / 6), color * 0.72f);
+
+            if (convoy.PayloadFood > 0)
+            {
+                int badge = Math.Max(2, tileSize / 3);
+                spriteBatch.Draw(pixel, new Rectangle(marker.Right - badge, marker.Bottom - badge, badge, badge), new Color(245, 211, 112) * 0.92f);
+            }
+        }
+    }
+
+    private static void DrawForwardBases(SpriteBatch spriteBatch, Texture2D pixel, WorldRenderSnapshot snapshot, int tileSize)
+    {
+        foreach (var forwardBase in snapshot.ForwardBases.OrderBy(forwardBase => forwardBase.BaseId))
+        {
+            var center = TileCenter(forwardBase.X, forwardBase.Y, tileSize);
+            var color = GetForwardBaseColor(forwardBase);
+            int markerSize = Math.Max(tileSize + 2, 8);
+            int radius = Math.Max(markerSize, Math.Max(1, forwardBase.Radius) * tileSize);
+            int thickness = Math.Max(1, tileSize / 5);
+
+            var radiusRect = CenteredRect(center, radius * 2);
+            DrawRectOutline(spriteBatch, pixel, radiusRect, thickness, color * 0.34f);
+
+            var marker = CenteredRect(center, markerSize);
+            spriteBatch.Draw(pixel, marker, color * 0.26f);
+            DrawRectOutline(spriteBatch, pixel, marker, Math.Max(1, tileSize / 4), color * 0.86f);
+            DrawLine(spriteBatch, pixel, new Vector2(marker.X, marker.Y + (marker.Height / 2f)), new Vector2(marker.Right, marker.Y + (marker.Height / 2f)), color * 0.82f, thickness);
+            DrawLine(spriteBatch, pixel, new Vector2(marker.X + (marker.Width / 2f), marker.Y), new Vector2(marker.X + (marker.Width / 2f), marker.Bottom), color * 0.82f, thickness);
+        }
     }
 
     private static void DrawRoute(SpriteBatch spriteBatch, Texture2D pixel, CampaignRenderData campaign, int tileSize)
@@ -209,5 +260,35 @@ public sealed class CampaignOverlayPass : IRenderPass
             return new Color(236, 158, 92);
 
         return new Color(180, 180, 180);
+    }
+
+    private static Color GetSupplyConvoyColor(SupplyConvoyRenderData convoy)
+    {
+        if (string.Equals(convoy.Phase, "marching", StringComparison.OrdinalIgnoreCase))
+            return GetFactionColor(convoy.OwnerFactionId);
+
+        if (string.Equals(convoy.Phase, "delivered", StringComparison.OrdinalIgnoreCase))
+            return new Color(132, 220, 142);
+
+        if (string.Equals(convoy.Phase, "failed", StringComparison.OrdinalIgnoreCase))
+            return new Color(236, 158, 92);
+
+        var factionColor = GetFactionColor(convoy.OwnerFactionId);
+        return string.Equals(convoy.Phase, "pending", StringComparison.OrdinalIgnoreCase)
+            ? factionColor * 0.72f
+            : new Color(180, 180, 180);
+    }
+
+    private static Color GetForwardBaseColor(ForwardBaseRenderData forwardBase)
+    {
+        if (string.Equals(forwardBase.Phase, "expired", StringComparison.OrdinalIgnoreCase))
+            return new Color(156, 178, 190);
+
+        if (string.Equals(forwardBase.Phase, "abandoned", StringComparison.OrdinalIgnoreCase))
+            return new Color(236, 158, 92);
+
+        return string.Equals(forwardBase.Phase, "active", StringComparison.OrdinalIgnoreCase)
+            ? GetFactionColor(forwardBase.OwnerFactionId)
+            : new Color(180, 180, 180);
     }
 }

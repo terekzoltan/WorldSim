@@ -22,12 +22,14 @@ public readonly record struct RuntimeCommandResult(bool Success, string Message)
 public readonly record struct ManualCampaignLaunchCommand(
     Faction OwnerFaction,
     Faction TargetFaction,
-    int RequestedMemberCount)
+    int RequestedMemberCount,
+    bool AllowFallback = false)
 {
     public static ManualCampaignLaunchCommand DefaultOperatorSmoke { get; } = new(
         Faction.Obsidari,
         Faction.Aetheri,
-        RequestedMemberCount: 1);
+        RequestedMemberCount: 1,
+        AllowFallback: true);
 }
 
 public abstract record RuntimePatchCommand;

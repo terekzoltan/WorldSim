@@ -72,7 +72,7 @@ public class BoundaryRulesTests
     }
 
     [Fact]
-    public void CampaignGraphicsConsume_UsesSnapshotBoundaryOnly()
+    public void CampaignAndLogisticsGraphicsConsume_UsesSnapshotBoundaryOnly()
     {
         var files = new[]
         {

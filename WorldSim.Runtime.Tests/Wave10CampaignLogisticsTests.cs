@@ -41,6 +41,7 @@ public sealed class Wave10CampaignLogisticsTests
         Assert.True(runtime.TryCreateCampaign(Faction.Obsidari, Faction.Chirita, requestedMemberCount: 1).Success);
         AdvanceTicks(runtime, OrganicCadenceTicks);
         runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "p7a organic cap first");
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
@@ -589,6 +590,35 @@ public sealed class Wave10CampaignLogisticsTests
         var world = GetWorld(runtime);
         foreach (var person in SelectPeople(world, GetColony(world, faction), count))
             person.AssignRole(PersonRole.Warrior);
+    }
+
+    private static void AddActionableScoutIntel(SimulationRuntime runtime, Faction ownerFaction, Faction targetFaction)
+    {
+        var world = GetWorld(runtime);
+        var owner = GetColony(world, ownerFaction);
+        var target = GetColony(world, targetFaction);
+        var sourceActor = SelectPeople(world, owner, 1)[0];
+        sourceActor.AssignRole(PersonRole.Scout);
+        var scoutIntel = GetScoutIntelStates(runtime);
+        scoutIntel.Add(new ScoutIntelState(
+            intelId: scoutIntel.Count + 1,
+            ownerFaction: owner.Faction,
+            observedFaction: target.Faction,
+            observedColonyId: target.Id,
+            observationKind: ScoutIntelObservationKind.Colony,
+            x: target.Origin.x,
+            y: target.Origin.y,
+            sourceActorId: sourceActor.Id,
+            createdTick: runtime.Tick,
+            ttlTicks: 60,
+            confidence: 0.8f));
+    }
+
+    private static List<ScoutIntelState> GetScoutIntelStates(SimulationRuntime runtime)
+    {
+        var scoutIntelField = typeof(SimulationRuntime).GetField("_scoutIntel", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(scoutIntelField);
+        return Assert.IsAssignableFrom<List<ScoutIntelState>>(scoutIntelField!.GetValue(runtime));
     }
 
     private static Person[] SelectPeople(World world, Colony colony, int count)

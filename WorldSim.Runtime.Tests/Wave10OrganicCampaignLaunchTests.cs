@@ -44,6 +44,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
 
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
         runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic cadence test");
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
         runtime.AdvanceTick(0f);
 
         var campaign = Assert.Single(runtime.Campaigns);
@@ -60,6 +61,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
         GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
@@ -78,6 +80,8 @@ public sealed class Wave10OrganicCampaignLaunchTests
         var world = GetWorld(runtime);
         world.SetFactionStance(Faction.Obsidari, Faction.Sylvars, Stance.Hostile);
         world.SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.War);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Sylvars);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
@@ -145,6 +149,42 @@ public sealed class Wave10OrganicCampaignLaunchTests
     }
 
     [Fact]
+    public void OrganicCampaign_InjectedLaunchWithoutScoutIntelSuppressesLaunch()
+    {
+        var runtime = CreateRuntime();
+        var targetColonyId = GetColony(GetWorld(runtime), Faction.Aetheri).Id;
+        runtime = CreateRuntime(FixedLaunchStrategist.For(Faction.Aetheri, targetColonyId, requestedWarriors: 1));
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+        PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic no-scout apply gate test");
+
+        runtime.AdvanceTick(0f);
+
+        Assert.Empty(runtime.Campaigns);
+    }
+
+    [Fact]
+    public void OrganicCampaign_InjectedLaunchWithStaleActiveScoutIntelSuppressesLaunch()
+    {
+        var runtime = CreateRuntime();
+        var targetColonyId = GetColony(GetWorld(runtime), Faction.Aetheri).Id;
+        runtime = CreateRuntime(FixedLaunchStrategist.For(Faction.Aetheri, targetColonyId, requestedWarriors: 1));
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks * 2);
+        PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic stale-scout apply gate test");
+        AddScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri, createdTick: 0);
+        Assert.Single(runtime.ScoutIntel);
+        Assert.True(Assert.Single(runtime.ScoutIntel).TicksSinceRefresh > 30);
+
+        runtime.AdvanceTick(0f);
+
+        Assert.Empty(runtime.Campaigns);
+        Assert.Single(runtime.GetSnapshot().ScoutIntel);
+    }
+
+    [Fact]
     public void OrganicCampaign_InsufficientEligibleMembersSuppressLaunch()
     {
         var runtime = CreateRuntime();
@@ -180,6 +220,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 3);
         runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic cap test");
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
@@ -195,6 +236,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 3);
         runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic same-pair test");
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
         runtime.AdvanceTick(0f);
         ResolveCampaign(GetLiveCampaigns(runtime).Single());
 
@@ -214,6 +256,8 @@ public sealed class Wave10OrganicCampaignLaunchTests
         PrepareEligibleCampaignMembers(runtime, Faction.Sylvars, count: 2);
         PrepareAdditionalEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2, PersonRole.Warrior);
         runtime.DeclareWar(Faction.Sylvars, Faction.Obsidari, "organic mirror cap test");
+        AddActionableScoutIntel(runtime, Faction.Sylvars, Faction.Obsidari);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Sylvars);
 
         runtime.AdvanceTick(0f);
 
@@ -235,6 +279,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         MoveTargetOriginToBlockableTile(world, target);
         Assert.True(world.TryAddWoodWall(target, target.Origin));
         world.SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.War);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
@@ -255,6 +300,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
         world.SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.War);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri, alternateTarget.Id);
 
         runtime.AdvanceTick(0f);
 
@@ -285,6 +331,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
         runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic warrior-only test");
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
@@ -329,6 +376,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 3);
         runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic clamp test");
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
@@ -361,6 +409,8 @@ public sealed class Wave10OrganicCampaignLaunchTests
         var world = GetWorld(runtime);
         world.SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
         world.SetFactionStance(Faction.Obsidari, Faction.Chirita, Stance.Hostile);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Chirita);
     }
 
     private static SimulationRuntime CreateRuntime(ICampaignStrategist? strategist = null)
@@ -521,6 +571,51 @@ public sealed class Wave10OrganicCampaignLaunchTests
         Assert.NotNull(campaignsField);
         var campaigns = Assert.IsAssignableFrom<List<CampaignState>>(campaignsField!.GetValue(runtime));
         return campaigns;
+    }
+
+    private static void AddActionableScoutIntel(SimulationRuntime runtime, Faction ownerFaction, Faction targetFaction)
+        => AddScoutIntel(runtime, ownerFaction, targetFaction, observedColonyId: null, runtime.Tick);
+
+    private static void AddActionableScoutIntel(SimulationRuntime runtime, Faction ownerFaction, Faction targetFaction, int observedColonyId)
+        => AddScoutIntel(runtime, ownerFaction, targetFaction, observedColonyId, runtime.Tick);
+
+    private static void AddScoutIntel(SimulationRuntime runtime, Faction ownerFaction, Faction targetFaction, long createdTick)
+        => AddScoutIntel(runtime, ownerFaction, targetFaction, observedColonyId: null, createdTick);
+
+    private static void AddScoutIntel(
+        SimulationRuntime runtime,
+        Faction ownerFaction,
+        Faction targetFaction,
+        int? observedColonyId,
+        long createdTick)
+    {
+        var world = GetWorld(runtime);
+        var owner = GetColony(world, ownerFaction);
+        var target = observedColonyId.HasValue
+            ? world._colonies.First(colony => colony.Id == observedColonyId.Value && colony.Faction == targetFaction)
+            : GetColony(world, targetFaction);
+        var sourceActor = SelectCampaignMemberCandidates(world, ownerFaction, 1)[0];
+        sourceActor.AssignRole(PersonRole.Scout);
+        var scoutIntel = GetScoutIntelStates(runtime);
+        scoutIntel.Add(new ScoutIntelState(
+            intelId: scoutIntel.Count + 1,
+            ownerFaction: owner.Faction,
+            observedFaction: target.Faction,
+            observedColonyId: target.Id,
+            observationKind: ScoutIntelObservationKind.Colony,
+            x: target.Origin.x,
+            y: target.Origin.y,
+            sourceActorId: sourceActor.Id,
+            createdTick: createdTick,
+            ttlTicks: 60,
+            confidence: 0.8f));
+    }
+
+    private static List<ScoutIntelState> GetScoutIntelStates(SimulationRuntime runtime)
+    {
+        var scoutIntelField = typeof(SimulationRuntime).GetField("_scoutIntel", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(scoutIntelField);
+        return Assert.IsAssignableFrom<List<ScoutIntelState>>(scoutIntelField!.GetValue(runtime));
     }
 
     private static World GetWorld(SimulationRuntime runtime)

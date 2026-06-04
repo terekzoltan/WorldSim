@@ -47,6 +47,7 @@ public sealed class SimulationRuntime
     private const int MinCausalWindowTicks = 10;
     private const int MaxCausalWindowTicks = 100;
     private const int CampaignPathMaxExpansions = 4096;
+    private const int OperatorSmokeCampaignPathMaxExpansions = 32768;
     private const int OrganicCampaignLaunchCadenceTicks = 20;
     private const int OrganicCampaignMaxUnresolvedPerOwner = 2;
     private const int OrganicCampaignMaxUnresolvedPerUnorderedPair = 1;
@@ -602,64 +603,265 @@ public sealed class SimulationRuntime
 
     public CampaignCreationResult TryCreateCampaign(Faction ownerFaction, Faction targetFaction, int requestedMemberCount)
     {
-        if (!IsCampaignRuntimeAvailable())
-        {
-            return CampaignCreationResult.Failed(
-                CampaignCreationStatus.CampaignRuntimeUnavailable,
-                "Campaign creation requires WORLDSIM_ENABLE_DIPLOMACY=true and WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true.");
-        }
+        var validation = ValidateCampaignCreation(ownerFaction, targetFaction, requestedMemberCount);
+        if (!validation.Success)
+            return validation.Result;
 
-        if (!Enum.IsDefined(typeof(Faction), ownerFaction))
-        {
-            return CampaignCreationResult.Failed(
-                CampaignCreationStatus.InvalidOwnerFaction,
-                $"Invalid owner faction value: {(int)ownerFaction}.");
-        }
-
-        if (!Enum.IsDefined(typeof(Faction), targetFaction))
-        {
-            return CampaignCreationResult.Failed(
-                CampaignCreationStatus.InvalidTargetFaction,
-                $"Invalid target faction value: {(int)targetFaction}.");
-        }
-
-        if (ownerFaction == targetFaction)
-        {
-            return CampaignCreationResult.Failed(
-                CampaignCreationStatus.SameFaction,
-                "Campaign creation requires ownerFaction != targetFaction.");
-        }
-
-        if (requestedMemberCount <= 0)
-        {
-            return CampaignCreationResult.Failed(
-                CampaignCreationStatus.InvalidRequestedMemberCount,
-                "Campaign creation requires requestedMemberCount > 0.");
-        }
-
-        var ownerColony = _world._colonies.FirstOrDefault(colony => colony.Faction == ownerFaction);
-        if (ownerColony == null)
-        {
-            return CampaignCreationResult.Failed(
-                CampaignCreationStatus.OwnerColonyNotFound,
-                $"No owner colony found for faction {ownerFaction}.");
-        }
-
-        var targetColony = _world._colonies.FirstOrDefault(colony => colony.Faction == targetFaction);
-        if (targetColony == null)
-        {
-            return CampaignCreationResult.Failed(
-                CampaignCreationStatus.TargetColonyNotFound,
-                $"No target colony found for faction {targetFaction}.");
-        }
-
-        return CreateCampaignFromResolvedColonies(ownerColony, targetColony, requestedMemberCount);
+        return CreateCampaignFromResolvedColonies(validation.OwnerColony!, validation.TargetColony!, requestedMemberCount);
     }
 
     private CampaignCreationResult CreateCampaignFromResolvedColonies(Colony ownerColony, Colony targetColony, int requestedMemberCount)
     {
         var campaignId = _nextCampaignId++;
         var armyId = _nextArmyId++;
+        _campaigns.Add(CreateCampaignState(ownerColony, targetColony, requestedMemberCount, campaignId, armyId, Tick));
+
+        return CampaignCreationResult.Created(campaignId, armyId);
+    }
+
+    public CampaignCreationResult TryCreateManualCampaign(ManualCampaignLaunchCommand command)
+    {
+        var commandValidation = ValidateCampaignCommandConfiguration(command.OwnerFaction, command.TargetFaction, command.RequestedMemberCount);
+        if (!commandValidation.Success)
+            return commandValidation.Result;
+
+        var blockedCampaignActorIds = CaptureCampaignBlockedActorIds();
+
+        if (command.AllowFallback)
+            return TryCreateDefaultOperatorSmokeCampaign(command.RequestedMemberCount, blockedCampaignActorIds);
+
+        var validation = ValidateCampaignCreation(command.OwnerFaction, command.TargetFaction, command.RequestedMemberCount);
+        if (!validation.Success)
+            return validation.Result;
+
+        return TryCreateManualCampaignForPair(
+            validation.OwnerColony!,
+            validation.TargetColony!,
+            command.RequestedMemberCount,
+            blockedCampaignActorIds,
+            allowRoleFallback: false,
+            out _,
+            out var explicitResult)
+            ? explicitResult
+            : explicitResult;
+    }
+
+    private CampaignCreationResult TryCreateDefaultOperatorSmokeCampaign(int requestedMemberCount, HashSet<int> blockedCampaignActorIds)
+    {
+        var diagnostics = new List<string>();
+        foreach (var (ownerColony, targetColony) in EnumerateDefaultOperatorSmokePairs())
+        {
+            if (TryCreateManualCampaignForPair(
+                    ownerColony,
+                    targetColony,
+                    requestedMemberCount,
+                    blockedCampaignActorIds,
+                    allowRoleFallback: true,
+                    out var successDiagnostic,
+                    out var successResult))
+            {
+                return successResult;
+            }
+
+            diagnostics.Add(successDiagnostic);
+        }
+
+        if (diagnostics.Count == 0)
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.CampaignRuntimeUnavailable,
+                "Manual smoke launch could not find any distinct faction colony pair.");
+        }
+
+        return CampaignCreationResult.Failed(
+            CampaignCreationStatus.CampaignRuntimeUnavailable,
+            $"Manual smoke launch could not find a viable campaign pair. Tried: {string.Join("; ", diagnostics.Take(4))}");
+    }
+
+    private IEnumerable<(Colony OwnerColony, Colony TargetColony)> EnumerateDefaultOperatorSmokePairs()
+    {
+        var seenPairs = new HashSet<(int OwnerColonyId, int TargetColonyId)>();
+
+        if (TryGetColonyByFaction(ManualCampaignLaunchCommand.DefaultOperatorSmoke.OwnerFaction, out var defaultOwner)
+            && TryGetColonyByFaction(ManualCampaignLaunchCommand.DefaultOperatorSmoke.TargetFaction, out var defaultTarget)
+            && defaultOwner.Id != defaultTarget.Id)
+        {
+            seenPairs.Add((defaultOwner.Id, defaultTarget.Id));
+            yield return (defaultOwner, defaultTarget);
+        }
+
+        var orderedColonies = _world._colonies
+            .OrderBy(colony => (int)colony.Faction)
+            .ThenBy(colony => colony.Id)
+            .ToArray();
+
+        foreach (var ownerColony in orderedColonies)
+        {
+            foreach (var targetColony in orderedColonies)
+            {
+                if (ownerColony.Faction == targetColony.Faction)
+                    continue;
+
+                if (!seenPairs.Add((ownerColony.Id, targetColony.Id)))
+                    continue;
+
+                yield return (ownerColony, targetColony);
+            }
+        }
+    }
+
+    private bool TryCreateManualCampaignForPair(
+        Colony ownerColony,
+        Colony targetColony,
+        int requestedMemberCount,
+        HashSet<int> blockedCampaignActorIds,
+        bool allowRoleFallback,
+        out string diagnostic,
+        out CampaignCreationResult result)
+    {
+        var preflightCampaign = CreateCampaignState(ownerColony, targetColony, requestedMemberCount, campaignId: 0, armyId: 0, createdTick: Tick);
+
+        if (!TryFindCampaignRallyPoint(preflightCampaign, out var rallyPoint))
+        {
+            diagnostic = $"{ownerColony.Faction}->{targetColony.Faction} rally unresolved origin=({ownerColony.Origin.x},{ownerColony.Origin.y})";
+            result = CampaignCreationResult.Failed(
+                CampaignCreationStatus.CampaignRuntimeUnavailable,
+                $"Manual smoke launch rally unresolved for {ownerColony.Faction}->{targetColony.Faction} from origin ({ownerColony.Origin.x},{ownerColony.Origin.y}).");
+            return false;
+        }
+
+        if (!TryResolveCampaignMarchObjective(preflightCampaign, out var objective))
+        {
+            diagnostic = $"{ownerColony.Faction}->{targetColony.Faction} objective unresolved target=({targetColony.Origin.x},{targetColony.Origin.y})";
+            result = CampaignCreationResult.Failed(
+                CampaignCreationStatus.CampaignRuntimeUnavailable,
+                $"Manual smoke launch objective unresolved for {ownerColony.Faction}->{targetColony.Faction} toward target ({targetColony.Origin.x},{targetColony.Origin.y}).");
+            return false;
+        }
+
+        if (!HasCampaignPathPreflight(preflightCampaign, rallyPoint, objective.MovementTarget, GetOperatorSmokePathMaxExpansions()))
+        {
+            diagnostic = $"{ownerColony.Faction}->{targetColony.Faction} route/path failed start=({rallyPoint.x},{rallyPoint.y}) objective=({objective.MovementTarget.x},{objective.MovementTarget.y})";
+            result = CampaignCreationResult.Failed(
+                CampaignCreationStatus.CampaignRuntimeUnavailable,
+                $"Manual smoke launch route/path preflight failed for {ownerColony.Faction}->{targetColony.Faction} from ({rallyPoint.x},{rallyPoint.y}) to ({objective.MovementTarget.x},{objective.MovementTarget.y}).");
+            return false;
+        }
+
+        var candidate = FindNextCampaignAssemblyMember(preflightCampaign, blockedCampaignActorIds, allowRoleFallback);
+        if (candidate == null)
+        {
+            diagnostic = $"{ownerColony.Faction}->{targetColony.Faction} no eligible member ownerColony={ownerColony.Id}";
+            result = CampaignCreationResult.Failed(
+                CampaignCreationStatus.CampaignRuntimeUnavailable,
+                $"Manual smoke launch requires at least one eligible member for {ownerColony.Faction}->{targetColony.Faction} (owner colony {ownerColony.Id}).");
+            return false;
+        }
+
+        var createdResult = CreateCampaignFromResolvedColonies(ownerColony, targetColony, requestedMemberCount);
+        var campaign = _campaigns.First(candidateCampaign => candidateCampaign.CampaignId == createdResult.CampaignId && candidateCampaign.ArmyId == createdResult.ArmyId);
+        PrimeManualCampaignForSmoke(campaign, candidate, blockedCampaignActorIds, rallyPoint, objective);
+        result = createdResult;
+        diagnostic = $"{ownerColony.Faction}->{targetColony.Faction} created";
+        return true;
+    }
+
+    private bool TryGetColonyByFaction(Faction faction, out Colony colony)
+    {
+        colony = _world._colonies.FirstOrDefault(candidate => candidate.Faction == faction)!;
+        return colony != null;
+    }
+
+    private (bool Success, CampaignCreationResult Result, Colony? OwnerColony, Colony? TargetColony) ValidateCampaignCreation(
+        Faction ownerFaction,
+        Faction targetFaction,
+        int requestedMemberCount)
+    {
+        var validation = ValidateCampaignCommandConfiguration(ownerFaction, targetFaction, requestedMemberCount);
+        if (!validation.Success)
+            return (false, validation.Result, null, null);
+
+        var ownerColony = _world._colonies.FirstOrDefault(colony => colony.Faction == ownerFaction);
+        if (ownerColony == null)
+        {
+            return (false,
+                CampaignCreationResult.Failed(
+                    CampaignCreationStatus.OwnerColonyNotFound,
+                    $"No owner colony found for faction {ownerFaction}."),
+                null,
+                null);
+        }
+
+        var targetColony = _world._colonies.FirstOrDefault(colony => colony.Faction == targetFaction);
+        if (targetColony == null)
+        {
+            return (false,
+                CampaignCreationResult.Failed(
+                    CampaignCreationStatus.TargetColonyNotFound,
+                    $"No target colony found for faction {targetFaction}."),
+                ownerColony,
+                null);
+        }
+
+        return (true, CampaignCreationResult.Created(0, 0), ownerColony, targetColony);
+    }
+
+    private (bool Success, CampaignCreationResult Result) ValidateCampaignCommandConfiguration(
+        Faction ownerFaction,
+        Faction targetFaction,
+        int requestedMemberCount)
+    {
+        if (!IsCampaignRuntimeAvailable())
+        {
+            return (false,
+                CampaignCreationResult.Failed(
+                    CampaignCreationStatus.CampaignRuntimeUnavailable,
+                    "Campaign creation requires WORLDSIM_ENABLE_DIPLOMACY=true and WORLDSIM_ENABLE_COMBAT_PRIMITIVES=true."));
+        }
+
+        if (!Enum.IsDefined(typeof(Faction), ownerFaction))
+        {
+            return (false,
+                CampaignCreationResult.Failed(
+                    CampaignCreationStatus.InvalidOwnerFaction,
+                    $"Invalid owner faction value: {(int)ownerFaction}."));
+        }
+
+        if (!Enum.IsDefined(typeof(Faction), targetFaction))
+        {
+            return (false,
+                CampaignCreationResult.Failed(
+                    CampaignCreationStatus.InvalidTargetFaction,
+                    $"Invalid target faction value: {(int)targetFaction}."));
+        }
+
+        if (ownerFaction == targetFaction)
+        {
+            return (false,
+                CampaignCreationResult.Failed(
+                    CampaignCreationStatus.SameFaction,
+                    "Campaign creation requires ownerFaction != targetFaction."));
+        }
+
+        if (requestedMemberCount <= 0)
+        {
+            return (false,
+                CampaignCreationResult.Failed(
+                    CampaignCreationStatus.InvalidRequestedMemberCount,
+                    "Campaign creation requires requestedMemberCount > 0."));
+        }
+
+        return (true, CampaignCreationResult.Created(0, 0));
+    }
+
+    private CampaignState CreateCampaignState(
+        Colony ownerColony,
+        Colony targetColony,
+        int requestedMemberCount,
+        int campaignId,
+        int armyId,
+        long createdTick)
+    {
         var routeIntent = new CampaignRouteIntent(
             ownerColony.Id,
             targetColony.Id,
@@ -676,21 +878,63 @@ public sealed class SimulationRuntime
             targetColony.Origin.x,
             targetColony.Origin.y,
             requestedMemberCount);
-        _campaigns.Add(new CampaignState(
+        return new CampaignState(
             campaignId,
             ownerColony.Faction,
             targetColony.Faction,
             ownerColony.Id,
             targetColony.Id,
-            Tick,
+            createdTick,
             routeIntent,
-            army));
-
-        return CampaignCreationResult.Created(campaignId, armyId);
+            army);
     }
 
-    public CampaignCreationResult TryCreateManualCampaign(ManualCampaignLaunchCommand command)
-        => TryCreateCampaign(command.OwnerFaction, command.TargetFaction, command.RequestedMemberCount);
+    private void PrimeManualCampaignForSmoke(
+        CampaignState campaign,
+        Person candidate,
+        HashSet<int> blockedCampaignActorIds,
+        (int x, int y) rallyPoint,
+        CampaignMarchObjective objective)
+    {
+        campaign.Army.SetRallyPoint(rallyPoint.x, rallyPoint.y);
+        campaign.BeginAssembly(Tick);
+        if (campaign.Army.TryAddMemberActorId(candidate.Id) && candidate.HasRole(PersonRole.SupplyCarrier))
+        {
+            ArmySupplyCarrierModel.AssignCarrier(candidate, campaign.Army.CarrierState);
+            campaign.Army.Wave9Evidence.RecordCarrierAssignment();
+        }
+
+        MoveCampaignMembersToRally(campaign, blockedCampaignActorIds);
+        WarmCampaignRouteCacheForSmoke(campaign, objective.MovementTarget);
+    }
+
+    private void WarmCampaignRouteCacheForSmoke(CampaignState campaign, (int x, int y) target)
+    {
+        var anchor = campaign.Army.MemberActorIds
+            .Select(actorId => _world._people.FirstOrDefault(person => person.Id == actorId))
+            .Where(person => person != null)
+            .Select(person => person!)
+            .OrderBy(person => person.Id)
+            .FirstOrDefault();
+        var start = anchor?.Pos ?? (x: campaign.RouteIntent.OriginX, y: campaign.RouteIntent.OriginY);
+        BuildCampaignRouteCache(campaign, new NavigationGrid(_world), start, target, _world.NavigationTopologyVersion, GetOperatorSmokePathMaxExpansions());
+    }
+
+    private bool HasCampaignPathPreflight(CampaignState campaign, (int x, int y) start, (int x, int y) target, int maxExpansions = CampaignPathMaxExpansions)
+    {
+        var path = NavigationPathfinder.FindPath(
+            new NavigationGrid(_world),
+            start,
+            target,
+            campaign.OriginColonyId,
+            maxExpansions,
+            out var budgetExceeded);
+
+        return !budgetExceeded && path.Count > 1;
+    }
+
+    private int GetOperatorSmokePathMaxExpansions()
+        => Math.Max(OperatorSmokeCampaignPathMaxExpansions, _world.Width * _world.Height);
 
     private void EvaluateOrganicCampaignLaunches(HashSet<int> blockedCampaignActorIds)
     {
@@ -787,6 +1031,11 @@ public sealed class SimulationRuntime
         var advantage = CalculateOrganicCampaignAdvantage(availableForLaunch, defenderCount);
         var distancePenalty = CalculateOrganicCampaignDistancePenalty(ownerColony, targetColony)
             + CalculateOrganicCampaignTieBreakPenalty(targetColony);
+        var isActionablyKnown = TryGetActionableScoutIntelForOrganicTarget(
+            ownerColony.Faction,
+            targetColony,
+            out var scoutIntel,
+            out var scoutIntelTicksSinceRefresh);
         return new CampaignTargetOption(
             TargetFactionId: (int)targetColony.Faction,
             TargetColonyId: targetColony.Id,
@@ -796,8 +1045,46 @@ public sealed class SimulationRuntime
             RequestedWarriors: Math.Min(2, availableForLaunch),
             RequestedCarriers: 0,
             DistancePenalty: distancePenalty,
-            IsKnown: true);
+            IsKnown: isActionablyKnown,
+            HasScoutIntel: scoutIntel != null,
+            ScoutIntelTicksSinceRefresh: scoutIntelTicksSinceRefresh,
+            ScoutIntelConfidence: scoutIntel?.Confidence ?? 0f);
     }
+
+    private bool HasActionableScoutIntelForOrganicTarget(Faction ownerFaction, Colony targetColony)
+        => TryGetActionableScoutIntelForOrganicTarget(ownerFaction, targetColony, out _, out _);
+
+    private bool TryGetActionableScoutIntelForOrganicTarget(
+        Faction ownerFaction,
+        Colony targetColony,
+        out ScoutIntelState? scoutIntel,
+        out int scoutIntelTicksSinceRefresh)
+    {
+        scoutIntel = null;
+        scoutIntelTicksSinceRefresh = int.MaxValue;
+        if (!IsScoutIntelTargetRelation(ownerFaction, targetColony.Faction))
+            return false;
+
+        scoutIntel = _scoutIntel
+            .Where(intel =>
+                intel.IsActive(Tick)
+                && intel.OwnerFaction == ownerFaction
+                && intel.ObservedFaction == targetColony.Faction
+                && intel.ObservedColonyId == targetColony.Id
+                && intel.ObservationKind == ScoutIntelObservationKind.Colony)
+            .OrderBy(intel => CalculateScoutIntelTicksSinceRefresh(intel))
+            .ThenByDescending(intel => intel.Confidence)
+            .ThenBy(intel => intel.IntelId)
+            .FirstOrDefault();
+        if (scoutIntel == null)
+            return false;
+
+        scoutIntelTicksSinceRefresh = CalculateScoutIntelTicksSinceRefresh(scoutIntel);
+        return scoutIntelTicksSinceRefresh <= GetOrganicCampaignScoutIntelFreshnessThresholdTicks();
+    }
+
+    private int GetOrganicCampaignScoutIntelFreshnessThresholdTicks()
+        => Math.Max(1, _campaignLogisticsOptions.ScoutIntelTtlTicks / 2);
 
     private CampaignCreationResult TryApplyOrganicCampaignLaunch(
         Colony ownerColony,
@@ -833,6 +1120,13 @@ public sealed class SimulationRuntime
             return CampaignCreationResult.Failed(
                 CampaignCreationStatus.TargetColonyNotFound,
                 $"Organic campaign target {targetFaction} is not hostile to {ownerColony.Faction}.");
+        }
+
+        if (!HasActionableScoutIntelForOrganicTarget(ownerColony.Faction, targetColony))
+        {
+            return CampaignCreationResult.Failed(
+                CampaignCreationStatus.CampaignRuntimeUnavailable,
+                $"Organic campaign target {targetFaction}/{targetColony.Id} is missing fresh actionable scout intel.");
         }
 
         if (CountUnresolvedOwnerCampaigns(ownerColony.Faction) >= OrganicCampaignMaxUnresolvedPerOwner)
@@ -1289,13 +1583,21 @@ public sealed class SimulationRuntime
         return false;
     }
 
-    private Person? FindNextCampaignAssemblyMember(CampaignState campaign, HashSet<int> blockedCampaignActorIds)
+    private Person? FindNextCampaignAssemblyMember(CampaignState campaign, HashSet<int> blockedCampaignActorIds, bool allowRoleFallback = false)
     {
         var assignedActorIds = GetActiveCampaignActorIds(exclude: campaign);
-        return _world._people
+        var candidates = _world._people
             .Where(person => IsEligibleCampaignAssemblyMember(person, campaign, assignedActorIds, blockedCampaignActorIds))
             .OrderBy(GetCampaignAssemblyCandidatePriority)
             .ThenByDescending(person => person.Strength + person.Defense)
+            .ThenBy(person => person.Id)
+            .FirstOrDefault();
+        if (candidates != null || !allowRoleFallback)
+            return candidates;
+
+        return _world._people
+            .Where(person => IsValidOperatorSmokeFallbackMember(person, campaign, assignedActorIds, blockedCampaignActorIds))
+            .OrderByDescending(person => person.Strength + person.Defense)
             .ThenBy(person => person.Id)
             .FirstOrDefault();
     }
@@ -1335,6 +1637,18 @@ public sealed class SimulationRuntime
         => person.HasRole(PersonRole.Warrior)
            || person.HasRole(PersonRole.SupplyCarrier)
            || person.Profession == Profession.Hunter;
+
+    private static bool IsValidOperatorSmokeFallbackMember(
+        Person person,
+        CampaignState campaign,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+        => person.Health > 0f
+           && person.Home.Id == campaign.OriginColonyId
+           && !campaign.Army.HasMemberActorId(person.Id)
+           && !assignedActorIds.Contains(person.Id)
+           && !blockedCampaignActorIds.Contains(person.Id)
+           && !IsCampaignAssemblyBlockedByTransientOwnership(person);
 
     private static int GetCampaignAssemblyCandidatePriority(Person person)
     {
@@ -2256,7 +2570,8 @@ public sealed class SimulationRuntime
         NavigationGrid grid,
         (int x, int y) start,
         (int x, int y) target,
-        int topologyVersion)
+        int topologyVersion,
+        int maxExpansions = CampaignPathMaxExpansions)
     {
         campaign.RouteCounters.RecordRouteRecompute();
         var path = NavigationPathfinder.FindPath(
@@ -2264,7 +2579,7 @@ public sealed class SimulationRuntime
             start,
             target,
             campaign.OriginColonyId,
-            CampaignPathMaxExpansions,
+            maxExpansions,
             out var budgetExceeded);
 
         if (budgetExceeded || path.Count <= 1)

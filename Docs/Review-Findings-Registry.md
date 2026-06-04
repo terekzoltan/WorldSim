@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-06-04 - Wave 10 P7-D Manual Smoke - Major - Campaign logistics panel clips under real smoke
+
+- Track: Track A / Graphics campaign logistics UI
+- Source: Track A -> Meta Coordinator manual smoke handoff for Wave 10 `P7-D`
+- Finding: Real app smoke on the existing `Ctrl+F2` campaign/logistics panel showed the panel text does not fit cleanly at the current size. Dense campaign rows plus the Logistics summary visibly clip/truncate, especially on lower rows.
+- Impact: P7-D can compile and pass boundary checks while still failing its primary user-visible goal: readable convoy/base UI for manual verification.
+- Resolution / guidance: Keep the fix Graphics-only. Reduce row density, shorten Logistics summary wording, reserve more vertical space, or fall back to compact counts when space is constrained. Re-run manual smoke before claiming clean GREEN.
+- Status: closed for P7-D; Graphics-only readability pass implemented and manual evidence shows compact campaign/logistics rows plus top-N fallback are readable enough for visual-consume closeout. Evidence: `Docs/Evidence/Manual/P7-D-Manual-Smoke-Followup.md`.
+
+## 2026-06-04 - Wave 10 P7-D Manual Smoke - Major - Manual/operator campaign launch can stall before logistics become visible
+
+- Track: Track B / Runtime manual-operator smoke path
+- Source: Track A -> Meta Coordinator manual smoke handoff for Wave 10 `P7-D`
+- Finding: Manual `Ctrl+Q` creates a real campaign entity, but the smoke run stayed at `assembling_pending` with `Army 0/1`, `anchor:none`, rally coordinate present, and `route:no path` for extended runtime despite a populated civilization. Because assembly never completed, no marching/logistics flow appeared.
+- Impact: Track A cannot fully verify convoy/base markers in the running app, so P7-D visual consume remains only partially proven. The current manual/operator path is insufficient for a deterministic smoke-ready logistics campaign.
+- Resolution / guidance: Add a runtime-owned smoke-ready preparation/launch path or deterministic explicit failure for operator smoke. The App should keep only hotkey routing/toast duties; Runtime should guarantee or clearly reject member preparation/assignment quickly enough to exercise route/logistics UI.
+- Status: deferred/routed; no longer blocks P7-D Track A closeout or Step 8 P7-E. Manual evidence showed intermittent operator-smoke behavior and one-person-probe limitations, but this is now routed to Wave 10 SMR prep Step10A / later Track B campaign hardening for durable non-interactive proof and operator-smoke policy, not another P7-D UI loop. Evidence: `Docs/Evidence/Manual/P7-D-Manual-Smoke-Followup.md`.
+
 ## 2026-06-03 - Wave 10 P7-C(B) Step Review - Major - Scout intel refresh identity must include owner faction coverage
 
 - Track: Track B / Runtime scout-intel lifecycle
