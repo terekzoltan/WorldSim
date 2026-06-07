@@ -34,6 +34,44 @@ public sealed record CampaignRuntimeSnapshot(
             ArmyRuntimeSnapshot.From(state.Army));
 }
 
+public sealed record SiegeUnitRuntimeSnapshot(
+    int SiegeUnitId,
+    int CampaignId,
+    int ArmyId,
+    Faction OwnerFaction,
+    SiegeUnitKind Kind,
+    SiegeUnitPhase Phase,
+    string InactiveReason,
+    int X,
+    int Y,
+    int TargetStructureId,
+    int TargetX,
+    int TargetY,
+    float Health,
+    float MaxHealth,
+    string RecentActionEffect,
+    long LastActionTick)
+{
+    public static SiegeUnitRuntimeSnapshot From(SiegeUnitState state)
+        => new(
+            state.SiegeUnitId,
+            state.CampaignId,
+            state.ArmyId,
+            state.OwnerFaction,
+            state.Kind,
+            state.Phase,
+            state.InactiveReason,
+            state.X,
+            state.Y,
+            state.TargetStructureId,
+            state.TargetX,
+            state.TargetY,
+            state.Health,
+            state.MaxHealth,
+            state.RecentActionEffect,
+            state.LastActionTick);
+}
+
 public sealed record CampaignSiegeRuntimeSnapshot(
     CampaignSiegeStatus Status,
     int TargetStructureId,

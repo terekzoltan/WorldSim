@@ -52,6 +52,9 @@ public sealed class SimulationRuntime
     private const int OrganicCampaignMaxUnresolvedPerOwner = 2;
     private const int OrganicCampaignMaxUnresolvedPerUnorderedPair = 1;
     private const int OrganicCampaignMinimumHomeDefenseReserve = 1;
+    private const float RamWallGatePressureDamage = 18f;
+    private const float RamStructurePressureDamage = 8f;
+    private const float MobileCatapultPressureDamage = 10f;
     private const double FloatingCausalEqTolerance = 0.0001d;
 
     private readonly record struct CampaignMarchObjective((int x, int y) MovementTarget, bool UsesFallback);
@@ -81,6 +84,7 @@ public sealed class SimulationRuntime
     private readonly List<SupplyConvoyState> _supplyConvoys = new();
     private readonly List<ForwardBaseState> _forwardBases = new();
     private readonly List<ScoutIntelState> _scoutIntel = new();
+    private readonly List<SiegeUnitState> _siegeUnits = new();
     private readonly Dictionary<CampaignWarScoreKey, int> _campaignWarScores = new();
     private readonly CampaignLogisticsOptions _campaignLogisticsOptions = CampaignLogisticsOptions.Default.Normalized();
     private readonly CampaignLogisticsCounters _campaignLogisticsCounters = new();
@@ -91,6 +95,7 @@ public sealed class SimulationRuntime
     private int _nextSupplyConvoyId = 1;
     private int _nextForwardBaseId = 1;
     private int _nextScoutIntelId = 1;
+    private int _nextSiegeUnitId = 1;
     private AiDebugSnapshot _latestAiDebugSnapshot;
     private int _trackedNpcCursor;
     private int _trackedActorId = -1;
@@ -117,6 +122,11 @@ public sealed class SimulationRuntime
             .Where(intel => intel.IsActive(Tick))
             .OrderBy(intel => intel.IntelId)
             .Select(intel => ScoutIntelRuntimeSnapshot.From(intel, CurrentCompletedTick))
+            .ToArray();
+    public IReadOnlyList<SiegeUnitRuntimeSnapshot> SiegeUnits
+        => _siegeUnits
+            .OrderBy(unit => unit.SiegeUnitId)
+            .Select(SiegeUnitRuntimeSnapshot.From)
             .ToArray();
     public CampaignLogisticsCounters CampaignLogisticsCounters => _campaignLogisticsCounters;
 
@@ -203,10 +213,11 @@ public sealed class SimulationRuntime
         EvaluateOrganicCampaignLaunches(blockedCampaignActorIds);
         QueueCampaignSiegePressureForActiveEncounters(dt, blockedCampaignActorIds);
         _world.Update(dt);
-        SyncCampaignSiegeStates(blockedCampaignActorIds);
-        ResolveCampaignEncounters();
         var postWorldBlockedCampaignActorIds = CaptureCampaignBlockedActorIds();
         blockedCampaignActorIds.UnionWith(postWorldBlockedCampaignActorIds);
+        SyncCampaignSiegeStates(blockedCampaignActorIds);
+        ResolveCampaignEncounters();
+        DeactivateInvalidSiegeUnits();
         PruneInvalidCampaignMembers(blockedCampaignActorIds);
         var marchEligibleCampaignIds = _campaigns
             .Where(campaign => campaign.Phase == CampaignPhase.Marching)
@@ -234,6 +245,7 @@ public sealed class SimulationRuntime
             SupplyConvoys = BuildSupplyConvoyRenderData(),
             ForwardBases = BuildForwardBaseRenderData(),
             ScoutIntel = BuildScoutIntelRenderData(),
+            SiegeUnits = BuildSiegeUnitRenderData(),
             Director = BuildDirectorRenderState()
         };
     }
@@ -305,6 +317,28 @@ public sealed class SimulationRuntime
                 intel.ExpirationTick,
                 CalculateScoutIntelTicksSinceRefresh(intel),
                 intel.Confidence))
+            .ToArray();
+
+    private IReadOnlyList<SiegeUnitRenderData> BuildSiegeUnitRenderData()
+        => _siegeUnits
+            .OrderBy(unit => unit.SiegeUnitId)
+            .Select(unit => new SiegeUnitRenderData(
+                unit.SiegeUnitId,
+                unit.CampaignId,
+                unit.ArmyId,
+                (int)unit.OwnerFaction,
+                MapSiegeUnitKindForReadModel(unit.Kind),
+                MapSiegeUnitPhaseForReadModel(unit.Phase),
+                unit.InactiveReason,
+                unit.X,
+                unit.Y,
+                unit.TargetStructureId,
+                unit.TargetX,
+                unit.TargetY,
+                unit.Health,
+                unit.MaxHealth,
+                unit.RecentActionEffect,
+                unit.LastActionTick))
             .ToArray();
 
     private int CalculateScoutIntelTicksSinceRefresh(ScoutIntelState intel)
@@ -595,6 +629,23 @@ public sealed class SimulationRuntime
         => kind switch
         {
             ScoutIntelObservationKind.Colony => "colony",
+            _ => "unknown"
+        };
+
+    private static string MapSiegeUnitKindForReadModel(SiegeUnitKind kind)
+        => kind switch
+        {
+            SiegeUnitKind.Ram => "ram",
+            SiegeUnitKind.SiegeTower => "siege_tower",
+            SiegeUnitKind.MobileCatapult => "mobile_catapult",
+            _ => "unknown"
+        };
+
+    private static string MapSiegeUnitPhaseForReadModel(SiegeUnitPhase phase)
+        => phase switch
+        {
+            SiegeUnitPhase.Active => "active",
+            SiegeUnitPhase.Inactive => "inactive",
             _ => "unknown"
         };
 
@@ -2205,7 +2256,10 @@ public sealed class SimulationRuntime
         if (!IsCampaignSiegeResolverEnabled())
         {
             foreach (var campaign in encounterCampaigns)
+            {
                 campaign.Siege.SuppressActivePressure(Tick);
+                MarkCampaignSiegeUnitsInactive(campaign, SiegeUnitInactiveReasons.SiegeDisabled);
+            }
             return;
         }
 
@@ -2219,6 +2273,7 @@ public sealed class SimulationRuntime
             if (!HasCompletePressureCapableEncounterRoster(campaign, blockedCampaignActorIds))
             {
                 campaign.Siege.SuppressActivePressure(Tick);
+                MarkCampaignSiegeUnitsInactive(campaign, SiegeUnitInactiveReasons.CampaignInvalid);
                 continue;
             }
 
@@ -2226,6 +2281,7 @@ public sealed class SimulationRuntime
             if (attacker == null)
             {
                 campaign.Siege.SuppressActivePressure(Tick);
+                MarkCampaignSiegeUnitsInactive(campaign, SiegeUnitInactiveReasons.CampaignInvalid);
                 continue;
             }
 
@@ -2251,10 +2307,14 @@ public sealed class SimulationRuntime
             pressurePairs.Add(group.Key);
 
             driver.Campaign.Siege.RecordPressure(driver.Target.Id, driver.Target.Owner.Id, Tick);
+            ApplyCampaignSiegeUnitEffects(driver.Campaign, driver.Attacker, driver.Target);
             _world.QueueExternalSiegePressure(driver.Attacker, driver.Target);
 
             foreach (var nonDriver in group.Where(candidate => !ReferenceEquals(candidate.Campaign, driver.Campaign)))
+            {
                 nonDriver.Campaign.Siege.SuppressActivePressure(Tick);
+                MarkCampaignSiegeUnitsInactive(nonDriver.Campaign, SiegeUnitInactiveReasons.CampaignInvalid);
+            }
         }
 
         foreach (var group in noTargetCandidates.GroupBy(GetCampaignSiegePair))
@@ -2262,7 +2322,10 @@ public sealed class SimulationRuntime
             if (pressurePairs.Contains(group.Key))
             {
                 foreach (var campaign in group)
+                {
                     campaign.Siege.SuppressActivePressure(Tick);
+                    MarkCampaignSiegeUnitsInactive(campaign, SiegeUnitInactiveReasons.CampaignInvalid);
+                }
                 continue;
             }
 
@@ -2271,9 +2334,149 @@ public sealed class SimulationRuntime
                 .ThenBy(campaign => campaign.CampaignId)
                 .First();
             reporter.Siege.MarkNoTarget(Tick);
+            MarkCampaignSiegeUnitsInactive(reporter, SiegeUnitInactiveReasons.CampaignInvalid);
 
             foreach (var nonReporter in group.Where(campaign => !ReferenceEquals(campaign, reporter)))
+            {
                 nonReporter.Siege.SuppressActivePressure(Tick);
+                MarkCampaignSiegeUnitsInactive(nonReporter, SiegeUnitInactiveReasons.CampaignInvalid);
+            }
+        }
+    }
+
+    private void ApplyCampaignSiegeUnitEffects(CampaignState campaign, Colony attacker, DefensiveStructure target)
+    {
+        if (!CanCampaignUseDedicatedSiegeUnits(attacker))
+            return;
+
+        var units = EnsureCampaignSiegeUnits(campaign, attacker, target);
+        var anchor = GetSiegeUnitAnchor(campaign);
+        foreach (var unit in units.Where(unit => unit.IsActive).OrderBy(unit => unit.Kind))
+        {
+            unit.RefreshPosition(anchor.x, anchor.y, target.Id, target.Pos.x, target.Pos.y);
+            switch (unit.Kind)
+            {
+                case SiegeUnitKind.Ram:
+                    if (!target.IsDestroyed)
+                    {
+                        var damage = IsWallOrGate(target.Kind) ? RamWallGatePressureDamage : RamStructurePressureDamage;
+                        _world.TryDamageDefensiveStructure(target.Pos, damage, attacker);
+                    }
+                    unit.RecordAction(IsWallOrGate(target.Kind) ? "ram_wall_gate_pressure" : "ram_structure_pressure", Tick);
+                    break;
+
+                case SiegeUnitKind.SiegeTower:
+                    if (!target.IsDestroyed && IsWallOrGate(target.Kind))
+                        _world.TryDamageDefensiveStructure(target.Pos, 4f, attacker);
+                    unit.RecordAction(IsWallOrGate(target.Kind) ? "siege_tower_access_pressure" : "siege_tower_support", Tick);
+                    break;
+
+                case SiegeUnitKind.MobileCatapult:
+                    if (!target.IsDestroyed)
+                        _world.TryDamageDefensiveStructure(target.Pos, MobileCatapultPressureDamage, attacker);
+                    unit.RecordAction("mobile_catapult_ranged_pressure", Tick);
+                    break;
+            }
+        }
+    }
+
+    private IReadOnlyList<SiegeUnitState> EnsureCampaignSiegeUnits(CampaignState campaign, Colony attacker, DefensiveStructure target)
+    {
+        var anchor = GetSiegeUnitAnchor(campaign);
+        var units = new List<SiegeUnitState>();
+        foreach (var kind in new[] { SiegeUnitKind.Ram, SiegeUnitKind.SiegeTower, SiegeUnitKind.MobileCatapult })
+        {
+            var existing = _siegeUnits.FirstOrDefault(unit =>
+                unit.IsActive
+                && unit.CampaignId == campaign.CampaignId
+                && unit.ArmyId == campaign.ArmyId
+                && unit.Kind == kind);
+            if (existing == null)
+            {
+                existing = new SiegeUnitState(
+                    _nextSiegeUnitId++,
+                    campaign.CampaignId,
+                    campaign.ArmyId,
+                    attacker.Faction,
+                    kind,
+                    Tick,
+                    anchor.x,
+                    anchor.y,
+                    target.Id,
+                    target.Pos.x,
+                    target.Pos.y,
+                    GetSiegeUnitMaxHealth(kind));
+                _siegeUnits.Add(existing);
+            }
+
+            units.Add(existing);
+        }
+
+        return units;
+    }
+
+    private (int x, int y) GetSiegeUnitAnchor(CampaignState campaign)
+    {
+        var anchor = campaign.Army.MemberActorIds
+            .Select(actorId => _world._people.FirstOrDefault(person => person.Id == actorId && person.Health > 0f))
+            .Where(person => person != null)
+            .Select(person => ((int x, int y)?)person!.Pos)
+            .FirstOrDefault();
+        return anchor.HasValue
+            ? anchor.Value
+            : (campaign.RouteIntent.TargetX, campaign.RouteIntent.TargetY);
+    }
+
+    private static bool CanCampaignUseDedicatedSiegeUnits(Colony attacker)
+        => attacker.UnlockedTechs.Contains("siege_craft");
+
+    private static float GetSiegeUnitMaxHealth(SiegeUnitKind kind)
+        => kind switch
+        {
+            SiegeUnitKind.Ram => 160f,
+            SiegeUnitKind.SiegeTower => 140f,
+            SiegeUnitKind.MobileCatapult => 120f,
+            _ => 100f
+        };
+
+    private static bool IsWallOrGate(DefensiveStructureKind kind)
+        => kind is DefensiveStructureKind.WoodWall
+            or DefensiveStructureKind.StoneWall
+            or DefensiveStructureKind.ReinforcedWall
+            or DefensiveStructureKind.Gate;
+
+    private void MarkCampaignSiegeUnitsInactive(CampaignState campaign, string reason)
+    {
+        foreach (var unit in _siegeUnits.Where(unit =>
+                     unit.IsActive
+                     && unit.CampaignId == campaign.CampaignId
+                     && unit.ArmyId == campaign.ArmyId))
+        {
+            unit.MarkInactive(Tick, reason);
+        }
+    }
+
+    private bool HasActiveCampaignSiegeUnits(CampaignState campaign)
+        => _siegeUnits.Any(unit =>
+            unit.IsActive
+            && unit.CampaignId == campaign.CampaignId
+            && unit.ArmyId == campaign.ArmyId);
+
+    private void DeactivateInvalidSiegeUnits()
+    {
+        foreach (var unit in _siegeUnits.Where(unit => unit.IsActive).ToArray())
+        {
+            var campaign = _campaigns.FirstOrDefault(candidate =>
+                candidate.CampaignId == unit.CampaignId
+                && candidate.ArmyId == unit.ArmyId);
+            if (campaign == null)
+            {
+                unit.MarkInactive(Tick, SiegeUnitInactiveReasons.CampaignInvalid);
+                continue;
+            }
+
+            if (campaign.Phase == CampaignPhase.Resolved)
+                unit.MarkInactive(Tick, SiegeUnitInactiveReasons.CampaignResolved);
         }
     }
 
@@ -2303,7 +2506,10 @@ public sealed class SimulationRuntime
         if (!IsCampaignSiegeResolverEnabled())
         {
             foreach (var campaign in _campaigns.Where(campaign => campaign.Phase == CampaignPhase.Encounter))
+            {
                 campaign.Siege.SuppressActivePressure(Tick);
+                MarkCampaignSiegeUnitsInactive(campaign, SiegeUnitInactiveReasons.SiegeDisabled);
+            }
             return;
         }
 
@@ -2326,9 +2532,29 @@ public sealed class SimulationRuntime
                     campaign.Siege.ObserveActiveSiege(matchingSiege.SiegeId, matchingSiege.BreachCount, Tick);
             }
 
-            if (campaign.Siege.Status == CampaignSiegeStatus.Breached
-                || !HasCompletePressureCapableEncounterRoster(campaign, blockedCampaignActorIds))
+            if (campaign.Siege.Status == CampaignSiegeStatus.Breached)
                 continue;
+
+            if (campaign.Siege.Status == CampaignSiegeStatus.NoTarget)
+                continue;
+
+            var hasCompletePressureCapableRoster = HasCompletePressureCapableEncounterRoster(campaign, blockedCampaignActorIds);
+            if (!hasCompletePressureCapableRoster && HasActiveCampaignSiegeUnits(campaign))
+            {
+                campaign.Siege.SuppressActivePressure(Tick);
+                MarkCampaignSiegeUnitsInactive(campaign, SiegeUnitInactiveReasons.CampaignInvalid);
+                continue;
+            }
+
+            if (campaign.Siege.LastPressureTick == Tick)
+                continue;
+
+            if (!hasCompletePressureCapableRoster)
+            {
+                campaign.Siege.SuppressActivePressure(Tick);
+                MarkCampaignSiegeUnitsInactive(campaign, SiegeUnitInactiveReasons.CampaignInvalid);
+                continue;
+            }
 
             TryObserveRecentCampaignBreach(campaign, recentBreaches);
         }

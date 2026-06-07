@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-04 - Wave 10 P7-E Step Review - Major - Siege units must follow campaign pressure suppression
+
+- Track: Track B / Runtime dedicated siege units
+- Source: Meta internal review + Swarm Assistant step-review synthesis for Wave 10 `P7-E`
+- Finding: The initial dedicated siege-unit implementation marks units inactive for some invalid paths, but not all non-pressure lifecycle paths after units have spawned. `SuppressActivePressure(...)` or `MarkNoTarget(...)` can reset/stop campaign siege pressure while `SiegeUnitState` remains `Active` in runtime/render snapshots. Follow-up review found two related lifecycle gaps: post-world sync initially used health-only validation, and then same-tick `LastPressureTick == Tick` could short-circuit before invalid roster cleanup.
+- Impact: Downstream `P7-F` AI and `P7-H` graphics could consume active siege units for a campaign that no longer has active siege pressure, creating stale snapshot truth across the runtime/read-model boundary.
+- Resolution / guidance: Fixed in the P7-E lifecycle fix passes before closeout. Runtime now deactivates campaign siege units when campaign siege pressure is stopped due to invalid/incomplete roster, post-world sync invalid roster including alive-but-pressure-invalid members, no-target reporter, resolver-disabled, and resolved campaign conditions. Same-tick sync validates pressure-capable roster before the `LastPressureTick == Tick` continue when active dedicated siege units exist, while preserving `Breached`, `NoTarget`, and non-unit campaign semantics. Focused regressions cover same-tick sync cleanup, no-target reporter cleanup, resolver-disabled-after-spawn cleanup, runtime inactive state, and snapshot inactive state.
+- Status: fixed in P7-E closeout; Step 9 may open after Meta synthesis/closeout routing.
+
 ## 2026-06-04 - Wave 10 P7-D Manual Smoke - Major - Campaign logistics panel clips under real smoke
 
 - Track: Track A / Graphics campaign logistics UI

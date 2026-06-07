@@ -77,6 +77,23 @@ public class WorldSnapshotInterpolatorTests
         Assert.Equal(5, Assert.Single(interpolated.People).X);
     }
 
+    [Fact]
+    public void Interpolate_PreservesSiegeUnits()
+    {
+        var previous = CreateSnapshot(Array.Empty<CampaignRenderData>(), Array.Empty<SupplyConvoyRenderData>(), Array.Empty<ForwardBaseRenderData>(), Array.Empty<ScoutIntelRenderData>(), Array.Empty<SiegeUnitRenderData>(), personX: 0);
+        var siegeUnit = CreateSiegeUnit();
+        var current = CreateSnapshot(Array.Empty<CampaignRenderData>(), Array.Empty<SupplyConvoyRenderData>(), Array.Empty<ForwardBaseRenderData>(), Array.Empty<ScoutIntelRenderData>(), new[] { siegeUnit }, personX: 10);
+
+        var interpolated = WorldSnapshotInterpolator.Interpolate(previous, current, alpha: 0.5f);
+
+        var result = Assert.Single(interpolated.SiegeUnits);
+        Assert.Equal(siegeUnit.SiegeUnitId, result.SiegeUnitId);
+        Assert.Equal(siegeUnit.CampaignId, result.CampaignId);
+        Assert.Equal(siegeUnit.Kind, result.Kind);
+        Assert.Equal(siegeUnit.RecentActionEffect, result.RecentActionEffect);
+        Assert.Equal(5, Assert.Single(interpolated.People).X);
+    }
+
     private static WorldRenderSnapshot CreateSnapshot(IReadOnlyList<CampaignRenderData> campaigns, int personX)
         => CreateSnapshot(campaigns, Array.Empty<SupplyConvoyRenderData>(), personX);
 
@@ -99,6 +116,15 @@ public class WorldSnapshotInterpolatorTests
         IReadOnlyList<ForwardBaseRenderData> forwardBases,
         IReadOnlyList<ScoutIntelRenderData> scoutIntel,
         int personX)
+        => CreateSnapshot(campaigns, supplyConvoys, forwardBases, scoutIntel, Array.Empty<SiegeUnitRenderData>(), personX);
+
+    private static WorldRenderSnapshot CreateSnapshot(
+        IReadOnlyList<CampaignRenderData> campaigns,
+        IReadOnlyList<SupplyConvoyRenderData> supplyConvoys,
+        IReadOnlyList<ForwardBaseRenderData> forwardBases,
+        IReadOnlyList<ScoutIntelRenderData> scoutIntel,
+        IReadOnlyList<SiegeUnitRenderData> siegeUnits,
+        int personX)
         => new(
             Width: 16,
             Height: 16,
@@ -117,6 +143,7 @@ public class WorldSnapshotInterpolatorTests
             SupplyConvoys: supplyConvoys,
             ForwardBases: forwardBases,
             ScoutIntel: scoutIntel,
+            SiegeUnits: siegeUnits,
             FactionStances: Array.Empty<FactionStanceRenderData>(),
             Ecology: CreateEcoHudData(),
             CurrentSeason: SeasonView.Spring,
@@ -264,6 +291,25 @@ public class WorldSnapshotInterpolatorTests
             ExpirationTick: 100,
             TicksSinceRefresh: 0,
             Confidence: 0.8f);
+
+    private static SiegeUnitRenderData CreateSiegeUnit()
+        => new(
+            SiegeUnitId: 55,
+            CampaignId: 42,
+            ArmyId: 77,
+            OwnerFactionId: 1,
+            Kind: "ram",
+            Phase: "active",
+            InactiveReason: "none",
+            X: 8,
+            Y: 9,
+            TargetStructureId: 12,
+            TargetX: 13,
+            TargetY: 14,
+            Health: 120f,
+            MaxHealth: 160f,
+            RecentActionEffect: "ram_wall_gate_pressure",
+            LastActionTick: 22);
 
     private static EcoHudData CreateEcoHudData()
         => new(

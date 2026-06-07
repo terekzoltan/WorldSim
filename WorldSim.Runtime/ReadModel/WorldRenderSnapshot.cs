@@ -68,6 +68,7 @@ public sealed record WorldRenderSnapshot(
     IReadOnlyList<SupplyConvoyRenderData> SupplyConvoys,
     IReadOnlyList<ForwardBaseRenderData> ForwardBases,
     IReadOnlyList<ScoutIntelRenderData> ScoutIntel,
+    IReadOnlyList<SiegeUnitRenderData> SiegeUnits,
     IReadOnlyList<FactionStanceRenderData> FactionStances,
     EcoHudData Ecology,
     SeasonView CurrentSeason,
@@ -114,6 +115,7 @@ public sealed record WorldRenderSnapshot(
             Array.Empty<SupplyConvoyRenderData>(),
             Array.Empty<ForwardBaseRenderData>(),
             Array.Empty<ScoutIntelRenderData>(),
+            Array.Empty<SiegeUnitRenderData>(),
             FactionStances,
             Ecology,
             CurrentSeason,
@@ -162,6 +164,7 @@ public sealed record WorldRenderSnapshot(
             Array.Empty<SupplyConvoyRenderData>(),
             Array.Empty<ForwardBaseRenderData>(),
             Array.Empty<ScoutIntelRenderData>(),
+            Array.Empty<SiegeUnitRenderData>(),
             FactionStances,
             Ecology,
             CurrentSeason,
@@ -211,6 +214,7 @@ public sealed record WorldRenderSnapshot(
             SupplyConvoys,
             Array.Empty<ForwardBaseRenderData>(),
             Array.Empty<ScoutIntelRenderData>(),
+            Array.Empty<SiegeUnitRenderData>(),
             FactionStances,
             Ecology,
             CurrentSeason,
@@ -521,6 +525,24 @@ public sealed record ScoutIntelRenderData(
     long ExpirationTick,
     int TicksSinceRefresh,
     float Confidence);
+
+public sealed record SiegeUnitRenderData(
+    int SiegeUnitId,
+    int CampaignId,
+    int ArmyId,
+    int OwnerFactionId,
+    string Kind,
+    string Phase,
+    string InactiveReason,
+    int X,
+    int Y,
+    int TargetStructureId,
+    int TargetX,
+    int TargetY,
+    float Health,
+    float MaxHealth,
+    string RecentActionEffect,
+    long LastActionTick);
 
 public sealed record CampaignResolutionRenderData(
     bool IsResolved,
