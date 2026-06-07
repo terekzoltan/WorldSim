@@ -23,6 +23,7 @@ public sealed class CombatOverlayPass : IRenderPass
         DrawContestedTiles(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawBattleZones(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawSiegeZones(spriteBatch, pixel, snapshot, settings.TileSize);
+        DrawSiegeUnits(spriteBatch, pixel, snapshot, settings.TileSize, context.VisibleTileBounds);
         DrawBreachMarkers(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawFormationMarkers(spriteBatch, pixel, snapshot, settings.TileSize);
         DrawCombatActors(spriteBatch, pixel, snapshot, settings.TileSize);
@@ -74,6 +75,131 @@ public sealed class CombatOverlayPass : IRenderPass
             DrawLine(spriteBatch, pixel, new Vector2(cx - marker, cy - marker), new Vector2(cx + marker, cy + marker), slash, Math.Max(1, tileSize / 4));
             DrawLine(spriteBatch, pixel, new Vector2(cx - marker, cy + marker), new Vector2(cx + marker, cy - marker), slash, Math.Max(1, tileSize / 4));
         }
+    }
+
+    private static void DrawSiegeUnits(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize, TileBounds visibleTiles)
+    {
+        foreach (var unit in snapshot.SiegeUnits.OrderBy(unit => unit.SiegeUnitId))
+        {
+            if (!IsSiegeUnitVisible(unit, visibleTiles, padding: 2))
+                continue;
+
+            bool active = string.Equals(unit.Phase, "active", StringComparison.OrdinalIgnoreCase);
+            var baseColor = GetFactionColor(unit.OwnerFactionId);
+            var color = active ? baseColor : Color.Lerp(baseColor, new Color(172, 172, 172), 0.68f);
+            float alpha = active ? 0.86f : 0.38f;
+            int thickness = Math.Max(1, tileSize / 5);
+            int size = Math.Max(tileSize + 2, 8);
+            var center = TileCenter(unit.X, unit.Y, tileSize);
+            var body = CenteredRect(center, size);
+
+            if (active)
+            {
+                var target = TileCenter(unit.TargetX, unit.TargetY, tileSize);
+                DrawLine(spriteBatch, pixel, center, target, color * 0.36f, Math.Max(1, tileSize / 6));
+                DrawRectOutline(spriteBatch, pixel, CenteredRect(target, Math.Max(4, tileSize / 2)), thickness, color * 0.58f);
+            }
+
+            DrawSiegeUnitGlyph(spriteBatch, pixel, unit.Kind, body, color * alpha, thickness);
+            DrawSiegeUnitHealthCue(spriteBatch, pixel, unit, body, tileSize, active);
+
+            if (active)
+                DrawSiegeUnitActionCue(spriteBatch, pixel, unit, center, tileSize, color);
+        }
+    }
+
+    private static bool IsSiegeUnitVisible(Runtime.ReadModel.SiegeUnitRenderData unit, TileBounds visibleTiles, int padding)
+        => ContainsWithPadding(visibleTiles, unit.X, unit.Y, padding)
+           || ContainsWithPadding(visibleTiles, unit.TargetX, unit.TargetY, padding);
+
+    private static bool ContainsWithPadding(TileBounds bounds, int x, int y, int padding)
+        => x >= bounds.MinX - padding
+           && x <= bounds.MaxX + padding
+           && y >= bounds.MinY - padding
+           && y <= bounds.MaxY + padding;
+
+    private static void DrawSiegeUnitGlyph(SpriteBatch spriteBatch, Texture2D pixel, string kind, Rectangle body, Color color, int thickness)
+    {
+        spriteBatch.Draw(pixel, body, color * 0.22f);
+        DrawRectOutline(spriteBatch, pixel, body, thickness, color);
+
+        if (string.Equals(kind, "ram", StringComparison.OrdinalIgnoreCase))
+        {
+            int y = body.Y + (body.Height / 2);
+            DrawLine(spriteBatch, pixel, new Vector2(body.X, y), new Vector2(body.Right, y), color * 0.96f, Math.Max(1, thickness + 1));
+            spriteBatch.Draw(pixel, new Rectangle(body.Right - thickness - 1, body.Y + thickness, Math.Max(1, thickness + 1), Math.Max(1, body.Height - (thickness * 2))), color * 0.8f);
+            return;
+        }
+
+        if (string.Equals(kind, "siege_tower", StringComparison.OrdinalIgnoreCase))
+        {
+            var tower = new Rectangle(body.X + (body.Width / 4), body.Y - Math.Max(2, body.Height / 3), Math.Max(2, body.Width / 2), body.Height + Math.Max(2, body.Height / 3));
+            spriteBatch.Draw(pixel, tower, color * 0.18f);
+            DrawRectOutline(spriteBatch, pixel, tower, thickness, color * 0.9f);
+            DrawLine(spriteBatch, pixel, new Vector2(tower.X, tower.Y + Math.Max(2, tower.Height / 3)), new Vector2(tower.Right, tower.Y + Math.Max(2, tower.Height / 3)), color * 0.84f, thickness);
+            return;
+        }
+
+        if (string.Equals(kind, "mobile_catapult", StringComparison.OrdinalIgnoreCase))
+        {
+            DrawLine(spriteBatch, pixel, new Vector2(body.X + thickness, body.Bottom - thickness), new Vector2(body.Right - thickness, body.Y + thickness), color * 0.95f, thickness);
+            DrawLine(spriteBatch, pixel, new Vector2(body.X + thickness, body.Y + thickness), new Vector2(body.Right - thickness, body.Bottom - thickness), color * 0.54f, Math.Max(1, thickness));
+            return;
+        }
+
+        DrawLine(spriteBatch, pixel, new Vector2(body.X, body.Y), new Vector2(body.Right, body.Bottom), color * 0.72f, thickness);
+    }
+
+    private static void DrawSiegeUnitHealthCue(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.SiegeUnitRenderData unit, Rectangle body, int tileSize, bool active)
+    {
+        if (unit.MaxHealth <= 0f)
+            return;
+
+        float healthRatio = Math.Clamp(unit.Health / unit.MaxHealth, 0f, 1f);
+        if (healthRatio >= 0.995f)
+            return;
+
+        int barHeight = Math.Max(1, tileSize / 5);
+        var back = new Rectangle(body.X, body.Bottom + 1, body.Width, barHeight);
+        var fill = new Rectangle(back.X, back.Y, Math.Max(1, (int)MathF.Round(back.Width * healthRatio)), back.Height);
+        var color = active ? new Color(242, 162, 96) : new Color(156, 156, 156);
+
+        spriteBatch.Draw(pixel, back, new Color(10, 14, 18) * 0.72f);
+        spriteBatch.Draw(pixel, fill, color * 0.82f);
+    }
+
+    private static void DrawSiegeUnitActionCue(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.SiegeUnitRenderData unit, Vector2 center, int tileSize, Color color)
+    {
+        if (string.IsNullOrWhiteSpace(unit.RecentActionEffect)
+            || string.Equals(unit.RecentActionEffect, "ready", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        int pulse = Math.Max(1, (int)(Math.Abs(unit.LastActionTick) % 3));
+        int radius = Math.Max(tileSize, tileSize + (pulse * Math.Max(1, tileSize / 4)));
+        int cx = (int)MathF.Round(center.X);
+        int cy = (int)MathF.Round(center.Y);
+
+        if (string.Equals(unit.RecentActionEffect, "ram_wall_gate_pressure", StringComparison.OrdinalIgnoreCase))
+        {
+            DrawCircleOutline(spriteBatch, pixel, cx, cy, radius, new Color(246, 164, 88) * 0.72f, Math.Max(1, tileSize / 5));
+            return;
+        }
+
+        if (string.Equals(unit.RecentActionEffect, "siege_tower_access_pressure", StringComparison.OrdinalIgnoreCase))
+        {
+            DrawLine(spriteBatch, pixel, new Vector2(cx - radius, cy + radius), new Vector2(cx, cy - radius), new Color(222, 206, 148) * 0.76f, Math.Max(1, tileSize / 5));
+            DrawLine(spriteBatch, pixel, new Vector2(cx, cy - radius), new Vector2(cx + radius, cy + radius), new Color(222, 206, 148) * 0.76f, Math.Max(1, tileSize / 5));
+            return;
+        }
+
+        if (string.Equals(unit.RecentActionEffect, "mobile_catapult_ranged_pressure", StringComparison.OrdinalIgnoreCase))
+        {
+            DrawCircleOutline(spriteBatch, pixel, cx, cy, radius + Math.Max(1, tileSize / 3), new Color(246, 202, 108) * 0.58f, Math.Max(1, tileSize / 6));
+            spriteBatch.Draw(pixel, CenteredRect(center, Math.Max(3, tileSize / 2)), new Color(246, 202, 108) * 0.55f);
+            return;
+        }
+
+        DrawCircleOutline(spriteBatch, pixel, cx, cy, radius, color * 0.44f, Math.Max(1, tileSize / 6));
     }
 
     private static void DrawBattleZones(SpriteBatch spriteBatch, Texture2D pixel, Runtime.ReadModel.WorldRenderSnapshot snapshot, int tileSize)
@@ -246,6 +372,24 @@ public sealed class CombatOverlayPass : IRenderPass
             tile.IsContested
             && Math.Abs(tile.X - centerX) <= radius
             && Math.Abs(tile.Y - centerY) <= radius);
+    }
+
+    private static Vector2 TileCenter(int x, int y, int tileSize)
+        => new((x * tileSize) + (tileSize / 2f), (y * tileSize) + (tileSize / 2f));
+
+    private static Rectangle CenteredRect(Vector2 center, int size)
+        => new((int)MathF.Round(center.X - (size / 2f)), (int)MathF.Round(center.Y - (size / 2f)), size, size);
+
+    private static Color GetFactionColor(int factionId)
+    {
+        return factionId switch
+        {
+            0 => new Color(94, 149, 214),
+            1 => new Color(216, 131, 93),
+            2 => new Color(120, 194, 128),
+            3 => new Color(181, 140, 232),
+            _ => new Color(180, 180, 180)
+        };
     }
 
     private static void DrawRectOutline(SpriteBatch spriteBatch, Texture2D pixel, Rectangle rect, int thickness, Color color)

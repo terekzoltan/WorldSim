@@ -49,9 +49,8 @@ public sealed class SimulationRuntime
     private const int CampaignPathMaxExpansions = 4096;
     private const int OperatorSmokeCampaignPathMaxExpansions = 32768;
     private const int OrganicCampaignLaunchCadenceTicks = 20;
-    private const int OrganicCampaignMaxUnresolvedPerOwner = 2;
-    private const int OrganicCampaignMaxUnresolvedPerUnorderedPair = 1;
-    private const int OrganicCampaignMinimumHomeDefenseReserve = 1;
+    private const int OrganicCampaignWarScorePressureThreshold = 30;
+    private const float OrganicCampaignWarScorePressureModifier = 0.08f;
     private const float RamWallGatePressureDamage = 18f;
     private const float RamStructurePressureDamage = 8f;
     private const float MobileCatapultPressureDamage = 10f;
@@ -1010,6 +1009,10 @@ public sealed class SimulationRuntime
 
             if (decision.Kind == CampaignStrategyDecisionKind.RequestConvoy)
                 TryApplySupplyConvoyRequest(ownerColony, decision, assignedActorIds, blockedCampaignActorIds);
+
+            if (decision.Kind == CampaignStrategyDecisionKind.ReinforceCampaign
+                && TryApplySiegeUnitProtectionReinforcement(ownerColony, decision, assignedActorIds, blockedCampaignActorIds))
+                continue;
         }
     }
 
@@ -1020,7 +1023,7 @@ public sealed class SimulationRuntime
     {
         var eligibleMembers = GetOrganicCampaignEligibleMembers(ownerColony, assignedActorIds, blockedCampaignActorIds);
         var availableWarriors = eligibleMembers.Count(person => person.HasRole(PersonRole.Warrior));
-        var availableForLaunch = Math.Max(0, availableWarriors - OrganicCampaignMinimumHomeDefenseReserve);
+        var availableForLaunch = Math.Max(0, availableWarriors - _campaignLogisticsOptions.MinimumHomeDefenseWarriors);
         var activeCampaignCount = CountUnresolvedOwnerCampaigns(ownerColony.Faction);
         return new CampaignStrategyContext(
             FactionId: (int)ownerColony.Faction,
@@ -1029,7 +1032,7 @@ public sealed class SimulationRuntime
             ActiveCampaignCount: activeCampaignCount,
             MaxActiveCampaigns: _campaignLogisticsOptions.MaxActiveCampaignsPerFaction,
             HomeDefenseScore: availableForLaunch,
-            MinimumHomeDefenseScore: OrganicCampaignMinimumHomeDefenseReserve,
+            MinimumHomeDefenseScore: _campaignLogisticsOptions.MinimumHomeDefenseWarriors,
             SupplyReadiness: 1.0f,
             VisibleEnemyPressure: CalculateVisibleEnemyPressure(ownerColony.Faction),
             CanLaunchCampaign: true,
@@ -1058,6 +1061,7 @@ public sealed class SimulationRuntime
             targetColonies = targetColonies.Where(candidate => candidate.Stance == Stance.War).ToArray();
 
         return targetColonies
+            .Where(candidate => !IsOrganicCampaignPairCapReached(ownerColony.Faction, candidate.Colony.Faction))
             .OrderBy(candidate => (int)candidate.Colony.Faction)
             .ThenBy(candidate => candidate.Colony.Id)
             .Select(candidate => BuildOrganicCampaignTargetOption(
@@ -1080,6 +1084,10 @@ public sealed class SimulationRuntime
     {
         var defenderCount = GetOrganicCampaignEligibleMembers(targetColony, assignedActorIds, blockedCampaignActorIds).Count;
         var advantage = CalculateOrganicCampaignAdvantage(availableForLaunch, defenderCount);
+        var pressure = ApplyOrganicCampaignWarScorePressureModifier(
+            ownerColony.Faction,
+            targetColony.Faction,
+            stance == Stance.War ? 1.0f : 0.75f);
         var distancePenalty = CalculateOrganicCampaignDistancePenalty(ownerColony, targetColony)
             + CalculateOrganicCampaignTieBreakPenalty(targetColony);
         var isActionablyKnown = TryGetActionableScoutIntelForOrganicTarget(
@@ -1090,7 +1098,7 @@ public sealed class SimulationRuntime
         return new CampaignTargetOption(
             TargetFactionId: (int)targetColony.Faction,
             TargetColonyId: targetColony.Id,
-            PressureScore: stance == Stance.War ? 1.0f : 0.75f,
+            PressureScore: pressure,
             AdvantageScore: advantage,
             MinimumWarriors: 1,
             RequestedWarriors: Math.Min(2, availableForLaunch),
@@ -1180,20 +1188,26 @@ public sealed class SimulationRuntime
                 $"Organic campaign target {targetFaction}/{targetColony.Id} is missing fresh actionable scout intel.");
         }
 
-        if (CountUnresolvedOwnerCampaigns(ownerColony.Faction) >= OrganicCampaignMaxUnresolvedPerOwner)
+        if (IsOrganicCampaignOwnerCapReached(ownerColony.Faction))
         {
             _campaignLogisticsCounters.RecordCampaignLaunchBlockedByCap();
             return CampaignCreationResult.Failed(CampaignCreationStatus.CampaignRuntimeUnavailable, "Organic campaign owner cap reached.");
         }
 
-        if (CountUnresolvedUnorderedPairCampaigns(ownerColony.Faction, targetFaction) >= OrganicCampaignMaxUnresolvedPerUnorderedPair)
+        if (IsOrganicCampaignPairCapReached(ownerColony.Faction, targetFaction))
+        {
+            _campaignLogisticsCounters.RecordCampaignLaunchBlockedByPairCap();
             return CampaignCreationResult.Failed(CampaignCreationStatus.CampaignRuntimeUnavailable, "Organic campaign unordered faction-pair cap reached.");
+        }
 
         if (!HasOrganicCampaignRoutePreflight(ownerColony, targetColony))
+        {
+            _campaignLogisticsCounters.RecordCampaignLaunchRouteBudgetExhausted();
             return CampaignCreationResult.Failed(CampaignCreationStatus.CampaignRuntimeUnavailable, "Organic campaign route/path budget preflight failed.");
+        }
 
         var eligibleMembers = GetOrganicCampaignEligibleMembers(ownerColony, assignedActorIds, blockedCampaignActorIds);
-        var availableForLaunch = Math.Max(0, eligibleMembers.Count(person => person.HasRole(PersonRole.Warrior)) - OrganicCampaignMinimumHomeDefenseReserve);
+        var availableForLaunch = Math.Max(0, eligibleMembers.Count(person => person.HasRole(PersonRole.Warrior)) - _campaignLogisticsOptions.MinimumHomeDefenseWarriors);
         if (availableForLaunch <= 0)
         {
             _campaignLogisticsCounters.RecordCampaignLaunchBlockedByHomeDefense();
@@ -1213,7 +1227,7 @@ public sealed class SimulationRuntime
             ownerColony.Origin,
             targetColony.Origin,
             ownerColony.Id,
-            CampaignPathMaxExpansions,
+            _campaignLogisticsOptions.RoutePathMaxExpansions,
             out var budgetExceeded);
 
         return !budgetExceeded && path.Count > 1;
@@ -1223,15 +1237,81 @@ public sealed class SimulationRuntime
         => _campaigns
             .Where(campaign => campaign.OwnerFaction == ownerFaction && campaign.Phase != CampaignPhase.Resolved)
             .OrderBy(campaign => campaign.CampaignId)
-            .Select(campaign => new ActiveCampaignStrategyFact(
-                campaign.CampaignId,
-                (int)campaign.TargetFaction,
-                campaign.TargetColonyId,
-                SupplyReadiness: CalculateCampaignSupplyReadiness(campaign),
-                AdvantageScore: 0f,
-                StalledTicks: campaign.RouteCounters.NoProgressTicks,
-                IsRecoverable: true))
+            .Select(campaign =>
+            {
+                var siegeFacts = BuildCampaignSiegeUnitStrategyFacts(campaign);
+                return new ActiveCampaignStrategyFact(
+                    campaign.CampaignId,
+                    (int)campaign.TargetFaction,
+                    campaign.TargetColonyId,
+                    SupplyReadiness: CalculateCampaignSupplyReadiness(campaign),
+                    AdvantageScore: 0f,
+                    StalledTicks: campaign.RouteCounters.NoProgressTicks,
+                    IsRecoverable: true,
+                    ActiveSiegeUnitCount: siegeFacts.activeCount,
+                    DamagedActiveSiegeUnitCount: siegeFacts.damagedCount,
+                    HasActiveSiegeUnits: siegeFacts.activeCount > 0,
+                    HasDamagedActiveSiegeUnits: siegeFacts.damagedCount > 0);
+            })
             .ToArray();
+
+    private (int activeCount, int damagedCount) BuildCampaignSiegeUnitStrategyFacts(CampaignState campaign)
+    {
+        var activeCount = 0;
+        var damagedCount = 0;
+        foreach (var unit in _siegeUnits)
+        {
+            if (unit.CampaignId != campaign.CampaignId
+                || unit.ArmyId != campaign.Army.ArmyId
+                || unit.Phase != SiegeUnitPhase.Active)
+                continue;
+
+            activeCount++;
+            if (unit.Health < unit.MaxHealth)
+                damagedCount++;
+        }
+
+        return (activeCount, damagedCount);
+    }
+
+    private bool TryApplySiegeUnitProtectionReinforcement(
+        Colony ownerColony,
+        CampaignStrategyDecision decision,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        if (decision.ReasonCode != CampaignStrategyReasonCode.CampaignSiegeUnitProtectionNeeded
+            || decision.RequestedWarriors <= 0)
+            return false;
+
+        var targetCampaign = _campaigns.FirstOrDefault(campaign =>
+            campaign.CampaignId == decision.CampaignId
+            && campaign.OwnerFaction == ownerColony.Faction
+            && campaign.Phase != CampaignPhase.Resolved);
+        if (targetCampaign == null || BuildCampaignSiegeUnitStrategyFacts(targetCampaign).damagedCount <= 0)
+            return false;
+
+        var reserve = CountAvailableHomeDefenseWarriors(ownerColony, assignedActorIds, blockedCampaignActorIds)
+            - _campaignLogisticsOptions.MinimumHomeDefenseWarriors;
+        var toAssign = Math.Min(decision.RequestedWarriors, Math.Max(0, reserve));
+        if (toAssign <= 0)
+            return false;
+
+        var assigned = 0;
+        foreach (var candidate in GetOrganicCampaignEligibleMembers(ownerColony, assignedActorIds, blockedCampaignActorIds)
+                     .Where(person => person.HasRole(PersonRole.Warrior)))
+        {
+            if (!targetCampaign.Army.TryAddProtectionReinforcementMemberActorId(candidate.Id))
+                continue;
+
+            assignedActorIds.Add(candidate.Id);
+            assigned++;
+            if (assigned >= toAssign)
+                break;
+        }
+
+        return assigned > 0;
+    }
 
     private bool TryApplySupplyConvoyRequest(
         Colony ownerColony,
@@ -1410,6 +1490,30 @@ public sealed class SimulationRuntime
     private int CountUnresolvedUnorderedPairCampaigns(Faction firstFaction, Faction secondFaction)
         => _campaigns.Count(campaign => campaign.Phase != CampaignPhase.Resolved
             && IsSameUnorderedFactionPair(campaign.OwnerFaction, campaign.TargetFaction, firstFaction, secondFaction));
+
+    private bool IsOrganicCampaignOwnerCapReached(Faction ownerFaction)
+        => CountUnresolvedOwnerCampaigns(ownerFaction) >= _campaignLogisticsOptions.MaxActiveCampaignsPerFaction;
+
+    private bool IsOrganicCampaignPairCapReached(Faction firstFaction, Faction secondFaction)
+        => CountUnresolvedUnorderedPairCampaigns(firstFaction, secondFaction)
+            >= _campaignLogisticsOptions.MaxUnresolvedCampaignsPerUnorderedPair;
+
+    private float ApplyOrganicCampaignWarScorePressureModifier(Faction ownerFaction, Faction targetFaction, float pressure)
+    {
+        var warScore = GetCampaignWarScoreFor(ownerFaction, targetFaction);
+        if (warScore <= -OrganicCampaignWarScorePressureThreshold)
+            pressure += OrganicCampaignWarScorePressureModifier;
+        else if (warScore >= OrganicCampaignWarScorePressureThreshold)
+            pressure -= OrganicCampaignWarScorePressureModifier;
+
+        return Math.Clamp(pressure, 0f, 1f);
+    }
+
+    private int GetCampaignWarScoreFor(Faction ownerFaction, Faction targetFaction)
+    {
+        var key = CampaignWarScoreKey.From(ownerFaction, targetFaction);
+        return _campaignWarScores.GetValueOrDefault(key, 0) * key.SignFor(ownerFaction);
+    }
 
     private static bool IsSameUnorderedFactionPair(Faction leftOwner, Faction leftTarget, Faction rightOwner, Faction rightTarget)
         => Math.Min((int)leftOwner, (int)leftTarget) == Math.Min((int)rightOwner, (int)rightTarget)

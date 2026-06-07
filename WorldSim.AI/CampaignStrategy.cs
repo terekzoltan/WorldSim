@@ -31,7 +31,8 @@ public enum CampaignStrategyReasonCode
     CampaignStalled,
     CampaignNotRecoverable,
     CampaignSupplyLow,
-    CampaignAdvantageForReinforcement
+    CampaignAdvantageForReinforcement,
+    CampaignSiegeUnitProtectionNeeded
 }
 
 public readonly record struct CampaignStrategyContext(
@@ -72,7 +73,11 @@ public readonly record struct ActiveCampaignStrategyFact(
     float SupplyReadiness,
     float AdvantageScore,
     int StalledTicks,
-    bool IsRecoverable = true);
+    bool IsRecoverable = true,
+    int ActiveSiegeUnitCount = 0,
+    int DamagedActiveSiegeUnitCount = 0,
+    bool HasActiveSiegeUnits = false,
+    bool HasDamagedActiveSiegeUnits = false);
 
 public readonly record struct CampaignStrategyDecision(
     CampaignStrategyDecisionKind Kind,
@@ -252,16 +257,20 @@ public sealed class DefaultCampaignStrategist : ICampaignStrategist
         }
 
         ActiveCampaignStrategyFact? selected = null;
+        var selectedReason = CampaignStrategyReasonCode.None;
 
         foreach (var campaign in context.ActiveCampaigns ?? Array.Empty<ActiveCampaignStrategyFact>())
         {
             if (!campaign.IsRecoverable
                 || campaign.SupplyReadiness < ReinforceSupplyThreshold
-                || campaign.AdvantageScore < ReinforceAdvantageThreshold)
+                || !IsReinforcementCandidate(campaign))
                 continue;
 
             if (selected == null || IsBetterReinforceCandidate(campaign, selected.Value))
+            {
                 selected = campaign;
+                selectedReason = GetReinforcementReason(campaign);
+            }
         }
 
         if (selected == null)
@@ -273,23 +282,41 @@ public sealed class DefaultCampaignStrategist : ICampaignStrategist
         var campaignToReinforce = selected.Value;
         decision = new CampaignStrategyDecision(
             CampaignStrategyDecisionKind.ReinforceCampaign,
-            CampaignStrategyReasonCode.CampaignAdvantageForReinforcement,
+            selectedReason,
             campaignToReinforce.TargetFactionId,
             campaignToReinforce.TargetColonyId,
             campaignToReinforce.CampaignId,
             RequestedWarriors: Math.Min(context.AvailableWarriors, Math.Max(1, context.AvailableWarriors / 3)),
-            Score: campaignToReinforce.AdvantageScore);
+            Score: CalculateReinforcementScore(campaignToReinforce));
         return true;
+    }
+
+    private static bool IsReinforcementCandidate(in ActiveCampaignStrategyFact campaign)
+        => campaign.HasDamagedActiveSiegeUnits || campaign.AdvantageScore >= ReinforceAdvantageThreshold;
+
+    private static CampaignStrategyReasonCode GetReinforcementReason(in ActiveCampaignStrategyFact campaign)
+        => campaign.HasDamagedActiveSiegeUnits
+            ? CampaignStrategyReasonCode.CampaignSiegeUnitProtectionNeeded
+            : CampaignStrategyReasonCode.CampaignAdvantageForReinforcement;
+
+    private static float CalculateReinforcementScore(in ActiveCampaignStrategyFact campaign)
+    {
+        var siegeProtectionBonus = campaign.HasDamagedActiveSiegeUnits
+            ? 1f + Math.Clamp(campaign.DamagedActiveSiegeUnitCount, 1, 10) * 0.1f
+            : 0f;
+        return siegeProtectionBonus + campaign.AdvantageScore;
     }
 
     private static bool IsBetterReinforceCandidate(
         in ActiveCampaignStrategyFact candidate,
         in ActiveCampaignStrategyFact current)
     {
-        if (candidate.AdvantageScore > current.AdvantageScore + ScoreEpsilon)
+        var candidateScore = CalculateReinforcementScore(candidate);
+        var currentScore = CalculateReinforcementScore(current);
+        if (candidateScore > currentScore + ScoreEpsilon)
             return true;
 
-        if (Math.Abs(candidate.AdvantageScore - current.AdvantageScore) <= ScoreEpsilon)
+        if (Math.Abs(candidateScore - currentScore) <= ScoreEpsilon)
             return candidate.CampaignId < current.CampaignId;
 
         return false;

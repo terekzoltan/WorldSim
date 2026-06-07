@@ -63,6 +63,16 @@ public sealed class ArmyState
         return true;
     }
 
+    internal bool TryAddProtectionReinforcementMemberActorId(int actorId)
+    {
+        // Used after campaign assembly for runtime-owned protection reinforcement; does not change initial requested assembly size.
+        if (actorId < 0 || _memberActorIds.Contains(actorId))
+            return false;
+
+        _memberActorIds.Add(actorId);
+        return true;
+    }
+
     internal bool RemoveMemberActorId(int actorId)
         => _memberActorIds.Remove(actorId);
 

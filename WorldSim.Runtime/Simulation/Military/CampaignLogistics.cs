@@ -4,6 +4,7 @@ namespace WorldSim.Simulation.Military;
 
 public sealed record CampaignLogisticsOptions(
     int MaxActiveCampaignsPerFaction = 2,
+    int MaxUnresolvedCampaignsPerUnorderedPair = 1,
     int MaxActiveConvoysPerFaction = 1,
     int MaxActiveForwardBasesPerFaction = 1,
     int MinimumHomeDefenseWarriors = 1,
@@ -26,6 +27,7 @@ public sealed record CampaignLogisticsOptions(
         => this with
         {
             MaxActiveCampaignsPerFaction = Math.Max(0, MaxActiveCampaignsPerFaction),
+            MaxUnresolvedCampaignsPerUnorderedPair = Math.Max(0, MaxUnresolvedCampaignsPerUnorderedPair),
             MaxActiveConvoysPerFaction = Math.Max(0, MaxActiveConvoysPerFaction),
             MaxActiveForwardBasesPerFaction = Math.Max(0, MaxActiveForwardBasesPerFaction),
             MinimumHomeDefenseWarriors = Math.Max(0, MinimumHomeDefenseWarriors),
@@ -51,7 +53,9 @@ public sealed record CampaignLogisticsOptions(
 public sealed class CampaignLogisticsCounters
 {
     public int CampaignLaunchBlockedByCap { get; private set; }
+    public int CampaignLaunchBlockedByPairCap { get; private set; }
     public int CampaignLaunchBlockedByHomeDefense { get; private set; }
+    public int CampaignLaunchRouteBudgetExhausted { get; private set; }
     public int ConvoySpawnBlockedByThrottle { get; private set; }
     public int ConvoySpawnBlockedByCap { get; private set; }
     public int ConvoySpawnBlockedByHomeDefense { get; private set; }
@@ -73,7 +77,9 @@ public sealed class CampaignLogisticsCounters
     public int ScoutIntelExpired { get; private set; }
 
     internal void RecordCampaignLaunchBlockedByCap() => CampaignLaunchBlockedByCap++;
+    internal void RecordCampaignLaunchBlockedByPairCap() => CampaignLaunchBlockedByPairCap++;
     internal void RecordCampaignLaunchBlockedByHomeDefense() => CampaignLaunchBlockedByHomeDefense++;
+    internal void RecordCampaignLaunchRouteBudgetExhausted() => CampaignLaunchRouteBudgetExhausted++;
     internal void RecordConvoySpawnBlockedByThrottle() => ConvoySpawnBlockedByThrottle++;
     internal void RecordConvoySpawnBlockedByCap() => ConvoySpawnBlockedByCap++;
     internal void RecordConvoySpawnBlockedByHomeDefense() => ConvoySpawnBlockedByHomeDefense++;

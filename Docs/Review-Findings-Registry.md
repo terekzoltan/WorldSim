@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-06-07 - Wave 10 P7-F Step Review - Blocking - ReinforceCampaign intent must be applied or disabled
+
+- Track: Track C / siege-unit AI deployment with narrow Runtime mapping
+- Source: Meta internal review lanes + Meta Coordinator step-review synthesis for Wave 10 `P7-F`
+- Finding: The P7-F implementation makes `DefaultCampaignStrategist` return `ReinforceCampaign` with `CampaignSiegeUnitProtectionNeeded` for damaged active siege units, and Runtime advertises `CanReinforceCampaign: true`, but `SimulationRuntime.EvaluateOrganicCampaignLaunches(...)` applies only `LaunchCampaign` and `RequestConvoy`. The new reinforcement intent can therefore become a silent runtime no-op.
+- Impact: P7-F can appear implemented because AI tests and fact-mapping tests pass, while no live runtime protection/escort/reinforcement effect occurs for vulnerable siege-unit campaigns. The no-op branch can also suppress normal launch evaluation during organic runtime ticks.
+- Resolution / guidance: Before P7-F closeout, either implement a minimal Runtime-owned `ReinforceCampaign` application path that produces a concrete protected/reinforced campaign effect without taking siege-unit lifecycle ownership, or explicitly disable/downgrade runtime reinforcement capability and revise acceptance. Add a focused runtime regression proving the chosen behavior.
+- Status: fixed in P7-F closeout; Runtime now has a protection-specific apply path for `CampaignSiegeUnitProtectionNeeded`, with focused regressions covering applied protection and no-op cases.
+
+## 2026-06-07 - Wave 10 P7-F Fix Re-review - Blocking - Reinforcement tests must use production capacity semantics
+
+- Track: Track C / siege-unit AI deployment with Runtime protection apply path
+- Source: Meta internal review + Meta Coordinator step-review synthesis for Wave 10 `P7-F` fix re-review
+- Finding: The attempted `CampaignSiegeUnitProtectionNeeded` runtime apply path adds warriors through `ArmyState.TryAddMemberActorId(...)`, but that method rejects additions once `MemberCount >= RequestedMemberCount`. The positive test makes reinforcement succeed by reflection-mutating the private `RequestedMemberCount` backing field, so it does not prove production-realistic protection for a normal full active campaign.
+- Impact: P7-F can still pass tests while failing to reinforce damaged siege-unit campaigns in normal runtime conditions. This repeats the earlier pattern of proving a nearby/plumbing condition rather than the requested deployed behavior.
+- Resolution / guidance: Before P7-F closeout, either add a production-owned reinforcement capacity/member path that works for a full active campaign without test-only reflection, or explicitly downgrade acceptance to spare-capacity refill only. Preferred fix: production-realistic test where a full active campaign with damaged active siege units and reserve warriors receives a concrete reinforcement/protection effect.
+- Status: fixed in P7-F closeout; `ArmyState.TryAddProtectionReinforcementMemberActorId(...)` provides a production-owned post-assembly reinforcement path, and the positive regression no longer reflection-expands `RequestedMemberCount`.
+
 ## 2026-06-04 - Wave 10 P7-E Step Review - Major - Siege units must follow campaign pressure suppression
 
 - Track: Track B / Runtime dedicated siege units

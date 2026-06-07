@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using WorldSim.AI;
 using WorldSim.Runtime;
 using WorldSim.Simulation;
 using WorldSim.Simulation.Combat;
@@ -270,9 +271,126 @@ public sealed class Wave10SiegeUnitTests
         Assert.Equal(1, active.Count(unit => unit.Kind == SiegeUnitKind.MobileCatapult));
     }
 
-    private static EncounterCampaignFixture CreateEncounterCampaign(bool unlockSiegeCraft)
+    [Fact]
+    public void BuildActiveCampaignStrategyFacts_MapsOnlyActiveSiegeUnits()
     {
-        var runtime = CreateRuntime();
+        var fixture = CreateEncounterCampaign(unlockSiegeCraft: true);
+        QueueCampaignSiegePressure(fixture.Runtime, 1f, new HashSet<int>());
+        var damaged = GetLiveSiegeUnits(fixture.Runtime).First(unit => unit.Phase == SiegeUnitPhase.Active);
+        SetSiegeUnitHealth(damaged, damaged.MaxHealth - 1f);
+
+        var fact = Assert.Single(BuildActiveCampaignStrategyFacts(fixture.Runtime, fixture.Owner.Faction));
+
+        Assert.Equal(fixture.CampaignId, fact.CampaignId);
+        Assert.Equal(3, fact.ActiveSiegeUnitCount);
+        Assert.Equal(1, fact.DamagedActiveSiegeUnitCount);
+        Assert.True(fact.HasActiveSiegeUnits);
+        Assert.True(fact.HasDamagedActiveSiegeUnits);
+    }
+
+    [Fact]
+    public void BuildActiveCampaignStrategyFacts_IgnoresInactiveSiegeUnitHistory()
+    {
+        var fixture = CreateEncounterCampaign(unlockSiegeCraft: true);
+        QueueCampaignSiegePressure(fixture.Runtime, 1f, new HashSet<int>());
+        var campaign = GetLiveCampaigns(fixture.Runtime).Single();
+        MarkSiegeUnitsInvalid(fixture.Runtime, campaign);
+        var inactiveUnitIds = fixture.Runtime.SiegeUnits.Select(unit => unit.SiegeUnitId).Order().ToArray();
+        Assert.Equal(3, inactiveUnitIds.Length);
+        Assert.All(fixture.Runtime.SiegeUnits, unit => Assert.Equal(SiegeUnitPhase.Inactive, unit.Phase));
+
+        EnsureSiegeUnits(fixture.Runtime, campaign, fixture.Owner, fixture.TargetWall!);
+        var activeUnits = fixture.Runtime.SiegeUnits.Where(unit => unit.Phase == SiegeUnitPhase.Active).ToArray();
+        Assert.Equal(3, activeUnits.Length);
+        Assert.Equal(6, fixture.Runtime.SiegeUnits.Count);
+
+        var fact = Assert.Single(BuildActiveCampaignStrategyFacts(fixture.Runtime, fixture.Owner.Faction));
+
+        Assert.Equal(fixture.CampaignId, fact.CampaignId);
+        Assert.Equal(3, fact.ActiveSiegeUnitCount);
+        Assert.Equal(0, fact.DamagedActiveSiegeUnitCount);
+        Assert.True(fact.HasActiveSiegeUnits);
+        Assert.False(fact.HasDamagedActiveSiegeUnits);
+    }
+
+    [Fact]
+    public void OrganicCampaign_FullArmyAppliesDamagedSiegeUnitProtectionReinforcementWithoutExpandingRequestedCount()
+    {
+        var fixture = CreateEncounterCampaign(unlockSiegeCraft: true);
+        QueueCampaignSiegePressure(fixture.Runtime, 1f, new HashSet<int>());
+        var campaignBefore = GetLiveCampaigns(fixture.Runtime).Single();
+        Assert.Equal(campaignBefore.Army.RequestedMemberCount, campaignBefore.Army.MemberCount);
+        var requestedMemberCount = campaignBefore.Army.RequestedMemberCount;
+        var damaged = GetLiveSiegeUnits(fixture.Runtime).First(unit => unit.Phase == SiegeUnitPhase.Active);
+        SetSiegeUnitHealth(damaged, damaged.MaxHealth - 1f);
+        var reserves = new[] { MakeReserveWarrior(fixture).Id, MakeReserveWarrior(fixture).Id };
+
+        EvaluateOrganicCampaignLaunches(fixture.Runtime);
+
+        var campaign = GetLiveCampaigns(fixture.Runtime).Single();
+        Assert.Equal(requestedMemberCount, campaign.Army.RequestedMemberCount);
+        Assert.Equal(requestedMemberCount + 1, campaign.Army.MemberCount);
+        Assert.True(campaign.Army.MemberCount > campaign.Army.RequestedMemberCount);
+        Assert.Contains(campaign.Army.MemberActorIds, actorId => reserves.Contains(actorId));
+    }
+
+    [Fact]
+    public void OrganicCampaign_InactiveSiegeUnitHistoryDoesNotApplyProtectionReinforcement()
+    {
+        var fixture = CreateEncounterCampaign(unlockSiegeCraft: true);
+        QueueCampaignSiegePressure(fixture.Runtime, 1f, new HashSet<int>());
+        var campaign = GetLiveCampaigns(fixture.Runtime).Single();
+        MarkSiegeUnitsInvalid(fixture.Runtime, campaign);
+        MakeReserveWarrior(fixture);
+        MakeReserveWarrior(fixture);
+        var before = campaign.Army.MemberCount;
+
+        EvaluateOrganicCampaignLaunches(fixture.Runtime);
+
+        Assert.Equal(before, campaign.Army.MemberCount);
+    }
+
+    [Fact]
+    public void OrganicCampaign_HomeDefenseReserveBlocksSiegeUnitProtectionReinforcement()
+    {
+        var fixture = CreateEncounterCampaign(unlockSiegeCraft: true);
+        QueueCampaignSiegePressure(fixture.Runtime, 1f, new HashSet<int>());
+        var damaged = GetLiveSiegeUnits(fixture.Runtime).First(unit => unit.Phase == SiegeUnitPhase.Active);
+        SetSiegeUnitHealth(damaged, damaged.MaxHealth - 1f);
+        var before = GetLiveCampaigns(fixture.Runtime).Single().Army.MemberCount;
+
+        EvaluateOrganicCampaignLaunches(fixture.Runtime);
+
+        Assert.Equal(before, GetLiveCampaigns(fixture.Runtime).Single().Army.MemberCount);
+    }
+
+    [Fact]
+    public void OrganicCampaign_GenericAdvantageReinforcementRemainsAdvisoryOnly()
+    {
+        var strategist = new FixedDecisionStrategist(new CampaignStrategyDecision(
+            CampaignStrategyDecisionKind.ReinforceCampaign,
+            CampaignStrategyReasonCode.CampaignAdvantageForReinforcement,
+            CampaignId: 1,
+            RequestedWarriors: 1));
+        var fixture = CreateEncounterCampaign(
+            unlockSiegeCraft: true,
+            campaignStrategist: strategist);
+        QueueCampaignSiegePressure(fixture.Runtime, 1f, new HashSet<int>());
+        MakeReserveWarrior(fixture);
+        var before = GetLiveCampaigns(fixture.Runtime).Single().Army.MemberCount;
+
+        EvaluateOrganicCampaignLaunches(fixture.Runtime);
+
+        Assert.Equal(before, GetLiveCampaigns(fixture.Runtime).Single().Army.MemberCount);
+    }
+
+    private static EncounterCampaignFixture CreateEncounterCampaign(
+        bool unlockSiegeCraft,
+        int requestedMemberCount = 1,
+        int preparedCandidateCount = 1,
+        ICampaignStrategist? campaignStrategist = null)
+    {
+        var runtime = CreateRuntime(campaignStrategist);
         EnableDiplomacyCombatAndSiege(runtime);
         var world = GetWorld(runtime);
         world.BirthRateMultiplier = 0f;
@@ -283,8 +401,8 @@ public sealed class Wave10SiegeUnitTests
         if (unlockSiegeCraft)
             owner.UnlockedTechs.Add("siege_craft");
 
-        Assert.Equal(1, runtime.PrepareWave9CampaignScenario(Faction.Obsidari, candidateCount: 1, carriedFoodPerCandidate: 2));
-        var result = runtime.TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1);
+        Assert.Equal(preparedCandidateCount, runtime.PrepareWave9CampaignScenario(Faction.Obsidari, candidateCount: preparedCandidateCount, carriedFoodPerCandidate: 2));
+        var result = runtime.TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: requestedMemberCount);
         Assert.True(result.Success);
         world.EnableCombatPrimitives = false;
 
@@ -292,7 +410,10 @@ public sealed class Wave10SiegeUnitTests
             runtime.AdvanceTick(0f);
 
         var campaign = runtime.Campaigns.Single();
-        var member = world._people.Single(person => campaign.Army.MemberActorIds.Contains(person.Id));
+        var member = world._people
+            .Where(person => campaign.Army.MemberActorIds.Contains(person.Id))
+            .OrderBy(person => person.Id)
+            .First();
         member.Pos = (campaign.Army.RallyX, campaign.Army.RallyY);
 
         for (var i = 0; i < 8 && runtime.Campaigns.Single().Phase != CampaignPhase.Marching; i++)
@@ -321,11 +442,11 @@ public sealed class Wave10SiegeUnitTests
         return new EncounterCampaignFixture(runtime, world, owner, target, member, wall, campaign.CampaignId, campaign.Army.ArmyId);
     }
 
-    private static SimulationRuntime CreateRuntime()
+    private static SimulationRuntime CreateRuntime(ICampaignStrategist? campaignStrategist = null)
     {
         var repoRoot = FindRepoRoot();
         var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
-        return new SimulationRuntime(32, 32, 12, techPath, aiOptions: null, randomSeed: 9601);
+        return new SimulationRuntime(32, 32, 12, techPath, aiOptions: null, randomSeed: 9601, campaignStrategist: campaignStrategist);
     }
 
     private static void EnableDiplomacyCombatAndSiege(SimulationRuntime runtime)
@@ -356,6 +477,21 @@ public sealed class Wave10SiegeUnitTests
         }
     }
 
+    private static Person MakeReserveWarrior(EncounterCampaignFixture fixture)
+    {
+        var reserve = fixture.World._people
+            .Where(person => person.Id != fixture.Member.Id && person.Home.Id == fixture.Owner.Id && person.Health <= 0f)
+            .OrderBy(person => person.Id)
+            .First();
+        reserve.Health = 100f;
+        reserve.Current = Job.Idle;
+        reserve.Profession = Profession.Generalist;
+        reserve.ClearRole(PersonRole.Warrior | PersonRole.SupplyCarrier | PersonRole.Scout | PersonRole.Commander);
+        reserve.AssignRole(PersonRole.Warrior);
+        reserve.SetCombatAssignment(null, null, Formation.Line, isCommander: false);
+        return reserve;
+    }
+
     private static void MarkSiegeUnitsInvalid(SimulationRuntime runtime, CampaignState campaign)
     {
         var method = typeof(SimulationRuntime).GetMethod("MarkCampaignSiegeUnitsInactive", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -370,6 +506,21 @@ public sealed class Wave10SiegeUnitTests
         method!.Invoke(runtime, new object[] { campaign, attacker, target });
     }
 
+    private static IReadOnlyList<ActiveCampaignStrategyFact> BuildActiveCampaignStrategyFacts(SimulationRuntime runtime, Faction ownerFaction)
+    {
+        var method = typeof(SimulationRuntime).GetMethod("BuildActiveCampaignStrategyFacts", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        var result = method!.Invoke(runtime, new object[] { ownerFaction });
+        return Assert.IsAssignableFrom<IReadOnlyList<ActiveCampaignStrategyFact>>(result);
+    }
+
+    private static void SetSiegeUnitHealth(SiegeUnitState unit, float health)
+    {
+        var field = typeof(SiegeUnitState).GetField("<Health>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(unit, health);
+    }
+
     private static void QueueCampaignSiegePressure(SimulationRuntime runtime, float dt, HashSet<int> blockedCampaignActorIds)
     {
         var method = typeof(SimulationRuntime).GetMethod("QueueCampaignSiegePressureForActiveEncounters", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -382,6 +533,29 @@ public sealed class Wave10SiegeUnitTests
         var method = typeof(SimulationRuntime).GetMethod("SyncCampaignSiegeStates", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(runtime, new object[] { blockedCampaignActorIds });
+    }
+
+    private static void EvaluateOrganicCampaignLaunches(SimulationRuntime runtime)
+    {
+        var tickField = typeof(SimulationRuntime).GetField("<Tick>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(tickField);
+        tickField!.SetValue(runtime, 20L);
+        var method = typeof(SimulationRuntime).GetMethod("EvaluateOrganicCampaignLaunches", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        method!.Invoke(runtime, new object[] { new HashSet<int>() });
+    }
+
+    private sealed class FixedDecisionStrategist : ICampaignStrategist
+    {
+        private readonly CampaignStrategyDecision _decision;
+
+        public FixedDecisionStrategist(CampaignStrategyDecision decision)
+        {
+            _decision = decision;
+        }
+
+        public CampaignStrategyDecision Decide(in CampaignStrategyContext context)
+            => _decision with { CampaignId = context.ActiveCampaigns?.FirstOrDefault().CampaignId ?? _decision.CampaignId };
     }
 
     private static void ResolveCampaign(CampaignState campaign)
@@ -416,6 +590,13 @@ public sealed class Wave10SiegeUnitTests
         var campaignsField = typeof(SimulationRuntime).GetField("_campaigns", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(campaignsField);
         return Assert.IsAssignableFrom<List<CampaignState>>(campaignsField!.GetValue(runtime));
+    }
+
+    private static List<SiegeUnitState> GetLiveSiegeUnits(SimulationRuntime runtime)
+    {
+        var unitsField = typeof(SimulationRuntime).GetField("_siegeUnits", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(unitsField);
+        return Assert.IsAssignableFrom<List<SiegeUnitState>>(unitsField!.GetValue(runtime));
     }
 
     private static World GetWorld(SimulationRuntime runtime)

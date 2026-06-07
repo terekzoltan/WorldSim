@@ -282,6 +282,99 @@ public class CampaignStrategyTests
     }
 
     [Fact]
+    public void DefaultStrategist_ReinforcesDamagedActiveSiegeUnitCampaign()
+    {
+        var strategist = new DefaultCampaignStrategist();
+        var campaign = CreateActiveCampaign(
+            supplyReadiness: 0.8f,
+            advantageScore: 0.1f,
+            activeSiegeUnitCount: 3,
+            damagedActiveSiegeUnitCount: 1);
+
+        var decision = strategist.Decide(CreateContext(
+            availableWarriors: 6,
+            canLaunchCampaign: false,
+            canReinforceCampaign: true,
+            activeCampaigns: new[] { campaign }));
+
+        Assert.Equal(CampaignStrategyDecisionKind.ReinforceCampaign, decision.Kind);
+        Assert.Equal(CampaignStrategyReasonCode.CampaignSiegeUnitProtectionNeeded, decision.ReasonCode);
+        Assert.Equal(campaign.CampaignId, decision.CampaignId);
+        Assert.Equal(2, decision.RequestedWarriors);
+    }
+
+    [Fact]
+    public void DefaultStrategist_AbortWinsOverSiegeUnitProtection()
+    {
+        var strategist = new DefaultCampaignStrategist();
+        var campaign = CreateActiveCampaign(
+            supplyReadiness: 0.05f,
+            advantageScore: 0.9f,
+            activeSiegeUnitCount: 3,
+            damagedActiveSiegeUnitCount: 1);
+
+        var decision = strategist.Decide(CreateContext(
+            canLaunchCampaign: false,
+            canAbortCampaign: true,
+            canReinforceCampaign: true,
+            activeCampaigns: new[] { campaign }));
+
+        Assert.Equal(CampaignStrategyDecisionKind.AbortCampaign, decision.Kind);
+        Assert.Equal(CampaignStrategyReasonCode.CampaignOutOfSupply, decision.ReasonCode);
+        Assert.Equal(campaign.CampaignId, decision.CampaignId);
+    }
+
+    [Fact]
+    public void DefaultStrategist_ConvoyWinsOverSiegeUnitProtection()
+    {
+        var strategist = new DefaultCampaignStrategist();
+        var campaign = CreateActiveCampaign(
+            supplyReadiness: 0.25f,
+            advantageScore: 0.9f,
+            activeSiegeUnitCount: 3,
+            damagedActiveSiegeUnitCount: 1);
+
+        var decision = strategist.Decide(CreateContext(
+            canLaunchCampaign: false,
+            canRequestConvoy: true,
+            canReinforceCampaign: true,
+            activeCampaigns: new[] { campaign }));
+
+        Assert.Equal(CampaignStrategyDecisionKind.RequestConvoy, decision.Kind);
+        Assert.Equal(CampaignStrategyReasonCode.CampaignSupplyLow, decision.ReasonCode);
+        Assert.Equal(campaign.CampaignId, decision.CampaignId);
+    }
+
+    [Fact]
+    public void DefaultStrategist_SiegeUnitProtectionWinsOverAdvantageReinforcementCandidate()
+    {
+        var strategist = new DefaultCampaignStrategist();
+        var advantageCampaign = CreateActiveCampaign(
+            campaignId: 100,
+            targetFactionId: 1,
+            targetColonyId: 10,
+            supplyReadiness: 0.8f,
+            advantageScore: 0.9f);
+        var siegeCampaign = CreateActiveCampaign(
+            campaignId: 200,
+            targetFactionId: 2,
+            targetColonyId: 20,
+            supplyReadiness: 0.8f,
+            advantageScore: 0.1f,
+            activeSiegeUnitCount: 3,
+            damagedActiveSiegeUnitCount: 1);
+
+        var decision = strategist.Decide(CreateContext(
+            canLaunchCampaign: false,
+            canReinforceCampaign: true,
+            activeCampaigns: new[] { advantageCampaign, siegeCampaign }));
+
+        Assert.Equal(CampaignStrategyDecisionKind.ReinforceCampaign, decision.Kind);
+        Assert.Equal(CampaignStrategyReasonCode.CampaignSiegeUnitProtectionNeeded, decision.ReasonCode);
+        Assert.Equal(siegeCampaign.CampaignId, decision.CampaignId);
+    }
+
+    [Fact]
     public void DefaultStrategist_HoldsReinforcement_WhenHomeDefenseFallsBelowMinimum()
     {
         var strategist = new DefaultCampaignStrategist();
@@ -367,7 +460,9 @@ public class CampaignStrategyTests
         float supplyReadiness = 0.8f,
         float advantageScore = 0.2f,
         int stalledTicks = 0,
-        bool isRecoverable = true)
+        bool isRecoverable = true,
+        int activeSiegeUnitCount = 0,
+        int damagedActiveSiegeUnitCount = 0)
         => new(
             campaignId,
             targetFactionId,
@@ -375,5 +470,9 @@ public class CampaignStrategyTests
             supplyReadiness,
             advantageScore,
             stalledTicks,
-            isRecoverable);
+            isRecoverable,
+            activeSiegeUnitCount,
+            damagedActiveSiegeUnitCount,
+            activeSiegeUnitCount > 0,
+            damagedActiveSiegeUnitCount > 0);
 }

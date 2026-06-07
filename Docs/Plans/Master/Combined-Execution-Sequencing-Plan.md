@@ -2151,10 +2151,10 @@ Wave 10 SMR evidence guardrail:
 
 > Combat Plan > Phase 7 Sprint 13
 
-- ⬜ **P7-E** Dedicated siege units — ram, siege tower, mobile catapult (Track B)
-- ⬜ **P7-F** Siege unit AI deployment (Track C)
-- ⬜ **P7-G** Multi-front war — bounded (Track B)
-- ⬜ **P7-H** Graphics for siege units (Track A)
+- ✅ **P7-E** Dedicated siege units — ram, siege tower, mobile catapult (Track B)
+- ✅ **P7-F** Siege unit AI deployment (Track C)
+- 🔄 **P7-G** Multi-front war — bounded (Track B)
+- 🔄 **P7-H** Graphics for siege units (Track A)
 - ⬜ **Wave 10 SMR advanced campaign prep** ScenarioRunner campaign resolution + logistics + siege-unit evidence surface (Track B / SMR Analyst validation)
 - ⬜ **Wave 10 SMR evidence** Campaign resolution + advanced warfare closeout package (SMR Analyst)
 
@@ -2294,6 +2294,9 @@ P7-D closeout / residual evidence route:
 |---------|---------|--------|-------|
 | Track B agent | P7-E | P7-A ✅ + P7-B ✅ | Multi-front and siege-unit work needs supply + bases runtime; P7-C/P7-D are not true execution-dependencies for this step and may proceed in parallel as downstream / non-blocking work |
 
+P7-E implementation note:
+- ✅ Track B dedicated siege-unit runtime foundation accepted: Runtime now owns campaign-scoped, non-actor `SiegeUnitState` records for ram/siege tower/mobile catapult, spawned idempotently at encounter/siege relevance only when the attacker has `siege_craft`. Scope stayed Track B runtime/read-model/test plus snapshot interpolator pass-through: no AI deployment, no Graphics rendering, no ScenarioRunner/SMR export, no App controls, no independent unit pathfinding, and no second siege truth model. Unit effects remain bounded through the existing siege pressure/damage/breach path (`ram_wall_gate_pressure`, `siege_tower_access_pressure`, `mobile_catapult_ranged_pressure`), resolved campaigns mark units inactive, and `SiegeUnitRenderData` exposes stable unit kind/phase/inactive reason/target/capability-effect fields for P7-F/P7-H consume. Meta+Swarm closeout accepted the lifecycle fix passes: post-world sync uses full pressure-capable validation, same-tick sync validates active dedicated siege-unit campaigns before the `LastPressureTick == Tick` skip, and focused regressions cover invalid/incomplete roster, alive-but-pressure-invalid same-tick cleanup, no-target reporter cleanup, resolver-disabled-after-spawn cleanup, runtime inactive state, and snapshot inactive state. Verification passed via focused `Wave10SiegeUnitTests` (12/12), `WorldSnapshotInterpolatorTests` (5/5), `Wave10CampaignResolutionTests` (22/22), full solution build, and diff hygiene. Step 9 (`P7-F`, `P7-G`, `P7-H`) is unblocked by P7-E; Step10A still owns durable ScenarioRunner/SMR siege-unit evidence export.
+
 **Step 9 — opens when P7-E ✅**
 
 | Session | Epic(s) | Prereq | Notes |
@@ -2301,6 +2304,18 @@ P7-D closeout / residual evidence route:
 | Track C agent | P7-F | P7-E ✅ | Siege-unit AI needs the dedicated unit types and behaviors first |
 | Track B agent | P7-G | P7-E ✅ | Multi-front war should be bounded using the finalized siege-unit/runtime constraints |
 | Track A agent | P7-H | P7-E ✅ | Graphics consume the siege-unit snapshot once the runtime entity set is stable |
+
+P7-G implementation progress note:
+- ✅ Track B bounded multi-front runtime policy accepted for the focused cap/filter/war-score slice: organic runtime launch/application paths now centralize owner cap, unordered pair cap, home reserve, and route budget semantics through `CampaignLogisticsOptions`; target-option filtering and apply-boundary validation share unresolved owner/pair cap helpers; pair-cap filtering allows a second distinct front while duplicate same-pair launches remain blocked; a small deterministic/clamped war-score pressure modifier shapes target choice without bypassing stance, scout, home-defense, route, owner, or pair gates; public/manual campaign creation remains an uncapped compatibility path. Scope stayed Track B runtime/tests/docs only: no Track C strategy contract changes, no Track A/App changes, no `SiegeUnitRenderData`/snapshot contract changes, and no ScenarioRunner/SMR export. Step10A still owns durable multi-front evidence export and must not overclaim these focused tests as durable ScenarioRunner proof.
+
+P7-F closeout note:
+- ✅ Track C/Runtime siege-unit AI deployment is accepted GREEN after production-capacity fix. Runtime now applies only `ReinforceCampaign` decisions with `CampaignSiegeUnitProtectionNeeded` through a protection-specific helper; generic `CampaignAdvantageForReinforcement` remains advisory/no-op. `ArmyState.TryAddProtectionReinforcementMemberActorId(...)` provides a narrow internal post-assembly reinforcement path that rejects invalid/duplicate actor ids, bypasses only the initial requested-count cap, and does not modify `RequestedMemberCount` or initial assembly semantics. Focused regression proves a full active campaign with damaged active siege units can gain a reserve warrior (`MemberCount == RequestedMemberCount + 1`) without reflection-expanded capacity, while inactive/history units, home-defense reserve, and generic advantage reinforcement remain no-op. Scope stayed P7-F AI + narrow Runtime/ArmyState/test only: no siege-unit lifecycle, read-model/render shape, App, ScenarioRunner/SMR, P7-G, or P7-H ownership. Verification passed via focused Runtime tests (18/18), focused AI tests (21/21), AI boundary grep, full solution build, and diff hygiene. Step10A still owns durable ScenarioRunner/SMR siege-unit evidence.
+
+P7-H implementation progress note:
+- 🔄 Track A overlay-only siege-unit visualization code/automated review accepted, but final visual closeout remains gated on manual smoke: `CombatOverlayPass` consumes `WorldRenderSnapshot.SiegeUnits` in the existing `Ctrl+F8` combat overlay and renders non-actor siege-unit glyphs for ram, siege tower, and mobile catapult with active/inactive styling, damaged-health cue, target cue, and bounded recent-action cues for the known P7-E effects. Scope stayed Graphics/docs-only: no Runtime/read-model/App/AI/ScenarioRunner/SMR/`Docs/Architecture` changes, no new hotkey, no new asset pipeline, and no actor-like gameplay rendering. Before P7-H can be marked ✅, manual app smoke must record distinct kind readability, active/inactive contrast, target cue visibility, at least one recent-action cue, and unchanged battle/siege/breach overlay readability; if no interactive siege-unit scene is available, this must remain an explicit active gate rather than a clean closeout. Step10A still owns durable siege-unit evidence export.
+
+Manual smoke follow-up note (2026-06-07):
+- User manual smoke looked healthy at a baseline level (`Ctrl+Q`, `Ctrl+F2`, sampled campaign/logistics states, multi-faction conflict), but dedicated siege units were not directly observed, so P7-H direct siege-unit visual proof is still incomplete. The same smoke also surfaced three accepted future-fix candidates: (1) operator/manual campaigns tending to remain one-member probes when larger squads would be more representative, (2) wood wall icon scale/readability looking too large, and (3) fragmented/random wall placement giving poor defensive value. These are recorded in `Docs/Evidence/Manual/Wave10-Step9-Manual-Smoke-Followup.md` and routed to Step10A/10B classification plus conditional Step10C follow-up, not treated as Step 9 blockers.
 
 P7 logistics cap note:
 - Detailed execution plan: `Docs/Plans/Master/Wave10-Campaign-Logistics-Hardening-Plan.md`.
@@ -2319,6 +2334,28 @@ P7 logistics cap note:
 |---------|---------|--------|-------|
 | SMR Analyst | Wave 10 SMR evidence | All Wave 10 implementation epics ✅ (`P6-G`/`P6-H`/`P6-I`/`P6-J(B)`/`P6-J(C) ✅ or N/A`/`P7-C B+C`/`P7-D`/`P7-F`/`P7-G`/`P7-H`) + Wave 10 SMR prep ✅ | Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient. Manual/operator launch evidence must not be overclaimed as organic campaign proof. |
 
+Step10B manual evidence input:
+- `Docs/Evidence/Manual/Wave10-Step9-Manual-Smoke-Followup.md` must be loaded during SMR closeout triage. Step10B should explicitly classify whether "no dedicated siege unit seen manually" is expected low-incidence behavior or evidence of a real runtime/visibility gap, and whether the accepted manual candidate issues belong in a post-SMR fix bucket.
+
+**Step 10C — post-SMR / manual gap closure (conditional)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator | Wave 10 gap triage | Step10B reviewed OR explicit user manual evidence request | Promote accepted manual-smoke + SMR residuals into a bounded fix bucket. Do not open by default if Step10A/10B produce no actionable gameplay/runtime/UI gaps. |
+| Track B agent | Step10C-B runtime/operator/fortification hardening | Meta triage ✅ | Candidate scope: manual/operator campaign sizing and assembly quality, siege-unit incidence/build/use follow-up if SMR/manual evidence shows low real activation, and wall placement coherence / defensive usefulness. |
+| Track A agent | Step10C-A fortification readability pass | Meta triage ✅ | Candidate scope: wall/watchtower icon scale/readability and siege/manual clarity improvements. |
+| Track C agent | Step10C-C advisory follow-up (conditional) | Explicit Track B or SMR handoff | Only if Step10B/Step10C-B proves a real strategist/advisory gap rather than a runtime/operator/visual issue. |
+
+Step10C policy note:
+- Step10C is evidence-driven. Every item must come from Step10A/10B evidence or an explicit manual evidence doc such as `Docs/Evidence/Manual/Wave10-Step9-Manual-Smoke-Followup.md`.
+- Current seeded candidates:
+  - operator/manual launch should stay at `1` only as a fallback; if more viable members exist, prefer a larger bounded squad for more representative campaign smoke,
+  - classify low manual siege-unit visibility after SMR before deciding whether to change runtime incidence or visual/debug observability,
+  - wall/watchtower icon scale/readability,
+  - wall placement coherence / defensive usefulness,
+  - noisy repeated `Army 0/1` / `anchor:none` assembly rows if SMR/manual evidence shows the issue persists.
+- Do not silently absorb SMR tooling/process ideas from `Docs/Ideas/Meta-Ideas-Inbox.md` into Step10C; the current inbox items are mainly SMR/process/tooling and should stay separate unless explicitly promoted.
+
 **Parallelism:** Wave 10 stays sequential across major phases (`C11 -> C12 -> C13`), but inside each phase the final consumer steps are grouped into the same step whenever cross-track work can proceed in parallel.
 
 ---
@@ -2334,7 +2371,7 @@ Purpose:
 Wave turn-gate:
 - Wave 10.5 is `READY` only after Wave 8.5 closeout is `✅` and Wave 10 closeout is `✅`.
 - Reason: convergence work should build on a proven solver-backed slice and the matured late combat/campaign surface before shared-family expansion prep begins.
-- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5.
+- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5. If Step10C is opened from SMR/manual evidence triage, it must also be closed or explicitly marked N/A before Wave 10.5.
 
 Audit hardening source:
 - `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md`
