@@ -38,6 +38,8 @@ Reference format: `Director Plan > Phase X Sprint Y > S1-A` or `Combat Plan > Ph
 
 Sequencing authority note: this Combined plan, `ops/PROJECT_STATE.md`, and accepted evidence notes are the active workflow authority. If a source plan's status header is stale, use the latest Combined execution rows, progress notes, and accepted evidence summaries for launch decisions.
 
+Wave insertion rule: when adding any new wave or post-wave slice to this Combined plan, optimize for maximum safe parallelism only after preserving sequential clarity. Every new step must state its prerequisites, owner, expected handoff, acceptance/evidence gate, and exactly which later step it unlocks. If parallelization would blur dependency truth, ownership, proof source-of-truth, or closeout responsibility, split the work into smaller steps, serialize it, or place it behind an explicit gate instead of forcing concurrency.
+
 Status legend: `⬜` = pending, `🔄` = ongoing, `✅` = done, `❌` = cancelled.
 
 Turn-gate legend (agent handoff safety):
@@ -2325,14 +2327,25 @@ P7 logistics cap note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | Wave 10 SMR prep - export/config | P6-I ✅ + P6-J(B) ✅ + P6-J(C) ✅/N/A + P7-C (B part) ✅ + P7-E ✅ + P7-G ✅ | Add ScenarioRunner artifact fields, drilldown fields, deterministic lanes, and focused tests for campaign resolution, manual/operator launch, organic launch, supply lines, forward bases, scouts, siege units, and multi-front constraints per `Wave9-10-SMR-Closeout-Plan.md`. Campaign-launch lanes must label proof type: `organic`, `deterministic_probe`, or `manual_operator`. |
-| SMR Analyst | Wave 10 SMR prep - validation | Track B export/config ✅ | Validate that the new artifact surface and deterministic lanes can prove Wave 10 behavior before the final closeout package |
+| Track B agent | Wave 10 SMR prep - export/config | P6-I ✅ + P6-J(B) ✅ + P6-J(C) ✅/N/A + P7-C (B part) ✅ + P7-E ✅ + P7-G ✅ | ✅ Accepted after re-review: normal `runs/*.json.wave10` is main-world-run/default-safe truth only, side-probe evidence is separated into `wave10-probes.json` with explicit `simulation_runtime_probe` provenance, manifest `wave10*` fields summarize probe evidence, drilldown does not claim probe counters as main timeline, and all required Wave10 lanes are represented as positive or explicit `proof_unavailable` probe entries. Deterministic/helper evidence must not be overclaimed as same-run or organic proof; Step10B must classify unavailable lanes before closeout. |
+| SMR Analyst | Wave 10 SMR prep - validation | Track B export/config ✅ after re-review | Validate that the new artifact surface and deterministic lanes can prove Wave 10 behavior before the final closeout package |
+
+Step10A validation result:
+- SMR prep validation artifact `.artifacts/smr/wave10-smr-prep-validation-001/` completed 72 runs with exit code 0, no assertions, and no anomalies; artifact/provenance surface is valid (`runs[].wave10` main-world truth, probe evidence in `wave10-probes.json`, drilldown non-overclaim intact).
+- Track B unavailable-lane fix artifact `.artifacts/smr/wave10-unavailable-lane-fix-001/` completed the 3 seed x 3 planner x 8 config probe matrix. Results: `manual_operator_launch` 9/9 positive, `multi_front_bounded` 9/9 positive as deterministic active multi-front proof (not organic proof), `campaign_siege_resolution` partial 3/9 positive, `forward_base_long_campaign` partial 5/9 positive, and `organic_campaign_launch` / `supply_line_convoy` / `scout_intel_campaign_choice` / `siege_unit_breach` remain explicit `proof_unavailable` with targeted Step10C/Meta-YELLOW routes.
+- Mini-review result: Track B evidence/probe fix pass is accepted as commit-safe YELLOW. The fix pass improved evidence classification and one core lane, but clean Step10B is still blocked by default; open Step10C-B/C next unless the user explicitly accepts a YELLOW Step10B with the recorded non-claims.
+
+Step10A follow-up triage plan:
+- Active handoff source: `Docs/Plans/Master/Wave10-Unavailable-Lane-Triage-Plan.md`.
+- Locked policy: core proof positive before clean Step10B where feasible; expensive/rare/visual gaps may be explicitly deferred to Step10C; Track B first pass is evidence/probe-only and must not use gameplay tuning to make lanes green.
+- Core Track B fix-now lanes before Step10B: `organic_campaign_launch`, `campaign_siege_resolution`, `supply_line_convoy`, `multi_front_bounded`.
+- Conditional/defer lanes: `forward_base_long_campaign`, `scout_intel_campaign_choice`, `siege_unit_breach` may be fixed if evidence-only setup is enough, otherwise they must be routed to Step10C-B/A/C or future-wave accepted limitation with explicit non-claims.
 
 **Step 10B — final Wave 10 closeout evidence**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst | Wave 10 SMR evidence | All Wave 10 implementation epics ✅ (`P6-G`/`P6-H`/`P6-I`/`P6-J(B)`/`P6-J(C) ✅ or N/A`/`P7-C B+C`/`P7-D`/`P7-F`/`P7-G`/`P7-H`) + Wave 10 SMR prep ✅ | Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient. Manual/operator launch evidence must not be overclaimed as organic campaign proof. |
+| SMR Analyst | Wave 10 SMR evidence | All Wave 10 implementation epics ✅ (`P6-G`/`P6-H`/`P6-I`/`P6-J(B)`/`P6-J(C) ✅ or N/A`/`P7-C B+C`/`P7-D`/`P7-F`/`P7-G`/`P7-H`) + Wave 10 SMR prep ✅ + `Wave10-Unavailable-Lane-Triage-Plan` Track B evidence pass reviewed + Step10C/YELLOW route decision | Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient. Manual/operator launch evidence must not be overclaimed as organic campaign proof. Clean closeout is blocked until `proof_unavailable` prep lanes are improved or explicitly routed by Meta/user as YELLOW. |
 
 Step10B manual evidence input:
 - `Docs/Evidence/Manual/Wave10-Step9-Manual-Smoke-Followup.md` must be loaded during SMR closeout triage. Step10B should explicitly classify whether "no dedicated siege unit seen manually" is expected low-incidence behavior or evidence of a real runtime/visibility gap, and whether the accepted manual candidate issues belong in a post-SMR fix bucket.

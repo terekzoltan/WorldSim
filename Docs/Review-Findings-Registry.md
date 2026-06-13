@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-06-07 - Wave 10 SMR Prep Validation - Major - Probe lane presence is not feature proof
+
+- Track: SMR Analyst / Track B evidence surface validation
+- Source: Meta step-review synthesis for `Wave-10-SMR-prep-validation`, artifact `.artifacts/smr/wave10-smr-prep-validation-001/`
+- Finding: The Step10A artifact/provenance surface validates successfully, but Wave10 closeout proof still depends on lane-specific classification rather than lane presence. After the Track B unavailable-lane fix pass, `.artifacts/smr/wave10-unavailable-lane-fix-001/` shows `multi_front_bounded` 9/9 positive as deterministic active multi-front proof, `campaign_siege_resolution` partial 3/9 positive, `forward_base_long_campaign` partial 5/9 positive, and `organic_campaign_launch` / `supply_line_convoy` / `scout_intel_campaign_choice` / `siege_unit_breach` still explicit routed `proof_unavailable`.
+- Impact: Wave10 final closeout cannot honestly claim campaign/logistics/siege/scout/multi-front feature proof from lane presence alone. Treating `wave10LaneNames` as proof would recreate a false-green evidence path.
+- Resolution / guidance: Before clean Wave10 final closeout, Meta must review whether the remaining routed/partial lanes are accepted YELLOW inputs for Step10B or should open Step10C-B/C first. Step10B reports must inspect `wave10-probes.json` statuses and non-claims, not just manifest lane names.
+- Status: partially addressed and commit-safe after Meta mini-review; `multi_front_bounded` is positive deterministic active multi-front proof, but unresolved/partial lanes remain. Active gate is Step10C-B/C by default before clean Wave10 final closeout, unless Meta/user explicitly accepts Step10B as YELLOW with non-claims.
+
+## 2026-06-07 - Wave 10 Step10A Step Review - Blocking - SMR proof artifacts must not mix side-probe and run evidence
+
+- Track: Track B / ScenarioRunner Wave10 SMR export-config
+- Source: Meta internal review lanes + Meta Coordinator step-review synthesis for Wave 10 `Step10A`
+- Finding: The initial Step10A implementation attaches `run.wave10` evidence generated from separate `SimulationRuntime` side-probes to normal ScenarioRunner runs whose metrics, perf, anomalies, and drilldown timeline come from a different executed `World` run. It also leaves required Wave10 closeout evidence domains incomplete versus the active SMR closeout plan, and drilldown Wave10 timeline samples are default/non-sampled even when a run-level Wave10 lane is configured.
+- Impact: SMR Analyst could read a run artifact as proving Wave10 behavior that did not occur in the serialized run/timeline, while supply-line, forward-base, scout-intel, siege-unit, and campaign-resolution closeout questions remain only partially answerable.
+- Resolution / guidance: Before Step10A closeout, either compute Wave10 evidence from the same executed run or split side-probe evidence into an explicitly separate/provenance-tagged artifact block. Add or actively defer deterministic lanes for every Wave10 closeout domain, and make drilldown semantics match the final evidence model. Do not use gameplay tuning to force evidence and do not stage unrelated `Docs/Architecture/` automation output.
+- Status: fixed and accepted in Step10A re-review; side-probe evidence is separated into `wave10-probes.json`, normal run `wave10` remains main-run truth, and manifest/drilldown semantics are covered by focused tests. Step10B must inspect `summary.json.wave10ProbeEvidence` and `wave10-probes.json` to classify unavailable lanes before closeout.
+
 ## 2026-06-07 - Wave 10 P7-F Step Review - Blocking - ReinforceCampaign intent must be applied or disabled
 
 - Track: Track C / siege-unit AI deployment with narrow Runtime mapping

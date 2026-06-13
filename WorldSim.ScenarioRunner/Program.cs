@@ -54,6 +54,7 @@ foreach (var warning in parsedConfigs.Warnings)
 var configs = parsedConfigs.Configs;
 var artifactDir = Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_ARTIFACT_DIR");
 const string InvalidWave9Scenario = "__invalid_wave9_scenario__";
+const string InvalidWave10Scenario = "__invalid_wave10_scenario__";
 
 if (configs.Count == 0 && string.IsNullOrWhiteSpace(rawConfigsJson))
 {
@@ -94,6 +95,7 @@ if (!IsCoreScenarioLane(requestedScenarioLane))
 }
 
 var runs = new List<ScenarioRunResult>(configs.Count * planners.Count * seeds.Length);
+var wave10ProbeEvidence = new List<ScenarioWave10ProbeEvidence>();
 var runTimelines = new Dictionary<string, List<ScenarioTimelineSample>>(StringComparer.Ordinal);
 foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
 {
@@ -176,6 +178,9 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
             }
 
             var wave9Telemetry = BuildWave9ScenarioTelemetry(config, planner, seed);
+            var wave10Probe = BuildWave10ScenarioTelemetry(config, planner, seed);
+            if (wave10Probe.ProofType != ScenarioWave10Evidence.ProofTypeNotConfigured)
+                wave10ProbeEvidence.Add(BuildWave10ProbeEvidence(config, planner, seed, wave10Probe));
 
             var runResult = BuildRunResult(
                 world,
@@ -203,7 +208,8 @@ var envelope = new ScenarioRunEnvelope(
     SeedCount: seeds.Length,
     PlannerCount: planners.Count,
     ConfigCount: configs.Count,
-    Runs: runs.ToList());
+    Runs: runs.ToList(),
+    Wave10ProbeEvidence: BuildWave10ProbeEvidenceSummary(wave10ProbeEvidence));
 
 var baselineLoad = compareEnabled
     ? ParseBaselineEnvelope(baselinePath)
@@ -248,7 +254,8 @@ if (!string.IsNullOrWhiteSpace(artifactDir))
         drilldownEnabled,
         drilldownTopN,
         drilldownSampleEvery,
-        runTimelines);
+        runTimelines,
+        wave10ProbeEvidence);
 }
 
 return Environment.ExitCode;
@@ -346,6 +353,7 @@ static ScenarioRunResult BuildRunResult(
         Contact: contactTelemetry,
         Ai: aiTelemetry,
         Wave9: wave9Telemetry,
+        Wave10: ScenarioWave10TelemetrySnapshot.Empty,
         PerfAvgTickMs: perfAvgTickMs,
         PerfMaxTickMs: perfMaxTickMs,
         PerfP99TickMs: perfP99TickMs,
@@ -554,6 +562,371 @@ static ScenarioWave9TelemetrySnapshot BuildCampaignAssemblyMarchEncounterTelemet
     return runtime.BuildScenarioWave9TelemetrySnapshot(config.Wave9Scenario);
 }
 
+static ScenarioWave10TelemetrySnapshot BuildWave10ScenarioTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    if (string.IsNullOrWhiteSpace(config.Wave10Scenario))
+        return ScenarioWave10TelemetrySnapshot.Empty;
+
+    return config.Wave10Scenario switch
+    {
+        "manual_operator_launch" => BuildManualOperatorLaunchTelemetry(config, planner, seed),
+        "organic_campaign_launch" => BuildOrganicCampaignLaunchTelemetry(config, planner, seed),
+        "siege_unit_breach" => BuildSiegeUnitBreachTelemetry(config, planner, seed),
+        "multi_front_bounded" => BuildMultiFrontBoundedTelemetry(config, planner, seed),
+        "campaign_siege_resolution" => BuildCampaignSiegeResolutionTelemetry(config, planner, seed),
+        "supply_line_convoy" => BuildSupplyLineConvoyTelemetry(config, planner, seed),
+        "forward_base_long_campaign" => BuildForwardBaseLongCampaignTelemetry(config, planner, seed),
+        "scout_intel_campaign_choice" => BuildScoutIntelCampaignChoiceTelemetry(config, planner, seed),
+        _ => ScenarioWave10TelemetrySnapshot.Empty with { Wave10Scenario = config.Wave10Scenario }
+    };
+}
+
+static ScenarioWave10ProbeEvidence BuildWave10ProbeEvidence(ScenarioConfig config, NpcPlannerMode planner, int seed, ScenarioWave10TelemetrySnapshot telemetry)
+    => new(
+        ProbeKey: BuildWave10ProbeKey(config.Name, planner, seed, telemetry.Wave10Scenario),
+        ConfigName: config.Name,
+        Planner: planner.ToString(),
+        Seed: seed,
+        Wave10Scenario: telemetry.Wave10Scenario,
+        RuntimeSource: ScenarioWave10Evidence.RuntimeSourceSimulationRuntimeProbe,
+        Ticks: Math.Max(config.Ticks, GetWave10ProbeMinimumTicks(telemetry.Wave10Scenario)),
+        Dt: config.Dt,
+        Width: Math.Max(config.Width, 40),
+        Height: Math.Max(config.Height, 40),
+        InitialPopulation: Math.Max(config.InitialPop, 80),
+        Telemetry: telemetry);
+
+static ScenarioWave10ProbeEvidenceSummary BuildWave10ProbeEvidenceSummary(IReadOnlyList<ScenarioWave10ProbeEvidence> probes)
+{
+    var lanes = probes
+        .Select(probe => probe.Wave10Scenario)
+        .Where(name => !string.IsNullOrWhiteSpace(name) && name != "none")
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(name => name, StringComparer.Ordinal)
+        .ToArray();
+    var proofTypes = probes
+        .Select(probe => probe.Telemetry.ProofType)
+        .Where(proofType => !string.IsNullOrWhiteSpace(proofType))
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(proofType => proofType, StringComparer.Ordinal)
+        .ToArray();
+    var unavailable = probes
+        .Where(probe => probe.Telemetry.EvidenceStatus == ScenarioWave10Evidence.EvidenceStatusProofUnavailable)
+        .Select(probe => probe.Wave10Scenario)
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(name => name, StringComparer.Ordinal)
+        .ToArray();
+
+    return new ScenarioWave10ProbeEvidenceSummary(
+        Enabled: probes.Count > 0,
+        ProbeCount: probes.Count,
+        LaneNames: lanes,
+        ProofTypes: proofTypes,
+        UnavailableLaneNames: unavailable,
+        ArtifactFile: probes.Count > 0 ? "wave10-probes.json" : null);
+}
+
+static string BuildWave10ProbeKey(string configName, NpcPlannerMode planner, int seed, string scenario)
+    => $"{ToFileSafeToken(configName)}__{ToFileSafeToken(planner.ToString())}__seed{seed}__{ToFileSafeToken(scenario)}";
+
+static int GetWave10ProbeMinimumTicks(string scenario)
+    => scenario switch
+    {
+        "manual_operator_launch" => 80,
+        "organic_campaign_launch" => 720,
+        "siege_unit_breach" => 900,
+        "multi_front_bounded" => 120,
+        "campaign_siege_resolution" => 900,
+        "supply_line_convoy" => 900,
+        "forward_base_long_campaign" => 900,
+        "scout_intel_campaign_choice" => 720,
+        _ => 0
+    };
+
+static CampaignCreationResult CreatePreparedProbeCampaign(
+    SimulationRuntime runtime,
+    Faction owner,
+    Faction target,
+    int requestedMemberCount = 1,
+    int candidateCount = 12,
+    int carriedFoodPerCandidate = 0)
+{
+    _ = runtime.PrepareWave9CampaignScenario(owner, candidateCount, carriedFoodPerCandidate);
+    return runtime.TryCreateCampaign(owner, target, requestedMemberCount);
+}
+
+static string[] RouteToStep10C(string nonClaim, string route)
+    => new[] { nonClaim, route };
+
+static bool HasAnyConvoyOutcome(ScenarioWave10TelemetrySnapshot telemetry)
+    => telemetry.ConvoysDelivered > 0
+       || telemetry.ConvoysFailed > 0
+       || telemetry.ConvoyThrottleBlocks > 0
+       || telemetry.ConvoyCapBlocks > 0
+       || telemetry.ConvoyHomeDefenseBlocks > 0
+       || telemetry.ConvoyRouteBudgetExhausted > 0;
+
+static bool HasCampaignSiegeResolutionSignal(ScenarioWave10TelemetrySnapshot telemetry)
+    => telemetry.SiegePressureTicks > 0
+       || telemetry.ResolvedCampaigns > 0
+       || telemetry.CampaignBreaches > 0
+       || telemetry.AttackerVictories > 0
+       || telemetry.DefenderHeld > 0;
+
+static bool HasSiegeUnitActionSignal(ScenarioWave10TelemetrySnapshot telemetry)
+    => telemetry.SiegeUnitActionTicks > 0
+       || telemetry.SiegePressureTicks > 0
+       || telemetry.CampaignBreaches > 0;
+
+static bool HasActiveMultiFrontProof(ScenarioWave10TelemetrySnapshot telemetry)
+    => telemetry.MaxActiveCampaignsForAnyFaction > 1
+       || telemetry.MaxUnresolvedPairsForAnyFactionPair > 1;
+
+static bool HasMultiFrontBoundProof(ScenarioWave10TelemetrySnapshot telemetry)
+    => telemetry.CampaignLaunchBlockedByCap > 0
+       || telemetry.CampaignLaunchBlockedByPairCap > 0
+       || telemetry.CampaignLaunchBlockedByHomeDefense > 0
+       || telemetry.CampaignLaunchRouteBudgetExhausted > 0;
+
+static ScenarioWave10TelemetrySnapshot BuildManualOperatorLaunchTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = CreateWave10Runtime(config, planner, seed);
+    var creation = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    AdvanceRuntime(runtime, config, minimumTicks: 80);
+
+    return runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        ScenarioWave10Evidence.ProofTypeManualOperator,
+        creation.Success ? ScenarioWave10Evidence.EvidenceStatusPositive : ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+        creation.Success ? ScenarioWave10Evidence.ReasonNone : ScenarioWave10Evidence.ReasonLaneNotConfigured,
+        creation.Success
+            ? new[] { "manual operator launch is not organic campaign proof" }
+            : new[] { "manual operator launch did not create a campaign in bounded prep" });
+}
+
+static ScenarioWave10TelemetrySnapshot BuildOrganicCampaignLaunchTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = CreateWave10Runtime(config, planner, seed);
+    runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 organic evidence lane");
+    AdvanceRuntime(runtime, config, minimumTicks: 720);
+    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        ScenarioWave10Evidence.ProofTypeOrganic,
+        ScenarioWave10Evidence.EvidenceStatusPositive,
+        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+        ScenarioWave10Evidence.ReasonNone);
+
+    return telemetry.CampaignLaunches > 0
+        ? telemetry
+        : telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            NonClaims = RouteToStep10C(
+                "organic campaign launch was not reproduced without gameplay policy changes; manual/operator proof is not organic proof",
+                "route: Step10C-C or Meta YELLOW organic strategist/runtime evidence follow-up")
+        };
+}
+
+static ScenarioWave10TelemetrySnapshot BuildSiegeUnitBreachTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = CreateWave10Runtime(config, planner, seed);
+    try
+    {
+        runtime.UnlockTechForPrimaryColony("siege_craft");
+    }
+    catch (InvalidOperationException)
+    {
+        return runtime.BuildScenarioWave10TelemetrySnapshot(
+            config.Wave10Scenario,
+            ScenarioWave10Evidence.ProofTypeDeterministicProbe,
+            ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+            ScenarioWave10Evidence.ReasonSiegeUnitNotReproduced,
+            RouteToStep10C(
+                "siege_craft setup was not reproduced through existing public tech unlock without gameplay policy/resource changes",
+                "route: Step10C-B runtime siege-unit evidence setup follow-up"));
+    }
+
+    _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    AdvanceRuntime(runtime, config, minimumTicks: 900);
+    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        ScenarioWave10Evidence.ProofTypeDeterministicProbe,
+        ScenarioWave10Evidence.EvidenceStatusPositive,
+        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+        ScenarioWave10Evidence.ReasonNone,
+        new[] { "deterministic probe is not organic siege-unit proof" });
+
+    return telemetry.SiegeUnitsSpawned > 0 && HasSiegeUnitActionSignal(telemetry)
+        ? telemetry
+        : telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonSiegeUnitNotReproduced,
+            NonClaims = RouteToStep10C(
+                "siege-unit spawn/action/breach evidence was not reproduced with existing production-safe probe setup",
+                "route: Step10C-B runtime siege-unit evidence follow-up; Step10C-A only if runtime proof exists but visual/manual consume remains missing")
+        };
+}
+
+static ScenarioWave10TelemetrySnapshot BuildMultiFrontBoundedTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = CreateWave10Runtime(config, planner, seed);
+    _ = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Aetheri, carriedFoodPerCandidate: 2);
+    _ = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Sylvars, carriedFoodPerCandidate: 2);
+    _ = CreatePreparedProbeCampaign(runtime, Faction.Sylvars, Faction.Chirita, carriedFoodPerCandidate: 2);
+    AdvanceRuntime(runtime, config, minimumTicks: 120);
+    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        ScenarioWave10Evidence.ProofTypeDeterministicProbe,
+        ScenarioWave10Evidence.EvidenceStatusPositive,
+        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+        ScenarioWave10Evidence.ReasonNone,
+        new[] { "deterministic active multi-front probe is not organic launch proof" });
+
+    return HasActiveMultiFrontProof(telemetry) || HasMultiFrontBoundProof(telemetry)
+        ? telemetry
+        : telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonMultiFrontBoundNotReproduced,
+            NonClaims = RouteToStep10C(
+                "multi-front active campaign or cap/bound proof was not reproduced without gameplay policy changes",
+                "route: Step10C-B runtime multi-front evidence follow-up")
+        };
+}
+
+static ScenarioWave10TelemetrySnapshot BuildCampaignSiegeResolutionTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = CreateWave10Runtime(config, planner, seed);
+    var creation = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Aetheri, carriedFoodPerCandidate: 2);
+    if (!creation.Success)
+        _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    AdvanceRuntime(runtime, config, minimumTicks: 900);
+    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        ScenarioWave10Evidence.ProofTypeDeterministicProbe,
+        ScenarioWave10Evidence.EvidenceStatusPositive,
+        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+        ScenarioWave10Evidence.ReasonNone,
+        new[] { "deterministic campaign setup is not organic campaign proof" });
+
+    return telemetry.CampaignSiegesEntered > 0 && HasCampaignSiegeResolutionSignal(telemetry)
+        ? telemetry
+        : telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonCampaignSiegeNotReproduced,
+            NonClaims = RouteToStep10C(
+                "campaign siege entry plus pressure/resolution proof was not reproduced with existing production-safe probe setup",
+                "route: Step10C-B runtime campaign siege/resolution evidence follow-up")
+        };
+}
+
+static ScenarioWave10TelemetrySnapshot BuildSupplyLineConvoyTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = CreateWave10Runtime(config, planner, seed);
+    _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    AdvanceRuntime(runtime, config, minimumTicks: 900);
+    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        ScenarioWave10Evidence.ProofTypeDeterministicProbe,
+        ScenarioWave10Evidence.EvidenceStatusPositive,
+        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+        ScenarioWave10Evidence.ReasonNone,
+        new[] { "deterministic supply-line probe is not organic campaign proof" });
+
+    return telemetry.ConvoysSpawned > 0 && HasAnyConvoyOutcome(telemetry)
+        ? telemetry
+        : telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonSupplyLineConvoyNotReproduced,
+            NonClaims = RouteToStep10C(
+                "supply-line convoy spawn plus outcome proof was not reproduced with existing production-safe probe setup",
+                "route: Step10C-B runtime supply-line evidence follow-up")
+        };
+}
+
+static ScenarioWave10TelemetrySnapshot BuildForwardBaseLongCampaignTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = CreateWave10Runtime(config, planner, seed);
+    _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    AdvanceRuntime(runtime, config, minimumTicks: 900);
+    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        ScenarioWave10Evidence.ProofTypeDeterministicProbe,
+        ScenarioWave10Evidence.EvidenceStatusPositive,
+        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+        ScenarioWave10Evidence.ReasonNone,
+        new[] { "deterministic forward-base probe is not organic campaign proof" });
+
+    return telemetry.ForwardBasesEstablished > 0 && (telemetry.ForwardBaseRestTicks > 0 || telemetry.ForwardBasesExpired > 0 || telemetry.ForwardBasesAbandoned > 0)
+        ? telemetry
+        : telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonForwardBaseLifecycleNotReproduced,
+            NonClaims = RouteToStep10C(
+                "forward-base established plus rest/expiry/abandon lifecycle proof was not reproduced with existing production-safe probe setup",
+                "route: Step10C-B runtime forward-base lifecycle evidence follow-up")
+        };
+}
+
+static ScenarioWave10TelemetrySnapshot BuildScoutIntelCampaignChoiceTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
+{
+    var runtime = CreateWave10Runtime(config, planner, seed);
+    runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 scout-intel evidence lane");
+    AdvanceRuntime(runtime, config, minimumTicks: 720);
+    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        ScenarioWave10Evidence.ProofTypeDeterministicProbe,
+        ScenarioWave10Evidence.EvidenceStatusPositive,
+        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+        ScenarioWave10Evidence.ReasonNone,
+        new[] { "deterministic scout-intel probe is not organic campaign proof" });
+
+    return telemetry.ScoutIntelObserved > 0 && telemetry.CampaignTargetsWithScoutIntel > 0
+        ? telemetry
+        : telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonScoutIntelChoiceNotReproduced,
+            NonClaims = telemetry.ScoutIntelObserved > 0
+                ? RouteToStep10C(
+                    "scout intel was observed but campaign target-with-intel proof was not reproduced without strategist/policy changes",
+                    "route: P7-C(C) / Step10C-C scout-intel campaign-choice consume follow-up")
+                : RouteToStep10C(
+                    "scout-intel observe plus campaign-choice proof was not reproduced with existing production-safe probe setup",
+                    "route: Step10C-B runtime scout-intel evidence setup follow-up")
+        };
+}
+
+static SimulationRuntime CreateWave10Runtime(ScenarioConfig config, NpcPlannerMode planner, int seed)
+    => WithTemporaryEnvironment(
+        new Dictionary<string, string?>
+        {
+            ["WORLDSIM_ENABLE_DIPLOMACY"] = "true",
+            ["WORLDSIM_ENABLE_COMBAT_PRIMITIVES"] = "true",
+            ["WORLDSIM_ENABLE_SIEGE"] = "true"
+        },
+        () => new SimulationRuntime(
+            width: Math.Max(config.Width, 40),
+            height: Math.Max(config.Height, 40),
+            initialPopulation: Math.Max(config.InitialPop, 80),
+            technologyFilePath: FindTechPath(),
+            aiOptions: new RuntimeAiOptions { PlannerMode = planner },
+            randomSeed: seed));
+
+static void AdvanceRuntime(SimulationRuntime runtime, ScenarioConfig config, int minimumTicks)
+{
+    var maxTicks = Math.Max(config.Ticks, minimumTicks);
+    for (var tick = 0; tick < maxTicks; tick++)
+        runtime.AdvanceTick(config.Dt);
+}
+
 static T WithTemporaryEnvironment<T>(IReadOnlyDictionary<string, string?> values, Func<T> action)
 {
     var previous = values.ToDictionary(pair => pair.Key, pair => Environment.GetEnvironmentVariable(pair.Key), StringComparer.Ordinal);
@@ -728,7 +1101,8 @@ static void WriteArtifactBundle(
     bool drilldownEnabled,
     int drilldownTopN,
     int drilldownSampleEvery,
-    IReadOnlyDictionary<string, List<ScenarioTimelineSample>> runTimelines)
+    IReadOnlyDictionary<string, List<ScenarioTimelineSample>> runTimelines,
+    IReadOnlyList<ScenarioWave10ProbeEvidence> wave10ProbeEvidence)
 {
     var artifactDir = Path.GetFullPath(artifactDirRaw);
     var runsDir = Path.Combine(artifactDir, "runs");
@@ -765,6 +1139,10 @@ static void WriteArtifactBundle(
         File.WriteAllText(runPath, JsonSerializer.Serialize(run, jsonOptions));
     }
 
+    if (wave10ProbeEvidence.Count > 0)
+        File.WriteAllText(Path.Combine(artifactDir, "wave10-probes.json"), JsonSerializer.Serialize(wave10ProbeEvidence, jsonOptions));
+    var wave10Summary = BuildWave10ProbeEvidenceSummary(wave10ProbeEvidence);
+
     var manifest = new ScenarioArtifactManifest(
         SchemaVersion: "smr/v1",
         GeneratedAtUtc: DateTime.UtcNow,
@@ -792,7 +1170,11 @@ static void WriteArtifactBundle(
         DrilldownEnabled: drilldownSummary.Enabled,
         DrilldownSelectedRuns: drilldownSummary.SelectedRuns,
         DrilldownTopN: drilldownSummary.TopN,
-        DrilldownSampleEvery: drilldownSummary.SampleEvery);
+        DrilldownSampleEvery: drilldownSummary.SampleEvery,
+        Wave10Enabled: wave10Summary.Enabled,
+        Wave10RunCount: wave10Summary.ProbeCount,
+        Wave10LaneNames: wave10Summary.LaneNames,
+        Wave10ProofTypes: wave10Summary.ProofTypes);
 
     File.WriteAllText(Path.Combine(artifactDir, "manifest.json"), JsonSerializer.Serialize(manifest, jsonOptions));
     File.WriteAllText(Path.Combine(artifactDir, "run.log"), runLog);
@@ -1568,6 +1950,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
     var ecologyTelemetry = world.BuildScenarioEcologyTelemetrySnapshot().ToTimelineSnapshot();
     var supplyTelemetry = world.BuildScenarioSupplyTelemetrySnapshot().ToTimelineSnapshot();
     var wave9Telemetry = ScenarioWave9TimelineSnapshot.Empty;
+    var wave10Telemetry = ScenarioWave10TimelineSnapshot.Empty;
 
     return new ScenarioTimelineSample(
         Tick: tick,
@@ -1591,6 +1974,7 @@ static ScenarioTimelineSample BuildTimelineSample(World world, int tick, double 
         Contact: contactTelemetry,
         Ai: aiTelemetry,
         Wave9: wave9Telemetry,
+        Wave10: wave10Telemetry,
         Ecology: ecologyTelemetry,
         Supply: supplyTelemetry,
         PerfTickMs: perfTickMs);
@@ -1755,10 +2139,18 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
                 continue;
             }
 
+            var normalizedWave10Scenario = NormalizeWave10Scenario(config.Wave10Scenario);
+            if (normalizedWave10Scenario == InvalidWave10Scenario)
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (Wave10Scenario must be null or one of: manual_operator_launch, organic_campaign_launch, siege_unit_breach, multi_front_bounded, campaign_siege_resolution, supply_line_convoy, forward_base_long_campaign, scout_intel_campaign_choice, or documented aliases). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
             configs.Add(config with
             {
                 Name = string.IsNullOrWhiteSpace(config.Name) ? $"config_{index + 1}" : config.Name,
-                Wave9Scenario = normalizedWave9Scenario
+                Wave9Scenario = normalizedWave9Scenario,
+                Wave10Scenario = normalizedWave10Scenario
             });
         }
 
@@ -1795,6 +2187,25 @@ static string? NormalizeWave9Scenario(string? raw)
         "campaign_foraging" or "foraging-extension" or "campaign-foraging" => "campaign_foraging",
         "campaign_assembly_march_encounter" or "campaign-assembly-march-encounter" => "campaign_assembly_march_encounter",
         _ => InvalidWave9Scenario
+    };
+}
+
+static string? NormalizeWave10Scenario(string? raw)
+{
+    if (string.IsNullOrWhiteSpace(raw))
+        return null;
+
+    return raw.Trim().ToLowerInvariant() switch
+    {
+        "manual_operator_launch" or "manual-operator-launch" => "manual_operator_launch",
+        "organic_campaign_launch" or "organic-campaign-launch" => "organic_campaign_launch",
+        "siege_unit_breach" or "siege-unit-breach" => "siege_unit_breach",
+        "multi_front_bounded" or "multi-front-bounded" => "multi_front_bounded",
+        "campaign_siege_resolution" or "campaign-siege-resolution" => "campaign_siege_resolution",
+        "supply_line_convoy" or "supply-line-convoy" => "supply_line_convoy",
+        "forward_base_long_campaign" or "forward-base-long-campaign" => "forward_base_long_campaign",
+        "scout_intel_campaign_choice" or "scout-intel-campaign-choice" => "scout_intel_campaign_choice",
+        _ => InvalidWave10Scenario
     };
 }
 
@@ -1898,7 +2309,8 @@ sealed record ScenarioConfig(
     float? FoodRegrowthMinSeconds = null,
     float? FoodRegrowthJitterSeconds = null,
     string? SupplyScenario = null,
-    string? Wave9Scenario = null);
+    string? Wave9Scenario = null,
+    string? Wave10Scenario = null);
 
 sealed record ScenarioRunResult(
     string ConfigName,
@@ -1952,6 +2364,7 @@ sealed record ScenarioRunResult(
     ScenarioContactTelemetrySnapshot Contact,
     ScenarioAiTelemetrySnapshot Ai,
     ScenarioWave9TelemetrySnapshot? Wave9,
+    ScenarioWave10TelemetrySnapshot Wave10,
     double PerfAvgTickMs,
     double PerfMaxTickMs,
     double PerfP99TickMs,
@@ -1966,7 +2379,30 @@ sealed record ScenarioRunEnvelope(
     int SeedCount,
     int PlannerCount,
     int ConfigCount,
-    List<ScenarioRunResult> Runs);
+    List<ScenarioRunResult> Runs,
+    ScenarioWave10ProbeEvidenceSummary? Wave10ProbeEvidence = null);
+
+sealed record ScenarioWave10ProbeEvidenceSummary(
+    bool Enabled,
+    int ProbeCount,
+    string[] LaneNames,
+    string[] ProofTypes,
+    string[] UnavailableLaneNames,
+    string? ArtifactFile);
+
+sealed record ScenarioWave10ProbeEvidence(
+    string ProbeKey,
+    string ConfigName,
+    string Planner,
+    int Seed,
+    string Wave10Scenario,
+    string RuntimeSource,
+    int Ticks,
+    float Dt,
+    int Width,
+    int Height,
+    int InitialPopulation,
+    ScenarioWave10TelemetrySnapshot Telemetry);
 
 sealed record ScenarioArtifactManifest(
     string SchemaVersion,
@@ -1995,7 +2431,11 @@ sealed record ScenarioArtifactManifest(
     bool DrilldownEnabled,
     int DrilldownSelectedRuns,
     int DrilldownTopN,
-    int DrilldownSampleEvery);
+    int DrilldownSampleEvery,
+    bool Wave10Enabled,
+    int Wave10RunCount,
+    string[] Wave10LaneNames,
+    string[] Wave10ProofTypes);
 
 sealed record ScenarioConfigParseResult(List<ScenarioConfig> Configs, bool HadError, IReadOnlyList<string> Warnings);
 
@@ -2138,6 +2578,7 @@ sealed record ScenarioTimelineSample(
     ScenarioContactTimelineSnapshot Contact,
     ScenarioAiTimelineSnapshot Ai,
     ScenarioWave9TimelineSnapshot? Wave9,
+    ScenarioWave10TimelineSnapshot Wave10,
     ScenarioEcologyTimelineSnapshot? Ecology,
     ScenarioSupplyTimelineSnapshot? Supply,
     double PerfTickMs);

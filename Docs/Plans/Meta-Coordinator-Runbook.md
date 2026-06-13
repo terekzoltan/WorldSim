@@ -16,6 +16,8 @@
 - Git allapotra **NEM** tamaszkodunk (messy repo); helye: fajlok tenyleges tartalma a lenyeg.
 - A workflow-optimalizalas es a human-in-the-loop tisztasag first-class Meta felelosseg. Ha egy visszatero ketertelmuseg, closeout-res, vagy koordinacios surlodas latszik, a Meta minimalis processz-javitast javasol es - ha a felhasznalo jovahagyja - rogzit a megfelelo dokumentumban.
 - Ha a statusz vagy gate-jelentes ketertelmu, az explicit emberi dontes / lock note erosebb, mint a hallgatolagos kovetkeztetes.
+- Uj wave vagy post-wave slice felvetelekor a Meta elso prioritasa a szekvencialis egyertelmuseg: csak azutan maximalizaljon parallelizmust, hogy a prereq-ek, ownerek, handoffok, acceptance/evidence gate-ek es unlockolt kovetkezo lepesek egyertelmuen le vannak irva.
+- Ha a parallelizmus osszemosna a dependency-igazsagforrast, az ownershipot, a bizonyitas forrasat vagy a closeout-felelosseget, a Metanak a munkat kisebb, serializalt vagy explicit gate-elt stepekre kell bontania ahelyett, hogy latszolagos throughput miatt egyben hagyja.
 
 ---
 

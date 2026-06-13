@@ -238,6 +238,12 @@ Gate szabaly:
 - Meta Coordinator vagy Track agent nem jelolhet stepet kesznek, ha az `ops/PROJECT_STATE.md` nincs frissitve vagy nincs explicit `No state change from this step.` allitas.
 - Meta Coordinator nem green-lightolhatja a kovetkezo lepest, amig nem ellenorizte, hogy az `ops/PROJECT_STATE.md` eleg friss es a helyes kovetkezo role/action fele mutat.
 
+Uj wave felveteli szabaly:
+- Ha barmikor uj wave, post-wave slice vagy nagyobb Combined-step kerul a tervbe, a parhuzamositas legyen a masodlagos optimalizalas, es a szekvencialis egyertelmuseg maradjon az elso szamu szabaly.
+- Minden uj step irja ki explicit: mi a prereq, ki az owner, milyen handoffot var, milyen acceptance/evidence gate zarja le, es pontosan melyik kovetkezo stepet oldja fel.
+- Ha a parallel munka elmosna a dependency igazsagforrast, az ownershipot, a proof source-of-truthot vagy a closeout felelosseget, a stepet szet kell bontani, serializalni vagy explicit gate moge kell tenni.
+- A parallelizmus throughput-optimalizalas, nem workflow authority; uj wave tervezesnel ezt az elvet kell kovetni.
+
 ## Active review finding follow-up protocol
 
 Cel:

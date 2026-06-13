@@ -402,6 +402,111 @@ public sealed class SimulationRuntime
             PeakMarchDistance: _campaigns.Max(campaign => campaign.RouteCounters.MarchProgressTicks));
     }
 
+    public ScenarioWave10TelemetrySnapshot BuildScenarioWave10TelemetrySnapshot(
+        string? wave10Scenario,
+        string proofType,
+        string evidenceStatus,
+        string timelineSemantics,
+        string reasonCode,
+        IReadOnlyList<string>? nonClaims = null)
+    {
+        var unresolvedCampaigns = _campaigns
+            .Where(campaign => campaign.Phase != CampaignPhase.Resolved)
+            .ToArray();
+        var resolvedCampaigns = _campaigns
+            .Where(campaign => campaign.Resolution.IsResolved)
+            .ToArray();
+        var activeScoutIntel = _scoutIntel
+            .Where(intel => intel.IsActive(Tick))
+            .ToArray();
+        var freshScoutIntel = activeScoutIntel
+            .Count(intel => CalculateScoutIntelTicksSinceRefresh(intel) <= GetOrganicCampaignScoutIntelFreshnessThresholdTicks());
+        var activeSiegeUnits = _siegeUnits.Count(unit => unit.IsActive);
+        var inactiveSiegeUnits = _siegeUnits.Count - activeSiegeUnits;
+
+        return new ScenarioWave10TelemetrySnapshot(
+            Wave10Scenario: string.IsNullOrWhiteSpace(wave10Scenario) ? "none" : wave10Scenario.Trim(),
+            RuntimeSource: ScenarioWave10Evidence.RuntimeSourceSimulationRuntimeProbe,
+            ProofType: string.IsNullOrWhiteSpace(proofType) ? ScenarioWave10Evidence.ProofTypeNotConfigured : proofType.Trim(),
+            EvidenceStatus: string.IsNullOrWhiteSpace(evidenceStatus) ? ScenarioWave10Evidence.EvidenceStatusNotApplicable : evidenceStatus.Trim(),
+            TimelineSemantics: string.IsNullOrWhiteSpace(timelineSemantics) ? ScenarioWave10Evidence.TimelineSemanticsNotSampled : timelineSemantics.Trim(),
+            ReasonCode: string.IsNullOrWhiteSpace(reasonCode) ? ScenarioWave10Evidence.ReasonNone : reasonCode.Trim(),
+            NonClaims: nonClaims?.Where(claim => !string.IsNullOrWhiteSpace(claim)).Select(claim => claim.Trim()).ToArray() ?? Array.Empty<string>(),
+            CampaignLaunches: _campaigns.Count,
+            ActiveCampaigns: unresolvedCampaigns.Length,
+            ResolvedCampaigns: resolvedCampaigns.Length,
+            AttackerVictories: resolvedCampaigns.Count(campaign => campaign.Resolution.Kind == CampaignResolutionKind.AttackerVictory),
+            DefenderHeld: resolvedCampaigns.Count(campaign => campaign.Resolution.Kind == CampaignResolutionKind.DefenderHeld),
+            CampaignSiegesEntered: _campaigns.Sum(campaign => campaign.Siege.SiegesEntered),
+            CampaignBreaches: _campaigns.Sum(campaign => campaign.Siege.BreachesObserved),
+            SiegePressureTicks: _campaigns.Sum(campaign => campaign.Siege.SiegePressureTicks),
+            LootFood: resolvedCampaigns.Sum(campaign => campaign.Resolution.LootFood),
+            LootWood: resolvedCampaigns.Sum(campaign => campaign.Resolution.LootWood),
+            LootStone: resolvedCampaigns.Sum(campaign => campaign.Resolution.LootStone),
+            LootGold: resolvedCampaigns.Sum(campaign => campaign.Resolution.LootGold),
+            WarScoreDeltaTotal: resolvedCampaigns.Sum(campaign => campaign.Resolution.WarScoreDelta),
+            PeaceAppliedCount: resolvedCampaigns.Count(campaign => campaign.Resolution.PeaceApplied),
+            ActiveSupplyConvoys: _supplyConvoys.Count(convoy => convoy.Phase is SupplyConvoyPhase.Pending or SupplyConvoyPhase.Marching),
+            ConvoysSpawned: _campaignLogisticsCounters.ConvoysSpawned,
+            ConvoysDelivered: _campaignLogisticsCounters.ConvoysDelivered,
+            ConvoysFailed: _campaignLogisticsCounters.ConvoysFailed,
+            ConvoyThrottleBlocks: _campaignLogisticsCounters.ConvoySpawnBlockedByThrottle,
+            ConvoyCapBlocks: _campaignLogisticsCounters.ConvoySpawnBlockedByCap,
+            ConvoyHomeDefenseBlocks: _campaignLogisticsCounters.ConvoySpawnBlockedByHomeDefense,
+            ConvoyRouteBudgetExhausted: _campaignLogisticsCounters.ConvoySpawnRouteBudgetExhausted + _campaignLogisticsCounters.ConvoyRouteBudgetExhausted,
+            ActiveForwardBases: _forwardBases.Count(forwardBase => forwardBase.Phase == ForwardBasePhase.Active),
+            ForwardBasesEstablished: _campaignLogisticsCounters.ForwardBasesEstablished,
+            ForwardBasesExpired: _campaignLogisticsCounters.ForwardBasesExpired,
+            ForwardBasesAbandoned: _campaignLogisticsCounters.ForwardBasesAbandoned,
+            ForwardBaseRestTicks: _campaignLogisticsCounters.ForwardBaseRestTicks,
+            ScoutIntelObserved: _campaignLogisticsCounters.ScoutIntelObserved,
+            ScoutIntelRefreshed: _campaignLogisticsCounters.ScoutIntelRefreshed,
+            ScoutIntelExpired: _campaignLogisticsCounters.ScoutIntelExpired,
+            ActiveScoutIntel: activeScoutIntel.Length,
+            FreshScoutIntel: freshScoutIntel,
+            CampaignTargetsWithScoutIntel: CountCampaignTargetsWithScoutIntel(unresolvedCampaigns),
+            SiegeUnitsSpawned: _siegeUnits.Count,
+            ActiveSiegeUnits: activeSiegeUnits,
+            InactiveSiegeUnits: inactiveSiegeUnits,
+            SiegeUnitActionTicks: _siegeUnits.Count(unit => unit.LastActionTick >= 0),
+            MaxActiveCampaignsForAnyFaction: MaxUnresolvedCampaignsByOwner(unresolvedCampaigns),
+            MaxUnresolvedPairsForAnyFactionPair: MaxUnresolvedCampaignsByUnorderedPair(unresolvedCampaigns),
+            CampaignLaunchBlockedByCap: _campaignLogisticsCounters.CampaignLaunchBlockedByCap,
+            CampaignLaunchBlockedByPairCap: _campaignLogisticsCounters.CampaignLaunchBlockedByPairCap,
+            CampaignLaunchBlockedByHomeDefense: _campaignLogisticsCounters.CampaignLaunchBlockedByHomeDefense,
+            CampaignLaunchRouteBudgetExhausted: _campaignLogisticsCounters.CampaignLaunchRouteBudgetExhausted,
+            WarScorePressureSignals: _campaignWarScores.Values.Count(score => Math.Abs(score) >= OrganicCampaignWarScorePressureThreshold),
+            HomeGarrisonViolationCount: CountHomeGarrisonViolations(unresolvedCampaigns));
+    }
+
+    private int CountCampaignTargetsWithScoutIntel(IEnumerable<CampaignState> campaigns)
+        => campaigns.Count(campaign =>
+        {
+            var targetColony = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.TargetColonyId);
+            return targetColony != null && HasActionableScoutIntelForOrganicTarget(campaign.OwnerFaction, targetColony);
+        });
+
+    private static int MaxUnresolvedCampaignsByOwner(IReadOnlyCollection<CampaignState> campaigns)
+        => campaigns.Count == 0
+            ? 0
+            : campaigns.GroupBy(campaign => campaign.OwnerFaction).Max(group => group.Count());
+
+    private static int MaxUnresolvedCampaignsByUnorderedPair(IReadOnlyCollection<CampaignState> campaigns)
+        => campaigns.Count == 0
+            ? 0
+            : campaigns.GroupBy(campaign => (Math.Min((int)campaign.OwnerFaction, (int)campaign.TargetFaction), Math.Max((int)campaign.OwnerFaction, (int)campaign.TargetFaction))).Max(group => group.Count());
+
+    private int CountHomeGarrisonViolations(IEnumerable<CampaignState> campaigns)
+        => campaigns
+            .Select(campaign => _world._colonies.FirstOrDefault(colony => colony.Id == campaign.OriginColonyId))
+            .Where(colony => colony != null)
+            .Select(colony => colony!)
+            .Distinct()
+            .Count(colony => _world._people.Count(person =>
+                person.Health > 0f
+                && ReferenceEquals(person.Home, colony)
+                && person.HasRole(PersonRole.Warrior)) < _campaignLogisticsOptions.MinimumHomeDefenseWarriors);
+
     private CampaignRenderData BuildCampaignRenderData(CampaignState campaign)
     {
         bool hasObjective = TryResolveCampaignMarchObjective(campaign, out var objective);
