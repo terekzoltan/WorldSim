@@ -2157,8 +2157,8 @@ Wave 10 SMR evidence guardrail:
 - ✅ **P7-F** Siege unit AI deployment (Track C)
 - 🔄 **P7-G** Multi-front war — bounded (Track B)
 - 🔄 **P7-H** Graphics for siege units (Track A)
-- ⬜ **Wave 10 SMR advanced campaign prep** ScenarioRunner campaign resolution + logistics + siege-unit evidence surface (Track B / SMR Analyst validation)
-- ⬜ **Wave 10 SMR evidence** Campaign resolution + advanced warfare closeout package (SMR Analyst)
+- ✅ **Wave 10 SMR advanced campaign prep** ScenarioRunner campaign resolution + logistics + siege-unit evidence surface (Track B / SMR Analyst validation)
+- ✅ **Wave 10 SMR evidence** Campaign resolution + advanced warfare closeout package (SMR Analyst)
 
 **Parallelism:** C11 -> C12 -> C13 are **sequential** (each builds on previous).
 
@@ -2350,10 +2350,15 @@ Step10A follow-up triage plan:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst | Wave 10 SMR evidence | All Wave 10 implementation epics ✅ (`P6-G`/`P6-H`/`P6-I`/`P6-J(B)`/`P6-J(C) ✅ or N/A`/`P7-C B+C`/`P7-D`/`P7-F`/`P7-G`/`P7-H`) + Wave 10 SMR prep ✅ + Step10C-B Track B evidence pass reviewed/accepted ✅ (`6bc6fd9`) | READY. Run and review Wave 10 all-around + targeted campaign resolution/logistics/siege packages before Wave 10.5; generic smoke alone is not sufficient. Manual/operator launch evidence must not be overclaimed as organic campaign proof. Use `.artifacts/smr/wave10-step10c-b-runtime-evidence-002/` as prep input: 8/8 lanes positive, no unavailable lanes, scout fresh-intel blocker cleared. |
+| SMR Analyst | Wave 10 SMR evidence | All Wave 10 implementation epics ✅ (`P6-G`/`P6-H`/`P6-I`/`P6-J(B)`/`P6-J(C) ✅ or N/A`/`P7-C B+C`/`P7-D`/`P7-F`/`P7-G`/`P7-H`) + Wave 10 SMR prep ✅ + Step10C-B Track B evidence pass reviewed/accepted ✅ (`6bc6fd9`) | ✅ Accepted GREEN after the repaired closeout rerun. Broad package `.artifacts/smr/all-around-smoke-wave10-001/` remains green, and exact standard-seed targeted closeout `.artifacts/smr/wave10-campaign-resolution-focused-002/` completes the 3 seed x 3 planner x 8 lane matrix with `exitCode=0`, `assertionFailures=0`, `anomalyCount=0`, and `wave10ProbeEvidence.unavailableLaneNames=[]`. The prior failing `multi__goap__seed303__multi_front_bounded` surface is now positive through deterministic owner-cap proof prep (`maxActiveCampaignsForAnyFaction=2`, `campaignLaunchBlockedByCap=1`). Provenance stays intact: `runs[].wave10` remains `main_world_run` truth, `wave10-probes.json` stays `simulation_runtime_probe`, and drilldown main-run timelines remain `not_configured` / `not_sampled`. `assertionSkipped=216` is accepted as benign because the assert-compatible companion main-world profile disables combat primitives for Wave 10 proof configs; combat proof still comes only from the side-probe lanes. Manual/operator launch evidence must not be overclaimed as organic campaign proof, and supply wording remains request-bound unless delivered/failed convoy counters become positive. |
 
 Step10B manual evidence input:
 - `Docs/Evidence/Manual/Wave10-Step9-Manual-Smoke-Followup.md` must be loaded during SMR closeout triage. Step10B should explicitly classify whether "no dedicated siege unit seen manually" is expected low-incidence behavior or evidence of a real runtime/visibility gap, and whether the accepted manual candidate issues belong in a post-SMR fix bucket.
+
+Step10B closeout result:
+- ✅ SMR Analyst closeout review accepted the repaired rerun as GREEN. The targeted package no longer has unavailable lanes or hard assertion failures, and the previous `multi_front_bounded` Goap/303 regression is covered by focused regressions plus the green `-002` artifact.
+- Manual residuals remain post-SMR candidates only: direct siege-unit visual low incidence, wall/watchtower readability, fragmented wall placement, and one-member operator probes are not Step10B blockers from current evidence.
+- Track C remains closed from current evidence; no strategist/advisory gap was newly proven by the repaired Step10B rerun.
 
 **Step 10C — post-SMR / manual gap closure (conditional)**
 

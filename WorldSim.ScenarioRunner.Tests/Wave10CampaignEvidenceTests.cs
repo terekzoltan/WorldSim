@@ -201,6 +201,76 @@ public sealed class Wave10CampaignEvidenceTests
     }
 
     [Fact]
+    public void Wave10AssertEnabledCloseoutProfile_UsesStableMainWorldRunSettings()
+    {
+        var artifactDir = CreateArtifactDir();
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_MODE"] = "assert",
+                ["WORLDSIM_SCENARIO_ASSERT"] = "true",
+                ["WORLDSIM_SCENARIO_SEEDS"] = "101",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = ConfigJson("forward", "forward-base-long-campaign", ticks: 8)
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var run = summary.RootElement.GetProperty("runs").EnumerateArray().Single();
+        Assert.Equal(64, run.GetProperty("width").GetInt32());
+        Assert.Equal(40, run.GetProperty("height").GetInt32());
+        Assert.Equal(24, run.GetProperty("initialPop").GetInt32());
+        Assert.Equal(300, run.GetProperty("ticks").GetInt32());
+        Assert.False(run.GetProperty("enableCombatPrimitives").GetBoolean());
+        Assert.False(run.GetProperty("enableDiplomacy").GetBoolean());
+        Assert.Equal(1, run.GetProperty("birthRateMultiplier").GetSingle());
+
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.Equal(0, manifest.RootElement.GetProperty("assertionFailures").GetInt32());
+
+        using var probes = ReadJson(Path.Combine(artifactDir, "wave10-probes.json"));
+        var forward = probes.RootElement.EnumerateArray().Single().GetProperty("telemetry");
+        Assert.Equal("positive", forward.GetProperty("evidenceStatus").GetString());
+    }
+
+    [Fact]
+    public void Wave10MultiFrontBounded_Goap303_AssertEnabled_IsNotProofUnavailable()
+    {
+        var artifactDir = CreateArtifactDir();
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_MODE"] = "assert",
+                ["WORLDSIM_SCENARIO_ASSERT"] = "true",
+                ["WORLDSIM_SCENARIO_SEEDS"] = "303",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "goap",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = ConfigJson("multi", "multi-front-bounded", ticks: 8)
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var probeSummary = summary.RootElement.GetProperty("wave10ProbeEvidence");
+        Assert.Empty(probeSummary.GetProperty("unavailableLaneNames").EnumerateArray());
+
+        using var probes = ReadJson(Path.Combine(artifactDir, "wave10-probes.json"));
+        var telemetry = probes.RootElement.EnumerateArray().Single().GetProperty("telemetry");
+        Assert.Equal("positive", telemetry.GetProperty("evidenceStatus").GetString());
+        Assert.True(
+            telemetry.GetProperty("campaignLaunchBlockedByCap").GetInt32() > 0
+            || telemetry.GetProperty("campaignLaunchBlockedByPairCap").GetInt32() > 0
+            || telemetry.GetProperty("maxActiveCampaignsForAnyFaction").GetInt32() > 1,
+            $"Expected bounded multi-front proof\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+    }
+
+    [Fact]
     public void InvalidWave10Scenario_ReturnsConfigError()
     {
         var artifactDir = CreateArtifactDir();

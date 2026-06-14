@@ -1691,6 +1691,7 @@ public sealed class SimulationRuntime
         {
             "organic_campaign_launch" => TryPrepareWave10OrganicCampaignLaunchEvidence(),
             "campaign_siege_resolution" => TryPrepareWave10CampaignSiegeEvidence(unlockSiegeCraft: false),
+            "multi_front_bounded" => TryPrepareWave10MultiFrontEvidence(),
             "supply_line_convoy" => TryPrepareWave10SupplyLineEvidence(),
             "forward_base_long_campaign" => TryPrepareWave10ForwardBaseEvidence(),
             "scout_intel_campaign_choice" => TryPrepareWave10ScoutIntelEvidence(),
@@ -1717,6 +1718,43 @@ public sealed class SimulationRuntime
         DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 scout-intel evidence setup");
         var result = TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1);
         return result.Success;
+    }
+
+    private bool TryPrepareWave10MultiFrontEvidence()
+    {
+        const Faction ownerFaction = Faction.Obsidari;
+        if (!TryPrepareWave10ScoutIntelPreconditions(ownerFaction, Faction.Aetheri, warriorCount: 6)
+            || !TryPrepareWave10ScoutIntelPreconditions(ownerFaction, Faction.Sylvars, warriorCount: 6)
+            || !TryPrepareWave10ScoutIntelPreconditions(ownerFaction, Faction.Chirita, warriorCount: 6))
+        {
+            return false;
+        }
+
+        var first = TryCreateCampaign(ownerFaction, Faction.Aetheri, requestedMemberCount: 1);
+        var second = TryCreateCampaign(ownerFaction, Faction.Sylvars, requestedMemberCount: 1);
+        if (!first.Success || !second.Success)
+            return false;
+
+        var ownerColony = _world._colonies.FirstOrDefault(colony => colony.Faction == ownerFaction);
+        var thirdTarget = _world._colonies.FirstOrDefault(colony => colony.Faction == Faction.Chirita);
+        if (ownerColony == null || thirdTarget == null)
+            return false;
+
+        var assignedActorIds = GetActiveCampaignActorIds();
+        var blockedCampaignActorIds = CaptureCampaignBlockedActorIds();
+        var decision = new CampaignStrategyDecision(
+            CampaignStrategyDecisionKind.LaunchCampaign,
+            CampaignStrategyReasonCode.TargetPressureAndAdvantage,
+            TargetFactionId: (int)Faction.Chirita,
+            TargetColonyId: thirdTarget.Id,
+            RequestedWarriors: 1,
+            RequestedCarriers: 0,
+            Score: 1f);
+
+        _ = TryApplyOrganicCampaignLaunch(ownerColony, decision, assignedActorIds, blockedCampaignActorIds);
+
+        return CountUnresolvedOwnerCampaigns(ownerFaction) >= _campaignLogisticsOptions.MaxActiveCampaignsPerFaction
+            && _campaignLogisticsCounters.CampaignLaunchBlockedByCap > 0;
     }
 
     private bool TryPrepareWave10SupplyLineEvidence()

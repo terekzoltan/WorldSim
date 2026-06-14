@@ -103,25 +103,26 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
     {
         foreach (var seed in seeds.OrderBy(s => s))
         {
+            var mainRunConfig = ResolveMainRunExecutionConfig(config, assertEnabled);
             var world = new World(
-                width: config.Width,
-                height: config.Height,
-                initialPop: config.InitialPop,
+                width: mainRunConfig.Width,
+                height: mainRunConfig.Height,
+                initialPop: mainRunConfig.InitialPop,
                 brainFactory: _ => new RuntimeNpcBrain(planner, $"ScenarioRunner:{planner}"),
                 randomSeed: seed)
             {
-                EnableCombatPrimitives = config.EnableCombatPrimitives,
-                EnableDiplomacy = config.EnableDiplomacy,
-                EnableSiege = config.EnableSiege,
-                EnablePredatorHumanAttacks = config.EnablePredatorHumanAttacks,
-                StoneBuildingsEnabled = config.StoneBuildingsEnabled,
-                BirthRateMultiplier = config.BirthRateMultiplier,
-                MovementSpeedMultiplier = config.MovementSpeedMultiplier
+                EnableCombatPrimitives = mainRunConfig.EnableCombatPrimitives,
+                EnableDiplomacy = mainRunConfig.EnableDiplomacy,
+                EnableSiege = mainRunConfig.EnableSiege,
+                EnablePredatorHumanAttacks = mainRunConfig.EnablePredatorHumanAttacks,
+                StoneBuildingsEnabled = mainRunConfig.StoneBuildingsEnabled,
+                BirthRateMultiplier = mainRunConfig.BirthRateMultiplier,
+                MovementSpeedMultiplier = mainRunConfig.MovementSpeedMultiplier
             };
-            ApplyEcologyBalanceConfig(world, config);
-            ApplySupplyScenarioConfig(world, config);
+            ApplyEcologyBalanceConfig(world, mainRunConfig);
+            ApplySupplyScenarioConfig(world, mainRunConfig);
 
-            List<double>? tickTimesMs = perfEnabled ? new List<double>(config.Ticks) : null;
+            List<double>? tickTimesMs = perfEnabled ? new List<double>(mainRunConfig.Ticks) : null;
             long peakEntities = 0;
             var timelineSamples = drilldownEnabled ? new List<ScenarioTimelineSample>() : null;
             var peakActiveBattles = 0;
@@ -131,13 +132,13 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
             var minCombatMoraleObserved = 100f;
             var sawLivingPerson = false;
 
-            for (var i = 0; i < config.Ticks; i++)
+            for (var i = 0; i < mainRunConfig.Ticks; i++)
             {
                 var perfTickMs = 0d;
                 if (perfEnabled)
                 {
                     var stopwatch = Stopwatch.StartNew();
-                    world.Update(config.Dt);
+                    world.Update(mainRunConfig.Dt);
                     stopwatch.Stop();
                     perfTickMs = stopwatch.Elapsed.TotalMilliseconds;
                     tickTimesMs!.Add(perfTickMs);
@@ -151,10 +152,10 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 }
                 else
                 {
-                    world.Update(config.Dt);
+                    world.Update(mainRunConfig.Dt);
                 }
 
-                if (timelineSamples is not null && ShouldCaptureTickSample(i, config.Ticks, drilldownSampleEvery))
+                if (timelineSamples is not null && ShouldCaptureTickSample(i, mainRunConfig.Ticks, drilldownSampleEvery))
                     timelineSamples.Add(BuildTimelineSample(world, i + 1, perfTickMs));
 
                 peakActiveBattles = Math.Max(peakActiveBattles, world.ActiveBattleCount);
@@ -184,7 +185,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
 
             var runResult = BuildRunResult(
                 world,
-                config,
+                mainRunConfig,
                 planner,
                 seed,
                 visualLaneResolution.Effective,
@@ -201,6 +202,27 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 runTimelines[BuildRunKey(runResult)] = timelineSamples;
         }
     }
+}
+
+static ScenarioConfig ResolveMainRunExecutionConfig(ScenarioConfig config, bool assertEnabled)
+{
+    if (!assertEnabled || string.IsNullOrWhiteSpace(config.Wave10Scenario))
+        return config;
+
+    // Wave10 feature proof comes from side probes. Under assert mode, keep the companion
+    // main-world run on a stable health-check profile instead of the tiny 8-tick proof setup.
+    return config with
+    {
+        Width = Math.Max(config.Width, 64),
+        Height = Math.Max(config.Height, 40),
+        InitialPop = Math.Max(config.InitialPop, 24),
+        Ticks = Math.Max(config.Ticks, 300),
+        EnableCombatPrimitives = false,
+        EnableDiplomacy = false,
+        EnableSiege = true,
+        BirthRateMultiplier = config.BirthRateMultiplier > 0f ? config.BirthRateMultiplier : 1f,
+        MovementSpeedMultiplier = config.MovementSpeedMultiplier > 0f ? config.MovementSpeedMultiplier : 1f
+    };
 }
 
 var envelope = new ScenarioRunEnvelope(
@@ -778,9 +800,13 @@ static ScenarioWave10TelemetrySnapshot BuildSiegeUnitBreachTelemetry(ScenarioCon
 static ScenarioWave10TelemetrySnapshot BuildMultiFrontBoundedTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
 {
     var runtime = CreateWave10Runtime(config, planner, seed);
-    _ = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Aetheri, carriedFoodPerCandidate: 2);
-    _ = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Sylvars, carriedFoodPerCandidate: 2);
-    _ = CreatePreparedProbeCampaign(runtime, Faction.Sylvars, Faction.Chirita, carriedFoodPerCandidate: 2);
+    var prepared = runtime.TryPrepareWave10EvidenceScenario(config.Wave10Scenario);
+    if (!prepared)
+    {
+        _ = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Aetheri, carriedFoodPerCandidate: 2);
+        _ = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Sylvars, carriedFoodPerCandidate: 2);
+        _ = CreatePreparedProbeCampaign(runtime, Faction.Sylvars, Faction.Chirita, carriedFoodPerCandidate: 2);
+    }
     AdvanceRuntime(runtime, config, minimumTicks: 120);
     var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
         config.Wave10Scenario,
