@@ -6,6 +6,7 @@ using WorldSim.AI;
 using WorldSim.Runtime.Diagnostics;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
 using WorldSim.Simulation.Effects;
@@ -1680,6 +1681,312 @@ public sealed class SimulationRuntime
 
     public void DisableWave9CampaignScenarioCombatInvalidation()
         => _world.EnableCombatPrimitives = false;
+
+    public bool TryPrepareWave10EvidenceScenario(string? wave10Scenario)
+    {
+        if (!IsCampaignRuntimeAvailable() || string.IsNullOrWhiteSpace(wave10Scenario))
+            return false;
+
+        return wave10Scenario.Trim().ToLowerInvariant() switch
+        {
+            "organic_campaign_launch" => TryPrepareWave10OrganicCampaignLaunchEvidence(),
+            "campaign_siege_resolution" => TryPrepareWave10CampaignSiegeEvidence(unlockSiegeCraft: false),
+            "supply_line_convoy" => TryPrepareWave10SupplyLineEvidence(),
+            "forward_base_long_campaign" => TryPrepareWave10ForwardBaseEvidence(),
+            "scout_intel_campaign_choice" => TryPrepareWave10ScoutIntelEvidence(),
+            "siege_unit_breach" => TryPrepareWave10CampaignSiegeEvidence(unlockSiegeCraft: true),
+            _ => false
+        };
+    }
+
+    private bool TryPrepareWave10OrganicCampaignLaunchEvidence()
+    {
+        if (!TryPrepareWave10ScoutIntelPreconditions(Faction.Obsidari, Faction.Aetheri, warriorCount: 3))
+            return false;
+
+        DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 organic evidence setup");
+        Tick = Math.Max(Tick, OrganicCampaignLaunchCadenceTicks);
+        return true;
+    }
+
+    private bool TryPrepareWave10ScoutIntelEvidence()
+    {
+        if (!TryPrepareWave10ScoutIntelPreconditions(Faction.Obsidari, Faction.Aetheri, warriorCount: 2))
+            return false;
+
+        DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 scout-intel evidence setup");
+        var result = TryCreateCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1);
+        return result.Success;
+    }
+
+    private bool TryPrepareWave10SupplyLineEvidence()
+    {
+        var campaign = TryCreateWave10PreparedMarchingCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, preparedWarriors: 3);
+        if (campaign == null)
+            return false;
+
+        campaign.Army.SupplyState.RecordSupplyPressure(isOutOfSupply: true);
+        campaign.Army.SupplyState.RecordSupplyPressure(isOutOfSupply: true);
+        var owner = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.OriginColonyId);
+        if (owner == null)
+            return false;
+
+        var assignedActorIds = GetActiveCampaignActorIds();
+        var blockedCampaignActorIds = CaptureCampaignBlockedActorIds();
+        var decision = new CampaignStrategyDecision(
+            CampaignStrategyDecisionKind.RequestConvoy,
+            CampaignStrategyReasonCode.CampaignSupplyLow,
+            TargetFactionId: (int)campaign.TargetFaction,
+            TargetColonyId: campaign.TargetColonyId,
+            CampaignId: campaign.CampaignId,
+            Score: 1f);
+        if (!TryApplySupplyConvoyRequest(owner, decision, assignedActorIds, blockedCampaignActorIds))
+            return false;
+
+        _ = TryApplySupplyConvoyRequest(owner, decision, assignedActorIds, blockedCampaignActorIds);
+        return true;
+    }
+
+    private bool TryPrepareWave10ForwardBaseEvidence()
+    {
+        var campaign = TryCreateWave10PreparedMarchingCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, preparedWarriors: 2);
+        if (campaign == null)
+            return false;
+
+        var owner = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.OriginColonyId);
+        if (owner == null || !TryFindWave10ForwardBaseAnchor(owner, out var anchor))
+            return false;
+
+        var member = GetWave10CampaignMembers(campaign).FirstOrDefault();
+        if (member == null)
+            return false;
+
+        member.Pos = anchor;
+        member.ApplyStaminaDelta(-50f);
+        if (!TryEstablishForwardBase(campaign, new HashSet<int>()))
+            return false;
+
+        AdvanceForwardBases(new HashSet<int>());
+        return true;
+    }
+
+    private bool TryPrepareWave10CampaignSiegeEvidence(bool unlockSiegeCraft)
+    {
+        var campaign = TryCreateWave10PreparedMarchingCampaign(Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, preparedWarriors: 2);
+        if (campaign == null)
+            return false;
+
+        var attacker = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.OriginColonyId);
+        var defender = _world._colonies.FirstOrDefault(colony => colony.Id == campaign.TargetColonyId);
+        if (attacker == null || defender == null)
+            return false;
+
+        if (unlockSiegeCraft)
+            UnlockWave10SiegeCraftForEvidence(attacker);
+
+        if (!TryEnsureWave10EvidenceWall(defender, out var wall))
+            return false;
+
+        foreach (var member in GetWave10CampaignMembers(campaign))
+        {
+            member.Pos = FindWave10EncounterPosition(defender, wall.Pos);
+            ResetWave10EvidenceActor(member);
+        }
+
+        campaign.BeginEncounter(Tick);
+        return campaign.Phase == CampaignPhase.Encounter;
+    }
+
+    private bool TryPrepareWave10ScoutIntelPreconditions(Faction ownerFaction, Faction targetFaction, int warriorCount)
+    {
+        var owner = _world._colonies.FirstOrDefault(colony => colony.Faction == ownerFaction);
+        var target = _world._colonies.FirstOrDefault(colony => colony.Faction == targetFaction);
+        if (owner == null || target == null)
+            return false;
+
+        var prepared = PrepareWave10EvidenceWarriors(owner, warriorCount);
+        if (prepared.Length < warriorCount)
+            return false;
+
+        var scout = _world._people
+            .Where(person => person.Health > 0f && person.Home.Id == owner.Id && !prepared.Contains(person))
+            .OrderBy(person => person.Id)
+            .FirstOrDefault();
+        if (scout == null)
+            return false;
+
+        ResetWave10EvidenceActor(scout);
+        scout.AssignRole(PersonRole.Scout);
+        scout.Pos = target.Origin;
+        _world.SetFactionStance(owner.Faction, target.Faction, Stance.War);
+        AdvanceScoutIntel();
+        return _campaignLogisticsCounters.ScoutIntelObserved > 0;
+    }
+
+    private CampaignState? TryCreateWave10PreparedMarchingCampaign(
+        Faction ownerFaction,
+        Faction targetFaction,
+        int requestedMemberCount,
+        int preparedWarriors)
+    {
+        var owner = _world._colonies.FirstOrDefault(colony => colony.Faction == ownerFaction);
+        if (owner == null)
+            return null;
+
+        var members = PrepareWave10EvidenceWarriors(owner, Math.Max(preparedWarriors, requestedMemberCount));
+        if (members.Length < requestedMemberCount)
+            return null;
+
+        var result = TryCreateCampaign(ownerFaction, targetFaction, requestedMemberCount);
+        if (!result.Success || !result.CampaignId.HasValue)
+            return null;
+
+        var campaign = _campaigns.First(candidate => candidate.CampaignId == result.CampaignId.Value);
+        for (var i = 0; i < requestedMemberCount; i++)
+            campaign.Army.TryAddMemberActorId(members[i].Id);
+
+        var rally = owner.Origin;
+        campaign.Army.SetRallyPoint(rally.x, rally.y);
+        campaign.BeginAssembly(Tick);
+        campaign.MarkAssemblyComplete(Tick);
+        foreach (var member in GetWave10CampaignMembers(campaign))
+            member.Pos = rally;
+        return campaign.Phase == CampaignPhase.Marching ? campaign : null;
+    }
+
+    private Person[] PrepareWave10EvidenceWarriors(Colony owner, int count)
+    {
+        var people = _world._people
+            .Where(person => person.Health > 0f && person.Home.Id == owner.Id)
+            .OrderBy(person => person.Id)
+            .ToArray();
+        foreach (var person in people)
+            ResetWave10EvidenceActor(person);
+
+        var selected = people.Take(Math.Max(0, count)).ToArray();
+        foreach (var person in selected)
+            person.AssignRole(PersonRole.Warrior);
+        return selected;
+    }
+
+    private static void ResetWave10EvidenceActor(Person person)
+    {
+        person.ClearRole(PersonRole.Warrior | PersonRole.SupplyCarrier | PersonRole.Scout | PersonRole.Commander);
+        person.Profession = Profession.Generalist;
+        person.Current = Job.Idle;
+        person.SetCombatAssignment(null, null, Formation.Line, isCommander: false);
+        person.ApplyStaminaDelta(100f);
+        person.ApplyMoraleDelta(100f);
+    }
+
+    private IReadOnlyList<Person> GetWave10CampaignMembers(CampaignState campaign)
+        => campaign.Army.MemberActorIds
+            .Select(actorId => _world._people.FirstOrDefault(person => person.Id == actorId && person.Health > 0f))
+            .Where(person => person != null)
+            .Select(person => person!)
+            .OrderBy(person => person.Id)
+            .ToArray();
+
+    private void UnlockWave10SiegeCraftForEvidence(Colony colony)
+    {
+        foreach (var techId in new[] { "woodcutting", "construction", "mining", "tools", "fortification", "siege_craft" })
+            colony.UnlockedTechs.Add(techId);
+    }
+
+    private bool TryEnsureWave10EvidenceWall(Colony defender, out DefensiveStructure wall)
+    {
+        wall = _world.DefensiveStructures
+            .Where(structure => !structure.IsDestroyed && structure.Owner.Id == defender.Id)
+            .OrderBy(structure => Math.Abs(structure.Pos.x - defender.Origin.x) + Math.Abs(structure.Pos.y - defender.Origin.y))
+            .ThenBy(structure => structure.Id)
+            .FirstOrDefault()!;
+        if (wall != null)
+            return true;
+
+        if (!TryFindWave10BuildableNear(defender.Origin, minDistance: 3, out var pos))
+            return false;
+
+        if (!_world.TryAddWoodWall(defender, pos))
+            return false;
+
+        wall = _world.DefensiveStructures.Single(structure => structure.Owner.Id == defender.Id && structure.Pos == pos);
+        return true;
+    }
+
+    private (int x, int y) FindWave10EncounterPosition(Colony defender, (int x, int y) wall)
+    {
+        foreach (var candidate in EnumerateWave10ManhattanRing(wall, maxRadius: 3))
+        {
+            if (_world.IsMovementBlocked(candidate.x, candidate.y, defender.Id))
+                continue;
+            return candidate;
+        }
+
+        return defender.Origin;
+    }
+
+    private bool TryFindWave10ForwardBaseAnchor(Colony owner, out (int x, int y) anchor)
+    {
+        for (var y = 0; y < _world.Height; y++)
+        {
+            for (var x = 0; x < _world.Width; x++)
+            {
+                var candidate = (x, y);
+                if (Math.Abs(candidate.x - owner.Origin.x) + Math.Abs(candidate.y - owner.Origin.y) < _campaignLogisticsOptions.ForwardBaseMinDistanceFromHome)
+                    continue;
+                if (_world.IsMovementBlocked(candidate.x, candidate.y, owner.Id))
+                    continue;
+                if (!HasForwardBaseRoutePreflight(owner, candidate))
+                    continue;
+
+                anchor = candidate;
+                return true;
+            }
+        }
+
+        anchor = default;
+        return false;
+    }
+
+    private bool TryFindWave10BuildableNear((int x, int y) origin, int minDistance, out (int x, int y) position)
+    {
+        for (var radius = Math.Max(0, minDistance); radius <= Math.Max(_world.Width, _world.Height); radius++)
+        {
+            foreach (var candidate in EnumerateWave10ManhattanRing(origin, radius))
+            {
+                if (Math.Abs(candidate.x - origin.x) + Math.Abs(candidate.y - origin.y) < minDistance)
+                    continue;
+                if (!_world.CanPlaceStructureAt(candidate.x, candidate.y))
+                    continue;
+
+                position = candidate;
+                return true;
+            }
+        }
+
+        position = default;
+        return false;
+    }
+
+    private IEnumerable<(int x, int y)> EnumerateWave10ManhattanRing((int x, int y) origin, int maxRadius)
+    {
+        for (var radius = 0; radius <= Math.Max(0, maxRadius); radius++)
+        {
+            for (var dy = -radius; dy <= radius; dy++)
+            {
+                for (var dx = -radius; dx <= radius; dx++)
+                {
+                    if (Math.Abs(dx) + Math.Abs(dy) != radius)
+                        continue;
+                    int x = origin.x + dx;
+                    int y = origin.y + dy;
+                    if (x < 0 || y < 0 || x >= _world.Width || y >= _world.Height)
+                        continue;
+                    yield return (x, y);
+                }
+            }
+        }
+    }
 
     private void AdvanceCampaignAssemblies(HashSet<int> blockedCampaignActorIds)
     {

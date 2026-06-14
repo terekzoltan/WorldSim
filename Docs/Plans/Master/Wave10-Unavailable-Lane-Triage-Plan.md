@@ -1,10 +1,10 @@
 # Wave 10 Unavailable-Lane Triage and Evidence Fix Plan
 
-Status: Active triage / handoff plan
+Status: Track B Step10C-B follow-up evidence ready for Meta mini-review
 Owner: Meta Coordinator
 Date: 2026-06-12
 
-Mini-review status: Track B evidence/probe fix pass accepted as commit-safe YELLOW. It preserves provenance and improves `multi_front_bounded` to positive deterministic active multi-front proof, but it does not unblock clean Step10B by itself. Default next route is Step10C-B/C for unresolved/partial lanes unless the user explicitly accepts a YELLOW Step10B with non-claims.
+Mini-review status: Track B evidence/probe fix pass accepted as commit-safe YELLOW. Follow-up Step10C-B implementation evidence is now available in local artifact `.artifacts/smr/wave10-step10c-b-runtime-evidence-002/`: 72 probes, exit code 0, no assertions, no anomalies, and 8/8 lanes positive. The previous scout timing blocker is resolved: `scout_intel_campaign_choice` now captures telemetry inside a fresh scout-intel window (`ticks=20` in the probe artifact) and the probe shows `scoutIntelObserved=1`, `activeScoutIntel=1`, `freshScoutIntel=1`, `campaignTargetsWithScoutIntel=1` in representative runs.
 
 ## Purpose
 
@@ -47,11 +47,30 @@ This plan turns the unavailable-lane result into a bounded handoff: Track B gets
 | `manual_operator_launch` | Positive 9/9 | Keep as positive prep signal; keep non-claim that it is not organic proof | Track B | No fix required |
 | `organic_campaign_launch` | `proof_unavailable` 9/9 | Positive organic proof or explicit proof that only probe setup was missing; must not be replaced by manual proof | Track B | Fix-now core lane |
 | `campaign_siege_resolution` | Partial positive 3/9, weak siege/breach proof | Positive deterministic campaign/siege evidence with at least siege entry/pressure plus resolution or breach-related counter; if breach remains rare, classify separately | Track B | Fix-now core lane |
-| `supply_line_convoy` | `proof_unavailable` 9/9 | Positive deterministic convoy lifecycle evidence: spawn plus delivered/failed/throttle/cap outcome | Track B | Fix-now core lane |
+| `supply_line_convoy` | `proof_unavailable` 9/9 | Positive deterministic convoy request-bound outcome evidence: spawn plus delivered/failed or cap/throttle/route/home-defense outcome; call it delivery lifecycle proof only when delivered/failed is positive | Track B | Fix-now core lane |
 | `multi_front_bounded` | `proof_unavailable` 9/9 | Positive bound evidence: multiple active campaigns or cap/pair-cap/home-defense/route-budget block counters | Track B | Fix-now core lane |
 | `forward_base_long_campaign` | `proof_unavailable` 9/9 | Try deterministic forward-base evidence via existing setup only: established plus rest/expired/abandoned signal | Track B | Fix if evidence-only; otherwise defer to Step10C-B |
 | `scout_intel_campaign_choice` | `proof_unavailable` 9/9 | Try deterministic scout-intel observe/refresh plus campaign target-with-intel signal | Track B first, Track C only if strategist consume is the proven gap | Fix if evidence-only; otherwise defer to P7-C(C)/Step10C |
 | `siege_unit_breach` | `proof_unavailable` 9/9 | Try deterministic siege-unit spawn/action/breach evidence via existing tech/manual campaign setup only | Track B first, Track A only for visual/manual consume, Track C only for protection/AI gap | Defer likely acceptable to Step10C-B/A if low-incidence remains |
+
+## Track B Step10C-B implementation evidence
+
+Artifact: `.artifacts/smr/wave10-step10c-b-runtime-evidence-002/` (local raw artifact, do not commit unless explicitly requested).
+
+Result summary:
+
+| Lane | Step10C-B result | Route |
+|------|------------------|-------|
+| `manual_operator_launch` | 9/9 positive manual-operator probe; still non-claims organic proof | Keep as prep/smoke signal |
+| `multi_front_bounded` | 9/9 positive deterministic active multi-front proof | Fixed |
+| `organic_campaign_launch` | 9/9 positive organic proof after runtime evidence setup reaches launch cadence | Fixed core lane |
+| `campaign_siege_resolution` | 9/9 positive deterministic siege entry plus pressure/resolution signal | Fixed core lane |
+| `supply_line_convoy` | 9/9 positive deterministic convoy spawn plus request-bound outcome signal | Fixed core lane |
+| `forward_base_long_campaign` | 9/9 positive deterministic forward-base establishment plus lifecycle signal | Fixed conditional lane |
+| `siege_unit_breach` | 9/9 positive deterministic siege-unit spawn plus action/pressure signal | Fixed conditional lane |
+| `scout_intel_campaign_choice` | 9/9 positive; scout intel is observed, remains fresh, and target-with-intel proof is positive inside the bounded probe window | Fixed after Track B timing follow-up |
+
+Current Meta gate input: the scout timing blocker is cleared in Track B evidence. Supply-line wording still stays precise: cap/throttle/route/home-defense blocks are request-bound outcomes, not delivery lifecycle proof unless `ConvoysDelivered` or `ConvoysFailed` is positive.
 
 ## Track B implementation handoff
 

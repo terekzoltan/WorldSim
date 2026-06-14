@@ -117,12 +117,45 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.True(multi.GetProperty("maxActiveCampaignsForAnyFaction").GetInt32() > 1, $"Expected active multi-front owner proof\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
         Assert.Contains("not organic launch proof", string.Join(" | ", multi.GetProperty("nonClaims").EnumerateArray().Select(value => value.GetString())));
 
-        AssertUnavailableRoute(probeItems, "organic_campaign_launch", "organic_launch_not_reproduced_without_policy_tweak", "Step10C-C");
-        AssertUnavailableRoute(probeItems, "campaign_siege_resolution", "campaign_siege_not_reproduced_without_policy_tweak", "Step10C-B");
-        AssertUnavailableRoute(probeItems, "supply_line_convoy", "supply_line_convoy_not_reproduced_without_policy_tweak", "Step10C-B");
-        AssertUnavailableRoute(probeItems, "forward_base_long_campaign", "forward_base_lifecycle_not_reproduced_without_policy_tweak", "Step10C-B");
-        AssertUnavailableRoute(probeItems, "scout_intel_campaign_choice", "scout_intel_campaign_choice_not_reproduced_without_policy_tweak", "Step10C-B");
-        AssertUnavailableRoute(probeItems, "siege_unit_breach", "siege_unit_not_reproduced_without_policy_tweak", "Step10C-B");
+        var organic = ProbeFor(probeItems, "organic_campaign_launch").GetProperty("telemetry");
+        Assert.Equal("organic", organic.GetProperty("proofType").GetString());
+        AssertPositive(organic);
+        Assert.True(organic.GetProperty("campaignLaunches").GetInt32() > 0, $"No organic launch evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+
+        var resolution = ProbeFor(probeItems, "campaign_siege_resolution").GetProperty("telemetry");
+        Assert.Equal("deterministic_probe", resolution.GetProperty("proofType").GetString());
+        AssertPositive(resolution);
+        Assert.True(resolution.GetProperty("campaignSiegesEntered").GetInt32() > 0, $"No campaign siege entry evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(resolution.GetProperty("resolvedCampaigns").GetInt32() > 0 || resolution.GetProperty("siegePressureTicks").GetInt32() > 0, $"No campaign siege pressure/resolution evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+
+        var supply = ProbeFor(probeItems, "supply_line_convoy").GetProperty("telemetry");
+        Assert.Equal("deterministic_probe", supply.GetProperty("proofType").GetString());
+        AssertPositive(supply);
+        Assert.True(supply.GetProperty("convoysSpawned").GetInt32() > 0, $"No convoy spawn evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(HasAnyConvoyOutcome(supply), $"No convoy request-bound outcome evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+
+        var forward = ProbeFor(probeItems, "forward_base_long_campaign").GetProperty("telemetry");
+        Assert.Equal("deterministic_probe", forward.GetProperty("proofType").GetString());
+        AssertPositive(forward);
+        Assert.True(forward.GetProperty("forwardBasesEstablished").GetInt32() > 0, $"No forward-base establishment evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(
+            forward.GetProperty("forwardBaseRestTicks").GetInt32() > 0
+            || forward.GetProperty("forwardBasesExpired").GetInt32() > 0
+            || forward.GetProperty("forwardBasesAbandoned").GetInt32() > 0,
+            $"No forward-base lifecycle evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+
+        var scout = ProbeFor(probeItems, "scout_intel_campaign_choice").GetProperty("telemetry");
+        Assert.Equal("deterministic_probe", scout.GetProperty("proofType").GetString());
+        AssertPositive(scout);
+        Assert.True(scout.GetProperty("scoutIntelObserved").GetInt32() > 0, $"No scout-intel observation evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(scout.GetProperty("freshScoutIntel").GetInt32() > 0, $"No fresh scout-intel evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(scout.GetProperty("campaignTargetsWithScoutIntel").GetInt32() > 0, $"No campaign target-with-intel evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+
+        var siegeUnit = ProbeFor(probeItems, "siege_unit_breach").GetProperty("telemetry");
+        Assert.Equal("deterministic_probe", siegeUnit.GetProperty("proofType").GetString());
+        AssertPositive(siegeUnit);
+        Assert.True(siegeUnit.GetProperty("siegeUnitsSpawned").GetInt32() > 0, $"No siege-unit spawn evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(siegeUnit.GetProperty("siegeUnitActionTicks").GetInt32() > 0 || siegeUnit.GetProperty("siegePressureTicks").GetInt32() > 0, $"No siege-unit action evidence\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
 
         foreach (var probe in probeItems)
         {
@@ -264,6 +297,20 @@ public sealed class Wave10CampaignEvidenceTests
 
     private static JsonElement ProbeFor(JsonElement[] probes, string scenario)
         => probes.Single(probe => string.Equals(probe.GetProperty("wave10Scenario").GetString(), scenario, StringComparison.Ordinal));
+
+    private static void AssertPositive(JsonElement telemetry)
+    {
+        Assert.Equal("positive", telemetry.GetProperty("evidenceStatus").GetString());
+        Assert.Equal("none", telemetry.GetProperty("reasonCode").GetString());
+    }
+
+    private static bool HasAnyConvoyOutcome(JsonElement telemetry)
+        => telemetry.GetProperty("convoysDelivered").GetInt32() > 0
+           || telemetry.GetProperty("convoysFailed").GetInt32() > 0
+           || telemetry.GetProperty("convoyThrottleBlocks").GetInt32() > 0
+           || telemetry.GetProperty("convoyCapBlocks").GetInt32() > 0
+           || telemetry.GetProperty("convoyHomeDefenseBlocks").GetInt32() > 0
+           || telemetry.GetProperty("convoyRouteBudgetExhausted").GetInt32() > 0;
 
     private static void AssertUnavailableRoute(JsonElement[] probes, string scenario, string reasonCode, string route)
     {

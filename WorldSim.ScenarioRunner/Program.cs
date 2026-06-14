@@ -639,7 +639,7 @@ static int GetWave10ProbeMinimumTicks(string scenario)
         "campaign_siege_resolution" => 900,
         "supply_line_convoy" => 900,
         "forward_base_long_campaign" => 900,
-        "scout_intel_campaign_choice" => 720,
+        "scout_intel_campaign_choice" => 20,
         _ => 0
     };
 
@@ -678,6 +678,9 @@ static bool HasSiegeUnitActionSignal(ScenarioWave10TelemetrySnapshot telemetry)
        || telemetry.SiegePressureTicks > 0
        || telemetry.CampaignBreaches > 0;
 
+static bool HasFreshScoutIntelSignal(ScenarioWave10TelemetrySnapshot telemetry)
+    => telemetry.FreshScoutIntel > 0;
+
 static bool HasActiveMultiFrontProof(ScenarioWave10TelemetrySnapshot telemetry)
     => telemetry.MaxActiveCampaignsForAnyFaction > 1
        || telemetry.MaxUnresolvedPairsForAnyFactionPair > 1;
@@ -708,7 +711,9 @@ static ScenarioWave10TelemetrySnapshot BuildManualOperatorLaunchTelemetry(Scenar
 static ScenarioWave10TelemetrySnapshot BuildOrganicCampaignLaunchTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
 {
     var runtime = CreateWave10Runtime(config, planner, seed);
-    runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 organic evidence lane");
+    var prepared = runtime.TryPrepareWave10EvidenceScenario(config.Wave10Scenario);
+    if (!prepared)
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 organic evidence lane");
     AdvanceRuntime(runtime, config, minimumTicks: 720);
     var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
         config.Wave10Scenario,
@@ -724,19 +729,19 @@ static ScenarioWave10TelemetrySnapshot BuildOrganicCampaignLaunchTelemetry(Scena
             EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
             ReasonCode = ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
             NonClaims = RouteToStep10C(
-                "organic campaign launch was not reproduced without gameplay policy changes; manual/operator proof is not organic proof",
-                "route: Step10C-C or Meta YELLOW organic strategist/runtime evidence follow-up")
+                prepared
+                    ? "organic setup preconditions were prepared but organic strategist/runtime launch was not reproduced; manual/operator proof is not organic proof"
+                    : "organic campaign setup preconditions were not reproduced through the bounded runtime evidence setup; manual/operator proof is not organic proof",
+                prepared
+                    ? "route: Step10C-C organic strategist/runtime evidence follow-up"
+                    : "route: Step10C-B runtime organic setup evidence follow-up")
         };
 }
 
 static ScenarioWave10TelemetrySnapshot BuildSiegeUnitBreachTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
 {
     var runtime = CreateWave10Runtime(config, planner, seed);
-    try
-    {
-        runtime.UnlockTechForPrimaryColony("siege_craft");
-    }
-    catch (InvalidOperationException)
+    if (!runtime.TryPrepareWave10EvidenceScenario(config.Wave10Scenario))
     {
         return runtime.BuildScenarioWave10TelemetrySnapshot(
             config.Wave10Scenario,
@@ -749,7 +754,6 @@ static ScenarioWave10TelemetrySnapshot BuildSiegeUnitBreachTelemetry(ScenarioCon
                 "route: Step10C-B runtime siege-unit evidence setup follow-up"));
     }
 
-    _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
     AdvanceRuntime(runtime, config, minimumTicks: 900);
     var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
         config.Wave10Scenario,
@@ -801,9 +805,13 @@ static ScenarioWave10TelemetrySnapshot BuildMultiFrontBoundedTelemetry(ScenarioC
 static ScenarioWave10TelemetrySnapshot BuildCampaignSiegeResolutionTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
 {
     var runtime = CreateWave10Runtime(config, planner, seed);
-    var creation = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Aetheri, carriedFoodPerCandidate: 2);
-    if (!creation.Success)
-        _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    var prepared = runtime.TryPrepareWave10EvidenceScenario(config.Wave10Scenario);
+    if (!prepared)
+    {
+        var creation = CreatePreparedProbeCampaign(runtime, Faction.Obsidari, Faction.Aetheri, carriedFoodPerCandidate: 2);
+        if (!creation.Success)
+            _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    }
     AdvanceRuntime(runtime, config, minimumTicks: 900);
     var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
         config.Wave10Scenario,
@@ -820,7 +828,9 @@ static ScenarioWave10TelemetrySnapshot BuildCampaignSiegeResolutionTelemetry(Sce
             EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
             ReasonCode = ScenarioWave10Evidence.ReasonCampaignSiegeNotReproduced,
             NonClaims = RouteToStep10C(
-                "campaign siege entry plus pressure/resolution proof was not reproduced with existing production-safe probe setup",
+                prepared
+                    ? "campaign siege setup was prepared but siege entry plus pressure/resolution proof was not reproduced without gameplay policy changes"
+                    : "campaign siege entry plus pressure/resolution proof was not reproduced with existing production-safe probe setup",
                 "route: Step10C-B runtime campaign siege/resolution evidence follow-up")
         };
 }
@@ -828,7 +838,9 @@ static ScenarioWave10TelemetrySnapshot BuildCampaignSiegeResolutionTelemetry(Sce
 static ScenarioWave10TelemetrySnapshot BuildSupplyLineConvoyTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
 {
     var runtime = CreateWave10Runtime(config, planner, seed);
-    _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    var prepared = runtime.TryPrepareWave10EvidenceScenario(config.Wave10Scenario);
+    if (!prepared)
+        _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
     AdvanceRuntime(runtime, config, minimumTicks: 900);
     var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
         config.Wave10Scenario,
@@ -845,7 +857,9 @@ static ScenarioWave10TelemetrySnapshot BuildSupplyLineConvoyTelemetry(ScenarioCo
             EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
             ReasonCode = ScenarioWave10Evidence.ReasonSupplyLineConvoyNotReproduced,
             NonClaims = RouteToStep10C(
-                "supply-line convoy spawn plus outcome proof was not reproduced with existing production-safe probe setup",
+                prepared
+                    ? "supply-line convoy setup was prepared but spawn plus outcome proof was not reproduced without gameplay policy changes"
+                    : "supply-line convoy spawn plus outcome proof was not reproduced with existing production-safe probe setup",
                 "route: Step10C-B runtime supply-line evidence follow-up")
         };
 }
@@ -853,7 +867,9 @@ static ScenarioWave10TelemetrySnapshot BuildSupplyLineConvoyTelemetry(ScenarioCo
 static ScenarioWave10TelemetrySnapshot BuildForwardBaseLongCampaignTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
 {
     var runtime = CreateWave10Runtime(config, planner, seed);
-    _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+    var prepared = runtime.TryPrepareWave10EvidenceScenario(config.Wave10Scenario);
+    if (!prepared)
+        _ = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
     AdvanceRuntime(runtime, config, minimumTicks: 900);
     var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
         config.Wave10Scenario,
@@ -870,38 +886,83 @@ static ScenarioWave10TelemetrySnapshot BuildForwardBaseLongCampaignTelemetry(Sce
             EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
             ReasonCode = ScenarioWave10Evidence.ReasonForwardBaseLifecycleNotReproduced,
             NonClaims = RouteToStep10C(
-                "forward-base established plus rest/expiry/abandon lifecycle proof was not reproduced with existing production-safe probe setup",
+                prepared
+                    ? "forward-base setup was prepared but established plus rest/expiry/abandon lifecycle proof was not reproduced without gameplay policy changes"
+                    : "forward-base established plus rest/expiry/abandon lifecycle proof was not reproduced with existing production-safe probe setup",
                 "route: Step10C-B runtime forward-base lifecycle evidence follow-up")
         };
 }
 
 static ScenarioWave10TelemetrySnapshot BuildScoutIntelCampaignChoiceTelemetry(ScenarioConfig config, NpcPlannerMode planner, int seed)
 {
+    var scenario = config.Wave10Scenario ?? "scout_intel_campaign_choice";
     var runtime = CreateWave10Runtime(config, planner, seed);
-    runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 scout-intel evidence lane");
-    AdvanceRuntime(runtime, config, minimumTicks: 720);
-    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
-        config.Wave10Scenario,
-        ScenarioWave10Evidence.ProofTypeDeterministicProbe,
-        ScenarioWave10Evidence.EvidenceStatusPositive,
-        ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
-        ScenarioWave10Evidence.ReasonNone,
-        new[] { "deterministic scout-intel probe is not organic campaign proof" });
+    var prepared = runtime.TryPrepareWave10EvidenceScenario(scenario);
+    if (!prepared)
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 scout-intel evidence lane");
 
-    return telemetry.ScoutIntelObserved > 0 && telemetry.CampaignTargetsWithScoutIntel > 0
-        ? telemetry
-        : telemetry with
+    var captureTicks = Math.Max(config.Ticks, GetWave10ProbeMinimumTicks(scenario));
+    ScenarioWave10TelemetrySnapshot? positiveTelemetry = null;
+    ScenarioWave10TelemetrySnapshot? freshScoutTelemetry = null;
+    ScenarioWave10TelemetrySnapshot latestTelemetry = BuildPositiveScoutTelemetry();
+
+    ScenarioWave10TelemetrySnapshot BuildPositiveScoutTelemetry()
+        => runtime.BuildScenarioWave10TelemetrySnapshot(
+            scenario,
+            ScenarioWave10Evidence.ProofTypeDeterministicProbe,
+            ScenarioWave10Evidence.EvidenceStatusPositive,
+            ScenarioWave10Evidence.TimelineSemanticsNotTickSampled,
+            ScenarioWave10Evidence.ReasonNone,
+            new[] { "deterministic scout-intel probe is not organic campaign proof" });
+
+    void CaptureTelemetrySample()
+    {
+        var telemetry = BuildPositiveScoutTelemetry();
+
+        if (telemetry.ScoutIntelObserved > 0 && telemetry.CampaignTargetsWithScoutIntel > 0)
+            positiveTelemetry ??= telemetry;
+        if (telemetry.ScoutIntelObserved > 0 && HasFreshScoutIntelSignal(telemetry))
+            freshScoutTelemetry = telemetry;
+
+        latestTelemetry = telemetry;
+    }
+
+    CaptureTelemetrySample();
+    for (var tick = 0; tick < captureTicks; tick++)
+    {
+        runtime.AdvanceTick(config.Dt);
+        CaptureTelemetrySample();
+    }
+
+    if (positiveTelemetry != null)
+        return positiveTelemetry;
+
+    if (freshScoutTelemetry != null)
+    {
+        return freshScoutTelemetry with
         {
             EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
             ReasonCode = ScenarioWave10Evidence.ReasonScoutIntelChoiceNotReproduced,
-            NonClaims = telemetry.ScoutIntelObserved > 0
-                ? RouteToStep10C(
-                    "scout intel was observed but campaign target-with-intel proof was not reproduced without strategist/policy changes",
-                    "route: P7-C(C) / Step10C-C scout-intel campaign-choice consume follow-up")
-                : RouteToStep10C(
-                    "scout-intel observe plus campaign-choice proof was not reproduced with existing production-safe probe setup",
-                    "route: Step10C-B runtime scout-intel evidence setup follow-up")
+            NonClaims = RouteToStep10C(
+                "scout intel was observed and remained fresh, but campaign target-with-intel proof was not reproduced under fresh-intel conditions",
+                "route: P7-C(C) / Step10C-C scout-intel campaign-choice consume follow-up")
         };
+    }
+
+    return latestTelemetry with
+    {
+        EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+        ReasonCode = ScenarioWave10Evidence.ReasonScoutIntelChoiceNotReproduced,
+        NonClaims = latestTelemetry.ScoutIntelObserved > 0
+            ? RouteToStep10C(
+                "scout intel was observed, but the probe window did not retain fresh scout intel long enough to prove campaign target-with-intel consume",
+                "route: Step10C-B runtime scout-intel timing/freshness follow-up")
+            : RouteToStep10C(
+                prepared
+                    ? "scout-intel setup was prepared but observe plus campaign-choice proof was not reproduced without gameplay policy changes"
+                    : "scout-intel observe plus campaign-choice proof was not reproduced with existing production-safe probe setup",
+                "route: Step10C-B runtime scout-intel evidence setup follow-up")
+    };
 }
 
 static SimulationRuntime CreateWave10Runtime(ScenarioConfig config, NpcPlannerMode planner, int seed)

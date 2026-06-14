@@ -2334,12 +2334,17 @@ Step10A validation result:
 - SMR prep validation artifact `.artifacts/smr/wave10-smr-prep-validation-001/` completed 72 runs with exit code 0, no assertions, and no anomalies; artifact/provenance surface is valid (`runs[].wave10` main-world truth, probe evidence in `wave10-probes.json`, drilldown non-overclaim intact).
 - Track B unavailable-lane fix artifact `.artifacts/smr/wave10-unavailable-lane-fix-001/` completed the 3 seed x 3 planner x 8 config probe matrix. Results: `manual_operator_launch` 9/9 positive, `multi_front_bounded` 9/9 positive as deterministic active multi-front proof (not organic proof), `campaign_siege_resolution` partial 3/9 positive, `forward_base_long_campaign` partial 5/9 positive, and `organic_campaign_launch` / `supply_line_convoy` / `scout_intel_campaign_choice` / `siege_unit_breach` remain explicit `proof_unavailable` with targeted Step10C/Meta-YELLOW routes.
 - Mini-review result: Track B evidence/probe fix pass is accepted as commit-safe YELLOW. The fix pass improved evidence classification and one core lane, but clean Step10B is still blocked by default; open Step10C-B/C next unless the user explicitly accepts a YELLOW Step10B with the recorded non-claims.
+- Step10C-B Track B follow-up evidence artifact `.artifacts/smr/wave10-step10c-b-runtime-evidence-002/` completed the 3 seed x 3 planner x 8 config probe matrix with exit code 0, no assertions, no anomalies, and 8/8 positive lanes. The previous scout timing blocker is cleared: `scout_intel_campaign_choice` now measures in a bounded fresh-intel window (`ticks=20` in the probe artifact) and representative probes show `scoutIntelObserved=1`, `activeScoutIntel=1`, `freshScoutIntel=1`, `campaignTargetsWithScoutIntel=1`.
 
 Step10A follow-up triage plan:
 - Active handoff source: `Docs/Plans/Master/Wave10-Unavailable-Lane-Triage-Plan.md`.
 - Locked policy: core proof positive before clean Step10B where feasible; expensive/rare/visual gaps may be explicitly deferred to Step10C; Track B first pass is evidence/probe-only and must not use gameplay tuning to make lanes green.
 - Core Track B fix-now lanes before Step10B: `organic_campaign_launch`, `campaign_siege_resolution`, `supply_line_convoy`, `multi_front_bounded`.
 - Conditional/defer lanes: `forward_base_long_campaign`, `scout_intel_campaign_choice`, `siege_unit_breach` may be fixed if evidence-only setup is enough, otherwise they must be routed to Step10C-B/A/C or future-wave accepted limitation with explicit non-claims.
+- User-approved next route: Step10C-B/C first pass is now opened before clean Step10B. Track B receives the first implementation handoff and must classify the remaining unavailable/partial lanes as deterministic setup gap, telemetry export gap, Track B runtime behavior gap, Track C strategist/advisory gap, or accepted low-incidence/deferred limitation.
+- Active Track B result: supply, campaign siege/resolution, siege-unit action, forward-base lifecycle, scout-intel target-with-intel, multi-front, and organic launch proof are now positive in the Step10C-B follow-up artifact while preserving `runs[].wave10` main-world truth and `wave10-probes.json` side-probe provenance. Supply remains request-bound outcome proof unless delivered/failed counters become positive.
+- Track C remains closed from the current evidence; the previous scout-intel consume blocker was resolved in Track B.
+- Next Meta gate: review `.artifacts/smr/wave10-step10c-b-runtime-evidence-002/` and decide whether Step10B can proceed from the now-8/8-positive Track B package.
 
 **Step 10B — final Wave 10 closeout evidence**
 
@@ -2354,8 +2359,8 @@ Step10B manual evidence input:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator | Wave 10 gap triage | Step10B reviewed OR explicit user manual evidence request | Promote accepted manual-smoke + SMR residuals into a bounded fix bucket. Do not open by default if Step10A/10B produce no actionable gameplay/runtime/UI gaps. |
-| Track B agent | Step10C-B runtime/operator/fortification hardening | Meta triage ✅ | Candidate scope: manual/operator campaign sizing and assembly quality, siege-unit incidence/build/use follow-up if SMR/manual evidence shows low real activation, and wall placement coherence / defensive usefulness. |
+| Meta Coordinator | Wave 10 gap triage | Step10A unavailable-lane YELLOW + user approval to open Step10C-B/C before clean Step10B | ✅ Opened from Step10A evidence residuals. Promote only evidence-backed residuals into bounded fixes; do not convert lane presence into proof. |
+| Track B agent | Step10C-B runtime/evidence gap first pass | Meta triage ✅ + Track B handoff sent | 🔄 Follow-up evidence ready for Meta mini-review. The `-002` artifact preserves `runs[].wave10` main-world truth and `wave10-probes.json` side-probe provenance and reports 8/8 positive lanes; the former scout-intel timing blocker is cleared inside a fresh-intel probe window. |
 | Track A agent | Step10C-A fortification readability pass | Meta triage ✅ | Candidate scope: wall/watchtower icon scale/readability and siege/manual clarity improvements. |
 | Track C agent | Step10C-C advisory follow-up (conditional) | Explicit Track B or SMR handoff | Only if Step10B/Step10C-B proves a real strategist/advisory gap rather than a runtime/operator/visual issue. |
 
