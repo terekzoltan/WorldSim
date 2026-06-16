@@ -104,6 +104,23 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
         foreach (var seed in seeds.OrderBy(s => s))
         {
             var mainRunConfig = ResolveMainRunExecutionConfig(config, assertEnabled);
+            if (IsWave10LifecycleScenario(mainRunConfig.Wave10Scenario))
+            {
+                var lifecycleRunResult = RunRuntimeBackedWave10LifecycleScenario(
+                    mainRunConfig,
+                    planner,
+                    seed,
+                    visualLaneResolution.Effective,
+                    perfEnabled,
+                    drilldownEnabled,
+                    drilldownSampleEvery,
+                    out var lifecycleTimelineSamples);
+                runs.Add(lifecycleRunResult);
+                if (lifecycleTimelineSamples is not null)
+                    runTimelines[BuildRunKey(lifecycleRunResult)] = lifecycleTimelineSamples;
+                continue;
+            }
+
             var world = new World(
                 width: mainRunConfig.Width,
                 height: mainRunConfig.Height,
@@ -206,7 +223,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
 
 static ScenarioConfig ResolveMainRunExecutionConfig(ScenarioConfig config, bool assertEnabled)
 {
-    if (!assertEnabled || string.IsNullOrWhiteSpace(config.Wave10Scenario))
+    if (!assertEnabled || string.IsNullOrWhiteSpace(config.Wave10Scenario) || IsWave10LifecycleScenario(config.Wave10Scenario))
         return config;
 
     // Wave10 feature proof comes from side probes. Under assert mode, keep the companion
@@ -384,6 +401,337 @@ static ScenarioRunResult BuildRunResult(
         EcologyBalance: ecologyBalance,
         Supply: supplyTelemetry,
         EnablePredatorHumanAttacks: world.EnablePredatorHumanAttacks);
+}
+
+static ScenarioRunResult RunRuntimeBackedWave10LifecycleScenario(
+    ScenarioConfig config,
+    NpcPlannerMode planner,
+    int seed,
+    LowCostProfileLane visualLane,
+    bool perfEnabled,
+    bool drilldownEnabled,
+    int drilldownSampleEvery,
+    out List<ScenarioTimelineSample>? timelineSamples)
+{
+    var runtime = CreateScenarioRuntime(config, planner, seed);
+    ApplyWave10LifecyclePreconditions(runtime, config.Wave10Scenario);
+
+    timelineSamples = drilldownEnabled ? new List<ScenarioTimelineSample>() : null;
+    List<double>? tickTimesMs = perfEnabled ? new List<double>(config.Ticks) : null;
+    long peakEntities = 0;
+    var peakActiveBattles = 0;
+    var peakActiveCombatGroups = 0;
+    var peakRoutingPeople = 0;
+    var ticksWithActiveBattle = 0;
+    var minCombatMoraleObserved = 100f;
+    var sawLivingPerson = false;
+    long? manualLaunchAttemptTick = null;
+    var manualLaunchSucceeded = false;
+    var manualLaunchStatus = "not_attempted";
+    var manualLaunchTick = ResolveManualLaunchTick(config);
+
+    for (var i = 0; i < config.Ticks; i++)
+    {
+        var tickNumber = i + 1L;
+        if (config.Wave10Scenario == "manual_operator_campaign_lifecycle" && !manualLaunchAttemptTick.HasValue && tickNumber >= manualLaunchTick)
+        {
+            var creation = runtime.TryCreateManualCampaign(ManualCampaignLaunchCommand.DefaultOperatorSmoke);
+            manualLaunchAttemptTick = tickNumber;
+            manualLaunchSucceeded = creation.Success;
+            manualLaunchStatus = creation.Status.ToString();
+        }
+
+        var perfTickMs = 0d;
+        if (perfEnabled)
+        {
+            var stopwatch = Stopwatch.StartNew();
+            runtime.AdvanceTick(config.Dt);
+            stopwatch.Stop();
+            perfTickMs = stopwatch.Elapsed.TotalMilliseconds;
+            tickTimesMs!.Add(perfTickMs);
+        }
+        else
+        {
+            runtime.AdvanceTick(config.Dt);
+        }
+
+        var tickTelemetry = runtime.BuildScenarioRunTelemetrySnapshot();
+        peakEntities = Math.Max(peakEntities, tickTelemetry.EntityCount);
+        peakActiveBattles = Math.Max(peakActiveBattles, tickTelemetry.ActiveBattles);
+        peakActiveCombatGroups = Math.Max(peakActiveCombatGroups, tickTelemetry.ActiveCombatGroups);
+        if (tickTelemetry.ActiveBattles > 0)
+            ticksWithActiveBattle++;
+        peakRoutingPeople = Math.Max(peakRoutingPeople, tickTelemetry.RoutingPeople);
+        if (tickTelemetry.People > 0)
+        {
+            sawLivingPerson = true;
+            minCombatMoraleObserved = Math.Min(minCombatMoraleObserved, tickTelemetry.MinCombatMorale);
+        }
+
+        if (timelineSamples is not null && ShouldCaptureTickSample(i, config.Ticks, drilldownSampleEvery))
+        {
+            var wave10Timeline = BuildLifecycleWave10Telemetry(
+                    runtime,
+                    config,
+                    manualLaunchAttemptTick,
+                    manualLaunchSucceeded,
+                    manualLaunchStatus)
+                .ToTimelineSnapshot();
+            timelineSamples.Add(BuildRuntimeTimelineSample(tickTelemetry, wave10Timeline, (int)tickNumber, perfTickMs));
+        }
+    }
+
+    var finalTelemetry = runtime.BuildScenarioRunTelemetrySnapshot();
+    var wave10Telemetry = BuildLifecycleWave10Telemetry(
+        runtime,
+        config,
+        manualLaunchAttemptTick,
+        manualLaunchSucceeded,
+        manualLaunchStatus);
+
+    return BuildRuntimeBackedRunResult(
+        finalTelemetry,
+        config,
+        planner,
+        seed,
+        visualLane,
+        wave10Telemetry,
+        tickTimesMs,
+        peakEntities,
+        peakActiveBattles,
+        peakActiveCombatGroups,
+        peakRoutingPeople,
+        ticksWithActiveBattle,
+        sawLivingPerson ? minCombatMoraleObserved : 100f);
+}
+
+static ScenarioRunResult BuildRuntimeBackedRunResult(
+    ScenarioRunTelemetrySnapshot telemetry,
+    ScenarioConfig config,
+    NpcPlannerMode planner,
+    int seed,
+    LowCostProfileLane visualLane,
+    ScenarioWave10TelemetrySnapshot wave10Telemetry,
+    List<double>? tickTimesMs,
+    long peakEntities,
+    int peakActiveBattles,
+    int peakActiveCombatGroups,
+    int peakRoutingPeople,
+    int ticksWithActiveBattle,
+    float minCombatMoraleObserved)
+{
+    var perfAvgTickMs = 0d;
+    var perfMaxTickMs = 0d;
+    var perfP99TickMs = 0d;
+    var perfPeakEntities = 0L;
+    if (tickTimesMs is { Count: > 0 })
+    {
+        perfAvgTickMs = tickTimesMs.Average();
+        perfMaxTickMs = tickTimesMs.Max();
+        var sortedTickTimes = tickTimesMs.OrderBy(value => value).ToArray();
+        var p99Index = (int)(0.99 * sortedTickTimes.Length);
+        if (p99Index >= sortedTickTimes.Length)
+            p99Index = sortedTickTimes.Length - 1;
+        perfP99TickMs = sortedTickTimes[p99Index];
+        perfPeakEntities = peakEntities;
+    }
+
+    return new ScenarioRunResult(
+        ConfigName: config.Name,
+        PlannerMode: planner.ToString(),
+        Seed: seed,
+        VisualLane: visualLane.ToString(),
+        Width: config.Width,
+        Height: config.Height,
+        InitialPop: config.InitialPop,
+        Ticks: config.Ticks,
+        Dt: config.Dt,
+        EnableCombatPrimitives: config.EnableCombatPrimitives,
+        EnableDiplomacy: config.EnableDiplomacy,
+        EnableSiege: config.EnableSiege,
+        StoneBuildingsEnabled: config.StoneBuildingsEnabled,
+        BirthRateMultiplier: config.BirthRateMultiplier,
+        MovementSpeedMultiplier: config.MovementSpeedMultiplier,
+        LivingColonies: telemetry.LivingColonies,
+        People: telemetry.People,
+        Food: telemetry.Food,
+        AverageFoodPerPerson: telemetry.AverageFoodPerPerson,
+        DeathsOldAge: telemetry.DeathsOldAge,
+        DeathsStarvation: telemetry.DeathsStarvation,
+        DeathsPredator: telemetry.DeathsPredator,
+        DeathsOther: telemetry.DeathsOther,
+        CombatDeaths: telemetry.CombatDeaths,
+        CombatEngagements: telemetry.CombatEngagements,
+        PredatorKillsByHumans: telemetry.PredatorKillsByHumans,
+        BattleTicks: telemetry.BattleTicks,
+        PeakActiveBattles: peakActiveBattles,
+        PeakActiveCombatGroups: peakActiveCombatGroups,
+        PeakRoutingPeople: peakRoutingPeople,
+        TicksWithActiveBattle: ticksWithActiveBattle,
+        MinCombatMoraleObserved: minCombatMoraleObserved,
+        DeathsStarvationRecent60s: telemetry.DeathsStarvationRecent60s,
+        DeathsStarvationWithFood: telemetry.DeathsStarvationWithFood,
+        OverlapResolveMoves: telemetry.OverlapResolveMoves,
+        CrowdDissipationMoves: telemetry.CrowdDissipationMoves,
+        BirthFallbackToOccupied: telemetry.BirthFallbackToOccupied,
+        BirthFallbackToParent: telemetry.BirthFallbackToParent,
+        BuildSiteResets: telemetry.BuildSiteResets,
+        NoProgressBackoffResource: telemetry.NoProgressBackoffResource,
+        NoProgressBackoffBuild: telemetry.NoProgressBackoffBuild,
+        NoProgressBackoffFlee: telemetry.NoProgressBackoffFlee,
+        NoProgressBackoffCombat: telemetry.NoProgressBackoffCombat,
+        AiNoPlanDecisions: telemetry.AiNoPlanDecisions,
+        AiReplanBackoffDecisions: telemetry.AiReplanBackoffDecisions,
+        AiResearchTechDecisions: telemetry.AiResearchTechDecisions,
+        DenseNeighborhoodTicks: telemetry.DenseNeighborhoodTicks,
+        LastTickDenseActors: telemetry.LastTickDenseActors,
+        Contact: telemetry.Contact,
+        Ai: telemetry.Ai,
+        Wave9: ScenarioWave9TelemetrySnapshot.Empty,
+        Wave10: wave10Telemetry,
+        PerfAvgTickMs: perfAvgTickMs,
+        PerfMaxTickMs: perfMaxTickMs,
+        PerfP99TickMs: perfP99TickMs,
+        PerfPeakEntities: perfPeakEntities,
+        Ecology: telemetry.Ecology,
+        EcologyBalance: telemetry.EcologyBalance,
+        Supply: telemetry.Supply,
+        EnablePredatorHumanAttacks: telemetry.EnablePredatorHumanAttacks);
+}
+
+static ScenarioTimelineSample BuildRuntimeTimelineSample(
+    ScenarioRunTelemetrySnapshot telemetry,
+    ScenarioWave10TimelineSnapshot wave10Telemetry,
+    int tick,
+    double perfTickMs)
+    => new(
+        Tick: tick,
+        People: telemetry.People,
+        Food: telemetry.Food,
+        LivingColonies: telemetry.LivingColonies,
+        CombatDeaths: telemetry.CombatDeaths,
+        CombatEngagements: telemetry.CombatEngagements,
+        BattleTicks: telemetry.BattleTicks,
+        ActiveBattles: telemetry.ActiveBattles,
+        ActiveCombatGroups: telemetry.ActiveCombatGroups,
+        RoutingPeople: telemetry.RoutingPeople,
+        MinCombatMorale: telemetry.MinCombatMorale,
+        NoProgressBackoffResource: telemetry.NoProgressBackoffResource,
+        NoProgressBackoffBuild: telemetry.NoProgressBackoffBuild,
+        NoProgressBackoffFlee: telemetry.NoProgressBackoffFlee,
+        NoProgressBackoffCombat: telemetry.NoProgressBackoffCombat,
+        AiNoPlanDecisions: telemetry.AiNoPlanDecisions,
+        AiReplanBackoffDecisions: telemetry.AiReplanBackoffDecisions,
+        AiResearchTechDecisions: telemetry.AiResearchTechDecisions,
+        Contact: telemetry.Contact.ToTimelineSnapshot(),
+        Ai: telemetry.Ai.ToTimelineSnapshot(),
+        Wave9: ScenarioWave9TimelineSnapshot.Empty,
+        Wave10: wave10Telemetry,
+        Ecology: telemetry.Ecology.ToTimelineSnapshot(),
+        Supply: telemetry.Supply.ToTimelineSnapshot(),
+        PerfTickMs: perfTickMs);
+
+static ScenarioWave10TelemetrySnapshot BuildLifecycleWave10Telemetry(
+    SimulationRuntime runtime,
+    ScenarioConfig config,
+    long? manualLaunchAttemptTick,
+    bool manualLaunchSucceeded,
+    string manualLaunchStatus)
+{
+    var proofType = config.Wave10Scenario == "manual_operator_campaign_lifecycle"
+        ? ScenarioWave10Evidence.ProofTypeManualOperator
+        : ScenarioWave10Evidence.ProofTypeOrganic;
+    var telemetry = runtime.BuildScenarioWave10TelemetrySnapshot(
+        config.Wave10Scenario,
+        proofType,
+        ScenarioWave10Evidence.EvidenceStatusPositive,
+        ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+        ScenarioWave10Evidence.ReasonNone,
+        BuildLifecycleNonClaims(config.Wave10Scenario),
+        ScenarioWave10Evidence.RuntimeSourceMainWorldRun,
+        manualLaunchAttemptTick,
+        manualLaunchSucceeded,
+        manualLaunchStatus);
+
+    if (config.Wave10Scenario == "manual_operator_campaign_lifecycle" && !manualLaunchSucceeded)
+    {
+        return telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonLaneNotConfigured,
+            NonClaims = RouteToStep10C(
+                "manual operator lifecycle attempted the runtime command but campaign creation did not succeed",
+                "route: Step10C-B runtime manual/operator launch follow-up")
+        };
+    }
+
+    if (config.Wave10Scenario == "organic_hostile_campaign_lifecycle" && telemetry.CampaignLaunches == 0)
+    {
+        return telemetry with
+        {
+            EvidenceStatus = ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ReasonCode = ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            NonClaims = RouteToStep10C(
+                "hostile organic lifecycle ran with runtime-owned war preconditions but no organic campaign launch occurred",
+                "route: Step10C-B/C classify runtime precondition vs strategist/advisory suppression")
+        };
+    }
+
+    return telemetry;
+}
+
+static string[] BuildLifecycleNonClaims(string? wave10Scenario)
+    => wave10Scenario switch
+    {
+        "manual_operator_campaign_lifecycle" => new[] { "manual operator lifecycle is runtime command proof, not App hotkey/UI proof" },
+        "organic_hostile_campaign_lifecycle" => new[] { "hostile lifecycle uses runtime war preconditions but does not directly create campaigns" },
+        "organic_campaign_lifecycle" => new[] { "pure organic no-launch runs may still be valid rarity evidence" },
+        _ => Array.Empty<string>()
+    };
+
+static int ResolveManualLaunchTick(ScenarioConfig config)
+{
+    var requested = config.Wave10ManualLaunchTick ?? 100;
+    return Math.Clamp(requested, 1, Math.Max(1, config.Ticks));
+}
+
+static SimulationRuntime CreateScenarioRuntime(ScenarioConfig config, NpcPlannerMode planner, int seed)
+    => WithTemporaryEnvironment(
+        new Dictionary<string, string?>
+        {
+            ["WORLDSIM_ENABLE_DIPLOMACY"] = config.EnableDiplomacy.ToString(),
+            ["WORLDSIM_ENABLE_COMBAT_PRIMITIVES"] = config.EnableCombatPrimitives.ToString(),
+            ["WORLDSIM_ENABLE_SIEGE"] = config.EnableSiege.ToString(),
+            ["WORLDSIM_ENABLE_PREDATOR_ATTACKS"] = config.EnablePredatorHumanAttacks.ToString()
+        },
+        () =>
+        {
+            var runtime = new SimulationRuntime(
+                width: config.Width,
+                height: config.Height,
+                initialPopulation: config.InitialPop,
+                technologyFilePath: FindTechPath(),
+                aiOptions: new RuntimeAiOptions { PlannerMode = planner },
+                randomSeed: seed);
+            runtime.ConfigureScenarioRunnerWorldOptions(
+                config.EnableCombatPrimitives,
+                config.EnableDiplomacy,
+                config.EnableSiege,
+                config.EnablePredatorHumanAttacks,
+                config.StoneBuildingsEnabled,
+                config.BirthRateMultiplier,
+                config.MovementSpeedMultiplier,
+                config.AnimalReplenishmentChancePerSecond,
+                config.PredatorReplenishmentChance,
+                config.FoodRegrowthMinSeconds,
+                config.FoodRegrowthJitterSeconds);
+            return runtime;
+        });
+
+static void ApplyWave10LifecyclePreconditions(SimulationRuntime runtime, string? wave10Scenario)
+{
+    if (wave10Scenario == "organic_hostile_campaign_lifecycle")
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "wave10 step10b2 hostile lifecycle");
 }
 
 static void ApplyEcologyBalanceConfig(World world, ScenarioConfig config)
@@ -646,6 +994,35 @@ static ScenarioWave10ProbeEvidenceSummary BuildWave10ProbeEvidenceSummary(IReadO
         ProofTypes: proofTypes,
         UnavailableLaneNames: unavailable,
         ArtifactFile: probes.Count > 0 ? "wave10-probes.json" : null);
+}
+
+static ScenarioWave10ManifestSummary BuildWave10ManifestSummary(ScenarioRunEnvelope envelope, IReadOnlyList<ScenarioWave10ProbeEvidence> probes)
+{
+    var mainRunWave10 = envelope.Runs
+        .Select(run => run.Wave10)
+        .Where(wave10 => wave10.ProofType != ScenarioWave10Evidence.ProofTypeNotConfigured)
+        .ToArray();
+
+    var lanes = probes
+        .Select(probe => probe.Wave10Scenario)
+        .Concat(mainRunWave10.Select(wave10 => wave10.Wave10Scenario))
+        .Where(name => !string.IsNullOrWhiteSpace(name) && name != "none")
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(name => name, StringComparer.Ordinal)
+        .ToArray();
+    var proofTypes = probes
+        .Select(probe => probe.Telemetry.ProofType)
+        .Concat(mainRunWave10.Select(wave10 => wave10.ProofType))
+        .Where(proofType => !string.IsNullOrWhiteSpace(proofType))
+        .Distinct(StringComparer.Ordinal)
+        .OrderBy(proofType => proofType, StringComparer.Ordinal)
+        .ToArray();
+
+    return new ScenarioWave10ManifestSummary(
+        Enabled: probes.Count > 0 || mainRunWave10.Length > 0,
+        RunCount: probes.Count + mainRunWave10.Length,
+        LaneNames: lanes,
+        ProofTypes: proofTypes);
 }
 
 static string BuildWave10ProbeKey(string configName, NpcPlannerMode planner, int seed, string scenario)
@@ -1229,6 +1606,7 @@ static void WriteArtifactBundle(
     if (wave10ProbeEvidence.Count > 0)
         File.WriteAllText(Path.Combine(artifactDir, "wave10-probes.json"), JsonSerializer.Serialize(wave10ProbeEvidence, jsonOptions));
     var wave10Summary = BuildWave10ProbeEvidenceSummary(wave10ProbeEvidence);
+    var wave10ManifestSummary = BuildWave10ManifestSummary(envelope, wave10ProbeEvidence);
 
     var manifest = new ScenarioArtifactManifest(
         SchemaVersion: "smr/v1",
@@ -1258,10 +1636,10 @@ static void WriteArtifactBundle(
         DrilldownSelectedRuns: drilldownSummary.SelectedRuns,
         DrilldownTopN: drilldownSummary.TopN,
         DrilldownSampleEvery: drilldownSummary.SampleEvery,
-        Wave10Enabled: wave10Summary.Enabled,
-        Wave10RunCount: wave10Summary.ProbeCount,
-        Wave10LaneNames: wave10Summary.LaneNames,
-        Wave10ProofTypes: wave10Summary.ProofTypes);
+        Wave10Enabled: wave10ManifestSummary.Enabled,
+        Wave10RunCount: wave10ManifestSummary.RunCount,
+        Wave10LaneNames: wave10ManifestSummary.LaneNames,
+        Wave10ProofTypes: wave10ManifestSummary.ProofTypes);
 
     File.WriteAllText(Path.Combine(artifactDir, "manifest.json"), JsonSerializer.Serialize(manifest, jsonOptions));
     File.WriteAllText(Path.Combine(artifactDir, "run.log"), runLog);
@@ -2229,7 +2607,7 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
             var normalizedWave10Scenario = NormalizeWave10Scenario(config.Wave10Scenario);
             if (normalizedWave10Scenario == InvalidWave10Scenario)
             {
-                warnings.Add($"Warning: invalid scenario config at index {index} (Wave10Scenario must be null or one of: manual_operator_launch, organic_campaign_launch, siege_unit_breach, multi_front_bounded, campaign_siege_resolution, supply_line_convoy, forward_base_long_campaign, scout_intel_campaign_choice, or documented aliases). Ignoring entry and marking run as config_error.");
+                warnings.Add($"Warning: invalid scenario config at index {index} (Wave10Scenario must be null or one of: manual_operator_launch, organic_campaign_launch, organic_campaign_lifecycle, organic_hostile_campaign_lifecycle, manual_operator_campaign_lifecycle, siege_unit_breach, multi_front_bounded, campaign_siege_resolution, supply_line_convoy, forward_base_long_campaign, scout_intel_campaign_choice, or documented aliases). Ignoring entry and marking run as config_error.");
                 continue;
             }
 
@@ -2286,6 +2664,9 @@ static string? NormalizeWave10Scenario(string? raw)
     {
         "manual_operator_launch" or "manual-operator-launch" => "manual_operator_launch",
         "organic_campaign_launch" or "organic-campaign-launch" => "organic_campaign_launch",
+        "organic_campaign_lifecycle" or "organic-campaign-lifecycle" => "organic_campaign_lifecycle",
+        "organic_hostile_campaign_lifecycle" or "organic-hostile-campaign-lifecycle" => "organic_hostile_campaign_lifecycle",
+        "manual_operator_campaign_lifecycle" or "manual-operator-campaign-lifecycle" => "manual_operator_campaign_lifecycle",
         "siege_unit_breach" or "siege-unit-breach" => "siege_unit_breach",
         "multi_front_bounded" or "multi-front-bounded" => "multi_front_bounded",
         "campaign_siege_resolution" or "campaign-siege-resolution" => "campaign_siege_resolution",
@@ -2295,6 +2676,11 @@ static string? NormalizeWave10Scenario(string? raw)
         _ => InvalidWave10Scenario
     };
 }
+
+static bool IsWave10LifecycleScenario(string? raw)
+    => raw is "organic_campaign_lifecycle"
+        or "organic_hostile_campaign_lifecycle"
+        or "manual_operator_campaign_lifecycle";
 
 static bool IsCoreScenarioLane(string? rawLane)
     => string.IsNullOrWhiteSpace(rawLane)
@@ -2397,7 +2783,8 @@ sealed record ScenarioConfig(
     float? FoodRegrowthJitterSeconds = null,
     string? SupplyScenario = null,
     string? Wave9Scenario = null,
-    string? Wave10Scenario = null);
+    string? Wave10Scenario = null,
+    int? Wave10ManualLaunchTick = null);
 
 sealed record ScenarioRunResult(
     string ConfigName,
@@ -2476,6 +2863,12 @@ sealed record ScenarioWave10ProbeEvidenceSummary(
     string[] ProofTypes,
     string[] UnavailableLaneNames,
     string? ArtifactFile);
+
+sealed record ScenarioWave10ManifestSummary(
+    bool Enabled,
+    int RunCount,
+    string[] LaneNames,
+    string[] ProofTypes);
 
 sealed record ScenarioWave10ProbeEvidence(
     string ProbeKey,

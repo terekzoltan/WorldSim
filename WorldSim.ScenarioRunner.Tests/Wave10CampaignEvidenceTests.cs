@@ -271,6 +271,97 @@ public sealed class Wave10CampaignEvidenceTests
     }
 
     [Fact]
+    public void Wave10ManualOperatorLifecycle_ExportsRuntimeBackedMainRunTelemetryAndSampledTimeline()
+    {
+        var artifactDir = CreateArtifactDir();
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "101",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = LifecycleConfigJson("manual-lifecycle", "manual-operator-campaign-lifecycle", ticks: 80, manualLaunchTick: 1),
+                ["WORLDSIM_SCENARIO_DRILLDOWN"] = "true",
+                ["WORLDSIM_SCENARIO_DRILLDOWN_TOP"] = "1",
+                ["WORLDSIM_SCENARIO_SAMPLE_EVERY"] = "20"
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        Assert.False(File.Exists(Path.Combine(artifactDir, "wave10-probes.json")), "Lifecycle main-run truth must not be exported as side-probe evidence.");
+
+        using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var run = summary.RootElement.GetProperty("runs").EnumerateArray().Single();
+        var wave10 = run.GetProperty("wave10");
+        AssertWave10BlockShape(wave10);
+        Assert.Equal("manual_operator_campaign_lifecycle", wave10.GetProperty("wave10Scenario").GetString());
+        Assert.Equal("main_world_run", wave10.GetProperty("runtimeSource").GetString());
+        Assert.Equal("manual_operator", wave10.GetProperty("proofType").GetString());
+        Assert.Equal("tick_sampled", wave10.GetProperty("timelineSemantics").GetString());
+        Assert.Equal(1, wave10.GetProperty("manualLaunchAttemptTick").GetInt64());
+        Assert.True(wave10.GetProperty("manualLaunchAttempted").GetBoolean());
+        Assert.True(wave10.GetProperty("manualLaunchSucceeded").GetBoolean(), $"Manual lifecycle launch failed\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.Equal("Created", wave10.GetProperty("manualLaunchStatus").GetString());
+        Assert.True(wave10.GetProperty("campaignLaunches").GetInt32() > 0, $"No campaign lifecycle after manual launch\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(wave10.GetProperty("firstCampaignLaunchTick").GetInt64() <= 1);
+
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.True(manifest.RootElement.GetProperty("wave10Enabled").GetBoolean());
+        Assert.Equal(1, manifest.RootElement.GetProperty("wave10RunCount").GetInt32());
+        Assert.Contains("manual_operator_campaign_lifecycle", manifest.RootElement.GetProperty("wave10LaneNames").EnumerateArray().Select(value => value.GetString()));
+
+        using var index = ReadJson(Path.Combine(artifactDir, "drilldown", "index.json"));
+        var runKey = index.RootElement.GetProperty("runs").EnumerateArray().First().GetProperty("runKey").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(runKey));
+        using var timeline = ReadJson(Path.Combine(artifactDir, "drilldown", runKey!, "timeline.json"));
+        var samples = timeline.RootElement.EnumerateArray().ToArray();
+        Assert.NotEmpty(samples);
+        Assert.All(samples, sample =>
+        {
+            var sampleWave10 = sample.GetProperty("wave10");
+            Assert.Equal("manual_operator_campaign_lifecycle", sampleWave10.GetProperty("wave10Scenario").GetString());
+            Assert.Equal("main_world_run", sampleWave10.GetProperty("runtimeSource").GetString());
+            Assert.Equal("tick_sampled", sampleWave10.GetProperty("timelineSemantics").GetString());
+        });
+    }
+
+    [Fact]
+    public void Wave10HostileLifecycle_UsesOrganicMainRunTelemetryWithoutProbeArtifact()
+    {
+        var artifactDir = CreateArtifactDir();
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "101",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = LifecycleConfigJson("hostile-lifecycle", "organic-hostile-campaign-lifecycle", ticks: 80),
+                ["WORLDSIM_SCENARIO_DRILLDOWN"] = "true",
+                ["WORLDSIM_SCENARIO_DRILLDOWN_TOP"] = "1",
+                ["WORLDSIM_SCENARIO_SAMPLE_EVERY"] = "20"
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        Assert.False(File.Exists(Path.Combine(artifactDir, "wave10-probes.json")), "Hostile lifecycle is main-run truth, not side-probe evidence.");
+        using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var wave10 = summary.RootElement.GetProperty("runs").EnumerateArray().Single().GetProperty("wave10");
+        Assert.Equal("organic_hostile_campaign_lifecycle", wave10.GetProperty("wave10Scenario").GetString());
+        Assert.Equal("main_world_run", wave10.GetProperty("runtimeSource").GetString());
+        Assert.Equal("organic", wave10.GetProperty("proofType").GetString());
+        Assert.Equal("tick_sampled", wave10.GetProperty("timelineSemantics").GetString());
+
+        using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
+        Assert.True(manifest.RootElement.GetProperty("wave10Enabled").GetBoolean());
+        Assert.Equal(1, manifest.RootElement.GetProperty("wave10RunCount").GetInt32());
+        Assert.Contains("organic_hostile_campaign_lifecycle", manifest.RootElement.GetProperty("wave10LaneNames").EnumerateArray().Select(value => value.GetString()));
+    }
+
+    [Fact]
     public void InvalidWave10Scenario_ReturnsConfigError()
     {
         var artifactDir = CreateArtifactDir();
@@ -407,6 +498,17 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.True(wave10.TryGetProperty("campaignLaunchBlockedByCap", out _));
         Assert.True(wave10.TryGetProperty("campaignLaunchBlockedByPairCap", out _));
         Assert.True(wave10.TryGetProperty("maxActiveCampaignsForAnyFaction", out _));
+        Assert.True(wave10.TryGetProperty("firstCampaignLaunchTick", out _));
+        Assert.True(wave10.TryGetProperty("firstAssemblyTick", out _));
+        Assert.True(wave10.TryGetProperty("firstMarchTick", out _));
+        Assert.True(wave10.TryGetProperty("firstEncounterTick", out _));
+        Assert.True(wave10.TryGetProperty("firstSiegeTick", out _));
+        Assert.True(wave10.TryGetProperty("firstResolutionTick", out _));
+        Assert.True(wave10.TryGetProperty("longestUnresolvedCampaignAgeTicks", out _));
+        Assert.True(wave10.TryGetProperty("manualLaunchAttemptTick", out _));
+        Assert.True(wave10.TryGetProperty("manualLaunchAttempted", out _));
+        Assert.True(wave10.TryGetProperty("manualLaunchSucceeded", out _));
+        Assert.True(wave10.TryGetProperty("manualLaunchStatus", out _));
     }
 
     private static string RemoveWave10BlocksFromSummary(string summaryPath)
@@ -430,6 +532,14 @@ public sealed class Wave10CampaignEvidenceTests
         => $$"""
            {"Name":"{{name}}","Width":32,"Height":32,"InitialPop":24,"Ticks":{{ticks}},"Dt":{{dt.ToString(System.Globalization.CultureInfo.InvariantCulture)}},"EnableCombatPrimitives":true,"EnableDiplomacy":true,"StoneBuildingsEnabled":false,"BirthRateMultiplier":0.0,"MovementSpeedMultiplier":1.0,"EnableSiege":true,"Wave10Scenario":"{{wave10Scenario}}"}
            """;
+
+    private static string LifecycleConfigJson(string name, string wave10Scenario, int ticks, int? manualLaunchTick = null)
+    {
+        var launchTickJson = manualLaunchTick.HasValue ? $",\"Wave10ManualLaunchTick\":{manualLaunchTick.Value}" : string.Empty;
+        return $$"""
+            [{"Name":"{{name}}","Width":40,"Height":40,"InitialPop":80,"Ticks":{{ticks}},"Dt":0.25,"EnableCombatPrimitives":true,"EnableDiplomacy":true,"StoneBuildingsEnabled":false,"BirthRateMultiplier":0.0,"MovementSpeedMultiplier":1.0,"EnableSiege":true,"Wave10Scenario":"{{wave10Scenario}}"{{launchTickJson}}}]
+            """;
+    }
 
     private static int RunScenarioRunner(
         string artifactDir,

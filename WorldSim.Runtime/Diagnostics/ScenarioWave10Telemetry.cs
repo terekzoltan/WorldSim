@@ -40,7 +40,14 @@ public sealed record ScenarioWave10TimelineSnapshot(
     int ResolvedCampaigns,
     int ActiveSiegeUnits,
     int CampaignLaunchBlockedByCap,
-    int CampaignLaunchBlockedByPairCap)
+    int CampaignLaunchBlockedByPairCap,
+    long? FirstCampaignLaunchTick,
+    long? FirstAssemblyTick,
+    long? FirstMarchTick,
+    long? FirstEncounterTick,
+    long? FirstSiegeTick,
+    long? FirstResolutionTick,
+    long LongestUnresolvedCampaignAgeTicks)
 {
     public static ScenarioWave10TimelineSnapshot Empty { get; } = new(
         Wave10Scenario: "none",
@@ -52,7 +59,14 @@ public sealed record ScenarioWave10TimelineSnapshot(
         ResolvedCampaigns: 0,
         ActiveSiegeUnits: 0,
         CampaignLaunchBlockedByCap: 0,
-        CampaignLaunchBlockedByPairCap: 0);
+        CampaignLaunchBlockedByPairCap: 0,
+        FirstCampaignLaunchTick: null,
+        FirstAssemblyTick: null,
+        FirstMarchTick: null,
+        FirstEncounterTick: null,
+        FirstSiegeTick: null,
+        FirstResolutionTick: null,
+        LongestUnresolvedCampaignAgeTicks: 0);
 }
 
 public sealed record ScenarioWave10TelemetrySnapshot(
@@ -107,7 +121,18 @@ public sealed record ScenarioWave10TelemetrySnapshot(
     int CampaignLaunchBlockedByHomeDefense,
     int CampaignLaunchRouteBudgetExhausted,
     int WarScorePressureSignals,
-    int HomeGarrisonViolationCount)
+    int HomeGarrisonViolationCount,
+    long? FirstCampaignLaunchTick,
+    long? FirstAssemblyTick,
+    long? FirstMarchTick,
+    long? FirstEncounterTick,
+    long? FirstSiegeTick,
+    long? FirstResolutionTick,
+    long LongestUnresolvedCampaignAgeTicks,
+    long? ManualLaunchAttemptTick,
+    bool ManualLaunchAttempted,
+    bool ManualLaunchSucceeded,
+    string ManualLaunchStatus)
 {
     public static ScenarioWave10TelemetrySnapshot Empty { get; } = new(
         Wave10Scenario: "none",
@@ -161,7 +186,18 @@ public sealed record ScenarioWave10TelemetrySnapshot(
         CampaignLaunchBlockedByHomeDefense: 0,
         CampaignLaunchRouteBudgetExhausted: 0,
         WarScorePressureSignals: 0,
-        HomeGarrisonViolationCount: 0);
+        HomeGarrisonViolationCount: 0,
+        FirstCampaignLaunchTick: null,
+        FirstAssemblyTick: null,
+        FirstMarchTick: null,
+        FirstEncounterTick: null,
+        FirstSiegeTick: null,
+        FirstResolutionTick: null,
+        LongestUnresolvedCampaignAgeTicks: 0,
+        ManualLaunchAttemptTick: null,
+        ManualLaunchAttempted: false,
+        ManualLaunchSucceeded: false,
+        ManualLaunchStatus: "not_attempted");
 
     public ScenarioWave10TimelineSnapshot ToTimelineSnapshot()
         => new(
@@ -174,5 +210,53 @@ public sealed record ScenarioWave10TelemetrySnapshot(
             ResolvedCampaigns,
             ActiveSiegeUnits,
             CampaignLaunchBlockedByCap,
-            CampaignLaunchBlockedByPairCap);
+            CampaignLaunchBlockedByPairCap,
+            FirstCampaignLaunchTick,
+            FirstAssemblyTick,
+            FirstMarchTick,
+            FirstEncounterTick,
+            FirstSiegeTick,
+            FirstResolutionTick,
+            LongestUnresolvedCampaignAgeTicks);
 }
+
+public sealed record ScenarioRunTelemetrySnapshot(
+    int LivingColonies,
+    int People,
+    int Food,
+    float AverageFoodPerPerson,
+    int DeathsOldAge,
+    int DeathsStarvation,
+    int DeathsPredator,
+    int DeathsOther,
+    int CombatDeaths,
+    int CombatEngagements,
+    int PredatorKillsByHumans,
+    int BattleTicks,
+    int ActiveBattles,
+    int ActiveCombatGroups,
+    int RoutingPeople,
+    float MinCombatMorale,
+    int DeathsStarvationRecent60s,
+    int DeathsStarvationWithFood,
+    int OverlapResolveMoves,
+    int CrowdDissipationMoves,
+    int BirthFallbackToOccupied,
+    int BirthFallbackToParent,
+    int BuildSiteResets,
+    int NoProgressBackoffResource,
+    int NoProgressBackoffBuild,
+    int NoProgressBackoffFlee,
+    int NoProgressBackoffCombat,
+    int AiNoPlanDecisions,
+    int AiReplanBackoffDecisions,
+    int AiResearchTechDecisions,
+    int DenseNeighborhoodTicks,
+    int LastTickDenseActors,
+    long EntityCount,
+    ScenarioContactTelemetrySnapshot Contact,
+    ScenarioAiTelemetrySnapshot Ai,
+    ScenarioEcologyTelemetrySnapshot Ecology,
+    ScenarioEcologyBalanceSnapshot EcologyBalance,
+    ScenarioSupplyTelemetrySnapshot Supply,
+    bool EnablePredatorHumanAttacks);

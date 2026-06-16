@@ -98,6 +98,8 @@ public sealed class CampaignState
     public CampaignSiegeState Siege { get; } = new();
     public CampaignResolutionState Resolution { get; } = new();
     public CampaignWave9EvidenceCounters Wave9Evidence { get; } = new();
+    public long EncounterStartedTick { get; private set; } = -1;
+    public long ResolvedTick { get; private set; } = -1;
 
     internal void BeginAssembly(long tick)
     {
@@ -141,6 +143,8 @@ public sealed class CampaignState
 
         RouteCache.Invalidate();
         Phase = CampaignPhase.Encounter;
+        if (EncounterStartedTick < 0)
+            EncounterStartedTick = Math.Max(0, tick);
         Wave9Evidence.RecordMarchCompleted();
         Wave9Evidence.RecordEncounterStarted();
     }
@@ -155,6 +159,7 @@ public sealed class CampaignState
 
         RouteCache.Invalidate();
         Phase = CampaignPhase.Resolved;
+        ResolvedTick = Math.Max(0, application.ResolvedTick);
         return true;
     }
 }

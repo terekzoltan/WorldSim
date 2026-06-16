@@ -49,6 +49,9 @@ packages/
 ops/
 Docs/Plans/Workflow/
 
+# Generated architecture intelligence snapshots
+Docs/Architecture/
+
 # Local artifact outputs
 .artifacts/*
 !.artifacts/.gitkeep

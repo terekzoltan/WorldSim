@@ -250,6 +250,93 @@ public sealed class SimulationRuntime
         };
     }
 
+    public void ConfigureScenarioRunnerWorldOptions(
+        bool enableCombatPrimitives,
+        bool enableDiplomacy,
+        bool enableSiege,
+        bool enablePredatorHumanAttacks,
+        bool stoneBuildingsEnabled,
+        float birthRateMultiplier,
+        float movementSpeedMultiplier,
+        float? animalReplenishmentChancePerSecond,
+        float? predatorReplenishmentChance,
+        float? foodRegrowthMinSeconds,
+        float? foodRegrowthJitterSeconds)
+    {
+        _world.EnableCombatPrimitives = enableCombatPrimitives;
+        _world.EnableDiplomacy = enableDiplomacy;
+        _world.EnableSiege = enableSiege;
+        _world.EnablePredatorHumanAttacks = enablePredatorHumanAttacks;
+        _world.StoneBuildingsEnabled = stoneBuildingsEnabled;
+        _world.BirthRateMultiplier = birthRateMultiplier;
+        _world.MovementSpeedMultiplier = movementSpeedMultiplier;
+
+        if (animalReplenishmentChancePerSecond.HasValue)
+            _world.AnimalReplenishmentChancePerSecond = animalReplenishmentChancePerSecond.Value;
+        if (predatorReplenishmentChance.HasValue)
+            _world.PredatorReplenishmentChance = predatorReplenishmentChance.Value;
+        if (foodRegrowthMinSeconds.HasValue)
+            _world.FoodRegrowthMinSeconds = foodRegrowthMinSeconds.Value;
+        if (foodRegrowthJitterSeconds.HasValue)
+            _world.FoodRegrowthJitterSeconds = foodRegrowthJitterSeconds.Value;
+    }
+
+    public ScenarioRunTelemetrySnapshot BuildScenarioRunTelemetrySnapshot()
+    {
+        var totalFood = _world._colonies.Sum(colony => colony.Stock[Resource.Food]);
+        var livingPeople = _world._people.Where(person => person.Health > 0f).ToArray();
+        var totalPeople = livingPeople.Length;
+        var averageFoodPerPerson = totalPeople > 0 ? totalFood / (float)totalPeople : 0f;
+        var livingColonies = _world._colonies.Count(colony => livingPeople.Any(person => person.Home == colony));
+        var routingPeople = livingPeople.Count(person => person.IsRouting);
+        var minCombatMorale = livingPeople.Select(person => person.CombatMorale).DefaultIfEmpty(100f).Min();
+        var entityCount = totalPeople
+            + _world._animals.Count(animal => animal.IsAlive)
+            + _world._colonies.Sum(colony => colony.HouseCount)
+            + _world.DefensiveStructures.Count;
+
+        return new ScenarioRunTelemetrySnapshot(
+            LivingColonies: livingColonies,
+            People: totalPeople,
+            Food: totalFood,
+            AverageFoodPerPerson: averageFoodPerPerson,
+            DeathsOldAge: _world.TotalDeathsOldAge,
+            DeathsStarvation: _world.TotalDeathsStarvation,
+            DeathsPredator: _world.TotalDeathsPredator,
+            DeathsOther: _world.TotalDeathsOther,
+            CombatDeaths: _world.TotalCombatDeaths,
+            CombatEngagements: _world.TotalCombatEngagements,
+            PredatorKillsByHumans: _world.TotalPredatorKillsByHumans,
+            BattleTicks: _world.TotalBattleTicks,
+            ActiveBattles: _world.ActiveBattleCount,
+            ActiveCombatGroups: _world.ActiveCombatGroupCount,
+            RoutingPeople: routingPeople,
+            MinCombatMorale: minCombatMorale,
+            DeathsStarvationRecent60s: _world.RecentDeathsStarvation60s,
+            DeathsStarvationWithFood: _world.TotalStarvationDeathsWithFood,
+            OverlapResolveMoves: _world.TotalOverlapResolveMoves,
+            CrowdDissipationMoves: _world.TotalCrowdDissipationMoves,
+            BirthFallbackToOccupied: _world.TotalBirthFallbackToOccupiedCount,
+            BirthFallbackToParent: _world.TotalBirthFallbackToParentCount,
+            BuildSiteResets: _world.TotalBuildSiteResetCount,
+            NoProgressBackoffResource: _world.TotalNoProgressBackoffResource,
+            NoProgressBackoffBuild: _world.TotalNoProgressBackoffBuild,
+            NoProgressBackoffFlee: _world.TotalNoProgressBackoffFlee,
+            NoProgressBackoffCombat: _world.TotalNoProgressBackoffCombat,
+            AiNoPlanDecisions: _world.TotalAiNoPlanDecisions,
+            AiReplanBackoffDecisions: _world.TotalAiReplanBackoffDecisions,
+            AiResearchTechDecisions: _world.TotalAiResearchTechDecisions,
+            DenseNeighborhoodTicks: _world.DenseNeighborhoodTicks,
+            LastTickDenseActors: _world.LastTickDenseActors,
+            EntityCount: entityCount,
+            Contact: _world.BuildScenarioContactTelemetrySnapshot(),
+            Ai: _world.BuildScenarioAiTelemetrySnapshot(),
+            Ecology: _world.BuildScenarioEcologyTelemetrySnapshot(),
+            EcologyBalance: _world.BuildScenarioEcologyBalanceSnapshot(),
+            Supply: _world.BuildScenarioSupplyTelemetrySnapshot(),
+            EnablePredatorHumanAttacks: _world.EnablePredatorHumanAttacks);
+    }
+
     private IReadOnlyList<CampaignRenderData> BuildCampaignRenderData()
         => _campaigns
             .Select(BuildCampaignRenderData)
@@ -409,8 +496,13 @@ public sealed class SimulationRuntime
         string evidenceStatus,
         string timelineSemantics,
         string reasonCode,
-        IReadOnlyList<string>? nonClaims = null)
+        IReadOnlyList<string>? nonClaims = null,
+        string runtimeSource = ScenarioWave10Evidence.RuntimeSourceSimulationRuntimeProbe,
+        long? manualLaunchAttemptTick = null,
+        bool manualLaunchSucceeded = false,
+        string? manualLaunchStatus = null)
     {
+        var allCampaigns = _campaigns.ToArray();
         var unresolvedCampaigns = _campaigns
             .Where(campaign => campaign.Phase != CampaignPhase.Resolved)
             .ToArray();
@@ -427,7 +519,7 @@ public sealed class SimulationRuntime
 
         return new ScenarioWave10TelemetrySnapshot(
             Wave10Scenario: string.IsNullOrWhiteSpace(wave10Scenario) ? "none" : wave10Scenario.Trim(),
-            RuntimeSource: ScenarioWave10Evidence.RuntimeSourceSimulationRuntimeProbe,
+            RuntimeSource: string.IsNullOrWhiteSpace(runtimeSource) ? ScenarioWave10Evidence.RuntimeSourceSimulationRuntimeProbe : runtimeSource.Trim(),
             ProofType: string.IsNullOrWhiteSpace(proofType) ? ScenarioWave10Evidence.ProofTypeNotConfigured : proofType.Trim(),
             EvidenceStatus: string.IsNullOrWhiteSpace(evidenceStatus) ? ScenarioWave10Evidence.EvidenceStatusNotApplicable : evidenceStatus.Trim(),
             TimelineSemantics: string.IsNullOrWhiteSpace(timelineSemantics) ? ScenarioWave10Evidence.TimelineSemanticsNotSampled : timelineSemantics.Trim(),
@@ -477,7 +569,24 @@ public sealed class SimulationRuntime
             CampaignLaunchBlockedByHomeDefense: _campaignLogisticsCounters.CampaignLaunchBlockedByHomeDefense,
             CampaignLaunchRouteBudgetExhausted: _campaignLogisticsCounters.CampaignLaunchRouteBudgetExhausted,
             WarScorePressureSignals: _campaignWarScores.Values.Count(score => Math.Abs(score) >= OrganicCampaignWarScorePressureThreshold),
-            HomeGarrisonViolationCount: CountHomeGarrisonViolations(unresolvedCampaigns));
+            HomeGarrisonViolationCount: CountHomeGarrisonViolations(unresolvedCampaigns),
+            FirstCampaignLaunchTick: MinNonNegative(allCampaigns.Select(campaign => campaign.CreatedTick)),
+            FirstAssemblyTick: MinNonNegative(allCampaigns.Select(campaign => campaign.Army.AssemblyStartedTick)),
+            FirstMarchTick: MinNonNegative(allCampaigns.Select(campaign => campaign.Army.AssemblyCompletedTick)),
+            FirstEncounterTick: MinNonNegative(allCampaigns.Select(campaign => campaign.EncounterStartedTick)),
+            FirstSiegeTick: MinNonNegative(allCampaigns.Select(campaign => campaign.Siege.SiegeEnteredTick)),
+            FirstResolutionTick: MinNonNegative(resolvedCampaigns.Select(campaign => campaign.ResolvedTick)),
+            LongestUnresolvedCampaignAgeTicks: unresolvedCampaigns.Length == 0 ? 0 : unresolvedCampaigns.Max(campaign => Math.Max(0, Tick - campaign.CreatedTick)),
+            ManualLaunchAttemptTick: manualLaunchAttemptTick,
+            ManualLaunchAttempted: manualLaunchAttemptTick.HasValue,
+            ManualLaunchSucceeded: manualLaunchSucceeded,
+            ManualLaunchStatus: string.IsNullOrWhiteSpace(manualLaunchStatus) ? "not_attempted" : manualLaunchStatus.Trim());
+    }
+
+    private static long? MinNonNegative(IEnumerable<long> values)
+    {
+        var candidates = values.Where(value => value >= 0).ToArray();
+        return candidates.Length == 0 ? null : candidates.Min();
     }
 
     private int CountCampaignTargetsWithScoutIntel(IEnumerable<CampaignState> campaigns)
