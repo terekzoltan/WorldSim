@@ -60,6 +60,35 @@ If Meta rejects this default, Step10B.5-F2 must instead implement natural scout 
 - Do not add Track A/UI/manual smoke fixes before runtime lifecycle health is restored.
 - Do not commit raw `.artifacts/smr/...` bundles.
 
+## SMR Runtime-Cost Reduction Policy
+
+Step10B.2 proved that a full matrix can become very expensive without changing the decision. Step10B.5 should preserve validity while avoiding redundant 5-hour reruns.
+
+Decision core:
+- Hostile organic is the primary organic emergence package.
+- Manual lifecycle is the control package proving runtime behavior after launch.
+- Pure organic is context evidence and should not run as a full package before hostile organic is at least partially healthy.
+- Stress is a sentinel/repro package first; broad stress runs only happen after targeted failures are fixed or when a mixed result needs coverage.
+
+Early-stop rules:
+- If hostile organic remains zero-launch in F3 staged confirm, stop. Do not run full pure or broad stress.
+- If manual lifecycle regresses after Track B fixes, stop. Do not run pure/stress until manual control recovers.
+- If diagnostics cannot explain no-launch, stop. Do not increase matrix size to compensate for weak telemetry.
+- If targeted seed-606 stress reproduces survival failure, fix that targeted failure before broad stress.
+
+Runtime-cost defaults:
+- Use `perf=false` for lifecycle proof packages unless a specific perf hypothesis is under test.
+- Use perf as a separate `perf-long` or `perf-stress` lane after lifecycle behavior works.
+- Use conservative drilldown: top 3 runs or only failing/non-green packages by default.
+- Use 3-seed x 3-planner sentinel packages before 10-seed packages.
+- Use medium/standard configs before large configs.
+
+Package scaling policy:
+- Hostile organic can scale first because it decides the core RED/green path.
+- Manual lifecycle can scale second because it is the control group.
+- Pure organic starts with at most 3 seeds x 3 planners x 2 configs; full 90-run pure package is optional and only useful if hostile/manual are healthy.
+- Stress starts with targeted sentinel lanes, especially small-lowpop/small-highpop seed 606 across planners; broad 240-run stress is optional after sentinel findings are fixed or explicitly accepted.
+
 ## Ownership
 
 Track B owns:
@@ -327,14 +356,15 @@ Prereq:
 Run order:
 - `wave10-organic-hostile-soak-002` first.
 - `wave10-manual-operator-lifecycle-002` second.
-- `wave10-organic-pure-soak-002` third.
-- `wave10-organic-lifecycle-stress-002` fourth.
+- `wave10-organic-pure-soak-002` third only if hostile/manual results are healthy enough to make pure rarity useful context.
+- `wave10-organic-lifecycle-stress-002` fourth only after targeted stress sentinel lanes pass or are explicitly routed.
 
 Full rerun rules:
 - Keep runtime-backed main-run truth.
 - Keep `wave10-probes.json` side-probe only.
 - Use conservative drilldown sampling to avoid artifact explosion.
 - Do not promote new artifacts to baseline unless Meta opens a separate baseline step.
+- Do not run full pure/stress matrices just to reconfirm a RED already decided by hostile/manual core evidence.
 
 GREEN criteria:
 - Hostile organic launches in multiple seed/planner/config combinations.
@@ -373,6 +403,7 @@ SMR gates should be staged:
 - Pilot before any full package.
 - Medium/standard confirm before large/stress.
 - Full B/C/A/D rerun only after focused gates pass.
+- Pure full matrix and broad stress matrix are optional escalation, not default first response.
 
 ## Evidence Interpretation Rules
 

@@ -213,11 +213,18 @@ Exit criteria:
 
 Only after F3-F5 pass.
 
-SMR Analyst should run:
+SMR Analyst should run staged packages, not the full historical 5-hour shape by default:
 - `wave10-organic-hostile-soak-002`,
 - `wave10-manual-operator-lifecycle-002`,
-- `wave10-organic-pure-soak-002`,
-- `wave10-organic-lifecycle-stress-002`.
+- `wave10-organic-pure-soak-002` only if hostile/manual are healthy enough that pure rarity context matters,
+- `wave10-organic-lifecycle-stress-002` only after targeted stress sentinel lanes pass or are explicitly routed.
+
+Runtime-cost policy:
+- hostile + manual are the decision core,
+- pure starts as small context matrix, not full 90-run default,
+- stress starts as seed-606 sentinel, not full 240-run default,
+- perf is a separate lane after lifecycle works,
+- drilldown should be conservative unless a package is non-green.
 
 The final report must answer:
 - Did hostile organic campaigns launch?

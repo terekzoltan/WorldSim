@@ -302,6 +302,13 @@ Step10B.5 must not:
 - Open Track C unless diagnostics prove a strategist-only contract gap.
 - Open Track A before runtime lifecycle health is restored.
 
+Runtime-cost policy:
+- Hostile organic and manual lifecycle are the decision core.
+- Pure organic full matrix is deferred unless hostile/manual are healthy enough that pure rarity context matters.
+- Stress begins as targeted sentinel, especially seed-606 small topology, before any broad matrix.
+- Perf is a separate lane after lifecycle behavior works.
+- Drilldown should be conservative and focused on non-green packages.
+
 ## Wave 10.5 Gate Impact
 
 Wave 10.5 remains blocked until Wave 8.5 and Wave 10 closeout are both complete.

@@ -10,6 +10,8 @@ F3 is verification, not a new fix. It proves whether F2 moved hostile organic li
 
 Avoid wasting another long SMR run if the organic launch pipeline is still blocked. Use staged pilots to confirm launch incidence, first launch timing, and no-launch explanations.
 
+F3 is also the main runtime-cost control point. A hostile organic zero-launch result is enough to stop the expensive recovery rerun path until diagnostics/fixes improve it.
+
 ## Run Order
 
 Start small:
@@ -37,6 +39,18 @@ Then standard confirm:
 
 Do not run the full 90-run hostile package until these confirms show useful signals.
 
+## Runtime-Cost Rules
+
+Use cheap runs to answer decision questions first:
+
+- keep `perf=false` unless a perf regression is the explicit hypothesis,
+- keep drilldown small, for example top 3 or only failing/non-green runs,
+- prefer medium/standard before large,
+- prefer 3 seeds before 10 seeds,
+- stop before pure/stress if hostile organic is still zero-launch.
+
+Do not use more matrix size to compensate for missing diagnostics. If no-launch is unexplained, return to F1/F2 instead.
+
 ## Metrics To Review
 
 - `campaignLaunches`,
@@ -60,6 +74,13 @@ Stop and return RED if:
 - diagnostics still cannot explain no-launch,
 - F2 caused hard survival/economy failures,
 - F2 caused manual/operator launch regression.
+
+If any of these stop conditions apply, do not run:
+
+- full pure organic,
+- broad stress,
+- perf-long,
+- large-map expansion.
 
 ## Continue Conditions
 
@@ -85,4 +106,5 @@ The F3 handoff must include:
 - representative no-launch reason summary,
 - whether manual downstream diagnostics should start,
 - whether stress survival repro should start,
-- whether full SMR package is still blocked.
+- whether full SMR package is still blocked,
+- whether pure organic should stay deferred or proceed as small context matrix.

@@ -2397,12 +2397,13 @@ Step10B.2 result:
 
 | Track B agent | Step10B.5-F5 stress seed-606 survival repro/fix | F3 initial confirm | ⬜ Reproduce the three `SURV-01/02/04` failing small-topology seed-606 lanes and fix narrowly or route an explicit limitation. Do not weaken survival assertions. Detail: `Docs/Plans/Master/Wave10-Step10B5-F5-Stress-Seed606-Survival-Repro-Fix.md`. |
 
-| SMR Analyst + Meta Coordinator | Step10B.5-F6 full recovery rerun + closeout | F3/F4/F5 accepted | ⬜ Rerun `wave10-organic-hostile-soak-002`, `wave10-manual-operator-lifecycle-002`, `wave10-organic-pure-soak-002`, and `wave10-organic-lifecycle-stress-002` only after focused gates pass. Meta decides GREEN/YELLOW/RED and whether Track C/A open. Detail: `Docs/Plans/Master/Wave10-Step10B5-F6-Full-Recovery-Rerun-And-Closeout.md`. |
+| SMR Analyst + Meta Coordinator | Step10B.5-F6 full recovery rerun + closeout | F3/F4/F5 accepted | ⬜ Run staged recovery evidence, not a full 5-hour matrix by default. Hostile organic and manual lifecycle are the decision core. Pure organic starts as small context matrix only if hostile/manual are healthy; stress starts as targeted sentinel (seed-606 small topology) before broad expansion; perf is separate after lifecycle works. Meta decides GREEN/YELLOW/RED and whether Track C/A open. Detail: `Docs/Plans/Master/Wave10-Step10B5-F6-Full-Recovery-Rerun-And-Closeout.md`. |
 
 Step10B.5 sequencing rules:
 - F1 must be diagnostics-only. Do not change launch behavior before the no-launch reason is visible.
 - F2 must not broadly tune campaign scores; it may only implement the accepted target-knowledge policy or another blocker proven by F1.
 - Full SMR packages are not allowed until pilot/confirm runs show meaningful signals.
+- Hostile + manual are the recovery decision core; pure/stress/perf are staged escalation, not mandatory default packages.
 - Track C remains closed unless F1/F2 diagnostics prove a strategy-only contract gap.
 - Track A remains deferred until runtime lifecycle health is restored.
 
