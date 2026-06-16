@@ -19,6 +19,11 @@
 - Uj wave vagy post-wave slice felvetelekor a Meta elso prioritasa a szekvencialis egyertelmuseg: csak azutan maximalizaljon parallelizmust, hogy a prereq-ek, ownerek, handoffok, acceptance/evidence gate-ek es unlockolt kovetkezo lepesek egyertelmuen le vannak irva.
 - Ha a parallelizmus osszemosna a dependency-igazsagforrast, az ownershipot, a bizonyitas forrasat vagy a closeout-felelosseget, a Metanak a munkat kisebb, serializalt vagy explicit gate-elt stepekre kell bontania ahelyett, hogy latszolagos throughput miatt egyben hagyja.
 
+Dispatch policy:
+- Run independent gates in parallel when that reduces turnaround without losing clarity.
+- Run gates sequentially when one gate's output materially affects the next gate's scope or interpretation.
+- If a gate is enabled but not meaningfully applicable to the target, say so explicitly in the review output instead of silently skipping it.
+
 ---
 
 ## Project State Continuity Protocol
