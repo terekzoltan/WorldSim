@@ -244,6 +244,64 @@ The closeout report must answer:
 
 Wave 10 is closeout-ready only after the SMR evidence report recommends acceptance and Meta accepts it.
 
+### Wave 10 Step10B.2 Organic/Manual Lifecycle Follow-up
+
+Step10B closed the deterministic/probe-based Wave 10 evidence gate, but the user requested an additional long-run organic/manual lifecycle evidence gate before Step10C residual decisions and Wave10.5 readiness.
+
+Source plan:
+- `Docs/Plans/Master/Wave10-Step10B2-Organic-Campaign-Lifecycle-SMR-Plan.md`
+
+Step10B.2 must answer:
+- Do campaigns emerge organically in long main-world runtime-backed runs?
+- If conflict/hostile preconditions exist, does the organic campaign cadence/strategist path launch campaigns without manual creation?
+- After runtime-owned manual/operator launch, does the campaign assemble, march, encounter, siege, resolve, or stall?
+- Do supply lines, forward bases, scout intel, siege units, war score, loot, and peace/resolution participate naturally in long runs?
+- Do long campaign runs introduce no-progress, clustering, perf, survival/economy, combat, or AI-planning regressions?
+
+Policy:
+- Step10B.2 is evidence + minimal instrumentation only; do not tune gameplay inline.
+- Use runtime-backed ScenarioRunner main-run evidence for lifecycle claims, not side-probe evidence.
+- Return GREEN/YELLOW/RED with precise Track routing for any gap.
+
+Step10B.2 result:
+- RED evidence. Hostile organic lifecycle produced `0/90` launches, pure organic produced `0/90` launches, stress hostile produced `0/240` launches and failed `SURV-01/02/04` in three seed-606 small-topology runs, while manual/operator lifecycle proved launch (`90/90`) and partial downstream progression only.
+- Source evidence: `Docs/Evidence/SMR/wave10-step10b2-organic-manual-lifecycle/README.md`.
+- This opens Step10B.5 recovery before Step10C residual disposition or Wave10.5 readiness.
+
+### Wave 10 Step10B.5 Organic Campaign RED Recovery
+
+Source plans:
+- `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
+- `Docs/Plans/Master/Wave10-Step10B5-Track-B-Implementation-Checklist.md`
+- Detailed F0-F6 execution files are indexed in the parent plan and in the Track B checklist.
+
+Purpose:
+- Convert the Step10B.2 RED lifecycle evidence into a sequenced Track B recovery pass.
+- First make organic campaign no-launch explainable through runtime/main-run diagnostics.
+- Then minimally fix the confirmed runtime blocker.
+- Only after focused pilots pass, rerun the full Step10B.2 recovery packages.
+
+Step10B.5 sequence:
+- F0 Meta: accept Step10B.2 RED evidence and decide Step10B.2-A prep-slice disposition.
+- F1 Track B: add organic launch decision-trail diagnostics with no behavior change.
+- F2 Track B: implement the accepted target-knowledge policy or another blocker proven by F1.
+- F3 Track B / SMR Analyst: hostile organic pilot and medium/standard confirm runs.
+- F4 Track B: manual lifecycle downstream diagnostics for convoy, scout, and siege-unit non-activation.
+- F5 Track B: seed-606 small-topology survival repro/fix without weakening `SURV-*`.
+- F6 SMR Analyst / Meta: full recovery rerun and GREEN/YELLOW/RED closeout.
+
+Default policy unless Meta overrides:
+- `War` targets are baseline-known enough for first organic campaign launch.
+- Fresh scout intel remains a quality/target-choice signal, not the only possible first-launch knowledge source under `War`.
+- Neutral/Tense targets remain non-launchable.
+
+Step10B.5 must not:
+- Merge side-probe evidence into main-run lifecycle claims.
+- Directly create organic campaigns in lifecycle configs.
+- Tune campaign scores before decision-trail diagnostics prove score is the blocker.
+- Open Track C unless diagnostics prove a strategist-only contract gap.
+- Open Track A before runtime lifecycle health is restored.
+
 ## Wave 10.5 Gate Impact
 
 Wave 10.5 remains blocked until Wave 8.5 and Wave 10 closeout are both complete.
@@ -253,6 +311,8 @@ After this plan, `Wave 10 closeout` means:
 - all Wave 10 implementation steps are complete
 - Wave 10 SMR prep is complete
 - Wave 10 SMR evidence is accepted
+- the user-requested Step10B.2 organic/manual lifecycle gate has been dispositioned
+- Step10B.5 RED-recovery is closed GREEN/YELLOW with Meta acceptance or explicitly deferred
 - Meta Coordinator records the closeout decision
 
 ## Risks

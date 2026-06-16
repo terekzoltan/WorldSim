@@ -2159,6 +2159,7 @@ Wave 10 SMR evidence guardrail:
 - 🔄 **P7-H** Graphics for siege units (Track A)
 - ✅ **Wave 10 SMR advanced campaign prep** ScenarioRunner campaign resolution + logistics + siege-unit evidence surface (Track B / SMR Analyst validation)
 - ✅ **Wave 10 SMR evidence** Campaign resolution + advanced warfare closeout package (SMR Analyst)
+- 🔄 **Step10B.2** Organic/manual campaign lifecycle long-run SMR evidence (SMR Analyst)
 
 **Parallelism:** C11 -> C12 -> C13 are **sequential** (each builds on previous).
 
@@ -2360,6 +2361,51 @@ Step10B closeout result:
 - Manual residuals remain post-SMR candidates only: direct siege-unit visual low incidence, wall/watchtower readability, fragmented wall placement, and one-member operator probes are not Step10B blockers from current evidence.
 - Track C remains closed from current evidence; no strategist/advisory gap was newly proven by the repaired Step10B rerun.
 
+**Step 10B.2 — organic/manual campaign lifecycle long-run evidence**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | Step10B.2 organic/manual lifecycle SMR | Step10B ✅ + user request for deeper organic proof | 🔴 RED evidence accepted for routing. Dedicated plan: `Docs/Plans/Master/Wave10-Step10B2-Organic-Campaign-Lifecycle-SMR-Plan.md`. Evidence note: `Docs/Evidence/SMR/wave10-step10b2-organic-manual-lifecycle/README.md`. Runtime-backed packages proved that manual/operator launch works (`90/90` launch, partial encounter/resolution), but hostile organic (`0/90`), pure organic (`0/90`), and stress hostile (`0/240`) did not launch. Stress also failed `SURV-01/02/04` in three seed-606 small-topology runs. Do not route directly to Track C from this evidence; next owner is Track B recovery planning unless a later diagnostic pass proves strategist/advisory ownership. |
+
+Step10B.2 required packages:
+- `wave10-organic-pure-soak-001`: pure organic long-run package; no manual launch or deterministic campaign creation.
+- `wave10-organic-hostile-soak-001`: hostile/war/tension precondition package; no direct campaign creation.
+- `wave10-manual-operator-lifecycle-001`: runtime-owned manual/operator launch at a configured tick, then long lifecycle observation.
+- `wave10-organic-lifecycle-stress-001`: broader seed/planner/config stress matrix for stuckness, no-progress, perf, clustering, and lifecycle variability.
+
+Step10B.2 decision policy:
+- GREEN if hostile organic and manual lifecycle packages show meaningful campaign lifecycle without systemic regressions.
+- YELLOW if pure organic is rare but hostile/manual lifecycle paths work and remaining gaps are clearly routed.
+- RED if hostile organic cannot launch, manual lifecycle systematically stalls, or runtime-backed lifecycle evidence cannot be produced reliably.
+
+Step10B.2 result:
+- RED. The decisive blockers are hostile organic no-launch, stress hostile no-launch plus survival failures, and incomplete downstream convoy/scout/siege-unit natural activation under manual lifecycle. This opens Step10B.5 before any Step10C residual disposition or Wave10.5 readiness decision.
+
+**Step 10B.5 — organic campaign RED recovery (Track B primary)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator | Step10B.5-F0 evidence acceptance + prep-slice disposition | Step10B.2 RED evidence | 🔄 Planned/active. Step10B.2 RED evidence is accepted for routing and Step10B.5 plans are written, but the local Step10B.2-A evidence-surface prep slice disposition must be confirmed before behavior fixes are mixed in. Detail: `Docs/Plans/Master/Wave10-Step10B5-F0-Evidence-Acceptance-And-Prep-Disposition.md`. |
+
+| Track B agent | Step10B.5-F1 organic launch decision-trail diagnostics | F0 ✅ | ⬜ Add diagnostics only, no behavior change. Explain no-launch with runtime/main-run counters: organic evaluation, eligible warriors, target counts, known/unknown targets, missing-scout blockers, strategist decision/reason, launch apply attempts, and creation status. Detail: `Docs/Plans/Master/Wave10-Step10B5-F1-Organic-Launch-Decision-Trail-Diagnostics.md`. Checklist: `Docs/Plans/Master/Wave10-Step10B5-Track-B-Implementation-Checklist.md`. |
+
+| Track B agent | Step10B.5-F2 target-knowledge policy fix | F1 diagnostic proof or Meta policy confirmation | ⬜ Minimal runtime fix. Default policy: `War` targets are baseline-known for first organic launch; scout intel remains a quality/target-choice signal, not the only possible first-launch knowledge source. Preserve caps, home-defense, pair-cap, route preflight, and side-probe provenance. Detail: `Docs/Plans/Master/Wave10-Step10B5-F2-Target-Knowledge-Policy-Fix.md`. |
+
+| Track B agent + SMR Analyst support | Step10B.5-F3 hostile organic pilot/confirm | F2 ✅ | ⬜ Run staged pilot/confirm before any full 90-run package. Stop if launches remain zero and return diagnostic RED; continue only if hostile organic launches in multiple seed/planner combinations or a new explicit blocker is identified. Detail: `Docs/Plans/Master/Wave10-Step10B5-F3-Hostile-Organic-Pilot-And-Confirm.md`. |
+
+| Track B agent | Step10B.5-F4 manual downstream diagnostics | F3 initial confirm | ⬜ Explain convoy/scout/siege-unit non-activation under manual lifecycle with reason counters before changing behavior. Do not claim no-tech runs prove dedicated siege-unit failure; distinguish convoy requested/spawned/delivered/failed. Detail: `Docs/Plans/Master/Wave10-Step10B5-F4-Manual-Downstream-Diagnostics.md`. |
+
+| Track B agent | Step10B.5-F5 stress seed-606 survival repro/fix | F3 initial confirm | ⬜ Reproduce the three `SURV-01/02/04` failing small-topology seed-606 lanes and fix narrowly or route an explicit limitation. Do not weaken survival assertions. Detail: `Docs/Plans/Master/Wave10-Step10B5-F5-Stress-Seed606-Survival-Repro-Fix.md`. |
+
+| SMR Analyst + Meta Coordinator | Step10B.5-F6 full recovery rerun + closeout | F3/F4/F5 accepted | ⬜ Rerun `wave10-organic-hostile-soak-002`, `wave10-manual-operator-lifecycle-002`, `wave10-organic-pure-soak-002`, and `wave10-organic-lifecycle-stress-002` only after focused gates pass. Meta decides GREEN/YELLOW/RED and whether Track C/A open. Detail: `Docs/Plans/Master/Wave10-Step10B5-F6-Full-Recovery-Rerun-And-Closeout.md`. |
+
+Step10B.5 sequencing rules:
+- F1 must be diagnostics-only. Do not change launch behavior before the no-launch reason is visible.
+- F2 must not broadly tune campaign scores; it may only implement the accepted target-knowledge policy or another blocker proven by F1.
+- Full SMR packages are not allowed until pilot/confirm runs show meaningful signals.
+- Track C remains closed unless F1/F2 diagnostics prove a strategy-only contract gap.
+- Track A remains deferred until runtime lifecycle health is restored.
+
 **Step 10C — post-SMR / manual gap closure (conditional)**
 
 | Session | Epic(s) | Prereq | Notes |
@@ -2394,7 +2440,7 @@ Purpose:
 Wave turn-gate:
 - Wave 10.5 is `READY` only after Wave 8.5 closeout is `✅` and Wave 10 closeout is `✅`.
 - Reason: convergence work should build on a proven solver-backed slice and the matured late combat/campaign surface before shared-family expansion prep begins.
-- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5. If Step10C is opened from SMR/manual evidence triage, it must also be closed or explicitly marked N/A before Wave 10.5.
+- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5. The user-requested Step10B.2 organic/manual lifecycle SMR gate is RED and opens Step10B.5; Step10B.5 must be closed GREEN/YELLOW with Meta acceptance or explicitly deferred before Wave 10.5. If Step10C is opened from SMR/manual evidence triage, it must also be closed or explicitly marked N/A before Wave 10.5.
 
 Audit hardening source:
 - `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md`
