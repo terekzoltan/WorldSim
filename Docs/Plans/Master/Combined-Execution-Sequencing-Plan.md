@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-05-12
+Last updated: 2026-06-16
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -2385,7 +2385,7 @@ Step10B.2 result:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator | Step10B.5-F0 evidence acceptance + prep-slice disposition | Step10B.2 RED evidence | 🔄 Planned/active. Step10B.2 RED evidence is accepted for routing and Step10B.5 plans are written, but the local Step10B.2-A evidence-surface prep slice disposition must be confirmed before behavior fixes are mixed in. Detail: `Docs/Plans/Master/Wave10-Step10B5-F0-Evidence-Acceptance-And-Prep-Disposition.md`. |
+| Meta Coordinator | Step10B.5-F0 evidence acceptance + prep-slice disposition | Step10B.2 RED evidence | ✅ Closed. Step10B.2 RED evidence is accepted for routing, Step10B.2-A evidence-surface prep slice is accepted as committed prep in `e4bb0a1`, and no behavior fix is bundled into F0. Detail: `Docs/Plans/Master/Wave10-Step10B5-F0-Evidence-Acceptance-And-Prep-Disposition.md`. |
 
 | Track B agent | Step10B.5-F1 organic launch decision-trail diagnostics | F0 ✅ | ⬜ Add diagnostics only, no behavior change. Explain no-launch with runtime/main-run counters: organic evaluation, eligible warriors, target counts, known/unknown targets, missing-scout blockers, strategist decision/reason, launch apply attempts, and creation status. Detail: `Docs/Plans/Master/Wave10-Step10B5-F1-Organic-Launch-Decision-Trail-Diagnostics.md`. Checklist: `Docs/Plans/Master/Wave10-Step10B5-Track-B-Implementation-Checklist.md`. |
 

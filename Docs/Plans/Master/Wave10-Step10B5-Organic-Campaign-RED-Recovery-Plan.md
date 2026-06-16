@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5 - Organic Campaign RED Recovery Plan
 
-Status: planned
+Status: active - F0 closed, F1 ready
 Owner: Meta Coordinator for sequencing; Track B primary implementation
 Source evidence: `Docs/Evidence/SMR/wave10-step10b2-organic-manual-lifecycle/README.md`
 Companion execution checklist: `Docs/Plans/Master/Wave10-Step10B5-Track-B-Implementation-Checklist.md`
@@ -120,6 +120,8 @@ Track A stays deferred unless:
 
 Owner: Meta Coordinator
 
+Status: accepted / closed 2026-06-16
+
 Detailed file: `Docs/Plans/Master/Wave10-Step10B5-F0-Evidence-Acceptance-And-Prep-Disposition.md`
 
 Prereq:
@@ -127,15 +129,15 @@ Prereq:
 - Step10B.2 evidence note exists and is reviewed.
 
 Actions:
-- Accept Step10B.2 as RED evidence.
-- Record that Step10C residual routing and Wave10.5 readiness remain blocked.
-- Review the local Step10B.2-A prep slice separately from gameplay fixes.
-- Decide whether to commit the prep slice as an evidence-surface commit before Track B begins behavior work.
-- Preserve local raw artifacts as local evidence only.
+- Step10B.2 RED evidence accepted for Step10B.5 routing.
+- Step10C residual routing and Wave10.5 readiness remain blocked.
+- Step10B.2-A prep slice accepted as committed evidence-surface prep in `e4bb0a1 feat(wave10): add step10b2 lifecycle evidence surface`.
+- Prep slice remains separate from behavior fixes and does not claim organic recovery.
+- Raw artifacts remain local evidence only.
 
 Acceptance:
 - Combined plan references Step10B.5 as the next recovery gate.
-- `ops/PROJECT_STATE.md` points to Track B Step10B.5-F1/F2 as the next role/action.
+- `ops/PROJECT_STATE.md` points to Track B Step10B.5-F1 as the next role/action.
 - No Track C or Track A work is opened.
 
 Unlocks:

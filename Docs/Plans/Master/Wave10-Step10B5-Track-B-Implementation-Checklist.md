@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5 - Track B Implementation Checklist
 
-Status: planned
+Status: ready for F1 diagnostics
 Primary owner: Track B
 Parent plan: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 Evidence source: `Docs/Evidence/SMR/wave10-step10b2-organic-manual-lifecycle/README.md`
@@ -59,11 +59,11 @@ Read first:
 
 Then inspect:
 - current worktree status,
-- local Step10B.2-A prep slice diff,
-- whether the prep slice is already reviewed/accepted by Meta.
+- accepted Step10B.2-A prep slice commit `e4bb0a1 feat(wave10): add step10b2 lifecycle evidence surface`,
+- whether any new local changes exist beyond the accepted prep slice.
 
 Stop condition:
-- If prep slice ownership/status is unclear, ask Meta before mixing it with behavior fixes.
+- If new local changes make prep-slice ownership/status unclear again, ask Meta before mixing them with behavior fixes.
 
 ### 2. F1 Diagnostics Only
 

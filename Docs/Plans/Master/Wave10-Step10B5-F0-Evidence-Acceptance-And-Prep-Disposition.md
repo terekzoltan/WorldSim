@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5-F0 - Evidence Acceptance And Prep-Slice Disposition
 
-Status: planned
+Status: accepted / closed
 Owner: Meta Coordinator
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
@@ -85,3 +85,23 @@ Track B should load, in order:
 - `Docs/Evidence/SMR/wave10-step10b2-organic-manual-lifecycle/README.md`
 
 Track B must state in its first handoff whether it is using the Step10B.2-A prep slice as-is, rebasing it, or replacing it.
+
+## F0 Closeout Record
+
+Date: 2026-06-16
+
+Decisions:
+
+- Step10B.2 RED evidence is accepted for routing into Step10B.5 recovery.
+- Step10B.2-A evidence-surface prep slice is accepted as committed prep work in `e4bb0a1 feat(wave10): add step10b2 lifecycle evidence surface`.
+- The prep slice is not a behavior fix and must not be used to claim organic launch recovery.
+- Default F2 policy remains accepted as the starting policy: `War` targets may be baseline-known for first organic campaign launch, scout intel remains a quality/target-choice signal, and Neutral/Tense targets remain non-launchable.
+- Step10C residual disposition and Wave10.5 readiness remain blocked until Step10B.5 is closed or explicitly deferred by Meta.
+- Track C and Track A remain closed/deferred for Step10B.5 until Track B diagnostics produce an explicit routing reason.
+
+F1 handoff:
+
+- Track B is cleared to start Step10B.5-F1 diagnostics-only.
+- F1 must not change launch behavior.
+- F1 should treat `e4bb0a1` as the accepted baseline evidence-surface prep and add decision-trail diagnostics on top of it.
+- F1 must classify hostile organic no-launch using runtime/main-run evidence before any F2 behavior fix begins.

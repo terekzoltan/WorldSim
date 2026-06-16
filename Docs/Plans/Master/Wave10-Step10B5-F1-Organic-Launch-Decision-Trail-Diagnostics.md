@@ -1,10 +1,12 @@
 # Wave 10 Step10B.5-F1 - Organic Launch Decision-Trail Diagnostics
 
-Status: planned
+Status: ready
 Owner: Track B
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
 F1 is diagnostics-only. It must make no-launch explainable before any behavior fix is attempted.
+
+F0 handoff is closed as of 2026-06-16. Track B should build on the accepted Step10B.2-A evidence-surface prep commit `e4bb0a1 feat(wave10): add step10b2 lifecycle evidence surface` and keep F1 strictly diagnostics-only.
 
 ## Purpose
 
