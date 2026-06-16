@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5-F1 - Organic Launch Decision-Trail Diagnostics
 
-Status: ready
+Status: implemented fix pass - pending deep-review
 Owner: Track B
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
@@ -13,6 +13,40 @@ F0 handoff is closed as of 2026-06-16. Track B should build on the accepted Step
 The Step10B.2 RED evidence showed zero organic launches and zero suppression counters. That is not enough to distinguish between missing cadence, missing eligible warriors, missing known targets, low launch score, strategy hold, or failed runtime application.
 
 F1 adds a runtime-owned decision trail so every no-launch lifecycle run has a concrete reason.
+
+## Implementation Notes
+
+Implemented on 2026-06-16 as diagnostics-only runtime instrumentation. A review fix pass on 2026-06-16
+completed the score/count semantics before commit. The exported run-level block is named `organicLaunchDiagnostics`
+and is default-safe for non-lifecycle runs.
+
+Field semantics are intentionally narrow:
+
+- The uncommitted `evaluationCount` field was replaced, not preserved as an alias.
+- `evaluationTickCount`: cumulative organic launch cadence evaluation tick count.
+- `ownerEvaluationCount`: cumulative owner-loop evaluations run during cadence ticks.
+- `lastEvaluationTick`: last cadence tick observed, or `null` before evaluation.
+- `evaluatedFactionIds`: deterministic sorted set of owner faction IDs evaluated by the runtime loop.
+- `last*` count fields: last evaluated owner/faction snapshot fields, not aggregate matrix fields.
+- `hasLastBestCandidateScore`: `true` only after at least one target option has been observed.
+- `lastBest*Score`: diagnostic best-candidate score components; default zero when `hasLastBestCandidateScore=false`.
+- `lastBestLaunchScore`: diagnostic composite `(pressure * 0.55) + (advantage * 0.45) + (visibleEnemyPressure * 0.15) - distancePenalty`, clamped to `0..1`; it is not a new launch gate.
+- `launchApply*`: cumulative runtime apply-attempt counters.
+- `launchApplyFailureStatuses`: stable list of `{ status, count }` entries.
+- `dominantNoLaunchReason`: compact classified reason using the F1 vocabulary.
+
+No launch policy, target-knowledge policy, AI strategist behavior, App code, or Graphics code changed in F1.
+
+Observed diagnostics:
+
+- Small runtime-controlled war-without-scout setup with prepared warriors reports the scout/known-target blocker path.
+- Main-run hostile lifecycle smoke `.artifacts/smr/wave10-step10b5-f1-hostile-diagnostics-smoke-003/` reports
+  `dominantNoLaunchReason=no_available_warriors_after_home_defense`, `evaluationTickCount=3`, `ownerEvaluationCount=12`,
+  `runtimeSource=main_world_run`, `campaignLaunches=0`, current score/count schema, and no `wave10-probes.json`.
+
+F2 should not automatically proceed as the original war-known target policy until Meta reviews whether F2 must first address
+organic lifecycle warrior availability / home-defense setup, or whether the target-knowledge policy remains the next fix after
+that blocker is handled.
 
 ## Primary Hypothesis
 

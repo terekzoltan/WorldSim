@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using WorldSim.AI;
+using WorldSim.Runtime.Diagnostics;
 using WorldSim.Simulation;
 using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Diplomacy;
@@ -182,6 +183,185 @@ public sealed class Wave10OrganicCampaignLaunchTests
 
         Assert.Empty(runtime.Campaigns);
         Assert.Single(runtime.GetSnapshot().ScoutIntel);
+    }
+
+    [Fact]
+    public void OrganicCampaignDiagnostics_WarWithoutScoutReportsMissingScoutIntelWithoutLaunching()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+        PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic diagnostics missing scout test");
+
+        runtime.AdvanceTick(0f);
+
+        Assert.Empty(runtime.Campaigns);
+        var diagnostics = runtime.BuildScenarioWave10TelemetrySnapshot(
+            "organic_hostile_campaign_lifecycle",
+            ScenarioWave10Evidence.ProofTypeOrganic,
+            ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+            ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            runtimeSource: ScenarioWave10Evidence.RuntimeSourceMainWorldRun)
+            .OrganicLaunchDiagnostics;
+        Assert.Equal(1, diagnostics.EvaluationTickCount);
+        Assert.True(diagnostics.OwnerEvaluationCount > diagnostics.EvaluationTickCount);
+        Assert.Contains((int)Faction.Obsidari, diagnostics.EvaluatedFactionIds);
+        Assert.NotNull(diagnostics.LastEvaluationTick);
+        Assert.Equal(0, diagnostics.LaunchApplyAttempts);
+        Assert.Contains(
+            diagnostics.DominantNoLaunchReason,
+            new[]
+            {
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonMissingScoutIntel,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoKnownTargets
+            });
+    }
+
+    [Fact]
+    public void OrganicCampaignDiagnostics_InjectedLaunchWithoutScoutRecordsApplyFailureStatus()
+    {
+        var targetColonyId = GetColony(GetWorld(CreateRuntime()), Faction.Aetheri).Id;
+        var runtime = CreateRuntime(FixedLaunchStrategist.For(Faction.Aetheri, targetColonyId, requestedWarriors: 1));
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+        PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic diagnostics apply gate test");
+
+        runtime.AdvanceTick(0f);
+
+        Assert.Empty(runtime.Campaigns);
+        var diagnostics = runtime.BuildScenarioWave10TelemetrySnapshot(
+            "organic_hostile_campaign_lifecycle",
+            ScenarioWave10Evidence.ProofTypeOrganic,
+            ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+            ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            runtimeSource: ScenarioWave10Evidence.RuntimeSourceMainWorldRun)
+            .OrganicLaunchDiagnostics;
+        Assert.Equal(1, diagnostics.EvaluationTickCount);
+        Assert.True(diagnostics.OwnerEvaluationCount > diagnostics.EvaluationTickCount);
+        Assert.True(diagnostics.LaunchApplyAttempts > 0);
+        Assert.True(diagnostics.LaunchApplyFailures > 0);
+        Assert.Equal(ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplyFailed, diagnostics.DominantNoLaunchReason);
+        Assert.Contains(
+            diagnostics.LaunchApplyFailureStatuses,
+            status => status.Status == CampaignCreationStatus.CampaignRuntimeUnavailable.ToString());
+        var failure = diagnostics.LaunchApplyFailureStatuses.First(status => status.Status == CampaignCreationStatus.CampaignRuntimeUnavailable.ToString());
+        Assert.True(failure.Count > 0);
+    }
+
+    [Fact]
+    public void OrganicCampaignDiagnostics_SplitsCadenceTicksFromOwnerEvaluationsAndListsFactions()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+        PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
+        PrepareAdditionalEligibleCampaignMembers(runtime, Faction.Sylvars, count: 2, PersonRole.Warrior);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic diagnostics owner split test");
+        runtime.DeclareWar(Faction.Sylvars, Faction.Chirita, "organic diagnostics owner split test");
+
+        runtime.AdvanceTick(0f);
+
+        var diagnostics = runtime.BuildScenarioWave10TelemetrySnapshot(
+            "organic_hostile_campaign_lifecycle",
+            ScenarioWave10Evidence.ProofTypeOrganic,
+            ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+            ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            runtimeSource: ScenarioWave10Evidence.RuntimeSourceMainWorldRun)
+            .OrganicLaunchDiagnostics;
+        Assert.Equal(1, diagnostics.EvaluationTickCount);
+        Assert.True(diagnostics.OwnerEvaluationCount > 1);
+        Assert.True(diagnostics.OwnerEvaluationCount >= diagnostics.EvaluatedFactionIds.Length);
+        Assert.Equal(diagnostics.EvaluatedFactionIds.OrderBy(id => id).ToArray(), diagnostics.EvaluatedFactionIds);
+        Assert.Contains((int)Faction.Obsidari, diagnostics.EvaluatedFactionIds);
+        Assert.Contains((int)Faction.Sylvars, diagnostics.EvaluatedFactionIds);
+    }
+
+    [Fact]
+    public void OrganicCampaignDiagnostics_NoTargetOptionKeepsScoreUnavailableWithDefaultScores()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+
+        runtime.AdvanceTick(0f);
+
+        var diagnostics = runtime.BuildScenarioWave10TelemetrySnapshot(
+            "organic_hostile_campaign_lifecycle",
+            ScenarioWave10Evidence.ProofTypeOrganic,
+            ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+            ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            runtimeSource: ScenarioWave10Evidence.RuntimeSourceMainWorldRun)
+            .OrganicLaunchDiagnostics;
+        Assert.Equal(1, diagnostics.EvaluationTickCount);
+        Assert.False(diagnostics.HasLastBestCandidateScore);
+        Assert.Equal(0f, diagnostics.LastBestPressureScore);
+        Assert.Equal(0f, diagnostics.LastBestAdvantageScore);
+        Assert.Equal(0f, diagnostics.LastBestDistancePenalty);
+        Assert.Equal(0f, diagnostics.LastBestLaunchScore);
+    }
+
+    [Fact]
+    public void OrganicCampaignDiagnostics_FinalNoTargetOwnerClearsEarlierScoreSnapshot()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+        PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic diagnostics stale score reset test");
+
+        runtime.AdvanceTick(0f);
+
+        var diagnostics = runtime.BuildScenarioWave10TelemetrySnapshot(
+            "organic_hostile_campaign_lifecycle",
+            ScenarioWave10Evidence.ProofTypeOrganic,
+            ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+            ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            runtimeSource: ScenarioWave10Evidence.RuntimeSourceMainWorldRun)
+            .OrganicLaunchDiagnostics;
+        // The runtime evaluates owners deterministically by faction, then colony id; Chirita is the final owner.
+        Assert.Equal(1, diagnostics.EvaluationTickCount);
+        Assert.True(diagnostics.OwnerEvaluationCount > 1);
+        Assert.Equal((int)Faction.Chirita, diagnostics.LastEvaluatedFactionId);
+        Assert.Equal(0, diagnostics.LastTargetOptionCount);
+        Assert.False(diagnostics.HasLastBestCandidateScore);
+        Assert.Equal(0f, diagnostics.LastBestPressureScore);
+        Assert.Equal(0f, diagnostics.LastBestAdvantageScore);
+        Assert.Equal(0f, diagnostics.LastBestDistancePenalty);
+        Assert.Equal(0f, diagnostics.LastBestLaunchScore);
+    }
+
+    [Fact]
+    public void OrganicCampaignDiagnostics_FinalTargetOptionOwnerReportsBestCandidateScore()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+        PrepareEligibleCampaignMembers(runtime, Faction.Chirita, count: 2);
+        runtime.DeclareWar(Faction.Chirita, Faction.Aetheri, "organic diagnostics final score test");
+
+        runtime.AdvanceTick(0f);
+
+        var diagnostics = runtime.BuildScenarioWave10TelemetrySnapshot(
+            "organic_hostile_campaign_lifecycle",
+            ScenarioWave10Evidence.ProofTypeOrganic,
+            ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+            ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            runtimeSource: ScenarioWave10Evidence.RuntimeSourceMainWorldRun)
+            .OrganicLaunchDiagnostics;
+        Assert.Equal((int)Faction.Chirita, diagnostics.LastEvaluatedFactionId);
+        Assert.True(diagnostics.LastTargetOptionCount > 0);
+        Assert.True(diagnostics.HasLastBestCandidateScore);
+        Assert.True(diagnostics.LastBestPressureScore > 0f);
+        Assert.True(diagnostics.LastBestAdvantageScore > 0f);
+        Assert.True(diagnostics.LastBestLaunchScore > 0f);
     }
 
     [Fact]

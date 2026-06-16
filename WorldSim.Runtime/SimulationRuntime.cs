@@ -75,6 +75,196 @@ public sealed class SimulationRuntime
             => faction == First ? 1 : -1;
     }
 
+    private sealed class OrganicLaunchDiagnosticsAccumulator
+    {
+        private readonly Dictionary<string, int> _failureStatuses = new(StringComparer.Ordinal);
+        private readonly SortedSet<int> _evaluatedFactionIds = new();
+
+        public int EvaluationTickCount { get; private set; }
+        public int OwnerEvaluationCount { get; private set; }
+        public long? LastEvaluationTick { get; private set; }
+        public int LastEvaluatedFactionId { get; private set; } = -1;
+        public int LastEligibleMembers { get; private set; }
+        public int LastAvailableWarriors { get; private set; }
+        public int LastActiveCampaignCount { get; private set; }
+        public int LastTargetOptionCount { get; private set; }
+        public int LastWarTargetCount { get; private set; }
+        public int LastHostileTargetCount { get; private set; }
+        public int LastKnownTargetCount { get; private set; }
+        public int LastUnknownTargetCount { get; private set; }
+        public int LastMissingScoutIntelTargetCount { get; private set; }
+        public bool HasLastBestCandidateScore { get; private set; }
+        public float LastBestPressureScore { get; private set; }
+        public float LastBestAdvantageScore { get; private set; }
+        public float LastBestDistancePenalty { get; private set; }
+        public float LastBestLaunchScore { get; private set; }
+        public string LastDecisionKind { get; private set; } = "none";
+        public string LastDecisionReasonCode { get; private set; } = "none";
+        public int LaunchApplyAttempts { get; private set; }
+        public int LaunchApplySuccesses { get; private set; }
+        public int LaunchApplyFailures { get; private set; }
+        private string? _dominantNoLaunchReason;
+
+        public void RecordEvaluationTick(long tick)
+        {
+            EvaluationTickCount++;
+            LastEvaluationTick = tick;
+        }
+
+        public void RecordEvaluation(
+            Faction ownerFaction,
+            int eligibleMembers,
+            CampaignStrategyContext context,
+            IReadOnlyList<CampaignTargetOption> targetOptions,
+            int warTargetCount,
+            int hostileTargetCount,
+            CampaignStrategyDecision decision)
+        {
+            OwnerEvaluationCount++;
+            LastEvaluatedFactionId = (int)ownerFaction;
+            _evaluatedFactionIds.Add((int)ownerFaction);
+            LastEligibleMembers = eligibleMembers;
+            LastAvailableWarriors = context.AvailableWarriors;
+            LastActiveCampaignCount = context.ActiveCampaignCount;
+            LastTargetOptionCount = targetOptions.Count;
+            LastWarTargetCount = warTargetCount;
+            LastHostileTargetCount = hostileTargetCount;
+            LastKnownTargetCount = targetOptions.Count(target => target.IsKnown);
+            LastUnknownTargetCount = targetOptions.Count(target => !target.IsKnown);
+            LastMissingScoutIntelTargetCount = targetOptions.Count(target => !target.IsKnown && !target.HasScoutIntel);
+            LastDecisionKind = decision.Kind.ToString();
+            LastDecisionReasonCode = decision.ReasonCode.ToString();
+            RecordBestCandidateScore(context, targetOptions);
+            PromoteDominantReason(DetermineNoLaunchReasonForCurrentEvaluation());
+        }
+
+        public void RecordLaunchApplyResult(CampaignCreationResult result)
+        {
+            LaunchApplyAttempts++;
+            if (result.Success)
+            {
+                LaunchApplySuccesses++;
+                PromoteDominantReason(ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplied);
+                return;
+            }
+
+            LaunchApplyFailures++;
+            var status = result.Status.ToString();
+            _failureStatuses[status] = _failureStatuses.TryGetValue(status, out var count) ? count + 1 : 1;
+            PromoteDominantReason(ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplyFailed);
+        }
+
+        public ScenarioOrganicLaunchDiagnosticsSnapshot ToSnapshot()
+            => new(
+                EvaluationTickCount,
+                OwnerEvaluationCount,
+                LastEvaluationTick,
+                _evaluatedFactionIds.ToArray(),
+                LastEvaluatedFactionId,
+                LastEligibleMembers,
+                LastAvailableWarriors,
+                LastActiveCampaignCount,
+                LastTargetOptionCount,
+                LastWarTargetCount,
+                LastHostileTargetCount,
+                LastKnownTargetCount,
+                LastUnknownTargetCount,
+                LastMissingScoutIntelTargetCount,
+                HasLastBestCandidateScore,
+                LastBestPressureScore,
+                LastBestAdvantageScore,
+                LastBestDistancePenalty,
+                LastBestLaunchScore,
+                LastDecisionKind,
+                LastDecisionReasonCode,
+                LaunchApplyAttempts,
+                LaunchApplySuccesses,
+                LaunchApplyFailures,
+                _failureStatuses
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => new ScenarioOrganicLaunchApplyFailureStatus(pair.Key, pair.Value))
+                    .ToArray(),
+                _dominantNoLaunchReason ?? ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNotEvaluated);
+
+        private void RecordBestCandidateScore(
+            CampaignStrategyContext context,
+            IReadOnlyList<CampaignTargetOption> targetOptions)
+        {
+            if (targetOptions.Count <= 0)
+            {
+                HasLastBestCandidateScore = false;
+                LastBestPressureScore = 0f;
+                LastBestAdvantageScore = 0f;
+                LastBestDistancePenalty = 0f;
+                LastBestLaunchScore = 0f;
+                return;
+            }
+
+            var selected = targetOptions
+                .Select(target => (Target: target, Score: CalculateOrganicLaunchDiagnosticScore(context, target)))
+                .OrderByDescending(candidate => candidate.Score)
+                .ThenBy(candidate => candidate.Target.TargetColonyId)
+                .ThenBy(candidate => candidate.Target.TargetFactionId)
+                .First();
+            HasLastBestCandidateScore = true;
+            LastBestPressureScore = selected.Target.PressureScore;
+            LastBestAdvantageScore = selected.Target.AdvantageScore;
+            LastBestDistancePenalty = selected.Target.DistancePenalty;
+            LastBestLaunchScore = selected.Score;
+        }
+
+        private static float CalculateOrganicLaunchDiagnosticScore(
+            CampaignStrategyContext context,
+            CampaignTargetOption target)
+        {
+            var score = (target.PressureScore * 0.55f)
+                + (target.AdvantageScore * 0.45f)
+                + (context.VisibleEnemyPressure * 0.15f)
+                - target.DistancePenalty;
+            return Math.Clamp(score, 0f, 1f);
+        }
+
+        private string DetermineNoLaunchReasonForCurrentEvaluation()
+        {
+            if (LastEligibleMembers <= 0)
+                return ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoEligibleMembers;
+
+            if (LastAvailableWarriors <= 0)
+                return ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoAvailableWarriorsAfterHomeDefense;
+
+            if (LastTargetOptionCount <= 0)
+                return ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoTargetOptions;
+
+            if (LastKnownTargetCount <= 0 && LastMissingScoutIntelTargetCount > 0)
+                return ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonMissingScoutIntel;
+
+            if (LastKnownTargetCount <= 0)
+                return ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoKnownTargets;
+
+            return ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonStrategyHoldNoViableTarget;
+        }
+
+        private void PromoteDominantReason(string reason)
+        {
+            if (_dominantNoLaunchReason == null || ReasonPriority(reason) > ReasonPriority(_dominantNoLaunchReason))
+                _dominantNoLaunchReason = reason;
+        }
+
+        private static int ReasonPriority(string reason)
+            => reason switch
+            {
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplied => 100,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplyFailed => 90,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonMissingScoutIntel => 80,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoKnownTargets => 70,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonStrategyHoldNoViableTarget => 60,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoTargetOptions => 50,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoAvailableWarriorsAfterHomeDefense => 40,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoEligibleMembers => 30,
+                _ => 0
+            };
+    }
+
     private readonly World _world;
     private readonly double _directorDampeningFactor;
     private readonly Queue<string> _recentAiDecisions = new();
@@ -88,6 +278,7 @@ public sealed class SimulationRuntime
     private readonly Dictionary<CampaignWarScoreKey, int> _campaignWarScores = new();
     private readonly CampaignLogisticsOptions _campaignLogisticsOptions = CampaignLogisticsOptions.Default.Normalized();
     private readonly CampaignLogisticsCounters _campaignLogisticsCounters = new();
+    private readonly OrganicLaunchDiagnosticsAccumulator _organicLaunchDiagnostics = new();
     private DirectorExecutionState _directorExecutionState = DirectorExecutionState.NotTriggered;
     private int _lastObservedDecisionTick = -1;
     private int _nextCampaignId = 1;
@@ -580,7 +771,8 @@ public sealed class SimulationRuntime
             ManualLaunchAttemptTick: manualLaunchAttemptTick,
             ManualLaunchAttempted: manualLaunchAttemptTick.HasValue,
             ManualLaunchSucceeded: manualLaunchSucceeded,
-            ManualLaunchStatus: string.IsNullOrWhiteSpace(manualLaunchStatus) ? "not_attempted" : manualLaunchStatus.Trim());
+            ManualLaunchStatus: string.IsNullOrWhiteSpace(manualLaunchStatus) ? "not_attempted" : manualLaunchStatus.Trim(),
+            OrganicLaunchDiagnostics: _organicLaunchDiagnostics.ToSnapshot());
     }
 
     private static long? MinNonNegative(IEnumerable<long> values)
@@ -1210,13 +1402,24 @@ public sealed class SimulationRuntime
             return;
 
         var assignedActorIds = GetActiveCampaignActorIds();
+        _organicLaunchDiagnostics.RecordEvaluationTick(Tick);
         foreach (var ownerColony in _world._colonies.OrderBy(colony => (int)colony.Faction).ThenBy(colony => colony.Id))
         {
-            var context = BuildOrganicCampaignStrategyContext(ownerColony, assignedActorIds, blockedCampaignActorIds);
+            var context = BuildOrganicCampaignStrategyContext(ownerColony, assignedActorIds, blockedCampaignActorIds, out var eligibleMemberCount);
             var decision = _campaignStrategist.Decide(context);
+            var targets = context.Targets ?? Array.Empty<CampaignTargetOption>();
+            _organicLaunchDiagnostics.RecordEvaluation(
+                ownerColony.Faction,
+                eligibleMemberCount,
+                context,
+                targets,
+                CountTargetOptionsByStance(ownerColony.Faction, targets, Stance.War),
+                CountTargetOptionsByStance(ownerColony.Faction, targets, Stance.Hostile),
+                decision);
             if (decision.Kind == CampaignStrategyDecisionKind.LaunchCampaign)
             {
                 var result = TryApplyOrganicCampaignLaunch(ownerColony, decision, assignedActorIds, blockedCampaignActorIds);
+                _organicLaunchDiagnostics.RecordLaunchApplyResult(result);
                 if (result.Success && result.CampaignId.HasValue)
                     assignedActorIds = GetActiveCampaignActorIds();
                 continue;
@@ -1234,9 +1437,11 @@ public sealed class SimulationRuntime
     private CampaignStrategyContext BuildOrganicCampaignStrategyContext(
         Colony ownerColony,
         HashSet<int> assignedActorIds,
-        HashSet<int> blockedCampaignActorIds)
+        HashSet<int> blockedCampaignActorIds,
+        out int eligibleMemberCount)
     {
         var eligibleMembers = GetOrganicCampaignEligibleMembers(ownerColony, assignedActorIds, blockedCampaignActorIds);
+        eligibleMemberCount = eligibleMembers.Count;
         var availableWarriors = eligibleMembers.Count(person => person.HasRole(PersonRole.Warrior));
         var availableForLaunch = Math.Max(0, availableWarriors - _campaignLogisticsOptions.MinimumHomeDefenseWarriors);
         var activeCampaignCount = CountUnresolvedOwnerCampaigns(ownerColony.Faction);
@@ -1257,6 +1462,14 @@ public sealed class SimulationRuntime
             Targets: BuildOrganicCampaignTargetOptions(ownerColony, availableForLaunch, assignedActorIds, blockedCampaignActorIds),
             ActiveCampaigns: BuildActiveCampaignStrategyFacts(ownerColony.Faction));
     }
+
+    private int CountTargetOptionsByStance(
+        Faction ownerFaction,
+        IReadOnlyList<CampaignTargetOption> targetOptions,
+        Stance stance)
+        => targetOptions.Count(target =>
+            Enum.IsDefined(typeof(Faction), (Faction)target.TargetFactionId)
+            && _world.GetFactionStance(ownerFaction, (Faction)target.TargetFactionId) == stance);
 
     private IReadOnlyList<CampaignTargetOption> BuildOrganicCampaignTargetOptions(
         Colony ownerColony,

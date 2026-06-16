@@ -33,6 +33,18 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.Equal("main_world_run_has_no_campaign_runtime", wave10.GetProperty("reasonCode").GetString());
         Assert.Empty(wave10.GetProperty("nonClaims").EnumerateArray());
         Assert.Equal(0, wave10.GetProperty("campaignLaunches").GetInt32());
+        var diagnostics = wave10.GetProperty("organicLaunchDiagnostics");
+        Assert.Equal(0, diagnostics.GetProperty("evaluationTickCount").GetInt32());
+        Assert.Equal(0, diagnostics.GetProperty("ownerEvaluationCount").GetInt32());
+        Assert.Empty(diagnostics.GetProperty("evaluatedFactionIds").EnumerateArray());
+        Assert.Equal(-1, diagnostics.GetProperty("lastEvaluatedFactionId").GetInt32());
+        Assert.False(diagnostics.GetProperty("hasLastBestCandidateScore").GetBoolean());
+        Assert.Equal(0, diagnostics.GetProperty("lastBestPressureScore").GetSingle());
+        Assert.Equal(0, diagnostics.GetProperty("lastBestAdvantageScore").GetSingle());
+        Assert.Equal(0, diagnostics.GetProperty("lastBestDistancePenalty").GetSingle());
+        Assert.Equal(0, diagnostics.GetProperty("lastBestLaunchScore").GetSingle());
+        Assert.Equal("not_evaluated", diagnostics.GetProperty("dominantNoLaunchReason").GetString());
+        Assert.Empty(diagnostics.GetProperty("launchApplyFailureStatuses").EnumerateArray());
 
         using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
         Assert.False(manifest.RootElement.GetProperty("wave10Enabled").GetBoolean());
@@ -354,6 +366,24 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.Equal("main_world_run", wave10.GetProperty("runtimeSource").GetString());
         Assert.Equal("organic", wave10.GetProperty("proofType").GetString());
         Assert.Equal("tick_sampled", wave10.GetProperty("timelineSemantics").GetString());
+        var diagnostics = wave10.GetProperty("organicLaunchDiagnostics");
+        var evaluationTickCount = diagnostics.GetProperty("evaluationTickCount").GetInt32();
+        var ownerEvaluationCount = diagnostics.GetProperty("ownerEvaluationCount").GetInt32();
+        Assert.True(evaluationTickCount > 0, $"Expected organic cadence evaluation diagnostics\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(ownerEvaluationCount >= evaluationTickCount, $"Expected owner evaluations to cover cadence ticks\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.NotEmpty(diagnostics.GetProperty("evaluatedFactionIds").EnumerateArray());
+        Assert.True(diagnostics.GetProperty("lastEvaluationTick").ValueKind == JsonValueKind.Number, $"Expected last evaluation tick\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        Assert.True(diagnostics.TryGetProperty("hasLastBestCandidateScore", out var hasBestCandidate));
+        Assert.True(hasBestCandidate.ValueKind == JsonValueKind.True || hasBestCandidate.ValueKind == JsonValueKind.False);
+        Assert.Equal(JsonValueKind.Number, diagnostics.GetProperty("lastBestPressureScore").ValueKind);
+        Assert.Equal(JsonValueKind.Number, diagnostics.GetProperty("lastBestAdvantageScore").ValueKind);
+        Assert.Equal(JsonValueKind.Number, diagnostics.GetProperty("lastBestDistancePenalty").ValueKind);
+        Assert.Equal(JsonValueKind.Number, diagnostics.GetProperty("lastBestLaunchScore").ValueKind);
+        Assert.NotEqual("not_evaluated", diagnostics.GetProperty("dominantNoLaunchReason").GetString());
+        Assert.Contains(
+            diagnostics.GetProperty("dominantNoLaunchReason").GetString(),
+            new[] { "no_available_warriors_after_home_defense", "missing_scout_intel", "no_known_targets", "launch_apply_failed", "strategy_hold_no_viable_target" });
+        Assert.Equal(0, wave10.GetProperty("campaignLaunches").GetInt32());
 
         using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
         Assert.True(manifest.RootElement.GetProperty("wave10Enabled").GetBoolean());
@@ -509,6 +539,33 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.True(wave10.TryGetProperty("manualLaunchAttempted", out _));
         Assert.True(wave10.TryGetProperty("manualLaunchSucceeded", out _));
         Assert.True(wave10.TryGetProperty("manualLaunchStatus", out _));
+        Assert.True(wave10.TryGetProperty("organicLaunchDiagnostics", out var diagnostics));
+        Assert.True(diagnostics.TryGetProperty("evaluationTickCount", out _));
+        Assert.True(diagnostics.TryGetProperty("ownerEvaluationCount", out _));
+        Assert.True(diagnostics.TryGetProperty("lastEvaluationTick", out _));
+        Assert.True(diagnostics.TryGetProperty("evaluatedFactionIds", out _));
+        Assert.True(diagnostics.TryGetProperty("lastEvaluatedFactionId", out _));
+        Assert.True(diagnostics.TryGetProperty("lastEligibleMembers", out _));
+        Assert.True(diagnostics.TryGetProperty("lastAvailableWarriors", out _));
+        Assert.True(diagnostics.TryGetProperty("lastActiveCampaignCount", out _));
+        Assert.True(diagnostics.TryGetProperty("lastTargetOptionCount", out _));
+        Assert.True(diagnostics.TryGetProperty("lastWarTargetCount", out _));
+        Assert.True(diagnostics.TryGetProperty("lastHostileTargetCount", out _));
+        Assert.True(diagnostics.TryGetProperty("lastKnownTargetCount", out _));
+        Assert.True(diagnostics.TryGetProperty("lastUnknownTargetCount", out _));
+        Assert.True(diagnostics.TryGetProperty("lastMissingScoutIntelTargetCount", out _));
+        Assert.True(diagnostics.TryGetProperty("hasLastBestCandidateScore", out _));
+        Assert.True(diagnostics.TryGetProperty("lastBestPressureScore", out _));
+        Assert.True(diagnostics.TryGetProperty("lastBestAdvantageScore", out _));
+        Assert.True(diagnostics.TryGetProperty("lastBestDistancePenalty", out _));
+        Assert.True(diagnostics.TryGetProperty("lastBestLaunchScore", out _));
+        Assert.True(diagnostics.TryGetProperty("lastDecisionKind", out _));
+        Assert.True(diagnostics.TryGetProperty("lastDecisionReasonCode", out _));
+        Assert.True(diagnostics.TryGetProperty("launchApplyAttempts", out _));
+        Assert.True(diagnostics.TryGetProperty("launchApplySuccesses", out _));
+        Assert.True(diagnostics.TryGetProperty("launchApplyFailures", out _));
+        Assert.True(diagnostics.TryGetProperty("launchApplyFailureStatuses", out _));
+        Assert.True(diagnostics.TryGetProperty("dominantNoLaunchReason", out _));
     }
 
     private static string RemoveWave10BlocksFromSummary(string summaryPath)

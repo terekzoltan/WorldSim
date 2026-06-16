@@ -69,6 +69,77 @@ public sealed record ScenarioWave10TimelineSnapshot(
         LongestUnresolvedCampaignAgeTicks: 0);
 }
 
+public sealed record ScenarioOrganicLaunchApplyFailureStatus(
+    string Status,
+    int Count);
+
+public sealed record ScenarioOrganicLaunchDiagnosticsSnapshot(
+    int EvaluationTickCount,
+    int OwnerEvaluationCount,
+    long? LastEvaluationTick,
+    int[] EvaluatedFactionIds,
+    int LastEvaluatedFactionId,
+    int LastEligibleMembers,
+    int LastAvailableWarriors,
+    int LastActiveCampaignCount,
+    int LastTargetOptionCount,
+    int LastWarTargetCount,
+    int LastHostileTargetCount,
+    int LastKnownTargetCount,
+    int LastUnknownTargetCount,
+    int LastMissingScoutIntelTargetCount,
+    bool HasLastBestCandidateScore,
+    float LastBestPressureScore,
+    float LastBestAdvantageScore,
+    float LastBestDistancePenalty,
+    float LastBestLaunchScore,
+    string LastDecisionKind,
+    string LastDecisionReasonCode,
+    int LaunchApplyAttempts,
+    int LaunchApplySuccesses,
+    int LaunchApplyFailures,
+    ScenarioOrganicLaunchApplyFailureStatus[] LaunchApplyFailureStatuses,
+    string DominantNoLaunchReason)
+{
+    public const string ReasonNotEvaluated = "not_evaluated";
+    public const string ReasonNoEligibleMembers = "no_eligible_members";
+    public const string ReasonNoAvailableWarriorsAfterHomeDefense = "no_available_warriors_after_home_defense";
+    public const string ReasonNoTargetOptions = "no_target_options";
+    public const string ReasonNoKnownTargets = "no_known_targets";
+    public const string ReasonMissingScoutIntel = "missing_scout_intel";
+    public const string ReasonStrategyHoldNoViableTarget = "strategy_hold_no_viable_target";
+    public const string ReasonLaunchApplyFailed = "launch_apply_failed";
+    public const string ReasonLaunchApplied = "launch_applied";
+
+    public static ScenarioOrganicLaunchDiagnosticsSnapshot Empty { get; } = new(
+        EvaluationTickCount: 0,
+        OwnerEvaluationCount: 0,
+        LastEvaluationTick: null,
+        EvaluatedFactionIds: Array.Empty<int>(),
+        LastEvaluatedFactionId: -1,
+        LastEligibleMembers: 0,
+        LastAvailableWarriors: 0,
+        LastActiveCampaignCount: 0,
+        LastTargetOptionCount: 0,
+        LastWarTargetCount: 0,
+        LastHostileTargetCount: 0,
+        LastKnownTargetCount: 0,
+        LastUnknownTargetCount: 0,
+        LastMissingScoutIntelTargetCount: 0,
+        HasLastBestCandidateScore: false,
+        LastBestPressureScore: 0f,
+        LastBestAdvantageScore: 0f,
+        LastBestDistancePenalty: 0f,
+        LastBestLaunchScore: 0f,
+        LastDecisionKind: "none",
+        LastDecisionReasonCode: "none",
+        LaunchApplyAttempts: 0,
+        LaunchApplySuccesses: 0,
+        LaunchApplyFailures: 0,
+        LaunchApplyFailureStatuses: Array.Empty<ScenarioOrganicLaunchApplyFailureStatus>(),
+        DominantNoLaunchReason: ReasonNotEvaluated);
+}
+
 public sealed record ScenarioWave10TelemetrySnapshot(
     string Wave10Scenario,
     string RuntimeSource,
@@ -132,7 +203,8 @@ public sealed record ScenarioWave10TelemetrySnapshot(
     long? ManualLaunchAttemptTick,
     bool ManualLaunchAttempted,
     bool ManualLaunchSucceeded,
-    string ManualLaunchStatus)
+    string ManualLaunchStatus,
+    ScenarioOrganicLaunchDiagnosticsSnapshot OrganicLaunchDiagnostics)
 {
     public static ScenarioWave10TelemetrySnapshot Empty { get; } = new(
         Wave10Scenario: "none",
@@ -197,7 +269,8 @@ public sealed record ScenarioWave10TelemetrySnapshot(
         ManualLaunchAttemptTick: null,
         ManualLaunchAttempted: false,
         ManualLaunchSucceeded: false,
-        ManualLaunchStatus: "not_attempted");
+        ManualLaunchStatus: "not_attempted",
+        OrganicLaunchDiagnostics: ScenarioOrganicLaunchDiagnosticsSnapshot.Empty);
 
     public ScenarioWave10TimelineSnapshot ToTimelineSnapshot()
         => new(
