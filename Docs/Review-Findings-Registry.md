@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-17 - Wave 10 Step10B.5-F2-A Step Review - Blocking - Mobilization role quota must count launchable actors
+
+- Track: Track B / Runtime organic campaign mobilization
+- Source: Meta internal lanes + Meta Coordinator step-review synthesis for `Step10B.5-F2-A`
+- Finding: The initial F2-A mobilization role-sync can assign persistent `PersonRole.Warrior` to home actors that are not launchable this cadence because the sync candidate/quota filter excludes active campaign actors but does not exclude `blockedCampaignActorIds` or transient campaign-blocked states (`Fight`, `Flee`, routing, active battle/group, raid/attack jobs). The later organic campaign context and home-defense counts do exclude these actors.
+- Impact: Transient or blocked actors can satisfy the desired warrior-role quota while `GetOrganicCampaignEligibleMembers(...)` later filters them out, allowing the original `no_available_warriors_after_home_defense` blocker to remain under realistic combat/routing conditions.
+- Resolution / guidance: Before F2-A closeout, align mobilization sync candidate/quota counting with organic launch eligibility by excluding blocked/transient actors, and add a focused regression where stronger blocked/transient home actors exist beside lower-strength idle candidates that must become launchable warriors.
+- Status: fixed in Step10B.5-F2-A blocker-fix re-review; mobilization role-sync now excludes blocked/transient actors from the quota pool and focused regression coverage proves idle launchable actors are promoted instead.
+
 ## 2026-06-07 - Wave 10 SMR Prep Validation - Major - Probe lane presence is not feature proof
 
 - Track: SMR Analyst / Track B evidence surface validation

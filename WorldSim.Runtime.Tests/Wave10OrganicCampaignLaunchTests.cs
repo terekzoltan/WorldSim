@@ -314,6 +314,10 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
         runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic diagnostics stale score reset test");
+        var world = GetWorld(runtime);
+        world.SetFactionStance(Faction.Chirita, Faction.Sylvars, Stance.Neutral);
+        world.SetFactionStance(Faction.Chirita, Faction.Obsidari, Stance.Neutral);
+        world.SetFactionStance(Faction.Chirita, Faction.Aetheri, Stance.Neutral);
 
         runtime.AdvanceTick(0f);
 
@@ -390,6 +394,165 @@ public sealed class Wave10OrganicCampaignLaunchTests
         runtime.AdvanceTick(0f);
 
         Assert.Empty(runtime.Campaigns);
+    }
+
+    [Fact]
+    public void OrganicCampaign_WarPressureMobilizesLaunchableWarriorsAfterReserve()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetRuntimeTick(runtime, OrganicCampaignCadenceTicks);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic f2-a war mobilization test");
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
+
+        runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(runtime.Campaigns);
+        Assert.Equal(Faction.Obsidari, campaign.OwnerFaction);
+        Assert.True(CountHomeWarriorRoles(runtime, Faction.Obsidari) >= 2);
+    }
+
+    [Fact]
+    public void OrganicCampaignDiagnostics_WarPressureWithoutScoutMovesPastNoAvailableWarriors()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetRuntimeTick(runtime, OrganicCampaignCadenceTicks);
+        runtime.DeclareWar(Faction.Chirita, Faction.Aetheri, "organic f2-a no-scout next blocker test");
+
+        runtime.AdvanceTick(0f);
+
+        Assert.Empty(runtime.Campaigns);
+        var diagnostics = BuildOrganicDiagnostics(runtime);
+        Assert.True(diagnostics.LastAvailableWarriors > 0);
+        Assert.NotEqual(
+            ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoAvailableWarriorsAfterHomeDefense,
+            diagnostics.DominantNoLaunchReason);
+        Assert.Contains(
+            diagnostics.DominantNoLaunchReason,
+            new[]
+            {
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonMissingScoutIntel,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoKnownTargets,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplyFailed,
+                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonStrategyHoldNoViableTarget
+            });
+    }
+
+    [Fact]
+    public void OrganicCampaign_NeutralStanceDoesNotMobilizeLaunchWarriors()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetRuntimeTick(runtime, OrganicCampaignCadenceTicks);
+        var before = CountHomeWarriorRoles(runtime, Faction.Obsidari);
+
+        runtime.AdvanceTick(0f);
+
+        Assert.Empty(runtime.Campaigns);
+        Assert.Equal(before, CountHomeWarriorRoles(runtime, Faction.Obsidari));
+    }
+
+    [Fact]
+    public void OrganicCampaign_WarMobilizationIsIdempotentAcrossCadences()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetRuntimeTick(runtime, OrganicCampaignCadenceTicks);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic f2-a idempotency test");
+
+        runtime.AdvanceTick(0f);
+        var afterFirstCadence = CountHomeWarriorRoles(runtime, Faction.Obsidari);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+        var afterSecondCadence = CountHomeWarriorRoles(runtime, Faction.Obsidari);
+
+        Assert.True(afterFirstCadence >= 2);
+        Assert.Equal(afterFirstCadence, afterSecondCadence);
+    }
+
+    [Fact]
+    public void OrganicCampaign_WarMobilizationPrefersPlainEligibleActorsOverSpecialRoles()
+    {
+        var runtime = CreateRuntime(initialPopulation: 24);
+        EnableDiplomacyAndCombat(runtime);
+        SetRuntimeTick(runtime, OrganicCampaignCadenceTicks);
+        var world = GetWorld(runtime);
+        SetAllCampaignCandidatesIneligible(world);
+        var candidates = SelectCampaignMemberCandidates(world, Faction.Obsidari, count: 4);
+        candidates[0].AssignRole(PersonRole.Scout);
+        candidates[1].AssignRole(PersonRole.SupplyCarrier);
+        candidates[2].AssignRole(PersonRole.Commander);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic f2-a special-role preference test");
+
+        runtime.AdvanceTick(0f);
+
+        Assert.False(candidates[0].HasRole(PersonRole.Warrior));
+        Assert.False(candidates[1].HasRole(PersonRole.Warrior));
+        Assert.False(candidates[2].HasRole(PersonRole.Warrior));
+        Assert.Contains(world._people, person =>
+            person.Home.Faction == Faction.Obsidari
+            && !person.HasRole(PersonRole.Scout)
+            && !person.HasRole(PersonRole.SupplyCarrier)
+            && !person.HasRole(PersonRole.Commander)
+            && person.HasRole(PersonRole.Warrior));
+    }
+
+    [Fact]
+    public void OrganicCampaign_WarMobilizationIgnoresBlockedTransientActorsForQuota()
+    {
+        var runtime = CreateRuntime(initialPopulation: 24);
+        EnableDiplomacyAndCombat(runtime);
+        SetRuntimeTick(runtime, OrganicCampaignCadenceTicks);
+        var world = GetWorld(runtime);
+        SetAllCampaignCandidatesIneligible(world);
+        var candidates = SelectCampaignMemberCandidates(world, Faction.Obsidari, count: 4).ToArray();
+        candidates[0].Strength = 100;
+        candidates[0].Defense = 100;
+        candidates[0].Current = Job.Flee;
+        candidates[1].Strength = 90;
+        candidates[1].Defense = 90;
+        candidates[1].Current = Job.AttackStructure;
+        candidates[2].Strength = 1;
+        candidates[2].Defense = 1;
+        candidates[3].Strength = 2;
+        candidates[3].Defense = 1;
+        foreach (var extra in world._people.Where(person =>
+                     person.Home.Faction == Faction.Obsidari
+                     && !candidates.Contains(person)))
+        {
+            extra.Current = Job.Flee;
+        }
+
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic f2-a blocked quota regression test");
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
+
+        runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(runtime.Campaigns);
+        Assert.Equal(Faction.Obsidari, campaign.OwnerFaction);
+        Assert.False(candidates[0].HasRole(PersonRole.Warrior));
+        Assert.False(candidates[1].HasRole(PersonRole.Warrior));
+        Assert.True(candidates[2].HasRole(PersonRole.Warrior));
+        Assert.True(candidates[3].HasRole(PersonRole.Warrior));
+    }
+
+    [Fact]
+    public void OrganicCampaign_WarMobilizationFallsBackToSpecialRolesOnlyAfterPlainCandidates()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetRuntimeTick(runtime, OrganicCampaignCadenceTicks);
+        var world = GetWorld(runtime);
+        SetAllCampaignCandidatesIneligible(world);
+        var candidates = SelectCampaignMemberCandidates(world, Faction.Obsidari, count: 3);
+        candidates[0].AssignRole(PersonRole.Scout);
+        candidates[1].AssignRole(PersonRole.SupplyCarrier);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic f2-a special-role fallback test");
+
+        runtime.AdvanceTick(0f);
+
+        Assert.True(candidates[2].HasRole(PersonRole.Warrior));
+        Assert.True(candidates[0].HasRole(PersonRole.Warrior) || candidates[1].HasRole(PersonRole.Warrior));
     }
 
     [Fact]
@@ -593,11 +756,11 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Chirita);
     }
 
-    private static SimulationRuntime CreateRuntime(ICampaignStrategist? strategist = null)
+    private static SimulationRuntime CreateRuntime(ICampaignStrategist? strategist = null, int initialPopulation = 12)
     {
         var repoRoot = FindRepoRoot();
         var techPath = Path.Combine(repoRoot, "Tech", "technologies.json");
-        return new SimulationRuntime(32, 32, 12, techPath, aiOptions: null, randomSeed: 9601, campaignStrategist: strategist);
+        return new SimulationRuntime(32, 32, initialPopulation, techPath, aiOptions: null, randomSeed: 9601, campaignStrategist: strategist);
     }
 
     private static void EnableDiplomacyAndCombat(SimulationRuntime runtime)
@@ -723,6 +886,13 @@ public sealed class Wave10OrganicCampaignLaunchTests
             runtime.AdvanceTick(0f);
     }
 
+    private static void SetRuntimeTick(SimulationRuntime runtime, long tick)
+    {
+        var tickProperty = typeof(SimulationRuntime).GetProperty(nameof(SimulationRuntime.Tick));
+        Assert.NotNull(tickProperty);
+        tickProperty!.SetValue(runtime, tick);
+    }
+
     private static void ResolveCampaign(CampaignState campaign)
     {
         Assert.True(campaign.Resolve(new CampaignResolutionApplication(
@@ -806,6 +976,22 @@ public sealed class Wave10OrganicCampaignLaunchTests
         Assert.NotNull(world);
         return world!;
     }
+
+    private static ScenarioOrganicLaunchDiagnosticsSnapshot BuildOrganicDiagnostics(SimulationRuntime runtime)
+        => runtime.BuildScenarioWave10TelemetrySnapshot(
+            "organic_hostile_campaign_lifecycle",
+            ScenarioWave10Evidence.ProofTypeOrganic,
+            ScenarioWave10Evidence.EvidenceStatusProofUnavailable,
+            ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+            ScenarioWave10Evidence.ReasonOrganicLaunchNotReproduced,
+            runtimeSource: ScenarioWave10Evidence.RuntimeSourceMainWorldRun)
+            .OrganicLaunchDiagnostics;
+
+    private static int CountHomeWarriorRoles(SimulationRuntime runtime, Faction faction)
+        => GetWorld(runtime)._people.Count(person =>
+            person.Health > 0f
+            && person.Home.Faction == faction
+            && person.HasRole(PersonRole.Warrior));
 
     private static string FindRepoRoot()
     {

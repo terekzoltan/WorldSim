@@ -1405,6 +1405,7 @@ public sealed class SimulationRuntime
         _organicLaunchDiagnostics.RecordEvaluationTick(Tick);
         foreach (var ownerColony in _world._colonies.OrderBy(colony => (int)colony.Faction).ThenBy(colony => colony.Id))
         {
+            SynchronizeOrganicCampaignMobilizationRoles(ownerColony, assignedActorIds, blockedCampaignActorIds);
             var context = BuildOrganicCampaignStrategyContext(ownerColony, assignedActorIds, blockedCampaignActorIds, out var eligibleMemberCount);
             var decision = _campaignStrategist.Decide(context);
             var targets = context.Targets ?? Array.Empty<CampaignTargetOption>();
@@ -1433,6 +1434,78 @@ public sealed class SimulationRuntime
                 continue;
         }
     }
+
+    private void SynchronizeOrganicCampaignMobilizationRoles(
+        Colony ownerColony,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        var warState = _world.GetColonyWarState(ownerColony.Id);
+        if (warState is not (ColonyWarState.Tense or ColonyWarState.War))
+            return;
+
+        var mobilizedWarriorCount = _world.GetColonyWarriorCount(ownerColony.Id);
+        if (mobilizedWarriorCount <= 0)
+            return;
+
+        var candidates = _world._people
+            .Where(person => IsOrganicCampaignMobilizationCandidate(person, ownerColony, assignedActorIds, blockedCampaignActorIds))
+            .ToArray();
+        if (candidates.Length <= 0)
+            return;
+
+        var desiredWarriorRoles = Math.Min(
+            candidates.Length,
+            Math.Max(mobilizedWarriorCount, _campaignLogisticsOptions.MinimumHomeDefenseWarriors + 1));
+        var existingWarriorRoles = candidates.Count(person => person.HasRole(PersonRole.Warrior));
+        if (existingWarriorRoles >= desiredWarriorRoles)
+            return;
+
+        var toAssign = desiredWarriorRoles - existingWarriorRoles;
+        var assigned = 0;
+        foreach (var candidate in candidates
+                     .Where(person => !person.HasRole(PersonRole.Warrior) && !HasSpecialCampaignRole(person))
+                     .OrderByDescending(person => person.Strength + person.Defense)
+                     .ThenBy(person => person.Id)
+                     .Take(toAssign))
+        {
+            candidate.AssignRole(PersonRole.Warrior);
+            assigned++;
+        }
+
+        if (assigned >= toAssign)
+            return;
+
+        foreach (var candidate in candidates
+                     .Where(person => !person.HasRole(PersonRole.Warrior))
+                     .OrderByDescending(person => person.Strength + person.Defense)
+                     .ThenBy(person => person.Id)
+                     .Take(toAssign - assigned))
+        {
+            candidate.AssignRole(PersonRole.Warrior);
+        }
+    }
+
+    private static bool IsOrganicCampaignMobilizationCandidate(
+        Person person,
+        Colony ownerColony,
+        HashSet<int> assignedActorIds,
+        HashSet<int> blockedCampaignActorIds)
+    {
+        if (person.Health <= 0f || person.Home.Id != ownerColony.Id)
+            return false;
+        if (assignedActorIds.Contains(person.Id))
+            return false;
+        if (blockedCampaignActorIds.Contains(person.Id) || IsCampaignAssemblyBlockedByTransientOwnership(person))
+            return false;
+
+        return true;
+    }
+
+    private static bool HasSpecialCampaignRole(Person person)
+        => person.HasRole(PersonRole.Scout)
+           || person.HasRole(PersonRole.SupplyCarrier)
+           || person.HasRole(PersonRole.Commander);
 
     private CampaignStrategyContext BuildOrganicCampaignStrategyContext(
         Colony ownerColony,
