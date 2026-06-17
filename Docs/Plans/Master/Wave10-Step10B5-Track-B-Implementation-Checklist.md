@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5 - Track B Implementation Checklist
 
-Status: ready for F1 diagnostics
+Status: F1 accepted; F2-A ready
 Primary owner: Track B
 Parent plan: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 Evidence source: `Docs/Evidence/SMR/wave10-step10b2-organic-manual-lifecycle/README.md`
@@ -8,7 +8,9 @@ Evidence source: `Docs/Evidence/SMR/wave10-step10b2-organic-manual-lifecycle/REA
 Detailed F-slice files:
 - F0: `Docs/Plans/Master/Wave10-Step10B5-F0-Evidence-Acceptance-And-Prep-Disposition.md`
 - F1: `Docs/Plans/Master/Wave10-Step10B5-F1-Organic-Launch-Decision-Trail-Diagnostics.md`
-- F2: `Docs/Plans/Master/Wave10-Step10B5-F2-Target-Knowledge-Policy-Fix.md`
+- F2-A: `Docs/Plans/Master/Wave10-Step10B5-F2A-Runtime-War-Mobilization-Launchability.md`
+- F2-B: `Docs/Plans/Master/Wave10-Step10B5-F2B-Mini-SMR-Harness-Confidence.md`
+- F2-C: `Docs/Plans/Master/Wave10-Step10B5-F2-Target-Knowledge-Policy-Fix.md`
 - F3: `Docs/Plans/Master/Wave10-Step10B5-F3-Hostile-Organic-Pilot-And-Confirm.md`
 - F4: `Docs/Plans/Master/Wave10-Step10B5-F4-Manual-Downstream-Diagnostics.md`
 - F5: `Docs/Plans/Master/Wave10-Step10B5-F5-Stress-Seed606-Survival-Repro-Fix.md`
@@ -20,9 +22,9 @@ Recover the Step10B.2 RED evidence by making organic campaign launch behavior ob
 
 ## Active Hypothesis To Validate
 
-Hostile organic no-launch likely occurs because the strategist requires `CampaignTargetOption.IsKnown`, and `IsKnown` currently requires fresh scout intel. Step10B.2 hostile setup declares war but does not create scout intel, so the strategist likely returns `NoViableTarget` before runtime application and suppression counters remain zero.
+F1 accepted in `cf34de6` changed the active blocker ordering. Main-run hostile lifecycle currently stops at `no_available_warriors_after_home_defense`. Controlled runtime coverage still proves the scout/known-target blocker exists after warriors are available, but target knowledge is no longer the first fix.
 
-This is a hypothesis. The first implementation slice must prove or disprove it.
+Therefore F2-A must first address runtime war mobilization / launchable warrior availability. F2-C target knowledge remains conditional after F2-A/F2-B evidence.
 
 ## Guardrails
 
@@ -30,6 +32,7 @@ This is a hypothesis. The first implementation slice must prove or disprove it.
 - Preserve `runs[].wave10` as main-run truth.
 - Preserve `wave10-probes.json` as side-probe evidence only.
 - Do not directly create campaigns in organic lifecycle configs.
+- Do not use scenario setup as a substitute for runtime gameplay correctness; harness setup is allowed only as a local proof/control aid.
 - Do not weaken `SURV-*` assertions.
 - Do not change Track C strategy internals unless Meta opens Track C from diagnostic evidence.
 - Do not change App/Graphics.
@@ -99,9 +102,57 @@ Exit criteria:
 - If target knowledge/scout hard gate is not the blocker, stop and update the plan with the proven blocker.
 - If target knowledge is the blocker, continue to F2.
 
-### 3. F2 Target Knowledge Policy Fix
+### 3. F2-A Runtime War Mobilization / Launchable Warrior Availability
 
-Implement only after F1 confirms the blocker or Meta explicitly confirms the default policy.
+Implement first after F1 acceptance.
+
+Goal:
+- Under war/hostile pressure, colonies should organically reach enough launchable warriors after home-defense reserve for campaign launch evaluation to progress.
+- This is a runtime gameplay fix, not just ScenarioRunner setup.
+
+Allowed scope:
+- Runtime-owned mobilization, role assignment, eligible member selection, or home-defense policy if narrowly justified.
+- Focused runtime tests and ScenarioRunner tests.
+- Small local mini-SMR/harness run after focused tests.
+
+Do not:
+- directly create campaigns,
+- add scout intel,
+- implement war-known target policy,
+- change AI strategist internals,
+- change App/Graphics,
+- broadly tune score thresholds.
+
+Tests required:
+- war/hostile pressure produces launchable warriors after reserve,
+- neutral/non-war scenarios do not receive accidental war mobilization,
+- cap/home-defense/route guards still block in intentional negative cases,
+- `organicLaunchDiagnostics` no longer reports `no_available_warriors_after_home_defense` as the dominant blocker in a focused hostile lifecycle proof.
+
+Exit criteria:
+- If F2-A moves the blocker to target knowledge/scout gate, continue to F2-B then F2-C.
+- If F2-A reveals a different blocker, stop and update the plan.
+
+### 4. F2-B Mini-SMR / Harness Confidence
+
+Track B may run a small local mini-SMR only to validate its own F2-A fix.
+
+Mini-SMR limits:
+- 1-3 seeds,
+- 1-2 planners,
+- 1-2 configs,
+- local `.artifacts` only,
+- no final GREEN/YELLOW/RED closeout recommendation.
+
+Acceptance:
+- artifact uses `runs[].wave10.runtimeSource = main_world_run`,
+- no `wave10-probes.json` overclaim,
+- dominant blocker moved past `no_available_warriors_after_home_defense`,
+- artifact path is documented but raw artifact is not committed.
+
+### 5. F2-C Target Knowledge Policy Fix
+
+Implement only after F2-A/F2-B show target knowledge/scout gate is the next blocker or Meta explicitly confirms the default policy after warrior availability is healthy.
 
 Recommended policy:
 - `War` target colony is baseline-known for minimal organic launch.
@@ -127,7 +178,7 @@ Verification:
 - ScenarioRunner focused tests,
 - full solution build.
 
-### 4. F3 Hostile Organic Pilot
+### 6. F3 Hostile Organic Pilot
 
 Do not run the full 90-run package first.
 
@@ -150,7 +201,7 @@ Stop condition:
 Continue condition:
 - Multiple seed/planner combinations launch or remaining no-launch runs are clearly explained.
 
-### 5. F4 Manual Downstream Diagnostics
+### 7. F4 Manual Downstream Diagnostics
 
 Add or fix reason counters before changing behavior.
 
@@ -182,7 +233,7 @@ Do not:
 - claim no-tech runs prove dedicated siege-unit failure,
 - overclaim convoy request as delivery proof.
 
-### 6. F5 Stress Seed-606 Survival Repro And Fix
+### 8. F5 Stress Seed-606 Survival Repro And Fix
 
 Reproduce only the failing lanes first:
 - `small-highpop | Htn | seed 606`,
@@ -209,7 +260,7 @@ Fix policy:
 Exit criteria:
 - The three failing lanes pass, or Meta accepts a separate known limitation route.
 
-### 7. F6 Full Recovery Rerun Handoff
+### 9. F6 Full Recovery Rerun Handoff
 
 Only after F3-F5 pass.
 

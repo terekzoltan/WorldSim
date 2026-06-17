@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5 - Organic Campaign RED Recovery Plan
 
-Status: active - F0 closed, F1 ready
+Status: active - F1 accepted, F2-A ready
 Owner: Meta Coordinator for sequencing; Track B primary implementation
 Source evidence: `Docs/Evidence/SMR/wave10-step10b2-organic-manual-lifecycle/README.md`
 Companion execution checklist: `Docs/Plans/Master/Wave10-Step10B5-Track-B-Implementation-Checklist.md`
@@ -8,7 +8,9 @@ Companion execution checklist: `Docs/Plans/Master/Wave10-Step10B5-Track-B-Implem
 F-slice detail files:
 - F0: `Docs/Plans/Master/Wave10-Step10B5-F0-Evidence-Acceptance-And-Prep-Disposition.md`
 - F1: `Docs/Plans/Master/Wave10-Step10B5-F1-Organic-Launch-Decision-Trail-Diagnostics.md`
-- F2: `Docs/Plans/Master/Wave10-Step10B5-F2-Target-Knowledge-Policy-Fix.md`
+- F2-A: `Docs/Plans/Master/Wave10-Step10B5-F2A-Runtime-War-Mobilization-Launchability.md`
+- F2-B: `Docs/Plans/Master/Wave10-Step10B5-F2B-Mini-SMR-Harness-Confidence.md`
+- F2-C: `Docs/Plans/Master/Wave10-Step10B5-F2-Target-Knowledge-Policy-Fix.md`
 - F3: `Docs/Plans/Master/Wave10-Step10B5-F3-Hostile-Organic-Pilot-And-Confirm.md`
 - F4: `Docs/Plans/Master/Wave10-Step10B5-F4-Manual-Downstream-Diagnostics.md`
 - F5: `Docs/Plans/Master/Wave10-Step10B5-F5-Stress-Seed606-Survival-Repro-Fix.md`
@@ -30,7 +32,7 @@ Accepted Step10B.2 facts:
 - Manual lifecycle did not naturally activate convoys, scouts, or dedicated siege units.
 - Existing suppression counters stayed zero in organic no-launch packages, so the current telemetry does not explain whether the blocker is cadence, precondition, target visibility, strategy, or validation.
 
-Current code-level hypothesis from the evidence review:
+Current code-level hypothesis from the Step10B.2 evidence review:
 - `SimulationRuntime.AdvanceTick(...)` calls `EvaluateOrganicCampaignLaunches(...)` before world update.
 - `DefaultCampaignStrategist` only launches when a target is viable.
 - `CampaignTargetOption.IsKnown` is currently tied to fresh actionable scout intel.
@@ -38,17 +40,22 @@ Current code-level hypothesis from the evidence review:
 - With no known target, the strategist likely returns `HoldDefensivePosture / NoViableTarget` before runtime application is attempted.
 - Because runtime application is not attempted, cap/home-defense/route suppression counters remain zero.
 
-This is a hypothesis to validate in Step10B.5-F1, not a license for blind tuning.
+This was the initial hypothesis for Step10B.5-F1, not a license for blind tuning.
+
+Step10B.5-F1 result accepted in `cf34de6`:
+- The main-run hostile lifecycle smoke `.artifacts/smr/wave10-step10b5-f1-hostile-diagnostics-smoke-003/` now reports `dominantNoLaunchReason=no_available_warriors_after_home_defense`.
+- Controlled runtime war-with-prepared-warriors coverage still proves the scout/known-target blocker exists after warrior availability is solved.
+- Therefore the recovery order is revised: fix runtime war mobilization / launchable warrior availability first (F2-A), use a small Track-owned mini-SMR/harness pass for local proof (F2-B), then handle target knowledge/scout gate only if it is the next blocker (F2-C).
 
 ## Required Policy Decision
 
-Default policy for implementation unless Meta overrides it:
+Default target-knowledge policy for F2-C unless Meta overrides it:
 - A `War` relation makes an enemy colony baseline-known enough for a minimal organic campaign launch.
 - A `Hostile` relation may become baseline-known only under explicit runtime policy, or may still require fresh scout intel depending on diagnostics.
 - Fresh scout intel remains a quality/confidence/target-choice signal, not the only possible first-launch knowledge source under `War`.
 - Neutral or Tense targets remain non-launchable without future explicit design work.
 
-If Meta rejects this default, Step10B.5-F2 must instead implement natural scout availability/observation as the first organic launch unlock path. Do not mix both policies in one unreviewed change.
+Do not apply this policy before F2-A/F2-B demonstrate that warrior availability/home-defense is no longer the dominant main-run hostile blocker. If Meta rejects this default later, F2-C must instead implement natural scout availability/observation as the first target-knowledge unlock path. Do not mix both policies in one unreviewed change.
 
 ## Non-Goals
 
@@ -56,6 +63,7 @@ If Meta rejects this default, Step10B.5-F2 must instead implement natural scout 
 - Do not use `wave10-probes.json` as organic lifecycle proof.
 - Do not directly create campaigns in organic lifecycle configs.
 - Do not globally tune campaign score thresholds before decision-trail telemetry proves the score is the blocker.
+- Do not treat scenario harness setup as the runtime gameplay fix. Harness setup may support diagnostics, but the primary goal is organic runtime behavior.
 - Do not add Track C strategist behavior unless runtime diagnostics prove a strategist-only contract gap.
 - Do not add Track A/UI/manual smoke fixes before runtime lifecycle health is restored.
 - Do not commit raw `.artifacts/smr/...` bundles.
@@ -93,14 +101,17 @@ Package scaling policy:
 
 Track B owns:
 - Runtime organic launch decision-trail telemetry.
+- Runtime war mobilization / launchable warrior availability fixes under hostile pressure.
 - Target knowledge policy and runtime validation/application.
 - ScenarioRunner lifecycle evidence surface and focused tests.
+- Small Track-owned mini-SMR/harness runs that directly validate the Track B fix under review.
 - Manual lifecycle downstream diagnostics for convoy/scout/siege-unit non-activation.
 - Stress seed-606 small-topology survival investigation and fix.
 
 SMR Analyst owns:
 - Pilot and full package reruns after Track B gates are green.
 - Counter-based evidence review and GREEN/YELLOW/RED recommendation.
+- Full matrix, cross-planner/cross-seed closeout, baseline/compare packages, and final SMR recommendation.
 
 Meta Coordinator owns:
 - Policy decisions.
@@ -191,43 +202,90 @@ Acceptance:
 - No gameplay behavior changes are included in F1.
 
 Unlocks:
-- Step10B.5-F2 if target knowledge is confirmed as the primary blocker.
+- Step10B.5-F2-A runtime war mobilization / launchable warrior availability.
 - Track C routing only if F1 proves a strategist-only blocker.
 
-### Step10B.5-F2 - Organic Target Knowledge Policy Fix
+### Step10B.5-F2-A - Runtime War Mobilization / Launchable Warrior Availability
 
 Owner: Track B
 
-Scope: minimal runtime behavior fix; no broad balancing.
+Scope: narrow runtime gameplay fix; no broad balancing.
+
+Detailed file: `Docs/Plans/Master/Wave10-Step10B5-F2A-Runtime-War-Mobilization-Launchability.md`
+
+Prereq:
+- F1 accepted in `cf34de6`.
+- Main-run hostile lifecycle diagnostics report `no_available_warriors_after_home_defense` as the dominant blocker.
+
+Recommended implementation:
+- Identify why hostile/war lifecycle has no launchable warriors after home-defense reserve.
+- Add the smallest runtime-owned war/hostile mobilization path that lets colonies organically field launchable warriors under war pressure.
+- Preserve `SimulationRuntime.AdvanceTick(...)` as the orchestration path.
+- Do not directly create campaigns.
+- Do not add scout intel or target-knowledge policy changes in F2-A.
+- Do not globally relax home-defense without a focused runtime policy and tests.
+- Do not change Track C strategist logic unless Meta opens Track C from evidence.
+
+Focused tests:
+- War/hostile pressure produces enough eligible launchable warriors after reserve in a controlled runtime scenario.
+- Non-war/neutral lifecycle does not get accidental war mobilization.
+- Existing home-defense/cap/route guards still block when intentionally configured.
+- Diagnostics move past `no_available_warriors_after_home_defense` to a later explicit reason or a launch attempt.
+
+Acceptance:
+- The main-run hostile lifecycle no longer stops at `no_available_warriors_after_home_defense` as the dominant blocker in a focused local proof.
+- The fix is a runtime gameplay improvement, not only scenario setup.
+- Behavior changes are narrow, tested, and do not create direct campaign launches.
+
+Unlocks:
+- Step10B.5-F2-B.
+
+### Step10B.5-F2-B - Mini-SMR / Hostile Lifecycle Harness Confidence
+
+Owner: Track B
+
+Scope: small Track-owned proof run for the F2-A fix; not a full SMR closeout.
+
+Detailed file: `Docs/Plans/Master/Wave10-Step10B5-F2B-Mini-SMR-Harness-Confidence.md`
+
+Policy:
+- Track B may run mini-SMR when it directly validates its own current fix.
+- Mini-SMR is capped to small seed/planner/config counts and local raw artifacts.
+- Mini-SMR cannot replace SMR Analyst full package closeout or final GREEN/YELLOW/RED recommendation.
+- Scenario setup may provide a war-ready minimum for harness/control purposes, but the F2-A runtime fix remains the primary gameplay solution.
+
+Acceptance:
+- A small hostile lifecycle main-run artifact proves the F2-A blocker moved past `no_available_warriors_after_home_defense`.
+- `runs[].wave10.runtimeSource = main_world_run`.
+- No `wave10-probes.json` overclaim.
+- Artifact path is referenced in docs; raw `.artifacts` remain uncommitted.
+
+Unlocks:
+- Step10B.5-F2-C if the next blocker is target knowledge / scout gate.
+- Step10B.5-F3 if hostile lifecycle launches or Meta accepts that F2-C is not needed.
+
+### Step10B.5-F2-C - Organic Target Knowledge / Scout Gate Policy Fix
+
+Owner: Track B
+
+Scope: conditional minimal runtime behavior fix; no broad balancing.
 
 Detailed file: `Docs/Plans/Master/Wave10-Step10B5-F2-Target-Knowledge-Policy-Fix.md`
 
 Prereq:
-- F1 diagnostics identify target knowledge / scout hard gate as the main no-launch blocker, or Meta explicitly accepts the default war-known policy.
+- F2-A/F2-B show target knowledge / scout hard gate as the next no-launch blocker, or Meta explicitly accepts the default war-known policy after warrior availability is solved.
 
 Recommended implementation:
 - Introduce a runtime-owned target knowledge resolver, for example `ResolveOrganicCampaignTargetKnowledge(...)`.
-- Treat `Stance.War` target colonies as baseline-known for minimal organic launch.
-- Treat `Stance.Hostile` conservatively: either require scout intel or allow baseline-known only if F1 evidence shows hostile pressure should be enough. If uncertain, start with War-only baseline-known and keep Hostile scout-gated.
-- Preserve scout fields as additional quality data:
-  - `HasScoutIntel`
-  - `ScoutIntelTicksSinceRefresh`
-  - `ScoutIntelConfidence`
-  - optional `TargetKnowledgeSource` such as `fresh_scout_intel`, `war_relation`, `hostile_relation`, `unknown`.
+- Treat `Stance.War` target colonies as baseline-known for minimal organic campaign launch.
+- Treat `Stance.Hostile` conservatively: either require scout intel or allow baseline-known only if evidence shows hostile pressure should be enough.
+- Preserve scout fields as additional quality data: `HasScoutIntel`, `ScoutIntelTicksSinceRefresh`, `ScoutIntelConfidence`, and optional `TargetKnowledgeSource`.
 - Do not make Neutral/Tense targets launchable.
 - Do not bypass cap, home-defense, pair-cap, route preflight, or same-faction validation.
 
-Focused tests:
-- War target without scout intel can become viable if warriors and route are valid.
-- Neutral/Tense targets without scout intel stay non-viable.
-- Fresh scout intel still marks target with scout fields and remains preferred/visible in telemetry.
-- No available warriors still prevents launch.
-- Pair cap / owner cap / route preflight still block launch and increment the right counters.
-- ScenarioRunner lifecycle pilot returns `runs[].wave10.runtimeSource = main_world_run` and no side-probe overclaim.
-
 Acceptance:
+- Known target count is non-zero under War lifecycle preconditions after warrior availability is healthy.
 - A controlled hostile/war lifecycle pilot produces at least one organic launch or a new explicit blocker reason.
-- Diagnostics show target known count is no longer zero under War preconditions.
 - Existing deterministic Step10B probe lanes are unchanged.
 
 Unlocks:
@@ -237,7 +295,7 @@ Unlocks:
 
 Owner: Track B for targeted rerun; SMR Analyst may assist with artifact review
 
-Scope: verification only after F2.
+Scope: verification only after F2-A/F2-B and F2-C if needed.
 
 Detailed file: `Docs/Plans/Master/Wave10-Step10B5-F3-Hostile-Organic-Pilot-And-Confirm.md`
 

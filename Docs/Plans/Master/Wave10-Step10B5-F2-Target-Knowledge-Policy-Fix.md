@@ -1,14 +1,14 @@
-# Wave 10 Step10B.5-F2 - Target Knowledge Policy Fix
+# Wave 10 Step10B.5-F2-C - Target Knowledge Policy Fix
 
-Status: planned
+Status: conditional - pending F2-A/F2-B
 Owner: Track B
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
-F2 is the first behavior-fix slice. It is only valid after F1 diagnostics identify target knowledge as the no-launch blocker or Meta explicitly confirms the default policy.
+F2-C is a conditional behavior-fix slice. It is only valid after F2-A/F2-B clear warrior availability/home-defense as the first main-run blocker and identify target knowledge / scout gate as the next no-launch blocker, or Meta explicitly confirms the default policy after warrior availability is healthy.
 
 ## Purpose
 
-Make organic campaign target knowledge consistent with gameplay intent. A declared war should be enough for a faction to know an enemy colony as a basic campaign target. Scout intel should improve quality and choice, not be the only possible first-launch gate under war conditions.
+Make organic campaign target knowledge consistent with gameplay intent after launchable warrior availability is solved. A declared war should be enough for a faction to know an enemy colony as a basic campaign target. Scout intel should improve quality and choice, not be the only possible first-launch gate under war conditions.
 
 ## Default Policy
 
@@ -48,6 +48,7 @@ If a `TargetKnowledgeSource` field is exported, make it additive/default-safe.
 - Do not bypass owner cap.
 - Do not bypass unordered pair cap.
 - Do not bypass home-defense reserve.
+- Do not use this slice to fix warrior availability; that is F2-A scope.
 - Do not bypass route preflight.
 - Do not allow same-faction launches.
 - Do not make Neutral/Tense targets launchable.

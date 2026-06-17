@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5-F1 - Organic Launch Decision-Trail Diagnostics
 
-Status: implemented fix pass - pending deep-review
+Status: accepted / committed in `cf34de6`
 Owner: Track B
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
@@ -44,9 +44,7 @@ Observed diagnostics:
   `dominantNoLaunchReason=no_available_warriors_after_home_defense`, `evaluationTickCount=3`, `ownerEvaluationCount=12`,
   `runtimeSource=main_world_run`, `campaignLaunches=0`, current score/count schema, and no `wave10-probes.json`.
 
-F2 should not automatically proceed as the original war-known target policy until Meta reviews whether F2 must first address
-organic lifecycle warrior availability / home-defense setup, or whether the target-knowledge policy remains the next fix after
-that blocker is handled.
+Meta routing decision after F1: proceed to F2-A runtime war mobilization / launchable warrior availability first. Target-knowledge policy is conditional F2-C after F2-A/F2-B move the main-run blocker past `no_available_warriors_after_home_defense`.
 
 ## Primary Hypothesis
 
