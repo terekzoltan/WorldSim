@@ -35,12 +35,29 @@ public sealed class Wave10ScoutAiConsumeTests
     }
 
     [Fact]
-    public void OrganicTarget_WithoutScoutIntel_IsNotKnownToStrategist()
+    public void OrganicTarget_WarWithoutScoutIntel_IsKnownToStrategist()
     {
         var strategist = new RecordingStrategist();
         var runtime = CreateRuntime(strategist);
         AdvanceToOrganicCadence(runtime);
         var world = PrepareStrategistRuntime(runtime, Faction.Obsidari, Faction.Aetheri);
+
+        runtime.AdvanceTick(0f);
+
+        var target = GetRecordedTarget(strategist, Faction.Obsidari, Faction.Aetheri, world);
+        Assert.True(target.IsKnown);
+        Assert.False(target.HasScoutIntel);
+        Assert.Equal(int.MaxValue, target.ScoutIntelTicksSinceRefresh);
+        Assert.Equal(0f, target.ScoutIntelConfidence);
+    }
+
+    [Fact]
+    public void OrganicTarget_HostileWithoutScoutIntel_IsNotKnownToStrategist()
+    {
+        var strategist = new RecordingStrategist();
+        var runtime = CreateRuntime(strategist);
+        AdvanceToOrganicCadence(runtime);
+        var world = PrepareStrategistRuntime(runtime, Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
 
         runtime.AdvanceTick(0f);
 
@@ -52,12 +69,32 @@ public sealed class Wave10ScoutAiConsumeTests
     }
 
     [Fact]
-    public void OrganicTarget_WithStaleActiveScoutIntel_IsExportedButNotKnownToStrategist()
+    public void OrganicTarget_WarWithStaleActiveScoutIntel_IsKnownAndKeepsScoutMetadata()
     {
         var strategist = new RecordingStrategist();
         var runtime = CreateRuntime(strategist);
         AdvanceTicks(runtime, 40);
         var world = PrepareStrategistRuntime(runtime, Faction.Obsidari, Faction.Aetheri);
+        AddScoutIntel(runtime, world, Faction.Obsidari, Faction.Aetheri, createdTick: 0);
+        Assert.Single(runtime.ScoutIntel);
+        Assert.True(Assert.Single(runtime.ScoutIntel).TicksSinceRefresh > 30);
+
+        runtime.AdvanceTick(0f);
+
+        var target = GetRecordedTarget(strategist, Faction.Obsidari, Faction.Aetheri, world);
+        Assert.True(target.IsKnown);
+        Assert.True(target.HasScoutIntel);
+        Assert.True(target.ScoutIntelTicksSinceRefresh > 30);
+        Assert.Single(runtime.GetSnapshot().ScoutIntel);
+    }
+
+    [Fact]
+    public void OrganicTarget_HostileWithStaleActiveScoutIntel_IsExportedButNotKnownToStrategist()
+    {
+        var strategist = new RecordingStrategist();
+        var runtime = CreateRuntime(strategist);
+        AdvanceTicks(runtime, 40);
+        var world = PrepareStrategistRuntime(runtime, Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
         AddScoutIntel(runtime, world, Faction.Obsidari, Faction.Aetheri, createdTick: 0);
         Assert.Single(runtime.ScoutIntel);
         Assert.True(Assert.Single(runtime.ScoutIntel).TicksSinceRefresh > 30);
@@ -108,7 +145,8 @@ public sealed class Wave10ScoutAiConsumeTests
     private static World PrepareStrategistRuntime(
         SimulationRuntime runtime,
         Faction ownerFaction,
-        Faction targetFaction)
+        Faction targetFaction,
+        Stance stance = Stance.War)
     {
         EnableDiplomacyAndCombat(runtime);
         var world = GetWorld(runtime);
@@ -119,7 +157,7 @@ public sealed class Wave10ScoutAiConsumeTests
         foreach (var warrior in warriors)
             warrior.AssignRole(PersonRole.Warrior);
 
-        world.SetFactionStance(owner.Faction, target.Faction, Stance.War);
+        world.SetFactionStance(owner.Faction, target.Faction, stance);
         return world;
     }
 

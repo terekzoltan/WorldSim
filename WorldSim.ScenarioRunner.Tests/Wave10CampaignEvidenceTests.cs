@@ -380,10 +380,12 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.Equal(JsonValueKind.Number, diagnostics.GetProperty("lastBestDistancePenalty").ValueKind);
         Assert.Equal(JsonValueKind.Number, diagnostics.GetProperty("lastBestLaunchScore").ValueKind);
         Assert.NotEqual("not_evaluated", diagnostics.GetProperty("dominantNoLaunchReason").GetString());
+        var campaignLaunches = wave10.GetProperty("campaignLaunches").GetInt32();
         Assert.Contains(
             diagnostics.GetProperty("dominantNoLaunchReason").GetString(),
-            new[] { "no_available_warriors_after_home_defense", "missing_scout_intel", "no_known_targets", "launch_apply_failed", "strategy_hold_no_viable_target" });
-        Assert.Equal(0, wave10.GetProperty("campaignLaunches").GetInt32());
+            new[] { "no_available_warriors_after_home_defense", "missing_scout_intel", "no_known_targets", "launch_apply_failed", "strategy_hold_no_viable_target", "launch_applied" });
+        if (campaignLaunches == 0)
+            Assert.NotEqual("missing_scout_intel", diagnostics.GetProperty("dominantNoLaunchReason").GetString());
 
         using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
         Assert.True(manifest.RootElement.GetProperty("wave10Enabled").GetBoolean());

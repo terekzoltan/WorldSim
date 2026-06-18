@@ -1591,9 +1591,10 @@ public sealed class SimulationRuntime
             stance == Stance.War ? 1.0f : 0.75f);
         var distancePenalty = CalculateOrganicCampaignDistancePenalty(ownerColony, targetColony)
             + CalculateOrganicCampaignTieBreakPenalty(targetColony);
-        var isActionablyKnown = TryGetActionableScoutIntelForOrganicTarget(
+        var isKnown = TryResolveOrganicCampaignTargetKnowledge(
             ownerColony.Faction,
             targetColony,
+            stance,
             out var scoutIntel,
             out var scoutIntelTicksSinceRefresh);
         return new CampaignTargetOption(
@@ -1605,10 +1606,23 @@ public sealed class SimulationRuntime
             RequestedWarriors: Math.Min(2, availableForLaunch),
             RequestedCarriers: 0,
             DistancePenalty: distancePenalty,
-            IsKnown: isActionablyKnown,
+            IsKnown: isKnown,
             HasScoutIntel: scoutIntel != null,
             ScoutIntelTicksSinceRefresh: scoutIntelTicksSinceRefresh,
             ScoutIntelConfidence: scoutIntel?.Confidence ?? 0f);
+    }
+
+    private bool TryResolveOrganicCampaignTargetKnowledge(
+        Faction ownerFaction,
+        Colony targetColony,
+        Stance stance,
+        out ScoutIntelState? scoutIntel,
+        out int scoutIntelTicksSinceRefresh)
+    {
+        if (TryGetActionableScoutIntelForOrganicTarget(ownerFaction, targetColony, out scoutIntel, out scoutIntelTicksSinceRefresh))
+            return true;
+
+        return stance == Stance.War;
     }
 
     private bool HasActionableScoutIntelForOrganicTarget(Faction ownerFaction, Colony targetColony)
@@ -1675,18 +1689,19 @@ public sealed class SimulationRuntime
                 $"No organic target colony found for faction {targetFaction} and colony {decision.TargetColonyId}.");
         }
 
-        if (_world.GetFactionStance(ownerColony.Faction, targetFaction) < Stance.Hostile)
+        var stance = _world.GetFactionStance(ownerColony.Faction, targetFaction);
+        if (stance < Stance.Hostile)
         {
             return CampaignCreationResult.Failed(
                 CampaignCreationStatus.TargetColonyNotFound,
                 $"Organic campaign target {targetFaction} is not hostile to {ownerColony.Faction}.");
         }
 
-        if (!HasActionableScoutIntelForOrganicTarget(ownerColony.Faction, targetColony))
+        if (!TryResolveOrganicCampaignTargetKnowledge(ownerColony.Faction, targetColony, stance, out _, out _))
         {
             return CampaignCreationResult.Failed(
                 CampaignCreationStatus.CampaignRuntimeUnavailable,
-                $"Organic campaign target {targetFaction}/{targetColony.Id} is missing fresh actionable scout intel.");
+                $"Organic campaign target {targetFaction}/{targetColony.Id} is missing target knowledge for {ownerColony.Faction}.");
         }
 
         if (IsOrganicCampaignOwnerCapReached(ownerColony.Faction))

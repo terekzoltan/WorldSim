@@ -1,10 +1,25 @@
 # Wave 10 Step10B.5-F2-C - Target Knowledge Policy Fix
 
-Status: conditional - pending F2-A/F2-B
+Status: accepted / closed
 Owner: Track B
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
 F2-C is a conditional behavior-fix slice. It is only valid after F2-A/F2-B clear warrior availability/home-defense as the first main-run blocker and identify target knowledge / scout gate as the next no-launch blocker, or Meta explicitly confirms the default policy after warrior availability is healthy.
+
+Implementation summary:
+- `Stance.War` targets are baseline-known for organic campaign launch.
+- `Stance.Hostile` targets remain scout-gated.
+- Neutral/Tense targets remain non-launchable.
+- Scout metadata remains actual scout metadata; War baseline knowledge does not fabricate scout intel.
+- `CountCampaignTargetsWithScoutIntel(...)` remains a fresh actionable scout-intel metric, not a known-target metric.
+- No `TargetKnowledgeSource` field was added.
+
+Local mini-SMR evidence: `.artifacts/smr/wave10-step10b5-f2c-target-knowledge-mini-001/`.
+- one seed x one planner x one hostile lifecycle config, `1200` ticks
+- `manifest.json`: `exitCode=0`, `totalRuns=1`, `anomalyCount=0`
+- `summary.json`: `runtimeSource=main_world_run`, `campaignLaunches=5`, `dominantNoLaunchReason=launch_applied`, `campaignTargetsWithScoutIntel=0`
+- `wave10-probes.json`: absent
+- artifact is local/ignored and must not be committed
 
 ## Purpose
 

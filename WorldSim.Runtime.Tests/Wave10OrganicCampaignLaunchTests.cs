@@ -72,6 +72,22 @@ public sealed class Wave10OrganicCampaignLaunchTests
     }
 
     [Fact]
+    public void OrganicCampaign_WarTargetCanLaunchWithoutScoutIntel_WhenEligibleMembersAreSufficient()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
+        PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
+        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic war baseline target knowledge test");
+
+        runtime.AdvanceTick(0f);
+
+        var campaign = Assert.Single(runtime.Campaigns);
+        Assert.Equal(Faction.Obsidari, campaign.OwnerFaction);
+        Assert.Equal(Faction.Aetheri, campaign.TargetFaction);
+    }
+
+    [Fact]
     public void OrganicCampaign_WarTargetIsPreferredOverHostileTarget()
     {
         var runtime = CreateRuntime();
@@ -150,7 +166,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
     }
 
     [Fact]
-    public void OrganicCampaign_InjectedLaunchWithoutScoutIntelSuppressesLaunch()
+    public void OrganicCampaign_InjectedHostileLaunchWithoutScoutIntelSuppressesLaunch()
     {
         var runtime = CreateRuntime();
         var targetColonyId = GetColony(GetWorld(runtime), Faction.Aetheri).Id;
@@ -158,7 +174,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         EnableDiplomacyAndCombat(runtime);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
-        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic no-scout apply gate test");
+        GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
 
         runtime.AdvanceTick(0f);
 
@@ -166,7 +182,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
     }
 
     [Fact]
-    public void OrganicCampaign_InjectedLaunchWithStaleActiveScoutIntelSuppressesLaunch()
+    public void OrganicCampaign_InjectedHostileLaunchWithStaleActiveScoutIntelSuppressesLaunch()
     {
         var runtime = CreateRuntime();
         var targetColonyId = GetColony(GetWorld(runtime), Faction.Aetheri).Id;
@@ -174,7 +190,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         EnableDiplomacyAndCombat(runtime);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks * 2);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
-        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic stale-scout apply gate test");
+        GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
         AddScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri, createdTick: 0);
         Assert.Single(runtime.ScoutIntel);
         Assert.True(Assert.Single(runtime.ScoutIntel).TicksSinceRefresh > 30);
@@ -186,7 +202,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
     }
 
     [Fact]
-    public void OrganicCampaignDiagnostics_WarWithoutScoutReportsMissingScoutIntelWithoutLaunching()
+    public void OrganicCampaignDiagnostics_WarWithoutScoutCanLaunchFromBaselineTargetKnowledge()
     {
         var runtime = CreateRuntime();
         EnableDiplomacyAndCombat(runtime);
@@ -196,7 +212,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
 
         runtime.AdvanceTick(0f);
 
-        Assert.Empty(runtime.Campaigns);
+        Assert.Single(runtime.Campaigns);
         var diagnostics = runtime.BuildScenarioWave10TelemetrySnapshot(
             "organic_hostile_campaign_lifecycle",
             ScenarioWave10Evidence.ProofTypeOrganic,
@@ -209,25 +225,19 @@ public sealed class Wave10OrganicCampaignLaunchTests
         Assert.True(diagnostics.OwnerEvaluationCount > diagnostics.EvaluationTickCount);
         Assert.Contains((int)Faction.Obsidari, diagnostics.EvaluatedFactionIds);
         Assert.NotNull(diagnostics.LastEvaluationTick);
-        Assert.Equal(0, diagnostics.LaunchApplyAttempts);
-        Assert.Contains(
-            diagnostics.DominantNoLaunchReason,
-            new[]
-            {
-                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonMissingScoutIntel,
-                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoKnownTargets
-            });
+        Assert.True(diagnostics.LaunchApplyAttempts > 0);
+        Assert.Equal(ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplied, diagnostics.DominantNoLaunchReason);
     }
 
     [Fact]
-    public void OrganicCampaignDiagnostics_InjectedLaunchWithoutScoutRecordsApplyFailureStatus()
+    public void OrganicCampaignDiagnostics_InjectedHostileLaunchWithoutScoutRecordsApplyFailureStatus()
     {
         var targetColonyId = GetColony(GetWorld(CreateRuntime()), Faction.Aetheri).Id;
         var runtime = CreateRuntime(FixedLaunchStrategist.For(Faction.Aetheri, targetColonyId, requestedWarriors: 1));
         EnableDiplomacyAndCombat(runtime);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
-        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic diagnostics apply gate test");
+        GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
 
         runtime.AdvanceTick(0f);
 
@@ -348,7 +358,8 @@ public sealed class Wave10OrganicCampaignLaunchTests
         EnableDiplomacyAndCombat(runtime);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Chirita, count: 2);
-        runtime.DeclareWar(Faction.Chirita, Faction.Aetheri, "organic diagnostics final score test");
+        GetWorld(runtime).SetFactionStance(Faction.Chirita, Faction.Aetheri, Stance.Hostile);
+        AddActionableScoutIntel(runtime, Faction.Chirita, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
@@ -375,7 +386,9 @@ public sealed class Wave10OrganicCampaignLaunchTests
         EnableDiplomacyAndCombat(runtime);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 0);
-        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic insufficient test");
+        GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
+        BlockFactionCampaignCandidates(runtime, Faction.Obsidari);
 
         runtime.AdvanceTick(0f);
 
@@ -388,8 +401,10 @@ public sealed class Wave10OrganicCampaignLaunchTests
         var runtime = CreateRuntime();
         EnableDiplomacyAndCombat(runtime);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
-        PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 1);
-        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic reserve test");
+        var members = PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 1);
+        GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
+        BlockFactionCampaignCandidatesExcept(runtime, Faction.Obsidari, members.Select(member => member.Id));
 
         runtime.AdvanceTick(0f);
 
@@ -413,7 +428,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
     }
 
     [Fact]
-    public void OrganicCampaignDiagnostics_WarPressureWithoutScoutMovesPastNoAvailableWarriors()
+    public void OrganicCampaignDiagnostics_WarPressureWithoutScoutLaunchesFromBaselineTargetKnowledge()
     {
         var runtime = CreateRuntime();
         EnableDiplomacyAndCombat(runtime);
@@ -422,21 +437,10 @@ public sealed class Wave10OrganicCampaignLaunchTests
 
         runtime.AdvanceTick(0f);
 
-        Assert.Empty(runtime.Campaigns);
+        Assert.Single(runtime.Campaigns);
         var diagnostics = BuildOrganicDiagnostics(runtime);
         Assert.True(diagnostics.LastAvailableWarriors > 0);
-        Assert.NotEqual(
-            ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoAvailableWarriorsAfterHomeDefense,
-            diagnostics.DominantNoLaunchReason);
-        Assert.Contains(
-            diagnostics.DominantNoLaunchReason,
-            new[]
-            {
-                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonMissingScoutIntel,
-                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonNoKnownTargets,
-                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplyFailed,
-                ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonStrategyHoldNoViableTarget
-            });
+        Assert.Equal(ScenarioOrganicLaunchDiagnosticsSnapshot.ReasonLaunchApplied, diagnostics.DominantNoLaunchReason);
     }
 
     [Fact]
@@ -621,7 +625,7 @@ public sealed class Wave10OrganicCampaignLaunchTests
         var target = GetColony(world, Faction.Aetheri);
         MoveTargetOriginToBlockableTile(world, target);
         Assert.True(world.TryAddWoodWall(target, target.Origin));
-        world.SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.War);
+        world.SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
         AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
@@ -659,7 +663,9 @@ public sealed class Wave10OrganicCampaignLaunchTests
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         var members = PrepareEligibleCampaignMembers(runtime, Faction.Obsidari, count: 2);
         members[0].Current = Job.Flee;
-        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic blocked actor test");
+        GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
+        BlockFactionCampaignCandidatesExcept(runtime, Faction.Obsidari, new[] { members[1].Id });
 
         runtime.AdvanceTick(0f);
 
@@ -682,31 +688,33 @@ public sealed class Wave10OrganicCampaignLaunchTests
     }
 
     [Fact]
-    public void OrganicCampaign_CarrierOnlyEligiblePoolSuppressesLaunch()
+    public void OrganicCampaign_CarrierOnlyEligiblePoolCanMobilizeAndLaunch()
     {
         var runtime = CreateRuntime();
         EnableDiplomacyAndCombat(runtime);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareRoleOnlyCampaignMembers(runtime, Faction.Obsidari, count: 3, PersonRole.SupplyCarrier);
-        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic carrier-only test");
+        GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
-        Assert.Empty(runtime.Campaigns);
+        Assert.Single(runtime.Campaigns);
     }
 
     [Fact]
-    public void OrganicCampaign_HunterOnlyEligiblePoolSuppressesLaunch()
+    public void OrganicCampaign_HunterOnlyEligiblePoolCanMobilizeAndLaunch()
     {
         var runtime = CreateRuntime();
         EnableDiplomacyAndCombat(runtime);
         AdvanceTicks(runtime, OrganicCampaignCadenceTicks);
         PrepareHunterOnlyCampaignMembers(runtime, Faction.Obsidari, count: 3);
-        runtime.DeclareWar(Faction.Obsidari, Faction.Aetheri, "organic hunter-only test");
+        GetWorld(runtime).SetFactionStance(Faction.Obsidari, Faction.Aetheri, Stance.Hostile);
+        AddActionableScoutIntel(runtime, Faction.Obsidari, Faction.Aetheri);
 
         runtime.AdvanceTick(0f);
 
-        Assert.Empty(runtime.Campaigns);
+        Assert.Single(runtime.Campaigns);
     }
 
     [Fact]
@@ -824,6 +832,16 @@ public sealed class Wave10OrganicCampaignLaunchTests
             person.Current = Job.Idle;
             person.SetCombatAssignment(null, null, Formation.Line, isCommander: false);
         }
+    }
+
+    private static void BlockFactionCampaignCandidates(SimulationRuntime runtime, Faction faction)
+        => BlockFactionCampaignCandidatesExcept(runtime, faction, Array.Empty<int>());
+
+    private static void BlockFactionCampaignCandidatesExcept(SimulationRuntime runtime, Faction faction, IEnumerable<int> actorIdsToKeep)
+    {
+        var keep = actorIdsToKeep.ToHashSet();
+        foreach (var person in GetWorld(runtime)._people.Where(person => person.Home.Faction == faction && !keep.Contains(person.Id)))
+            person.Current = Job.Flee;
     }
 
     private static Colony GetColony(World world, Faction faction)
