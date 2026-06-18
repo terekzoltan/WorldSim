@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5-F3 - Hostile Organic Pilot And Confirm
 
-Status: Track B execution complete; pending SMR Analyst review
+Status: SMR Analyst routing accepted / Route C selected
 Owner: Track B for staged run execution and artifact handoff; SMR Analyst reviews artifacts after Track B handoff
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
@@ -155,3 +155,12 @@ Track B ran the staged hostile organic pilot/confirm sequence. No source/test co
 - Medium topology shows downstream lifecycle progress through resolution in most runs and has a clean assert/anomaly gate.
 - Standard topology launches but does not progress past assembly within 5000 ticks and fails survival/economy assertions in every run.
 - Full 90-run hostile package remains blocked until SMR Analyst/Meta decide whether F4/F5 should proceed immediately, whether F5 should absorb the standard survival/economy collapse, or whether another narrower Track B diagnostic is required first.
+
+## SMR Analyst Routing Closeout - 2026-06-18
+
+- F3 artifact review completed read-only with no source/test/doc changes in the SMR Analyst pass.
+- Hostile zero-launch recovery verdict: GREEN.
+- Medium confirm verdict: GREEN for medium-backed downstream diagnostics.
+- Standard confirm verdict: YELLOW/RED observed survival/economy failure, but artifact validity is QUESTIONABLE because effective `movementSpeedMultiplier=0` materially affects lifecycle/survival interpretation.
+- Accepted routing: Route C, a new narrow Track B scenario/config diagnostic before treating standard as a valid F5 survival bug or running any full 90-run hostile package.
+- F4/F5/F6 remain blocked until Meta explicitly opens the next step from this Route C decision.
