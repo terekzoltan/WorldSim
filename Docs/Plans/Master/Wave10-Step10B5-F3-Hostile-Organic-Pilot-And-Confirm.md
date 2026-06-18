@@ -1,7 +1,7 @@
 # Wave 10 Step10B.5-F3 - Hostile Organic Pilot And Confirm
 
-Status: planned
-Owner: Track B for focused runs; SMR Analyst may assist with artifact review
+Status: Track B execution complete; pending SMR Analyst review
+Owner: Track B for staged run execution and artifact handoff; SMR Analyst reviews artifacts after Track B handoff
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
 F3 is verification, not a new fix. It proves whether F2 moved hostile organic lifecycle from zero-launch to meaningful launch behavior before expensive packages are rerun.
@@ -108,3 +108,50 @@ The F3 handoff must include:
 - whether stress survival repro should start,
 - whether full SMR package is still blocked,
 - whether pure organic should stay deferred or proceed as small context matrix.
+
+## Track B Execution Handoff - 2026-06-18
+
+Track B ran the staged hostile organic pilot/confirm sequence. No source/test code was changed in F3. Raw artifacts remain local-only under `.artifacts/smr/`.
+
+### Package 1 - Tiny pilot
+
+- Artifact: `.artifacts/smr/wave10-step10b5-f3-hostile-organic-pilot-001/`
+- Matrix: 1 seed (`101`) x 1 planner (`simple`) x 1 config (`hostile-medium-f3-pilot`)
+- Config: `Width=40`, `Height=40`, `InitialPop=80`, `Ticks=1500`, `Dt=0.25`, combat/diplomacy/siege enabled, `Wave10Scenario=organic-hostile-campaign-lifecycle`
+- Result: `exitCode=0`, `assertionFailures=0`, `anomalyCount=0`
+- Provenance: `runtimeSource=main_world_run`, `proofType=organic`, `timelineSemantics=tick_sampled`; no `wave10-probes.json`
+- Launch summary: 1/1 launch runs, 6 total launches, first launch tick 40, assembly/march/encounter/siege/resolution incidence 1/1
+- No-launch reason distribution: `launch_applied:1`
+- Anomaly classification: none
+
+### Package 2 - Medium confirm
+
+- Artifact: `.artifacts/smr/wave10-step10b5-f3-hostile-organic-medium-confirm-001/`
+- Matrix: 3 seeds (`101,202,303`) x 3 planners (`simple,goap,htn`) x 1 config (`hostile-medium-f3-confirm`)
+- Config: `Width=40`, `Height=40`, `InitialPop=80`, `Ticks=5000`, `Dt=0.25`, combat/diplomacy/siege enabled, `Wave10Scenario=organic-hostile-campaign-lifecycle`
+- Result: `exitCode=0`, `assertionFailures=0`, `anomalyCount=0`
+- Provenance: 9/9 runs have `runtimeSource=main_world_run`, `proofType=organic`, `timelineSemantics=tick_sampled`; no `wave10-probes.json`
+- Launch summary: 9/9 launch runs, 86 total launches, first launch tick min/max 20/60, by planner `Simple:3/3`, `Goap:3/3`, `Htn:3/3`
+- Lifecycle incidence: assembly 9/9, march 8/9, encounter 8/9, siege 6/9, resolution 8/9
+- No-launch reason distribution: `launch_applied:9`
+- Anomaly classification: none
+
+### Package 3 - Standard confirm
+
+- Artifact: `.artifacts/smr/wave10-step10b5-f3-hostile-organic-standard-confirm-001/`
+- Matrix: 3 seeds (`101,202,303`) x 3 planners (`simple,goap,htn`) x 1 config (`hostile-standard-f3-confirm`)
+- Config: `Width=64`, `Height=40`, `InitialPop=120`, `Ticks=5000`, `Dt=0.25`, combat/diplomacy/siege enabled, `Wave10Scenario=organic-hostile-campaign-lifecycle`
+- Result: `exitCode=2`, `exitReason=assert_fail`, `assertionFailures=45`, `assertionSkipped=2`, `anomalyCount=0`
+- Provenance: 9/9 runs have `runtimeSource=main_world_run`, `proofType=organic`, `timelineSemantics=tick_sampled`; no `wave10-probes.json`
+- Launch summary: 9/9 launch runs, 29 total launches, first launch tick min/max 20/40, by planner `Simple:3/3`, `Goap:3/3`, `Htn:3/3`
+- Lifecycle incidence: assembly 9/9, march 0/9, encounter 0/9, siege 0/9, resolution 0/9
+- No-launch reason distribution: `launch_applied:9`
+- Assertion failure distribution: `SURV-01:9`, `SURV-02:9`, `SURV-03:9`, `SURV-04:9`, `ECON-01:9`; skipped `COMB-01:1`, `COMB-02:1`
+- Anomaly classification: none in `anomalies.json`; assertion failures are blocking for clean GREEN and need SMR Analyst/Meta routing
+
+### Track B assessment for review
+
+- Hostile organic zero-launch is no longer the blocker: all staged packages launched in every run.
+- Medium topology shows downstream lifecycle progress through resolution in most runs and has a clean assert/anomaly gate.
+- Standard topology launches but does not progress past assembly within 5000 ticks and fails survival/economy assertions in every run.
+- Full 90-run hostile package remains blocked until SMR Analyst/Meta decide whether F4/F5 should proceed immediately, whether F5 should absorb the standard survival/economy collapse, or whether another narrower Track B diagnostic is required first.
