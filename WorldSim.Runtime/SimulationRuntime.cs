@@ -707,6 +707,7 @@ public sealed class SimulationRuntime
             .Count(intel => CalculateScoutIntelTicksSinceRefresh(intel) <= GetOrganicCampaignScoutIntelFreshnessThresholdTicks());
         var activeSiegeUnits = _siegeUnits.Count(unit => unit.IsActive);
         var inactiveSiegeUnits = _siegeUnits.Count - activeSiegeUnits;
+        var manualDownstreamDiagnostics = BuildManualDownstreamDiagnosticsSnapshot(unresolvedCampaigns, freshScoutIntel);
 
         return new ScenarioWave10TelemetrySnapshot(
             Wave10Scenario: string.IsNullOrWhiteSpace(wave10Scenario) ? "none" : wave10Scenario.Trim(),
@@ -772,8 +773,90 @@ public sealed class SimulationRuntime
             ManualLaunchAttempted: manualLaunchAttemptTick.HasValue,
             ManualLaunchSucceeded: manualLaunchSucceeded,
             ManualLaunchStatus: string.IsNullOrWhiteSpace(manualLaunchStatus) ? "not_attempted" : manualLaunchStatus.Trim(),
-            OrganicLaunchDiagnostics: _organicLaunchDiagnostics.ToSnapshot());
+            OrganicLaunchDiagnostics: _organicLaunchDiagnostics.ToSnapshot(),
+            ManualDownstreamDiagnostics: manualDownstreamDiagnostics);
     }
+
+    private ScenarioManualDownstreamDiagnosticsSnapshot BuildManualDownstreamDiagnosticsSnapshot(
+        IReadOnlyCollection<CampaignState> unresolvedCampaigns,
+        int freshScoutIntel)
+        => new(
+            BuildManualDownstreamConvoyDiagnosticsSnapshot(unresolvedCampaigns),
+            BuildManualDownstreamScoutDiagnosticsSnapshot(freshScoutIntel),
+            BuildManualDownstreamSiegeUnitDiagnosticsSnapshot());
+
+    private ScenarioManualDownstreamConvoyDiagnosticsSnapshot BuildManualDownstreamConvoyDiagnosticsSnapshot(
+        IReadOnlyCollection<CampaignState> unresolvedCampaigns)
+    {
+        return new ScenarioManualDownstreamConvoyDiagnosticsSnapshot(
+            Evaluated: _campaignLogisticsCounters.ConvoyEvaluations > 0 ? _campaignLogisticsCounters.ConvoyEvaluations : unresolvedCampaigns.Count,
+            Eligible: _campaignLogisticsCounters.ConvoyEligibleCampaigns,
+            Requested: _campaignLogisticsCounters.ConvoyRequests,
+            BlockedReason: ResolveManualDownstreamConvoyBlockedReason(),
+            Spawned: _campaignLogisticsCounters.ConvoysSpawned,
+            Delivered: _campaignLogisticsCounters.ConvoysDelivered,
+            Failed: _campaignLogisticsCounters.ConvoysFailed);
+    }
+
+    private string ResolveManualDownstreamConvoyBlockedReason()
+    {
+        if (_campaignLogisticsCounters.ConvoysSpawned > 0)
+            return "spawned";
+        if (_campaignLogisticsCounters.ConvoySpawnRouteBudgetExhausted + _campaignLogisticsCounters.ConvoyRouteBudgetExhausted > 0)
+            return "route_budget";
+        if (_campaignLogisticsCounters.ConvoySpawnBlockedByHomeDefense > 0)
+            return "home_defense";
+        if (_campaignLogisticsCounters.ConvoySpawnBlockedByThrottle > 0)
+            return "throttle";
+        if (_campaignLogisticsCounters.ConvoySpawnBlockedByCap > 0)
+            return "cap";
+        if (_campaignLogisticsCounters.ConvoyRequests > 0)
+            return "requested_no_spawn";
+        return "none";
+    }
+
+    private ScenarioManualDownstreamScoutDiagnosticsSnapshot BuildManualDownstreamScoutDiagnosticsSnapshot(int freshScoutIntel)
+        => new(
+            ObservationPasses: _campaignLogisticsCounters.ScoutObservationPasses,
+            LiveScoutActors: CountLiveScoutActors(),
+            SkippedByRelation: _campaignLogisticsCounters.ScoutObservationSkippedByRelation,
+            SkippedByRadius: _campaignLogisticsCounters.ScoutObservationSkippedByRadius,
+            NearestHostileDistance: CalculateNearestScoutHostileDistance(),
+            FreshIntel: freshScoutIntel);
+
+    private int CountLiveScoutActors()
+        => _world._people.Count(IsLiveScout);
+
+    private int CalculateNearestScoutHostileDistance()
+    {
+        var scouts = _world._people.Where(IsLiveScout).ToArray();
+        if (scouts.Length == 0)
+            return -1;
+
+        var nearest = int.MaxValue;
+        foreach (var scout in scouts)
+        {
+            var ownerFaction = scout.Home.Faction;
+            foreach (var target in _world._colonies)
+            {
+                if (target.Faction == ownerFaction || !IsScoutIntelTargetRelation(ownerFaction, target.Faction))
+                    continue;
+                nearest = Math.Min(nearest, ManhattanDistance(scout.Pos, target.Origin));
+            }
+        }
+
+        return nearest == int.MaxValue ? -1 : nearest;
+    }
+
+    private ScenarioManualDownstreamSiegeUnitDiagnosticsSnapshot BuildManualDownstreamSiegeUnitDiagnosticsSnapshot()
+        => new(
+            EncounterCampaigns: _campaignLogisticsCounters.SiegeUnitEncounterCampaigns,
+            TechLocked: _campaignLogisticsCounters.SiegeUnitTechLocked,
+            ResolverDisabled: _campaignLogisticsCounters.SiegeUnitResolverDisabled,
+            NoTarget: _campaignLogisticsCounters.SiegeUnitNoTarget,
+            AlreadyPresent: _campaignLogisticsCounters.SiegeUnitAlreadyPresent,
+            Spawned: _campaignLogisticsCounters.SiegeUnitsSpawned,
+            ActionTicks: _campaignLogisticsCounters.SiegeUnitActionTicks);
 
     private static long? MinNonNegative(IEnumerable<long> values)
     {
@@ -1755,12 +1838,14 @@ public sealed class SimulationRuntime
             .OrderBy(campaign => campaign.CampaignId)
             .Select(campaign =>
             {
+                var supplyReadiness = CalculateCampaignSupplyReadiness(campaign);
+                _campaignLogisticsCounters.RecordConvoyEvaluation(supplyReadiness < 1.0f);
                 var siegeFacts = BuildCampaignSiegeUnitStrategyFacts(campaign);
                 return new ActiveCampaignStrategyFact(
                     campaign.CampaignId,
                     (int)campaign.TargetFaction,
                     campaign.TargetColonyId,
-                    SupplyReadiness: CalculateCampaignSupplyReadiness(campaign),
+                    SupplyReadiness: supplyReadiness,
                     AdvantageScore: 0f,
                     StalledTicks: campaign.RouteCounters.NoProgressTicks,
                     IsRecoverable: true,
@@ -1841,6 +1926,8 @@ public sealed class SimulationRuntime
             && campaign.Phase != CampaignPhase.Resolved);
         if (targetCampaign == null)
             return false;
+
+        _campaignLogisticsCounters.RecordConvoyRequest();
 
         if (CountActiveSupplyConvoys(ownerColony.Faction) >= _campaignLogisticsOptions.MaxActiveConvoysPerFaction)
         {
@@ -3012,10 +3099,20 @@ public sealed class SimulationRuntime
             var radius = GetScoutIntelRadius(scout.Home);
             foreach (var target in targetColonies)
             {
-                if (target.Faction == ownerFaction || !IsScoutIntelTargetRelation(ownerFaction, target.Faction))
+                if (target.Faction == ownerFaction)
                     continue;
+
+                _campaignLogisticsCounters.RecordScoutObservationPass();
+                if (!IsScoutIntelTargetRelation(ownerFaction, target.Faction))
+                {
+                    _campaignLogisticsCounters.RecordScoutObservationSkippedByRelation();
+                    continue;
+                }
                 if (!IsWithinManhattanDistance(scout.Pos, target.Origin, radius))
+                {
+                    _campaignLogisticsCounters.RecordScoutObservationSkippedByRadius();
                     continue;
+                }
 
                 RecordScoutColonyIntel(ownerFaction, target, scout.Id);
             }
@@ -3217,8 +3314,12 @@ public sealed class SimulationRuntime
         if (encounterCampaigns.Length == 0)
             return;
 
+        foreach (var campaign in encounterCampaigns)
+            _campaignLogisticsCounters.RecordSiegeUnitEncounterCampaign();
+
         if (!IsCampaignSiegeResolverEnabled())
         {
+            _campaignLogisticsCounters.RecordSiegeUnitResolverDisabled(encounterCampaigns.Length);
             foreach (var campaign in encounterCampaigns)
             {
                 campaign.Siege.SuppressActivePressure(Tick);
@@ -3298,6 +3399,7 @@ public sealed class SimulationRuntime
                 .ThenBy(campaign => campaign.CampaignId)
                 .First();
             reporter.Siege.MarkNoTarget(Tick);
+            _campaignLogisticsCounters.RecordSiegeUnitNoTarget();
             MarkCampaignSiegeUnitsInactive(reporter, SiegeUnitInactiveReasons.CampaignInvalid);
 
             foreach (var nonReporter in group.Where(campaign => !ReferenceEquals(campaign, reporter)))
@@ -3311,9 +3413,19 @@ public sealed class SimulationRuntime
     private void ApplyCampaignSiegeUnitEffects(CampaignState campaign, Colony attacker, DefensiveStructure target)
     {
         if (!CanCampaignUseDedicatedSiegeUnits(attacker))
+        {
+            _campaignLogisticsCounters.RecordSiegeUnitTechLocked();
             return;
+        }
 
+        var existingActiveCount = _siegeUnits.Count(unit =>
+            unit.IsActive
+            && unit.CampaignId == campaign.CampaignId
+            && unit.ArmyId == campaign.ArmyId);
         var units = EnsureCampaignSiegeUnits(campaign, attacker, target);
+        var activeCount = units.Count(unit => unit.IsActive);
+        _campaignLogisticsCounters.RecordSiegeUnitAlreadyPresent(existingActiveCount);
+        _campaignLogisticsCounters.RecordSiegeUnitsSpawned(Math.Max(0, activeCount - existingActiveCount));
         var anchor = GetSiegeUnitAnchor(campaign);
         foreach (var unit in units.Where(unit => unit.IsActive).OrderBy(unit => unit.Kind))
         {
@@ -3342,6 +3454,8 @@ public sealed class SimulationRuntime
                     break;
             }
         }
+
+        _campaignLogisticsCounters.RecordSiegeUnitActionTicks(activeCount);
     }
 
     private IReadOnlyList<SiegeUnitState> EnsureCampaignSiegeUnits(CampaignState campaign, Colony attacker, DefensiveStructure target)

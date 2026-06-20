@@ -1,10 +1,17 @@
 # Wave 10 Step10B.5-F5 - Stress Seed-606 Survival Repro Fix
 
-Status: planned
+Status: unblocked next - stress seed-606 scope only
 Owner: Track B
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
 F5 handles the hard survival failures found by the Step10B.2 stress package. It should not be merged conceptually with organic launch target policy.
+
+Meta routing note after F4:
+- F5 is now explicitly open as the next Track B step.
+- Scope is limited to the three known Step10B.2 stress seed-606 survival lanes below.
+- Do not use the old F3 standard `movementSpeedMultiplier=0` collapse as F5 evidence.
+- Do not use F5 for manual downstream positive scout-role or tech-enabled siege-unit proof.
+- Do not run full hostile/pure/stress/perf broad packages unless a later Meta/SMR decision opens them.
 
 ## Purpose
 

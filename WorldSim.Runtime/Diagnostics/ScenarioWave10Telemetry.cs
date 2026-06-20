@@ -140,6 +140,72 @@ public sealed record ScenarioOrganicLaunchDiagnosticsSnapshot(
         DominantNoLaunchReason: ReasonNotEvaluated);
 }
 
+public sealed record ScenarioManualDownstreamConvoyDiagnosticsSnapshot(
+    int Evaluated,
+    int Eligible,
+    int Requested,
+    string BlockedReason,
+    int Spawned,
+    int Delivered,
+    int Failed)
+{
+    public static ScenarioManualDownstreamConvoyDiagnosticsSnapshot Empty { get; } = new(
+        Evaluated: 0,
+        Eligible: 0,
+        Requested: 0,
+        BlockedReason: "none",
+        Spawned: 0,
+        Delivered: 0,
+        Failed: 0);
+}
+
+public sealed record ScenarioManualDownstreamScoutDiagnosticsSnapshot(
+    int ObservationPasses,
+    int LiveScoutActors,
+    int SkippedByRelation,
+    int SkippedByRadius,
+    int NearestHostileDistance,
+    int FreshIntel)
+{
+    public static ScenarioManualDownstreamScoutDiagnosticsSnapshot Empty { get; } = new(
+        ObservationPasses: 0,
+        LiveScoutActors: 0,
+        SkippedByRelation: 0,
+        SkippedByRadius: 0,
+        NearestHostileDistance: -1,
+        FreshIntel: 0);
+}
+
+public sealed record ScenarioManualDownstreamSiegeUnitDiagnosticsSnapshot(
+    int EncounterCampaigns,
+    int TechLocked,
+    int ResolverDisabled,
+    int NoTarget,
+    int AlreadyPresent,
+    int Spawned,
+    int ActionTicks)
+{
+    public static ScenarioManualDownstreamSiegeUnitDiagnosticsSnapshot Empty { get; } = new(
+        EncounterCampaigns: 0,
+        TechLocked: 0,
+        ResolverDisabled: 0,
+        NoTarget: 0,
+        AlreadyPresent: 0,
+        Spawned: 0,
+        ActionTicks: 0);
+}
+
+public sealed record ScenarioManualDownstreamDiagnosticsSnapshot(
+    ScenarioManualDownstreamConvoyDiagnosticsSnapshot Convoy,
+    ScenarioManualDownstreamScoutDiagnosticsSnapshot Scout,
+    ScenarioManualDownstreamSiegeUnitDiagnosticsSnapshot SiegeUnit)
+{
+    public static ScenarioManualDownstreamDiagnosticsSnapshot Empty { get; } = new(
+        ScenarioManualDownstreamConvoyDiagnosticsSnapshot.Empty,
+        ScenarioManualDownstreamScoutDiagnosticsSnapshot.Empty,
+        ScenarioManualDownstreamSiegeUnitDiagnosticsSnapshot.Empty);
+}
+
 public sealed record ScenarioWave10TelemetrySnapshot(
     string Wave10Scenario,
     string RuntimeSource,
@@ -204,7 +270,8 @@ public sealed record ScenarioWave10TelemetrySnapshot(
     bool ManualLaunchAttempted,
     bool ManualLaunchSucceeded,
     string ManualLaunchStatus,
-    ScenarioOrganicLaunchDiagnosticsSnapshot OrganicLaunchDiagnostics)
+    ScenarioOrganicLaunchDiagnosticsSnapshot OrganicLaunchDiagnostics,
+    ScenarioManualDownstreamDiagnosticsSnapshot ManualDownstreamDiagnostics)
 {
     public static ScenarioWave10TelemetrySnapshot Empty { get; } = new(
         Wave10Scenario: "none",
@@ -270,7 +337,8 @@ public sealed record ScenarioWave10TelemetrySnapshot(
         ManualLaunchAttempted: false,
         ManualLaunchSucceeded: false,
         ManualLaunchStatus: "not_attempted",
-        OrganicLaunchDiagnostics: ScenarioOrganicLaunchDiagnosticsSnapshot.Empty);
+        OrganicLaunchDiagnostics: ScenarioOrganicLaunchDiagnosticsSnapshot.Empty,
+        ManualDownstreamDiagnostics: ScenarioManualDownstreamDiagnosticsSnapshot.Empty);
 
     public ScenarioWave10TimelineSnapshot ToTimelineSnapshot()
         => new(

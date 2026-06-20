@@ -45,6 +45,10 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.Equal(0, diagnostics.GetProperty("lastBestLaunchScore").GetSingle());
         Assert.Equal("not_evaluated", diagnostics.GetProperty("dominantNoLaunchReason").GetString());
         Assert.Empty(diagnostics.GetProperty("launchApplyFailureStatuses").EnumerateArray());
+        var manualDownstream = wave10.GetProperty("manualDownstreamDiagnostics");
+        Assert.Equal(0, manualDownstream.GetProperty("convoy").GetProperty("evaluated").GetInt32());
+        Assert.Equal(0, manualDownstream.GetProperty("scout").GetProperty("observationPasses").GetInt32());
+        Assert.Equal(0, manualDownstream.GetProperty("siegeUnit").GetProperty("encounterCampaigns").GetInt32());
 
         using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
         Assert.False(manifest.RootElement.GetProperty("wave10Enabled").GetBoolean());
@@ -318,6 +322,13 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.Equal("Created", wave10.GetProperty("manualLaunchStatus").GetString());
         Assert.True(wave10.GetProperty("campaignLaunches").GetInt32() > 0, $"No campaign lifecycle after manual launch\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
         Assert.True(wave10.GetProperty("firstCampaignLaunchTick").GetInt64() <= 1);
+        var downstream = wave10.GetProperty("manualDownstreamDiagnostics");
+        Assert.True(downstream.GetProperty("convoy").TryGetProperty("requested", out _));
+        Assert.True(downstream.GetProperty("convoy").TryGetProperty("blockedReason", out _));
+        Assert.True(downstream.GetProperty("scout").TryGetProperty("liveScoutActors", out _));
+        Assert.True(downstream.GetProperty("scout").TryGetProperty("nearestHostileDistance", out _));
+        Assert.True(downstream.GetProperty("siegeUnit").TryGetProperty("techLocked", out _));
+        Assert.True(downstream.GetProperty("siegeUnit").TryGetProperty("actionTicks", out _));
 
         using var manifest = ReadJson(Path.Combine(artifactDir, "manifest.json"));
         Assert.True(manifest.RootElement.GetProperty("wave10Enabled").GetBoolean());
@@ -600,6 +611,30 @@ public sealed class Wave10CampaignEvidenceTests
         Assert.True(diagnostics.TryGetProperty("launchApplyFailures", out _));
         Assert.True(diagnostics.TryGetProperty("launchApplyFailureStatuses", out _));
         Assert.True(diagnostics.TryGetProperty("dominantNoLaunchReason", out _));
+        Assert.True(wave10.TryGetProperty("manualDownstreamDiagnostics", out var downstreamDiagnostics));
+        var convoy = downstreamDiagnostics.GetProperty("convoy");
+        Assert.True(convoy.TryGetProperty("evaluated", out _));
+        Assert.True(convoy.TryGetProperty("eligible", out _));
+        Assert.True(convoy.TryGetProperty("requested", out _));
+        Assert.True(convoy.TryGetProperty("blockedReason", out _));
+        Assert.True(convoy.TryGetProperty("spawned", out _));
+        Assert.True(convoy.TryGetProperty("delivered", out _));
+        Assert.True(convoy.TryGetProperty("failed", out _));
+        var scout = downstreamDiagnostics.GetProperty("scout");
+        Assert.True(scout.TryGetProperty("observationPasses", out _));
+        Assert.True(scout.TryGetProperty("liveScoutActors", out _));
+        Assert.True(scout.TryGetProperty("skippedByRelation", out _));
+        Assert.True(scout.TryGetProperty("skippedByRadius", out _));
+        Assert.True(scout.TryGetProperty("nearestHostileDistance", out _));
+        Assert.True(scout.TryGetProperty("freshIntel", out _));
+        var siegeUnit = downstreamDiagnostics.GetProperty("siegeUnit");
+        Assert.True(siegeUnit.TryGetProperty("encounterCampaigns", out _));
+        Assert.True(siegeUnit.TryGetProperty("techLocked", out _));
+        Assert.True(siegeUnit.TryGetProperty("resolverDisabled", out _));
+        Assert.True(siegeUnit.TryGetProperty("noTarget", out _));
+        Assert.True(siegeUnit.TryGetProperty("alreadyPresent", out _));
+        Assert.True(siegeUnit.TryGetProperty("spawned", out _));
+        Assert.True(siegeUnit.TryGetProperty("actionTicks", out _));
     }
 
     private static string RemoveWave10BlocksFromSummary(string summaryPath)

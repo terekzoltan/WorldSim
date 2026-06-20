@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using WorldSim.AI;
+using WorldSim.Runtime.Diagnostics;
 using WorldSim.Simulation;
 using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Diplomacy;
@@ -127,6 +128,83 @@ public sealed class Wave10CampaignLogisticsTests
         Assert.Empty(runtime.SupplyConvoys);
         Assert.Equal(0, runtime.CampaignLogisticsCounters.CampaignLaunchBlockedByHomeDefense);
         Assert.True(runtime.CampaignLogisticsCounters.ConvoySpawnBlockedByHomeDefense > 0);
+    }
+
+    [Fact]
+    public void ManualDownstreamDiagnostics_DistinguishesConvoyRequestEligibilityAndBlockReason()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        var campaign = CreateMarchingCampaign(runtime, Faction.Obsidari, Faction.Aetheri, requestedMemberCount: 1, reserveWarriors: 0);
+        SetSustainedOutOfSupplyTicks(campaign.Army.SupplyState, 2);
+
+        AdvanceToNextCadence(runtime);
+        var diagnostics = BuildWave10Telemetry(runtime).ManualDownstreamDiagnostics.Convoy;
+
+        Assert.True(diagnostics.Evaluated > 0);
+        Assert.True(diagnostics.Eligible > 0);
+        Assert.True(diagnostics.Requested > 0);
+        Assert.Equal("home_defense", diagnostics.BlockedReason);
+        Assert.Equal(0, diagnostics.Spawned);
+        Assert.Equal(0, diagnostics.Delivered);
+        Assert.Equal(0, diagnostics.Failed);
+    }
+
+    [Fact]
+    public void ManualDownstreamDiagnostics_DistinguishesScoutRelationRadiusAndFreshIntel()
+    {
+        var runtime = CreateRuntime();
+        EnableDiplomacyAndCombat(runtime);
+        SetAllCampaignCandidatesIneligible(runtime);
+        var world = GetWorld(runtime);
+        var owner = GetColony(world, Faction.Obsidari);
+        var hostileTarget = GetColony(world, Faction.Aetheri);
+        var neutralTarget = GetColony(world, Faction.Sylvars);
+        var secondHostileTarget = GetColony(world, Faction.Chirita);
+        owner.Origin = (0, 0);
+        hostileTarget.Origin = (31, 31);
+        neutralTarget.Origin = (1, 0);
+        secondHostileTarget.Origin = (30, 31);
+        var scout = SelectPeople(world, owner, 1)[0];
+        scout.AssignRole(PersonRole.Scout);
+        scout.Pos = owner.Origin;
+        world.SetFactionStance(owner.Faction, hostileTarget.Faction, Stance.Hostile);
+        world.SetFactionStance(owner.Faction, neutralTarget.Faction, Stance.Neutral);
+        world.SetFactionStance(owner.Faction, secondHostileTarget.Faction, Stance.Hostile);
+
+        InvokeRuntimeMethod(runtime, "AdvanceScoutIntel");
+        var diagnostics = BuildWave10Telemetry(runtime).ManualDownstreamDiagnostics.Scout;
+
+        Assert.True(diagnostics.ObservationPasses > 0);
+        Assert.Equal(1, diagnostics.LiveScoutActors);
+        Assert.True(diagnostics.SkippedByRelation > 0);
+        Assert.True(diagnostics.SkippedByRadius > 0);
+        Assert.True(diagnostics.NearestHostileDistance > 0);
+        Assert.Equal(0, diagnostics.FreshIntel);
+    }
+
+    [Fact]
+    public void ManualDownstreamDiagnostics_DistinguishesSiegeUnitTechLockedAndSpawnedAction()
+    {
+        var lockedRuntime = CreateRuntime();
+        EnableDiplomacyAndCombat(lockedRuntime);
+        Assert.True(lockedRuntime.TryPrepareWave10EvidenceScenario("campaign_siege_resolution"));
+        lockedRuntime.AdvanceTick(1f);
+        var lockedDiagnostics = BuildWave10Telemetry(lockedRuntime).ManualDownstreamDiagnostics.SiegeUnit;
+
+        Assert.True(lockedDiagnostics.EncounterCampaigns > 0);
+        Assert.True(lockedDiagnostics.TechLocked > 0);
+        Assert.Equal(0, lockedDiagnostics.Spawned);
+
+        var enabledRuntime = CreateRuntime();
+        EnableDiplomacyAndCombat(enabledRuntime);
+        Assert.True(enabledRuntime.TryPrepareWave10EvidenceScenario("siege_unit_breach"));
+        enabledRuntime.AdvanceTick(1f);
+        var enabledDiagnostics = BuildWave10Telemetry(enabledRuntime).ManualDownstreamDiagnostics.SiegeUnit;
+
+        Assert.True(enabledDiagnostics.EncounterCampaigns > 0);
+        Assert.True(enabledDiagnostics.Spawned > 0);
+        Assert.True(enabledDiagnostics.ActionTicks > 0);
     }
 
     [Fact]
@@ -521,6 +599,18 @@ public sealed class Wave10CampaignLogisticsTests
         world.EnableDiplomacy = true;
         world.EnableCombatPrimitives = true;
     }
+
+    private static ScenarioWave10TelemetrySnapshot BuildWave10Telemetry(SimulationRuntime runtime)
+        => runtime.BuildScenarioWave10TelemetrySnapshot(
+            "manual_operator_campaign_lifecycle",
+            ScenarioWave10Evidence.ProofTypeManualOperator,
+            ScenarioWave10Evidence.EvidenceStatusPositive,
+            ScenarioWave10Evidence.TimelineSemanticsTickSampled,
+            ScenarioWave10Evidence.ReasonNone,
+            runtimeSource: ScenarioWave10Evidence.RuntimeSourceMainWorldRun,
+            manualLaunchAttemptTick: 1,
+            manualLaunchSucceeded: true,
+            manualLaunchStatus: "Created");
 
     private static CampaignState CreateMarchingCampaign(SimulationRuntime runtime, Faction owner, Faction target, int requestedMemberCount, int reserveWarriors)
     {

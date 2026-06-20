@@ -64,6 +64,9 @@ public sealed class CampaignLogisticsCounters
     public int ConvoysSpawned { get; private set; }
     public int ConvoysDelivered { get; private set; }
     public int ConvoysFailed { get; private set; }
+    public int ConvoyEvaluations { get; private set; }
+    public int ConvoyEligibleCampaigns { get; private set; }
+    public int ConvoyRequests { get; private set; }
     public int ForwardBasesEstablished { get; private set; }
     public int ForwardBasesExpired { get; private set; }
     public int ForwardBasesAbandoned { get; private set; }
@@ -75,6 +78,16 @@ public sealed class CampaignLogisticsCounters
     public int ScoutIntelObserved { get; private set; }
     public int ScoutIntelRefreshed { get; private set; }
     public int ScoutIntelExpired { get; private set; }
+    public int ScoutObservationPasses { get; private set; }
+    public int ScoutObservationSkippedByRelation { get; private set; }
+    public int ScoutObservationSkippedByRadius { get; private set; }
+    public int SiegeUnitEncounterCampaigns { get; private set; }
+    public int SiegeUnitTechLocked { get; private set; }
+    public int SiegeUnitResolverDisabled { get; private set; }
+    public int SiegeUnitNoTarget { get; private set; }
+    public int SiegeUnitAlreadyPresent { get; private set; }
+    public int SiegeUnitsSpawned { get; private set; }
+    public int SiegeUnitActionTicks { get; private set; }
 
     internal void RecordCampaignLaunchBlockedByCap() => CampaignLaunchBlockedByCap++;
     internal void RecordCampaignLaunchBlockedByPairCap() => CampaignLaunchBlockedByPairCap++;
@@ -85,6 +98,13 @@ public sealed class CampaignLogisticsCounters
     internal void RecordConvoySpawnBlockedByHomeDefense() => ConvoySpawnBlockedByHomeDefense++;
     internal void RecordConvoySpawnRouteBudgetExhausted() => ConvoySpawnRouteBudgetExhausted++;
     internal void RecordConvoyRouteBudgetExhausted() => ConvoyRouteBudgetExhausted++;
+    internal void RecordConvoyEvaluation(bool eligible)
+    {
+        ConvoyEvaluations++;
+        if (eligible)
+            ConvoyEligibleCampaigns++;
+    }
+    internal void RecordConvoyRequest() => ConvoyRequests++;
     internal void RecordConvoySpawned() => ConvoysSpawned++;
     internal void RecordConvoyDelivered() => ConvoysDelivered++;
     internal void RecordConvoyFailed() => ConvoysFailed++;
@@ -105,4 +125,14 @@ public sealed class CampaignLogisticsCounters
     internal void RecordScoutIntelObserved() => ScoutIntelObserved++;
     internal void RecordScoutIntelRefreshed() => ScoutIntelRefreshed++;
     internal void RecordScoutIntelExpired() => ScoutIntelExpired++;
+    internal void RecordScoutObservationPass() => ScoutObservationPasses++;
+    internal void RecordScoutObservationSkippedByRelation() => ScoutObservationSkippedByRelation++;
+    internal void RecordScoutObservationSkippedByRadius() => ScoutObservationSkippedByRadius++;
+    internal void RecordSiegeUnitEncounterCampaign() => SiegeUnitEncounterCampaigns++;
+    internal void RecordSiegeUnitTechLocked() => SiegeUnitTechLocked++;
+    internal void RecordSiegeUnitResolverDisabled(int count) => SiegeUnitResolverDisabled += Math.Max(0, count);
+    internal void RecordSiegeUnitNoTarget() => SiegeUnitNoTarget++;
+    internal void RecordSiegeUnitAlreadyPresent(int count) => SiegeUnitAlreadyPresent += Math.Max(0, count);
+    internal void RecordSiegeUnitsSpawned(int count) => SiegeUnitsSpawned += Math.Max(0, count);
+    internal void RecordSiegeUnitActionTicks(int count) => SiegeUnitActionTicks += Math.Max(0, count);
 }
