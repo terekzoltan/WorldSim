@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-20 - Wave 10 Step10B.5-F6 Closeout - Minor - Lifecycle progression does not prove manual command creation success
+
+- Track: SMR Analyst / Track B campaign runtime evidence
+- Source: Meta + Swarm step-review synthesis for `Step10B.5-F6`, artifacts `.artifacts/smr/wave10-manual-operator-lifecycle-002/` and `Docs/Evidence/SMR/wave10-step10b5-f6-full-recovery-closeout/README.md`
+- Finding: The manual control package showed 18/18 lifecycle progression and clean hard gates, but manual runtime-command creation was only 16/18; two runs reported `CampaignRuntimeUnavailable` while other campaign launches still occurred.
+- Impact: Future closeout reports could falsely claim the manual command path is fully healthy if they look only at lifecycle progression, launch totals, or `exitCode=0`.
+- Resolution / guidance: Keep manual command availability as its own counter in evidence review. Step10B closes as YELLOW accepted evidence, and Step10C must explicitly classify the manual residual before Wave10.5 readiness.
+- Status: open, actively routed to Step10C residual/manual gap triage
+
 ## 2026-06-17 - Wave 10 Step10B.5-F2-A Step Review - Blocking - Mobilization role quota must count launchable actors
 
 - Track: Track B / Runtime organic campaign mobilization

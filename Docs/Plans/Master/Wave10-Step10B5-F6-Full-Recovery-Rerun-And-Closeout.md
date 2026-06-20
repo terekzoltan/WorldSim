@@ -1,6 +1,6 @@
 # Wave 10 Step10B.5-F6 - Full Recovery Rerun And Closeout
 
-Status: planned
+Status: accepted YELLOW - Step10B closeout evidence
 Owner: SMR Analyst for rerun/review; Meta Coordinator for closeout decision
 Parent: `Docs/Plans/Master/Wave10-Step10B5-Organic-Campaign-RED-Recovery-Plan.md`
 
@@ -155,3 +155,30 @@ Meta must update:
 - `AGENTS.md` message board if meaningful.
 
 Wave10.5 remains blocked until F6 is accepted GREEN/YELLOW or explicitly deferred.
+
+## Closeout Outcome - 2026-06-20
+
+F6 was executed as staged evidence-only SMR closeout. No source, docs, or config behavior changes were made during the SMR execution.
+
+Persistent evidence note:
+
+- `Docs/Evidence/SMR/wave10-step10b5-f6-full-recovery-closeout/README.md`
+
+Local raw artifacts:
+
+- `.artifacts/smr/wave10-organic-hostile-soak-002/`
+- `.artifacts/smr/wave10-manual-operator-lifecycle-002/`
+
+Decision:
+
+- Overall verdict: YELLOW accepted.
+- Hostile organic core recovered strongly: 18/18 launch runs, 277 launches, 17/18 march/encounter/resolution, 10/18 siege, clean assertions/anomalies, and 18/18 `main_world_run|organic|tick_sampled` provenance.
+- Manual runtime-command control remains meaningful but partial: 18/18 lifecycle progression, clean assertions/anomalies, but 16/18 `Created` and 2/18 `CampaignRuntimeUnavailable`.
+- Pure organic, broad stress, and perf packages were not run by staged policy.
+
+Step10B closeout disposition:
+
+- Step10B can close as YELLOW accepted evidence.
+- The 2/18 manual command availability residual is accepted as a known limitation and routed to Step10C residual/manual gap triage.
+- Track C and Track A are not opened by F6 evidence.
+- Full hostile/pure/stress/perf broad expansion remains blocked unless Meta opens a separate evidence question.

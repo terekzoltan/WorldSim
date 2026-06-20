@@ -2403,7 +2403,7 @@ Step10B.2 result:
 
 | Track B agent | Step10B.5-F5 stress seed-606 survival repro/fix | F4 accepted ✅ + Meta keeps stress seed-606 active | ✅ Accepted as no-fix `no_longer_reproducible` evidence for the three targeted seed-606 lanes only. The three known Step10B.2 stress seed-606 survival lanes were rerun as separate single-lane ScenarioRunner assert+drilldown commands under `.artifacts/smr/wave10-step10b5-f5-seed606-repro-001/`; all passed before any fix, so no runtime/ScenarioRunner behavior change was made. No-fix sentinel rerun under `.artifacts/smr/wave10-step10b5-f5-seed606-postfix-001/` also passed all three lanes with `exitCode=0`, `assertionFailures=0`, `anomalyCount=0`, hard `SURV-01/02/04` pass status, and no `wave10-probes.json` proof claim. Full hostile/pure/stress/perf packages remain blocked until F6 Meta/SMR decision. Detail: `Docs/Plans/Master/Wave10-Step10B5-F5-Stress-Seed606-Survival-Repro-Fix.md`. |
 
-| SMR Analyst + Meta Coordinator | Step10B.5-F6 full recovery rerun + closeout | F3/F4/F5 accepted | ⬜ Run staged recovery evidence, not a full 5-hour matrix by default. Hostile organic and manual lifecycle are the decision core. Pure organic starts as small context matrix only if hostile/manual are healthy; stress starts as targeted sentinel (seed-606 small topology) before broad expansion; perf is separate after lifecycle works. Meta decides GREEN/YELLOW/RED and whether Track C/A open. Detail: `Docs/Plans/Master/Wave10-Step10B5-F6-Full-Recovery-Rerun-And-Closeout.md`. |
+| SMR Analyst + Meta Coordinator | Step10B.5-F6 full recovery rerun + closeout | F3/F4/F5 accepted | ✅ Accepted YELLOW. Staged evidence only, not broad matrix: hostile organic core `.artifacts/smr/wave10-organic-hostile-soak-002/` recovered strongly (`18/18` launch runs, `277` launches, `17/18` march/encounter/resolution, clean assertions/anomalies, `18/18 main_world_run|organic|tick_sampled`). Manual control `.artifacts/smr/wave10-manual-operator-lifecycle-002/` is meaningful but partial (`18/18` lifecycle progression, clean assertions/anomalies, `16/18 Created`, `2/18 CampaignRuntimeUnavailable`). Step10B closes as YELLOW accepted evidence; the manual-command residual is routed to Step10C residual/manual gap triage. Persistent note: `Docs/Evidence/SMR/wave10-step10b5-f6-full-recovery-closeout/README.md`. Detail: `Docs/Plans/Master/Wave10-Step10B5-F6-Full-Recovery-Rerun-And-Closeout.md`. |
 
 Step10B.5 sequencing rules:
 - F1 must be diagnostics-only. Do not change launch behavior before the no-launch reason is visible.
@@ -2412,7 +2412,8 @@ Step10B.5 sequencing rules:
 - Track B may run mini-SMR only for local fix confidence/routing proof; full matrix closeout remains SMR Analyst ownership.
 - Full SMR packages are not allowed until pilot/confirm runs show meaningful signals.
 - Hostile + manual are the recovery decision core; pure/stress/perf are staged escalation, not mandatory default packages.
-- F4 is accepted: F5 is explicitly unblocked next under the normal stress seed-606 scope only; F6 and full hostile/pure/stress/perf packages remain blocked until later Meta/SMR decision.
+- F6 is accepted YELLOW: Step10B is closed for Wave10 sequencing, but the manual-command residual (`2/18 CampaignRuntimeUnavailable`) is routed into Step10C residual/manual gap triage.
+- Full hostile/pure/stress/perf packages remain blocked unless Meta opens a separate evidence question.
 - Track C remains closed unless F1/F2 diagnostics prove a strategy-only contract gap.
 - Track A remains deferred until runtime lifecycle health is restored.
 
@@ -2428,6 +2429,7 @@ Step10B.5 sequencing rules:
 Step10C policy note:
 - Step10C is evidence-driven. Every item must come from Step10A/10B evidence or an explicit manual evidence doc such as `Docs/Evidence/Manual/Wave10-Step9-Manual-Smoke-Followup.md`.
 - Current seeded candidates:
+  - F6 manual runtime-command residual: decide whether `CampaignRuntimeUnavailable` under already-active organic campaign pressure is acceptable as a known limitation or needs a narrow Track B diagnostic/fix; classify this first as `in-scope now`, `not-yet-in-scope`, or `already resolved`,
   - operator/manual launch should stay at `1` only as a fallback; if more viable members exist, prefer a larger bounded squad for more representative campaign smoke,
   - classify low manual siege-unit visibility after SMR before deciding whether to change runtime incidence or visual/debug observability,
   - wall/watchtower icon scale/readability,
@@ -2450,7 +2452,7 @@ Purpose:
 Wave turn-gate:
 - Wave 10.5 is `READY` only after Wave 8.5 closeout is `✅` and Wave 10 closeout is `✅`.
 - Reason: convergence work should build on a proven solver-backed slice and the matured late combat/campaign surface before shared-family expansion prep begins.
-- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5. The user-requested Step10B.2 organic/manual lifecycle SMR gate is RED and opens Step10B.5; Step10B.5 must be closed GREEN/YELLOW with Meta acceptance or explicitly deferred before Wave 10.5. If Step10C is opened from SMR/manual evidence triage, it must also be closed or explicitly marked N/A before Wave 10.5.
+- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5. The user-requested Step10B.2 organic/manual lifecycle SMR gate is now closed through Step10B.5-F6 as YELLOW accepted evidence. Step10C remains the active residual/manual gap triage gate and must be closed or explicitly marked N/A before Wave 10.5.
 
 Audit hardening source:
 - `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md`
