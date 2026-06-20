@@ -223,7 +223,15 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
 
 static ScenarioConfig ResolveMainRunExecutionConfig(ScenarioConfig config, bool assertEnabled)
 {
-    if (!assertEnabled || string.IsNullOrWhiteSpace(config.Wave10Scenario) || IsWave10LifecycleScenario(config.Wave10Scenario))
+    if (IsWave10LifecycleScenario(config.Wave10Scenario))
+    {
+        return config with
+        {
+            MovementSpeedMultiplier = config.MovementSpeedMultiplier > 0f ? config.MovementSpeedMultiplier : 1f
+        };
+    }
+
+    if (!assertEnabled || string.IsNullOrWhiteSpace(config.Wave10Scenario))
         return config;
 
     // Wave10 feature proof comes from side probes. Under assert mode, keep the companion

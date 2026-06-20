@@ -312,10 +312,12 @@ Evidence requirements:
 
 Acceptance:
 - If hostile organic remains `0` launches after F2, stop and return RED with the new diagnostic reason. Do not run full expensive packages.
-- If medium/standard confirm launches, proceed to F4/F5 before full SMR rerun.
+- If medium/standard confirm launches cleanly, proceed to F4/F5 before full SMR rerun.
+- If standard confirm is artifact-validity questionable, route to Route C before treating it as F5 survival evidence.
 
 Unlocks:
-- Step10B.5-F4 and Step10B.5-F5.
+- Step10B.5-F4 after Route C acceptance.
+- Step10B.5-F5 only after F4 result review and only if Meta keeps the separate stress seed-606 survival issue active; the old F3 standard `movementSpeedMultiplier=0` collapse is not valid F5 evidence.
 
 ### Step10B.5-F4 - Manual Lifecycle Downstream Diagnostics
 

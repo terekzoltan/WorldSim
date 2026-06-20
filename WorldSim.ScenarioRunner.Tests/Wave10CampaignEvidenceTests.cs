@@ -394,6 +394,38 @@ public sealed class Wave10CampaignEvidenceTests
     }
 
     [Fact]
+    public void Wave10HostileLifecycle_OmittedMovementSpeedUsesSafeDefault()
+    {
+        var artifactDir = CreateArtifactDir();
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "101",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = LifecycleConfigJson("hostile-lifecycle-omitted-move", "organic-hostile-campaign-lifecycle", ticks: 80, includeMovementSpeed: false)
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(0, exitCode);
+        Assert.False(File.Exists(Path.Combine(artifactDir, "wave10-probes.json")), "Lifecycle evidence must stay main-run truth, not side-probe evidence.");
+        using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var run = summary.RootElement.GetProperty("runs").EnumerateArray().Single();
+        Assert.Equal(1f, run.GetProperty("movementSpeedMultiplier").GetSingle());
+        Assert.Equal(0f, run.GetProperty("birthRateMultiplier").GetSingle());
+
+        var wave10 = run.GetProperty("wave10");
+        Assert.Equal("organic_hostile_campaign_lifecycle", wave10.GetProperty("wave10Scenario").GetString());
+        Assert.Equal("main_world_run", wave10.GetProperty("runtimeSource").GetString());
+        Assert.Equal("organic", wave10.GetProperty("proofType").GetString());
+        Assert.Equal("tick_sampled", wave10.GetProperty("timelineSemantics").GetString());
+        Assert.True(wave10.GetProperty("organicLaunchDiagnostics").GetProperty("evaluationTickCount").GetInt32() > 0,
+            $"Expected organic cadence diagnostics\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+    }
+
+    [Fact]
     public void InvalidWave10Scenario_ReturnsConfigError()
     {
         var artifactDir = CreateArtifactDir();
@@ -592,11 +624,12 @@ public sealed class Wave10CampaignEvidenceTests
            {"Name":"{{name}}","Width":32,"Height":32,"InitialPop":24,"Ticks":{{ticks}},"Dt":{{dt.ToString(System.Globalization.CultureInfo.InvariantCulture)}},"EnableCombatPrimitives":true,"EnableDiplomacy":true,"StoneBuildingsEnabled":false,"BirthRateMultiplier":0.0,"MovementSpeedMultiplier":1.0,"EnableSiege":true,"Wave10Scenario":"{{wave10Scenario}}"}
            """;
 
-    private static string LifecycleConfigJson(string name, string wave10Scenario, int ticks, int? manualLaunchTick = null)
+    private static string LifecycleConfigJson(string name, string wave10Scenario, int ticks, int? manualLaunchTick = null, bool includeMovementSpeed = true)
     {
         var launchTickJson = manualLaunchTick.HasValue ? $",\"Wave10ManualLaunchTick\":{manualLaunchTick.Value}" : string.Empty;
+        var movementSpeedJson = includeMovementSpeed ? ",\"MovementSpeedMultiplier\":1.0" : string.Empty;
         return $$"""
-            [{"Name":"{{name}}","Width":40,"Height":40,"InitialPop":80,"Ticks":{{ticks}},"Dt":0.25,"EnableCombatPrimitives":true,"EnableDiplomacy":true,"StoneBuildingsEnabled":false,"BirthRateMultiplier":0.0,"MovementSpeedMultiplier":1.0,"EnableSiege":true,"Wave10Scenario":"{{wave10Scenario}}"{{launchTickJson}}}]
+            [{"Name":"{{name}}","Width":40,"Height":40,"InitialPop":80,"Ticks":{{ticks}},"Dt":0.25,"EnableCombatPrimitives":true,"EnableDiplomacy":true,"StoneBuildingsEnabled":false,"BirthRateMultiplier":0.0{{movementSpeedJson}},"EnableSiege":true,"Wave10Scenario":"{{wave10Scenario}}"{{launchTickJson}}}]
             """;
     }
 
