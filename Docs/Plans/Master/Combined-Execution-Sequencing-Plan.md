@@ -2415,19 +2415,20 @@ Step10B.5 sequencing rules:
 - F6 is accepted YELLOW: Step10B is closed for Wave10 sequencing, but the manual-command residual (`2/18 CampaignRuntimeUnavailable`) is routed into Step10C residual/manual gap triage.
 - Full hostile/pure/stress/perf packages remain blocked unless Meta opens a separate evidence question.
 - Track C remains closed unless F1/F2 diagnostics prove a strategy-only contract gap.
-- Track A remains deferred until runtime lifecycle health is restored.
+- Track A remains optional and evidence-driven after F6; Step10C closeout did not reopen it without fresh manual screenshots.
 
 **Step 10C — post-SMR / manual gap closure (conditional)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator | Wave 10 gap triage | Step10A unavailable-lane YELLOW + user approval to open Step10C-B/C before clean Step10B | ✅ Opened from Step10A evidence residuals. Promote only evidence-backed residuals into bounded fixes; do not convert lane presence into proof. |
+| Meta Coordinator | Wave 10 gap triage | Step10A unavailable-lane YELLOW + user approval to open Step10C-B/C before clean Step10B | ✅ Closed in docs-only triage (`Docs/Plans/Master/Wave10-Step10C-Residual-Manual-Gap-Triage.md`). The F6 `CampaignRuntimeUnavailable` residual is accepted as a known YELLOW limitation / future Track B-only diagnostic if fresh evidence turns it into a blocker. |
 | Track B agent | Step10C-B runtime/evidence gap first pass | Meta triage ✅ + Track B handoff sent | ✅ Accepted/committed in `6bc6fd9`. The `-002` artifact preserves `runs[].wave10` main-world truth and `wave10-probes.json` side-probe provenance and reports 8/8 positive lanes; the former scout-intel timing blocker is cleared inside a fresh-intel probe window. |
-| Track A agent | Step10C-A fortification readability pass | Meta triage ✅ | Candidate scope: wall/watchtower icon scale/readability and siege/manual clarity improvements. |
-| Track C agent | Step10C-C advisory follow-up (conditional) | Explicit Track B or SMR handoff | Only if Step10B/Step10C-B proves a real strategist/advisory gap rather than a runtime/operator/visual issue. |
+| Track A agent | Step10C-A fortification readability pass | Meta triage ✅ | Not opened in the Step10C closeout. Wall/watchtower readability and siege/manual clarity remain Track A candidates only if fresh manual evidence promotes them. |
+| Track C agent | Step10C-C advisory follow-up (conditional) | Explicit Track B or SMR handoff | Not opened. No Step10B/Step10C-B/F6 evidence proves a strategist/advisory gap rather than a runtime/operator/visual issue. |
 
 Step10C policy note:
 - Step10C is evidence-driven. Every item must come from Step10A/10B evidence or an explicit manual evidence doc such as `Docs/Evidence/Manual/Wave10-Step9-Manual-Smoke-Followup.md`.
+- Step10C closeout result (2026-06-21): the F6 manual runtime-command residual is classified as an accepted YELLOW limitation / `not-yet-in-scope` Track B-only follow-up, and the remaining manual/readability candidates stay deferred until fresh evidence promotes them. No new Step10C Track B/A/C slice opened from this closeout.
 - Current seeded candidates:
   - F6 manual runtime-command residual: decide whether `CampaignRuntimeUnavailable` under already-active organic campaign pressure is acceptable as a known limitation or needs a narrow Track B diagnostic/fix; classify this first as `in-scope now`, `not-yet-in-scope`, or `already resolved`,
   - operator/manual launch should stay at `1` only as a fallback; if more viable members exist, prefer a larger bounded squad for more representative campaign smoke,
@@ -2452,7 +2453,7 @@ Purpose:
 Wave turn-gate:
 - Wave 10.5 is `READY` only after Wave 8.5 closeout is `✅` and Wave 10 closeout is `✅`.
 - Reason: convergence work should build on a proven solver-backed slice and the matured late combat/campaign surface before shared-family expansion prep begins.
-- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5. The user-requested Step10B.2 organic/manual lifecycle SMR gate is now closed through Step10B.5-F6 as YELLOW accepted evidence. Step10C remains the active residual/manual gap triage gate and must be closed or explicitly marked N/A before Wave 10.5.
+- Wave 10 closeout includes the Wave 10 SMR prep + SMR evidence gates defined in `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`; implementation-only completion is not enough to unblock Wave 10.5. The user-requested Step10B.2 organic/manual lifecycle SMR gate is closed through Step10B.5-F6 as YELLOW accepted evidence, and Step10C docs-only residual/manual gap triage closeout is now accepted, so Wave 10.5 is unblocked.
 
 Audit hardening source:
 - `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md`

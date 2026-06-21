@@ -33,7 +33,7 @@ Entries:
 - Finding: The manual control package showed 18/18 lifecycle progression and clean hard gates, but manual runtime-command creation was only 16/18; two runs reported `CampaignRuntimeUnavailable` while other campaign launches still occurred.
 - Impact: Future closeout reports could falsely claim the manual command path is fully healthy if they look only at lifecycle progression, launch totals, or `exitCode=0`.
 - Resolution / guidance: Keep manual command availability as its own counter in evidence review. Step10B closes as YELLOW accepted evidence, and Step10C must explicitly classify the manual residual before Wave10.5 readiness.
-- Status: open, actively routed to Step10C residual/manual gap triage
+- Status: guidance; Step10C classified this as an accepted YELLOW limitation / future Track B-only diagnostic if fresh manual or SMR evidence turns it into a blocking reliability issue
 
 ## 2026-06-17 - Wave 10 Step10B.5-F2-A Step Review - Blocking - Mobilization role quota must count launchable actors
 
