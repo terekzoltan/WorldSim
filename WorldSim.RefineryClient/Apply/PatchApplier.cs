@@ -5,12 +5,6 @@ namespace WorldSimRefineryClient.Apply;
 
 public sealed class PatchApplier
 {
-    private static readonly string[] SupportedTreatyKinds =
-    {
-        "ceasefire",
-        "peace_talks"
-    };
-
     private const int MinFactionId = 0;
     private const int MaxFactionId = 3;
 
@@ -126,7 +120,7 @@ public sealed class PatchApplier
                 "proposeTreaty.treatyKind is required. Expected one of: ceasefire, peace_talks.");
         }
 
-        if (Array.IndexOf(SupportedTreatyKinds, treatyKind) < 0)
+        if (!RefineryVocabulary.IsTreatyKind(treatyKind))
         {
             throw new PatchApplyException(
                 $"Unsupported proposeTreaty.treatyKind '{treatyKindRaw}'. Expected one of: ceasefire, peace_talks.");

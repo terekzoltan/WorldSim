@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import hu.zoltanterek.worldsim.refinery.contracts.RefineryVocabulary;
 import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
@@ -595,7 +596,10 @@ public class LlmDirectorPlanner {
             return "both";
         }
         return switch (rawMode.trim().toLowerCase(Locale.ROOT)) {
-            case "both", "story_only", "nudge_only", "off" -> rawMode.trim().toLowerCase(Locale.ROOT);
+            case RefineryVocabulary.OUTPUT_MODE_BOTH,
+                    RefineryVocabulary.OUTPUT_MODE_STORY_ONLY,
+                    RefineryVocabulary.OUTPUT_MODE_NUDGE_ONLY,
+                    RefineryVocabulary.OUTPUT_MODE_OFF -> rawMode.trim().toLowerCase(Locale.ROOT);
             default -> "both";
         };
     }

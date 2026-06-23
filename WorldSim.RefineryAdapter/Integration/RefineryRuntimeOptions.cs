@@ -202,7 +202,8 @@ public sealed record RefineryRuntimeOptions(
         var normalized = string.IsNullOrWhiteSpace(raw) ? "auto" : raw.Trim().ToLowerInvariant();
         return normalized switch
         {
-            "auto" or "both" or "story_only" or "nudge_only" or "off" => normalized,
+            "auto" => normalized,
+            _ when WorldSim.Contracts.V2.RefineryVocabulary.IsSharedOutputMode(normalized) => normalized,
             _ => "auto"
         };
     }

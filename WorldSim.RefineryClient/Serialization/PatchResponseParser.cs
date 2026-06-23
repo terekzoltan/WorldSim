@@ -102,7 +102,7 @@ public sealed class PatchResponseParser
         if (op.ProposerFactionId == op.ReceiverFactionId)
             throw new PatchApplyException("proposeTreaty requires proposerFactionId != receiverFactionId.");
 
-        if (op.TreatyKind is not ("ceasefire" or "peace_talks"))
+        if (!RefineryVocabulary.IsTreatyKind(op.TreatyKind))
         {
             throw new PatchApplyException(
                 $"Unsupported proposeTreaty.treatyKind '{op.TreatyKind}'. Expected one of: ceasefire, peace_talks.");

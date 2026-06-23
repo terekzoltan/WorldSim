@@ -8,12 +8,6 @@ namespace WorldSim.RefineryAdapter.Translation;
 
 public sealed class PatchCommandTranslator
 {
-    private static readonly string[] SupportedTreatyKinds =
-    {
-        "ceasefire",
-        "peace_talks"
-    };
-
     private static readonly int MaxFactionId = Enum.GetValues(typeof(Faction)).Length - 1;
 
     public IReadOnlyList<RuntimePatchCommand> Translate(PatchResponse response)
@@ -52,7 +46,7 @@ public sealed class PatchCommandTranslator
                     {
                         foreach (var bias in setColonyDirective.Biases)
                         {
-                            if (!string.Equals(bias.Type, "goal_bias", StringComparison.OrdinalIgnoreCase))
+                            if (!string.Equals(bias.Type, RefineryVocabulary.BiasTypeGoalBias, StringComparison.OrdinalIgnoreCase))
                                 throw new InvalidOperationException($"Unsupported bias type '{bias.Type}' in setColonyDirective.");
                             biases.Add(new DirectorGoalBiasSpec(bias.GoalCategory, bias.Weight, bias.DurationTicks));
                         }
@@ -109,16 +103,16 @@ public sealed class PatchCommandTranslator
 
         var inferredSeverity = effectCount switch
         {
-            0 => "minor",
-            <= 2 => "major",
-            _ => "epic"
+            0 => RefineryVocabulary.SeverityMinor,
+            <= 2 => RefineryVocabulary.SeverityMajor,
+            _ => RefineryVocabulary.SeverityEpic
         };
 
         if (string.IsNullOrWhiteSpace(declaredSeverityRaw))
             return;
 
         var declaredSeverity = declaredSeverityRaw.Trim().ToLowerInvariant();
-        if (declaredSeverity is not ("minor" or "major" or "epic"))
+        if (!RefineryVocabulary.IsSeverity(declaredSeverity))
         {
             throw new InvalidOperationException(
                 $"Unsupported story beat severity '{declaredSeverityRaw}'. Expected one of: minor, major, epic."
@@ -143,7 +137,7 @@ public sealed class PatchCommandTranslator
 
         foreach (var effect in effects)
         {
-            if (!string.Equals(effect.Type, "domain_modifier", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(effect.Type, RefineryVocabulary.EffectTypeDomainModifier, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException($"Unsupported effect type '{effect.Type}' in {context}.");
             }
@@ -205,7 +199,7 @@ public sealed class PatchCommandTranslator
                 "proposeTreaty.treatyKind is required. Expected one of: ceasefire, peace_talks.");
         }
 
-        if (Array.IndexOf(SupportedTreatyKinds, treatyKind) < 0)
+        if (!RefineryVocabulary.IsTreatyKind(treatyKind))
         {
             throw new InvalidOperationException(
                 $"Unsupported proposeTreaty.treatyKind '{treatyKindRaw}'. Expected one of: ceasefire, peace_talks.");

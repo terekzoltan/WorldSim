@@ -6,8 +6,8 @@ This folder is the canonical classpath root for WorldSim `tools.refinery` artifa
 
 - `common/` shared, family-agnostic artifact policy/vocabulary space
 - `director/` Season Director family artifacts
-- `combat/` reserved namespace (future family)
-- `campaign/` reserved namespace (future family)
+- `combat/` reserved namespace and TR3-C skeleton artifacts (future family)
+- `campaign/` reserved namespace and TR3-C skeleton artifacts (future family)
 
 ## Scope rule
 
@@ -50,3 +50,11 @@ Designated output area note:
 - Internal director proposal/assertion handling is separate from wire-level bridge DTOs.
 - `PatchOp` / `PatchResponse` are bridge-output forms, not primary internal formal ontology.
 - Transitional note: validator/fallback paths that still operate directly on `PatchOp` remain transitional until later TR2/TR3 convergence.
+
+## TR3-C shared vocabulary and family skeleton policy
+
+- `common/design.problem`, `combat/*.problem`, and `campaign/*.problem` are skeleton artifacts only.
+- They are classpath-resolvable parse/load anchors for future family work.
+- They do not model combat or campaign rules, do not claim formal validation, and are not routed into the runtime solver path.
+- `common/shared-predicates.problem` is intentionally absent until a real shared predicate/error-predicate exists.
+- Existing director solver evidence markers remain stable compatibility markers; ScenarioRunner artifact-shape changes are out of scope for TR3-C unless Meta opens a Track B consult.

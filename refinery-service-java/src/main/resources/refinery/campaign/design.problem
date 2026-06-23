@@ -1,0 +1,5 @@
+% TR3-C campaign family skeleton only.
+% This artifact is a parse/load anchor, not semantic campaign validation.
+% It is intentionally not routed into the runtime solver path.
+
+class CampaignDesignSkeletonAnchor.

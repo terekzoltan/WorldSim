@@ -1,0 +1,5 @@
+% TR3-C combat family skeleton only.
+% No runtime facts are consumed by this artifact in this slice.
+% It is intentionally not routed into the runtime solver path.
+
+class CombatRuntimeSkeletonAnchor.

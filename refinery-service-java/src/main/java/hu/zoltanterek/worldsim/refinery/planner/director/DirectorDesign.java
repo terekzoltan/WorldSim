@@ -2,6 +2,8 @@ package hu.zoltanterek.worldsim.refinery.planner.director;
 
 import java.util.Set;
 
+import hu.zoltanterek.worldsim.refinery.contracts.RefineryVocabulary;
+
 public final class DirectorDesign {
     private DirectorDesign() {
     }
@@ -12,28 +14,13 @@ public final class DirectorDesign {
             "BoostIndustry"
     );
 
-    public static final Set<String> VALID_DOMAINS = Set.of(
-            "food",
-            "morale",
-            "economy",
-            "military",
-            "research"
-    );
+    public static final Set<String> VALID_DOMAINS = RefineryVocabulary.DOMAINS;
 
-    public static final Set<String> VALID_GOAL_CATEGORIES = Set.of(
-            "farming",
-            "gathering",
-            "crafting",
-            "building",
-            "social",
-            "military",
-            "research",
-            "rest"
-    );
+    public static final Set<String> VALID_GOAL_CATEGORIES = RefineryVocabulary.GOAL_CATEGORIES;
 
-    public static final Set<String> VALID_SEVERITIES = Set.of("minor", "major", "epic");
-    public static final Set<String> VALID_CAMPAIGN_KINDS = Set.of("declare_war", "propose_treaty");
-    public static final Set<String> VALID_TREATY_KINDS = Set.of("ceasefire", "peace_talks");
+    public static final Set<String> VALID_SEVERITIES = RefineryVocabulary.SEVERITIES;
+    public static final Set<String> VALID_CAMPAIGN_KINDS = RefineryVocabulary.CAMPAIGN_KINDS;
+    public static final Set<String> VALID_TREATY_KINDS = RefineryVocabulary.TREATY_KINDS;
 
     public static final Set<String> CAUSAL_ALLOWED_METRICS = Set.of(
             "food_reserves_pct",

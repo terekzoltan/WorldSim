@@ -1,0 +1,5 @@
+% TR3-C campaign family skeleton only.
+% No campaign constraints are modeled here in this slice.
+% It is intentionally not routed into the runtime solver path.
+
+class CampaignModelSkeletonAnchor.

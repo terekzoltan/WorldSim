@@ -1,8 +1,10 @@
 package hu.zoltanterek.worldsim.refinery.planner.refinery;
 
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
+import tools.refinery.generator.standalone.StandaloneRefinery;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,11 +46,51 @@ class RefineryArtifactCatalogTest {
         assertEquals(paths.size(), distinctCount, "Canonical director artifact paths must be unique");
     }
 
+    @Test
+    void canonicalFamilyArtifactsAreResolvableFromClasspath() {
+        for (RefineryArtifactFamily family : RefineryArtifactFamily.values()) {
+            for (String path : RefineryArtifactCatalog.canonicalProblemResourcePaths(family)) {
+                assertResourceExists(path);
+            }
+        }
+    }
+
+    @Test
+    void canonicalFamilyArtifactPathsAreDistinct() {
+        var paths = RefineryArtifactCatalog.canonicalProblemResourcePaths(RefineryArtifactFamily.DIRECTOR);
+        paths = new java.util.ArrayList<>(paths);
+        paths.addAll(RefineryArtifactCatalog.canonicalProblemResourcePaths(RefineryArtifactFamily.COMBAT));
+        paths.addAll(RefineryArtifactCatalog.canonicalProblemResourcePaths(RefineryArtifactFamily.CAMPAIGN));
+        paths.addAll(RefineryArtifactCatalog.canonicalProblemResourcePaths(RefineryArtifactFamily.COMMON));
+        long distinctCount = paths.stream().distinct().count();
+        assertEquals(paths.size(), distinctCount, "Canonical family artifact paths must be unique across families");
+    }
+
+    @Test
+    void nonDirectorSkeletonArtifactsParseAsRefineryProblems() throws Exception {
+        for (RefineryArtifactFamily family : java.util.List.of(
+                RefineryArtifactFamily.COMMON,
+                RefineryArtifactFamily.COMBAT,
+                RefineryArtifactFamily.CAMPAIGN
+        )) {
+            for (String path : RefineryArtifactCatalog.canonicalProblemResourcePaths(family)) {
+                StandaloneRefinery.getProblemLoader().loadString(readResource(path));
+            }
+        }
+    }
+
     private static void assertResourceExists(String resourcePath) {
         try (InputStream stream = RefineryArtifactCatalogTest.class.getResourceAsStream(resourcePath)) {
             assertNotNull(stream, "Expected classpath resource to exist: " + resourcePath);
         } catch (Exception ex) {
             throw new AssertionError("Failed to load classpath resource: " + resourcePath, ex);
+        }
+    }
+
+    private static String readResource(String resourcePath) throws Exception {
+        try (InputStream stream = RefineryArtifactCatalogTest.class.getResourceAsStream(resourcePath)) {
+            assertNotNull(stream, "Expected classpath resource to exist: " + resourcePath);
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 }

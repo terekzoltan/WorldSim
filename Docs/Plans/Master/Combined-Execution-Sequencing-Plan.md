@@ -2466,7 +2466,7 @@ Audit hardening source:
 
 - ✅ **TR3-A** Imperative validator deprecation plan (Track D)
 - ✅ **TR3-B** Fallback boundary cleanup + paid-live guardrail hardening (Track D)
-- ⬜ **TR3-C** Shared vocabulary + family expansion prep + evidence-schema generalization (Track D, Track B/C consult)
+- ✅ **TR3-C** Shared vocabulary + family expansion prep + evidence-schema generalization (Track D, Track B/C consult)
 
 ### Wave 10.5 — Execution Steps
 
@@ -2494,6 +2494,9 @@ TR3-B implementation closeout:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track D agent | TR3-C | TR3-B ✅ | Shared/common vocabulary prep should happen after the transitional boundaries and fallback responsibilities are explicit, including how refinery evidence can generalize beyond director-only families; re-read the official Refinery links before family/vocabulary design |
+
+TR3-C implementation closeout:
+- ✅ `TR3-C` implementation completed in the narrowed approved scope: symbolic Java/C# `RefineryVocabulary` surfaces and parity tests were added, shared output modes remain `both/story_only/nudge_only/off` while `auto` stays adapter/operator-local, numeric bounds and behavior policy remain in existing owner classes, common/combat/campaign `.problem` files are non-enforcing parse/load skeletons with catalog/resource tests, and `Docs/Plans/Master/Refinery-TR3-Shared-Vocabulary-And-Family-Policy.md` records policy-only family-neutral evidence guidance. No ScenarioRunner, Runtime, AI, App, Graphics, validator-retirement, paid-run, production solver-routing, or new fallback marker vocabulary scope was taken. Focused Java/C# gates, full Java suite, client/adapter tests, solution build, forbidden-scope, no-paid, marker-compatibility, and docs-overclaim checks passed.
 
 Wave 10.5 policy note:
 - Any task in this wave that creates, edits, or reviews refinery/model artifacts or convergence policy requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there. This is mandatory for implementers and reviewers, and must be refreshed in the current session before relying on Refinery semantics.

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import hu.zoltanterek.worldsim.refinery.contracts.RefineryVocabulary;
 import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
@@ -153,16 +154,19 @@ public class MockPlanner implements PatchPlanner {
     private static String normalizeOutputMode(String rawMode) {
         String mode = rawMode == null ? "both" : rawMode.trim().toLowerCase();
         return switch (mode) {
-            case "both", "story_only", "nudge_only", "off" -> mode;
+            case RefineryVocabulary.OUTPUT_MODE_BOTH,
+                    RefineryVocabulary.OUTPUT_MODE_STORY_ONLY,
+                    RefineryVocabulary.OUTPUT_MODE_NUDGE_ONLY,
+                    RefineryVocabulary.OUTPUT_MODE_OFF -> mode;
             default -> "both";
         };
     }
 
     private static List<PatchOp> applyDirectorOutputMode(List<PatchOp> patch, String outputMode) {
         return switch (outputMode) {
-            case "story_only" -> patch.stream().filter(op -> op instanceof PatchOp.AddStoryBeat).toList();
-            case "nudge_only" -> patch.stream().filter(MockPlanner::isNudgeSideDirectorOp).toList();
-            case "off" -> List.of();
+            case RefineryVocabulary.OUTPUT_MODE_STORY_ONLY -> patch.stream().filter(op -> op instanceof PatchOp.AddStoryBeat).toList();
+            case RefineryVocabulary.OUTPUT_MODE_NUDGE_ONLY -> patch.stream().filter(MockPlanner::isNudgeSideDirectorOp).toList();
+            case RefineryVocabulary.OUTPUT_MODE_OFF -> List.of();
             default -> patch;
         };
     }
