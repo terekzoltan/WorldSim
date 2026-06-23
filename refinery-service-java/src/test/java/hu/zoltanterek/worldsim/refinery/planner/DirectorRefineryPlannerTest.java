@@ -46,6 +46,32 @@ class DirectorRefineryPlannerTest {
     }
 
     @Test
+    void validateAndRepair_RetryExhaustionRecordsFallbackExactlyOnce() {
+        DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
+        DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 1, telemetry);
+        PatchRequest request = directorRequestWithActiveMajorBeat();
+
+        List<PatchOp> invalidCandidate = List.of(
+                new PatchOp.AddStoryBeat(
+                        "op_story",
+                        "BEAT_MAJOR_2",
+                        "Major pressure wave arrives.",
+                        20,
+                        "major",
+                        List.of(new PatchOp.EffectEntry("domain_modifier", "food", -0.05, 20))
+                )
+        );
+
+        DirectorRefineryPlanner.DirectorValidationResult result = planner.validateAndRepair(request, invalidCandidate);
+
+        assertTrue(result.fallbackUsed());
+        assertEquals(1, result.retriesUsed());
+        DirectorPipelineTelemetry.Snapshot snapshot = telemetry.snapshot();
+        assertEquals(1, snapshot.fallbackCount());
+        assertEquals(0, snapshot.validatedOutputsCount());
+    }
+
+    @Test
     void validateAndRepair_ReturnsValidatedResultForValidCandidate() {
         DirectorPipelineTelemetry telemetry = new DirectorPipelineTelemetry();
         DirectorRefineryPlanner planner = new DirectorRefineryPlanner(true, 2, telemetry);
@@ -146,6 +172,30 @@ class DirectorRefineryPlannerTest {
                 "req-director",
                 321L,
                 tick,
+                Goal.SEASON_DIRECTOR_CHECKPOINT,
+                snapshot,
+                null
+        );
+    }
+
+    private PatchRequest directorRequestWithActiveMajorBeat() {
+        ObjectNode director = objectMapper.createObjectNode();
+        director.put("colonyPopulation", 2);
+        director.put("beatCooldownRemainingTicks", 0);
+        director.putArray("activeBeats")
+                .addObject()
+                .put("beatId", "BEAT_MAJOR_1")
+                .put("severity", "major")
+                .put("remainingTicks", 8);
+
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        snapshot.set("director", director);
+
+        return new PatchRequest(
+                "v1",
+                "req-director-major",
+                321L,
+                128L,
                 Goal.SEASON_DIRECTOR_CHECKPOINT,
                 snapshot,
                 null

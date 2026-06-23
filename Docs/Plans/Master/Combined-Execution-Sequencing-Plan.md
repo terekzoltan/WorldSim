@@ -2465,7 +2465,7 @@ Audit hardening source:
 > Tools-Refinery Migration Plan > Phase TR3
 
 - ✅ **TR3-A** Imperative validator deprecation plan (Track D)
-- ⬜ **TR3-B** Fallback boundary cleanup + paid-live guardrail hardening (Track D)
+- ✅ **TR3-B** Fallback boundary cleanup + paid-live guardrail hardening (Track D)
 - ⬜ **TR3-C** Shared vocabulary + family expansion prep + evidence-schema generalization (Track D, Track B/C consult)
 
 ### Wave 10.5 — Execution Steps
@@ -2484,6 +2484,10 @@ TR3-A closeout:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track D agent | TR3-B | TR3-A ✅ | Fallback cleanup should build on the explicit validator-role classification, tighten paid-live guardrails, and keep operational policy explicit per the Refinery Live SMR Plan; re-read the official Refinery links before changing fallback/formal semantics |
+
+TR3-B implementation closeout:
+- ✅ `TR3-B` implementation completed: deterministic fallback construction moved behind `DirectorDeterministicFallbackPlanner`, `DirectorRefineryPlanner` keeps retry/exhaustion/telemetry responsibility, existing `directorStage:fallback-deterministic` + `directorFallback` warning semantics remain unchanged, campaign fallback behavior remains behind `campaignEnabled`, and `Docs/Plans/Master/Refinery-TR3-Fallback-Boundary-Policy.md` documents the Java vs ScenarioRunner paid-live guardrail boundary. Focused Java fallback/planner/marker tests and full Java suite passed; no C#/Runtime/ScenarioRunner/AI/App/Graphics changes, paid runs, `.problem` migration, `season_boundary` implementation, or new fallback marker vocabulary.
+- ✅ `TR3-B` accepted GREEN after Meta step-review + external Swarm review: no findings discovered, forbidden scope/no-paid/no-marker checks were clean, and TR3-C is now unblocked.
 
 **Step 3 — opens when TR3-B ✅**
 

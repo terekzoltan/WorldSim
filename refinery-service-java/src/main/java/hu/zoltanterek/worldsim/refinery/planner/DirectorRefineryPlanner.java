@@ -13,17 +13,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import hu.zoltanterek.worldsim.refinery.model.Goal;
 import hu.zoltanterek.worldsim.refinery.model.PatchOp;
 import hu.zoltanterek.worldsim.refinery.model.PatchRequest;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorDesign;
-import hu.zoltanterek.worldsim.refinery.planner.director.DirectorCampaignOpFactory;
+import hu.zoltanterek.worldsim.refinery.planner.director.DirectorDeterministicFallbackPlanner;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorModelValidator;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorPipelineTelemetry;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorRuntimeFacts;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorSnapshotMapper;
 import hu.zoltanterek.worldsim.refinery.planner.director.DirectorValidationOutcome;
-import hu.zoltanterek.worldsim.refinery.util.DeterministicIds;
 
 @Component
 public class DirectorRefineryPlanner {
@@ -35,6 +33,7 @@ public class DirectorRefineryPlanner {
     private final boolean campaignEnabled;
     private final DirectorPipelineTelemetry telemetry;
     private final DirectorSnapshotMapper snapshotMapper = new DirectorSnapshotMapper();
+    private final DirectorDeterministicFallbackPlanner fallbackPlanner = new DirectorDeterministicFallbackPlanner();
     private final DirectorModelValidator validator;
 
     @Autowired
@@ -170,7 +169,7 @@ public class DirectorRefineryPlanner {
             }
         }
 
-        List<PatchOp> fallback = buildDeterministicFallback(request, facts, campaignEnabled);
+        List<PatchOp> fallback = fallbackPlanner.build(request, facts, campaignEnabled);
         warnings.add("directorFallback deterministic fallback planner output was used.");
         telemetry.recordFallback(maxRetries);
         logger.error(
@@ -211,54 +210,6 @@ public class DirectorRefineryPlanner {
             return treaty.opId();
         }
         return null;
-    }
-
-    private static List<PatchOp> buildDeterministicFallback(PatchRequest request, DirectorRuntimeFacts facts, boolean campaignEnabled) {
-        List<PatchOp> fallback = new ArrayList<>(2);
-
-        if (facts.beatCooldownTicks() <= 0) {
-            String beatId = "BEAT_FALLBACK_" + DeterministicIds.shortStableId(
-                    request.seed(),
-                    request.tick(),
-                    Goal.SEASON_DIRECTOR_CHECKPOINT.name(),
-                    "fallback_beat"
-            );
-            String storyOpId = DeterministicIds.opId(
-                    request.seed(),
-                    request.tick(),
-                    Goal.SEASON_DIRECTOR_CHECKPOINT.name(),
-                    "addStoryBeat",
-                    beatId
-            );
-
-            fallback.add(new PatchOp.AddStoryBeat(
-                    storyOpId,
-                    beatId,
-                    "Season pressure rises; hold lines and preserve reserves.",
-                    DirectorDesign.MIN_STORY_DURATION + 11
-            ));
-        }
-
-        if (facts.colonyCount() > 0) {
-            String directive = "PrioritizeFood";
-            String directiveOpId = DeterministicIds.opId(
-                    request.seed(),
-                    request.tick(),
-                    Goal.SEASON_DIRECTOR_CHECKPOINT.name(),
-                    "setColonyDirective",
-                    "fallback:colony0:" + directive
-            );
-            fallback.add(new PatchOp.SetColonyDirective(
-                    directiveOpId,
-                    0,
-                    directive,
-                    DirectorDesign.MIN_DIRECTIVE_DURATION + 17
-            ));
-        }
-
-        DirectorCampaignOpFactory.buildDeterministicCampaignOp(request, campaignEnabled).ifPresent(fallback::add);
-
-        return fallback;
     }
 
     public record DirectorValidationResult(

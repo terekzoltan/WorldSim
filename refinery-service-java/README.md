@@ -110,6 +110,18 @@ Marker and telemetry semantics for Wave 8.6:
 
 Detailed Track B handoff for W8.6-D1: `Docs/Plans/Master/Wave8.6-W8.6-D1-Track-D-Policy-Lock-Handoff.md`.
 
+## TR3-B Fallback Boundary Policy
+
+TR3-B keeps deterministic fallback conservative and explicit. The fallback is an operational safety net after validation/retry exhaustion, not solver-backed validation and not a second hidden planner.
+
+- Fallback construction is isolated in `DirectorDeterministicFallbackPlanner`.
+- `DirectorRefineryPlanner` still owns retry exhaustion, fallback invocation, warnings, and telemetry.
+- Existing response truth is unchanged: `directorStage:fallback-deterministic` plus the `directorFallback` warning identify fallback output.
+- No new fallback explain marker vocabulary is introduced in TR3-B.
+- Paid-run preset, cap, rehearsal, scheduling, and artifact guardrails remain ScenarioRunner/Track B responsibilities.
+
+Detailed policy: `Docs/Plans/Master/Refinery-TR3-Fallback-Boundary-Policy.md`.
+
 ## Director Live Smoke Notes (Wave 6.1)
 
 This older smoke profile is not a Wave 8.6 paid preset recipe. For paid retry caps, capture policy, and solver observability expectations, use the Wave 8.6 policy section above and the W8.6-D1 handoff.
