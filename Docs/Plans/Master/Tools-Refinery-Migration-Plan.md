@@ -26,6 +26,8 @@ Before any task that creates or modifies refinery-related artifacts, the impleme
 1. `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md`
 2. every external official link listed in that guide's `Official References` section
 
+This is a current-session requirement: do not treat prior memory, extracted snippets, or secondary plan summaries as a substitute for opening the guide and the official links again before refinery/model work.
+
 This rule applies to:
 - Refinery model files
 - Java refinery-service implementation files

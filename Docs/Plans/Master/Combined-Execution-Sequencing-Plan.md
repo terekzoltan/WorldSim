@@ -38,6 +38,8 @@ Reference format: `Director Plan > Phase X Sprint Y > S1-A` or `Combat Plan > Ph
 
 Sequencing authority note: this Combined plan, `ops/PROJECT_STATE.md`, and accepted evidence notes are the active workflow authority. If a source plan's status header is stale, use the latest Combined execution rows, progress notes, and accepted evidence summaries for launch decisions.
 
+Refinery pre-read rule: any implementation, review, planning, or closeout step that touches refinery/model artifacts, solver semantics, Java refinery-service behavior, bridge/runtime semantics, or refinery evidence policy must first read `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` and open every official external Refinery link listed in its `Official References` section. Do not rely on remembered summaries or this Combined note alone.
+
 Wave insertion rule: when adding any new wave or post-wave slice to this Combined plan, optimize for maximum safe parallelism only after preserving sequential clarity. Every new step must state its prerequisites, owner, expected handoff, acceptance/evidence gate, and exactly which later step it unlocks. If parallelization would blur dependency truth, ownership, proof source-of-truth, or closeout responsibility, split the work into smaller steps, serialize it, or place it behind an explicit gate instead of forcing concurrency.
 
 Status legend: `⬜` = pending, `🔄` = ongoing, `✅` = done, `❌` = cancelled.
@@ -2462,7 +2464,7 @@ Audit hardening source:
 
 > Tools-Refinery Migration Plan > Phase TR3
 
-- ⬜ **TR3-A** Imperative validator deprecation plan (Track D)
+- ✅ **TR3-A** Imperative validator deprecation plan (Track D)
 - ⬜ **TR3-B** Fallback boundary cleanup + paid-live guardrail hardening (Track D)
 - ⬜ **TR3-C** Shared vocabulary + family expansion prep + evidence-schema generalization (Track D, Track B/C consult)
 
@@ -2472,22 +2474,25 @@ Audit hardening source:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | TR3-A | Wave 8.5 ✅ + Wave 10 ✅ | Audit/classification should happen after the first solver-backed slice and the current combat/campaign surface both stop moving |
+| Track D agent | TR3-A | Wave 8.5 ✅ + Wave 10 ✅ | Audit/classification should happen after the first solver-backed slice and the current combat/campaign surface both stop moving; mandatory pre-read: `Tools-Refinery-Agent-Guide.md` plus its official Refinery links |
+
+TR3-A closeout:
+- ✅ `TR3-A` accepted GREEN: `Docs/Plans/Master/Refinery-TR3-Validator-Responsibility-Matrix.md` classifies `INV-01` through `INV-20` plus planner/fallback orchestration responsibilities without retiring validators or changing behavior. `DirectorDesign.java` only gained a comment breadcrumb. Focused validator/planner tests and full Java suite passed; forbidden C#/Runtime/ScenarioRunner/AI/App/Graphics scope check was clean. Next step: `TR3-B` fallback boundary cleanup + paid-live guardrail hardening.
 
 **Step 2 — opens when TR3-A ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | TR3-B | TR3-A ✅ | Fallback cleanup should build on the explicit validator-role classification, tighten paid-live guardrails, and keep operational policy explicit per the Refinery Live SMR Plan |
+| Track D agent | TR3-B | TR3-A ✅ | Fallback cleanup should build on the explicit validator-role classification, tighten paid-live guardrails, and keep operational policy explicit per the Refinery Live SMR Plan; re-read the official Refinery links before changing fallback/formal semantics |
 
 **Step 3 — opens when TR3-B ✅**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track D agent | TR3-C | TR3-B ✅ | Shared/common vocabulary prep should happen after the transitional boundaries and fallback responsibilities are explicit, including how refinery evidence can generalize beyond director-only families |
+| Track D agent | TR3-C | TR3-B ✅ | Shared/common vocabulary prep should happen after the transitional boundaries and fallback responsibilities are explicit, including how refinery evidence can generalize beyond director-only families; re-read the official Refinery links before family/vocabulary design |
 
 Wave 10.5 policy note:
-- Any task in this wave that creates, edits, or reviews refinery/model artifacts or convergence policy requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there.
+- Any task in this wave that creates, edits, or reviews refinery/model artifacts or convergence policy requires reading `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` first, including the external official links referenced there. This is mandatory for implementers and reviewers, and must be refreshed in the current session before relying on Refinery semantics.
 - `Docs/Plans/Master/Refinery-Live-SMR-Plan.md` remains the detailed operational source of truth for refinery headless lanes; Combined only records ownership, gates, and wave placement.
 
 TR3 audit gates:

@@ -19,8 +19,11 @@ Until Wave 10.5 is explicitly opened by Combined and `ops/PROJECT_STATE.md`, eve
 Required pre-reads:
 - `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md`
 - `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md`
+- every official external Refinery link listed in `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` under `Official References`
 - `Docs/Plans/Master/Refinery-Live-SMR-Plan.md`
 - `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`
+
+Refinery link rule: do not start TR3 implementation, review, or closeout from memory alone. Re-open the agent guide and its official Refinery links in the current session before changing validator responsibility, `.problem` artifacts, solver semantics, bridge mapping, vocabulary, or refinery evidence policy.
 
 ## File Ownership Map
 

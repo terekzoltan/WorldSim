@@ -185,6 +185,9 @@ Track D design principles (OnlabRefinery parity):
 - Iterativ feedback loop: invalid candidate -> feedback -> retry -> deterministic fallback.
 - Determinisztikus output policy debugginghoz: ugyanarra a checkpoint inputra reprodukalhato eredmeny.
 
+Track D Refinery pre-read rule:
+- Minden refinery/model artifact, solver-semantika, Java refinery-service, bridge/runtime mapping vagy refinery evidence policy munka elott kotelezo elolvasni a `Docs/Plans/Master/Tools-Refinery-Agent-Guide.md` fajlt, es kulon megnyitni az ottani `Official References` szekcio hivatalos Refinery linkjeit. A lokalis osszefoglalo vagy memoria nem eleg.
+
 
 
 ## Kockazatok es mitigacio
@@ -487,3 +490,4 @@ Entries:
 - `[2026-06-15][Meta] Step10B.5 SMR runtime-cost policy rogzitve - hostile organic + manual lifecycle a recovery decision core, pure organic csak kis context matrix/healthy hostile utan, stress seed-606 sentinelbol indul full 240 run helyett, perf kulon lane lifecycle fix utan, drilldown konzervativ - kovetkezo lepes: Track B/SMR ezt kovesse F3/F6 futtatasoknal`.
 - `[2026-06-20][Meta] Step10B.5/F6 closeout zarva (YELLOW ✅) - hostile organic staged recovery erosen zold (`wave10-organic-hostile-soak-002`: 18/18 launch, 277 launch, 17/18 downstream), manual lifecycle meaningful de `2/18 CampaignRuntimeUnavailable` residual maradt (`wave10-manual-operator-lifecycle-002`); Step10B zarhato YELLOW-kent, residual Step10C manual gap triage-be routolva - kovetkezo lepes: Step10C residual/manual gap triage`.
 - `[2026-06-21][Meta] Wave10 Step10C triage zarva (✅) - docs-only residual/manual gap triage elfogadva: az F6 `CampaignRuntimeUnavailable` 2/18 residual ismert YELLOW limitacio / future Track B-only diagnostic, ha friss evidence blockerre emeli; a manual/readability candidate-ek Track A/B backlog maradnak, Track C nem nyilik, es Wave10.5 TR3-A indithato - kovetkezo lepes: Track D kickoff / Wave10.5 TR3-A`.
+- `[2026-06-23][Meta] Wave10.5 TR3-A status zarva (✅) - validator responsibility matrix elfogadva GREEN: `INV-01..20` + planner/fallback orchestration felelossegek dokumentalva, nincs validator retirement, nincs behavior/.problem/C#/Runtime/ScenarioRunner/AI/App/Graphics valtozas, focused Java + full Java gate zold - kovetkezo lepes: TR3-B fallback boundary cleanup + paid-live guardrail hardening`.

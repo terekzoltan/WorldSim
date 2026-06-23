@@ -71,6 +71,7 @@ public final class DirectorDesign {
     /**
      * Invariant labels are implementation-level validator codes used in runtime feedback.
      * They are not guaranteed to map 1:1 to the Director-Integration-Master-Plan 10.5 table.
+     * TR3 ownership classification lives in Docs/Plans/Master/Refinery-TR3-Validator-Responsibility-Matrix.md.
      */
     public static final String INV_01 = "INV-01"; // supported op types only
     public static final String INV_02 = "INV-02"; // at most one story beat
