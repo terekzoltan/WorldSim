@@ -28,6 +28,7 @@ their execution steps are not retroactively documented — see their proof links
 | **Wave 9 Runtime Campaign Hardening Plan** | `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md` |
 | **Wave 10 Campaign Logistics Hardening Plan** | `Docs/Plans/Master/Wave10-Campaign-Logistics-Hardening-Plan.md` |
 | **Wave 10.5 Refinery TR3 Audit Gates Plan** | `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md` |
+| **Wave 10.6 Coverage Baseline Plan** | `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md` |
 | **Wave 11 Ecology Plan** | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
 | **Wave 11 Ecology Hardening Plan** | `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md` |
 | **Wave 12 Architecture Hardening Plan** | `Docs/Plans/Master/Wave12-Codebase-Architecture-Hardening-Plan.md` |
@@ -2517,6 +2518,89 @@ TR3 audit gates:
 
 ---
 
+## Wave 10.6 - Coverage Baseline And Test Quality (Quality Gate)
+
+Purpose:
+- Create the first project-level line/branch coverage baseline across the C# simulation/refinery stack and the Java refinery service.
+- Measure test protection before Wave11 ecology runtime work starts, without turning coverage percentage into a premature hard gate.
+- Separate line/branch coverage from SMR/manual evidence: coverage identifies blind spots, while SMR/manual evidence still proves scenario behavior and balance.
+
+Source of truth:
+- `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md`
+
+Wave turn-gate:
+- Wave10.6 is `READY` after Wave10.5 TR3-C is accepted GREEN and committed.
+- Wave11 `E11-A` is not blocked by reaching a numeric coverage percentage.
+- Wave11 `E11-A` opens after W10.6-Q4 baseline evidence review, unless Q4 classifies a direct ecology/runtime test-debt item as `blocked-before-wave11`.
+- W10.6-Q5 and optional W10.6-Q6 do not block `E11-A` by default unless Q4/Meta explicitly promotes a finding.
+
+Coverage policy:
+- Baseline only in Wave10.6: no hard CI threshold and no PR/push coverage fail.
+- Later soft thresholds may be designed per module or changed-code surface after stable baseline evidence exists.
+- Raw coverage artifacts live under `.artifacts/coverage/<run-name>/` and are not committed by default.
+- Checked-in evidence should be short README-style summaries, not generated HTML/XML reports.
+
+Human/user assistance:
+- The user can help during W10.6-Q4 by classifying the first coverage gaps, especially whether any ecology-adjacent runtime blind spot should block Wave11.
+- Human/CI-owner approval is required before any W10.6-Q6 CI artifact workflow is added.
+
+### Sprint W10.6-Q: Coverage Baseline Infrastructure (Meta + Track B/D, Track C consult)
+
+- ✅ **W10.6-M1** Coverage strategy lock and plan-review (Meta Coordinator)
+- ⬜ **W10.6-Q1** C# coverage infrastructure - coverlet collector alignment and coverage collection across C# test projects (Track B primary, Track C/D consult)
+- ⬜ **W10.6-Q2** Java coverage infrastructure - JaCoCo report generation for `refinery-service-java` (Track D)
+- ⬜ **W10.6-Q3** Unified local coverage runbook and summary artifact contract (Meta/Track B, Track D consult)
+- ⬜ **W10.6-Q4** First coverage baseline evidence review and gap classification (Meta Coordinator / SMR Analyst style review, user assistance encouraged)
+- ⬜ **W10.6-Q5** Soft threshold and changed-code policy design (Meta Coordinator)
+- ⬜ **W10.6-Q6** Optional manual non-blocking CI coverage artifact upload (`workflow_dispatch` only; no PR/push/scheduled trigger yet)
+
+### Wave 10.6 - Execution Steps
+
+**Step 1 - strategy lock (Meta)**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta Coordinator | W10.6-M1 | Wave10.5 TR3-C ✅ + commit | Accepted plan-review, Combined insertion, state route | Plan reviewed with one critic subagent, baseline-only policy locked, no-hard-gate/no-paid/no-generated-artifact policy explicit | W10.6-Q1 + W10.6-Q2 |
+
+W10.6-M1 closeout:
+- ✅ `W10.6-M1` accepted GREEN: coverage plan reviewed by Meta Coordinator plus one critic subagent. Required edits were folded into `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md`: explicit `WorldSim.RefineryClient.Tests` coverage-policy alignment, first-run restore caveat, Track C consult for `WorldSim.AI.Tests`, and Q6 restricted to optional/manual `workflow_dispatch` only. Next step: W10.6-Q1/Q2 can start in parallel.
+
+**Step 2 - C# and Java coverage infrastructure in parallel**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Track B agent | W10.6-Q1 | W10.6-M1 ✅ | C# coverage collection command/result, package changes, exclusions if any, no generated artifacts staged | Coverlet coverage collection works for relevant C# test projects or exclusions documented; no hard threshold; build/test/`git diff --check` green | W10.6-Q3 |
+| Track D agent | W10.6-Q2 | W10.6-M1 ✅ | Java JaCoCo config/result, report paths, no generated artifacts staged | `refinery-service-java` test + `jacocoTestReport` works; XML generated locally; no hard threshold; no paid/live dependency | W10.6-Q3 |
+
+**Step 3 - unified local runbook after both coverage infrastructures exist**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta/Track B agent | W10.6-Q3 | W10.6-Q1 ✅ + W10.6-Q2 ✅ | Coverage runbook/summary artifact contract and local command sequence | Stable local C# + Java coverage command sequence documented; output paths under `.artifacts/coverage/<run-name>/`; no threshold gate | W10.6-Q4 |
+
+**Step 4 - baseline evidence review before Wave11 runtime work**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta Coordinator / SMR Analyst style review | W10.6-Q4 | W10.6-Q3 ✅ | Checked-in coverage evidence note plus gap classification | First baseline evidence note under `Docs/Evidence/Coverage/...`; raw reports local-only; every major gap classified as `accepted-for-now`, `future-soft-gate`, `test-debt-risk`, or `blocked-before-wave11` | Wave11 `E11-A` unless Q4 blocks; W10.6-Q5 |
+
+**Step 5 - soft policy design after baseline exists**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta Coordinator | W10.6-Q5 | W10.6-Q4 ✅ | Soft-threshold/changed-code policy proposal | No hard CI fail; future promotion criteria explicit; module-specific or changed-code warning policy defined | Optional W10.6-Q6 |
+
+**Step 6 - optional non-blocking CI artifact lane**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta/CI owner | W10.6-Q6 | W10.6-Q4 ✅ + human/CI approval | Manual CI artifact workflow or explicit defer decision | `workflow_dispatch` only if implemented; artifact upload works; no PR/push/scheduled trigger; no coverage threshold fail | Future coverage trend workflow |
+
+**Critical path:** `W10.6-M1 -> (W10.6-Q1 + W10.6-Q2) -> W10.6-Q3 -> W10.6-Q4 -> E11-A`.
+**Parallelism:** Q1 and Q2 may run in parallel after M1 because they touch separate C# and Java tooling surfaces; Q3/Q4 must remain sequential because they consume both outputs.
+
+---
+
 ## Wave 11 - Closed-Loop Ecology Redesign (Ecology Phase 2)
 
 Purpose:
@@ -2532,8 +2616,9 @@ Audit hardening source:
 - `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md`
 
 Wave turn-gate:
-- Wave 11 is `READY` only after Wave 10.5 closeout is `✅`.
-- Reason: the Pre-Wave8 ecology patch was intentionally a current-model stabilizer; the full closed-loop redesign was deferred until after the Wave 10.5 convergence point.
+- Wave 11 is `READY` only after Wave10.6-Q4 first coverage baseline evidence review is `✅`, unless Meta/user explicitly waives the quality lane.
+- Reason: the Pre-Wave8 ecology patch was intentionally a current-model stabilizer; the full closed-loop redesign was deferred until after the Wave 10.5 convergence point, and Wave10.6 now adds a baseline-only test-quality checkpoint before new ecology runtime work.
+- Wave11 readiness is not gated on a numeric coverage percentage. It is gated only on whether Q4 finds direct ecology/runtime test-debt that must be classified as `blocked-before-wave11`.
 
 E11 runtime performance note:
 - Detailed execution plan: `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md`.
@@ -2570,7 +2655,7 @@ E11 runtime performance note:
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | E11-A | Wave 10.5 ✅ | Contract locks the runtime/snapshot fields before model logic or consumers start |
+| Track B agent | E11-A | W10.6-Q4 ✅ | Contract locks the runtime/snapshot fields before model logic or consumers start; no numeric coverage threshold is required |
 
 **Step 2 - plant capacity foundation (Track B)**
 
