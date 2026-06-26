@@ -13,8 +13,34 @@ ModelConstraint(inv_domain_stack_cap).
 ModelConstraint(inv_budget_cap).
 ModelConstraint(inv_no_contradictory_same_domain_modifiers).
 
+MinorSeverity(severity_minor).
+MajorSeverity(severity_major).
+EpicSeverity(severity_epic).
+
 error storyBeatDuringCooldown(RuntimeCheckpointContext ctx, DesignatedOutputArea area, DirectorCheckpoint checkpoint, StoryBeatOutput story) <->
     RuntimeCheckpointContext::checkpoint(ctx, checkpoint),
     DesignatedOutputArea::checkpoint(area, checkpoint),
     DesignatedOutputArea::storyBeatSlot(area, story),
     beatCooldownRemainingTicks(ctx) > 0.
+
+error activeMajorStoryBeatConflict(RuntimeCheckpointContext ctx, DesignatedOutputArea area, DirectorCheckpoint checkpoint, ActiveBeatFact activeBeat, StoryBeatOutput story) <->
+    RuntimeCheckpointContext::checkpoint(ctx, checkpoint),
+    DesignatedOutputArea::checkpoint(area, checkpoint),
+    activeBeats(ctx, activeBeat),
+    ActiveBeatFact::severity(activeBeat, activeSeverity),
+    MajorSeverity(activeSeverity),
+    ActiveBeatFact::remainingTicks(activeBeat) > 0,
+    DesignatedOutputArea::storyBeatSlot(area, story),
+    StoryBeatOutput::severity(story, storySeverity),
+    MajorSeverity(storySeverity).
+
+error activeEpicStoryBeatConflict(RuntimeCheckpointContext ctx, DesignatedOutputArea area, DirectorCheckpoint checkpoint, ActiveBeatFact activeBeat, StoryBeatOutput story) <->
+    RuntimeCheckpointContext::checkpoint(ctx, checkpoint),
+    DesignatedOutputArea::checkpoint(area, checkpoint),
+    activeBeats(ctx, activeBeat),
+    ActiveBeatFact::severity(activeBeat, activeSeverity),
+    EpicSeverity(activeSeverity),
+    ActiveBeatFact::remainingTicks(activeBeat) > 0,
+    DesignatedOutputArea::storyBeatSlot(area, story),
+    StoryBeatOutput::severity(story, storySeverity),
+    EpicSeverity(storySeverity).

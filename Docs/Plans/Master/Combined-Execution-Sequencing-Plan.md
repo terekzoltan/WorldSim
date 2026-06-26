@@ -2547,8 +2547,8 @@ Human/user assistance:
 - ✅ **RFM-M1** Governance lock and language correction (Meta Coordinator)
 - ✅ **RFM-D1** Formal coverage inventory (Track D)
 - ✅ **RFM-D2** Runtime-fact authority and fixture corpus (Track D primary, Track B consult)
-- ⬜ **RFM-D3** Director-first predicate promotion pack (Track D)
-- ⬜ **RFM-D4** Differential solver-vs-validator harness (Track D)
+- ✅ **RFM-D3** Director-first predicate promotion pack (Track D)
+- ✅ **RFM-D4** Differential solver-vs-validator harness (Track D)
 - ⬜ **RFM-V1** Wave10.5 behavior proof pass (Track D primary, Meta/user assist optional)
 - ⬜ **RFM-M2** Closeout and W10.6 unblock decision (Meta Coordinator)
 
@@ -2587,11 +2587,17 @@ RFM-D2 closeout:
 |---------|---------|--------|------------------|---------------------|---------|
 | Track D agent | RFM-D3 | RFM-D1 ✅ + RFM-D2 ✅ | Predicate/error-predicate promotion on highest-risk director rule families | At least one non-trivial multi-rule family beyond cooldown becomes real formal enforcement with negative solver tests and parity/mismatch classification | RFM-D4 |
 
+RFM-D3 closeout:
+- ✅ `RFM-D3` accepted GREEN by Meta/operator approval: active major/epic exclusivity is now a narrow real formal predicate/error-predicate promotion for explicit core story severity against RFM-D2-authorized active beat facts. Java validator guards remain transitional/backstop, and budget/effect/domain/campaign/causal/ScenarioRunner/C#/Runtime/AI/App/Graphics scope remains unopened.
+
 **Step 5 - differential drift harness (Track D)**
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
 |---------|---------|--------|------------------|---------------------|---------|
 | Track D agent | RFM-D4 | RFM-D2 ✅ + RFM-D3 ✅ | Deterministic solver-vs-validator-vs-bridge mismatch report | Unsupported and divergent regions are explicit; gate no longer relies on Java-only self-confirmation | RFM-M2 |
+
+RFM-D4 closeout:
+- ✅ `RFM-D4` accepted GREEN by Meta re-review: `DirectorRefineryDifferentialHarnessTest` is a Track D Java test-owned deterministic differential harness comparing Java validator, core solver, and validated-output bridge outcomes. It covers accepted core parity, covered formal+validator rejections, formal-rejects-validator-accepts drift, validator-rejects-formal-accepts drift, validator repair-only/transitional drift, and explicit unsupported-by-formal categories for nested effects, directive biases, campaign ops, and causal chains. The prior YELLOW gap was fixed with an invalid-directive baseline case plus branch precondition asserts. No C# runtime, ScenarioRunner/SMR, paid/live, runtime-visible diagnostic, or new predicate-promotion scope was opened.
 
 **Step 6 - focused behavior proof for current Wave10.5 slice**
 

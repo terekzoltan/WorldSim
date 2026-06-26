@@ -30,6 +30,9 @@ class BiasOutput {
 }
 
 class Severity.
+class MinorSeverity extends Severity.
+class MajorSeverity extends Severity.
+class EpicSeverity extends Severity.
 class Domain.
 class GoalCategory.
 class DirectiveKind.
