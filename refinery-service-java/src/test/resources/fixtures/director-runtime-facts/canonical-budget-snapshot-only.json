@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-budget-snapshot-only",
+  "seed": 1006,
+  "tick": 640,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 4
+    },
+    "director": {
+      "currentTick": 640,
+      "currentSeason": "Summer",
+      "colonyPopulation": 54,
+      "activeBeats": [],
+      "activeDirectives": [],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 0,
+      "maxInfluenceBudget": 5.0,
+      "remainingInfluenceBudget": 3.125,
+      "lastCheckpointBudgetUsed": 1.875,
+      "lastBudgetCheckpointTick": 640
+    }
+  }
+}

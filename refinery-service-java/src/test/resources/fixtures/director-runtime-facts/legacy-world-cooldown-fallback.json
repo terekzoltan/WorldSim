@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-legacy-world-cooldown-fallback",
+  "seed": 1010,
+  "tick": 1152,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 2,
+      "storyBeatCooldownTicks": 7,
+      "activeBeats": [
+        {
+          "beatId": "BEAT_LEGACY_MINOR",
+          "severity": "minor",
+          "remainingTicks": 4
+        }
+      ],
+      "activeDirectives": [
+        {
+          "colonyId": 1,
+          "directive": "PrioritizeWood"
+        }
+      ]
+    }
+  }
+}

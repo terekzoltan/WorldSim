@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-minimal",
+  "seed": 1001,
+  "tick": 128,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "width": 128,
+      "height": 128,
+      "colonyCount": 4
+    },
+    "director": {
+      "currentTick": 128,
+      "currentSeason": "Spring",
+      "effectiveOutputMode": "unknown",
+      "effectiveOutputModeSource": "unknown",
+      "stage": "not_triggered",
+      "colonyPopulation": 47,
+      "foodReservesPct": 0.65,
+      "moraleAvg": 0.71,
+      "economyOutput": 1.2,
+      "activeBeats": [],
+      "activeDirectives": [],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 0,
+      "maxInfluenceBudget": 5.0,
+      "remainingInfluenceBudget": 5.0,
+      "lastCheckpointBudgetUsed": 0.0,
+      "lastBudgetCheckpointTick": 128,
+      "dampeningFactor": 1.0,
+      "activeDomainModifiers": [],
+      "activeGoalBiases": []
+    }
+  }
+}

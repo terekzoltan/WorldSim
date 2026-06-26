@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-active-directive",
+  "seed": 1005,
+  "tick": 512,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 4
+    },
+    "director": {
+      "currentTick": 512,
+      "currentSeason": "Spring",
+      "colonyPopulation": 53,
+      "activeBeats": [],
+      "activeDirectives": [
+        {
+          "colonyId": 2,
+          "directive": "PrioritizeFood",
+          "remainingTicks": 24
+        }
+      ],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 0,
+      "remainingInfluenceBudget": 4.0
+    }
+  }
+}

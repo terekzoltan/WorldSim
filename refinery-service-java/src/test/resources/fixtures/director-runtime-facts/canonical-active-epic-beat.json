@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-active-epic-beat",
+  "seed": 1004,
+  "tick": 420,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 4
+    },
+    "director": {
+      "currentTick": 420,
+      "currentSeason": "Winter",
+      "colonyPopulation": 49,
+      "activeBeats": [
+        {
+          "beatId": "BEAT_EPIC_RFM_D2",
+          "severity": "Epic",
+          "remainingTicks": 45
+        }
+      ],
+      "activeDirectives": [],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 0,
+      "remainingInfluenceBudget": 2.25
+    }
+  }
+}

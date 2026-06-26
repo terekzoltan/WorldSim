@@ -10,6 +10,8 @@ TR3-A classifies the current director imperative validator surface so later TR3 
 
 TR3-A implements only the validator responsibility matrix slice from `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md`. Task 1, Task 3, Task 4, Task 5, and Task 6 remain later TR3 work unless Meta opens them separately.
 
+Later formal-fidelity inventory: `Docs/Plans/Master/Refinery-Formal-Coverage-And-Fidelity-Matrix.md` deepens this historical ownership matrix with current formal-strength classifications. This note is a pointer only; it does not rewrite TR3-A classifications.
+
 ## Scope Guardrails
 
 - No C# bridge/client/adapter/ScenarioRunner changes in TR3-A.

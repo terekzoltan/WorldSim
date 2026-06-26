@@ -1,8 +1,8 @@
 # Wave 10.6 Coverage Baseline And Test Quality Plan
 
-Status: Meta-reviewed, accepted for Combined insertion
+Status: Meta-reviewed, accepted for Combined insertion; W10.6-Q1/Q2 currently blocked by pre-W10.6 refinery fidelity gate
 Owner: Meta Coordinator primary, Track B/D implementation owners by slice
-Placement: Proposed post-Wave10.5 quality wave before Wave11 `E11-A`
+Placement: Post-fidelity quality wave after the pre-W10.6 refinery model fidelity gate and before Wave11 `E11-A`
 
 ## Purpose
 

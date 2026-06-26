@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-active-major-beat",
+  "seed": 1003,
+  "tick": 360,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 4
+    },
+    "director": {
+      "currentTick": 360,
+      "currentSeason": "Autumn",
+      "colonyPopulation": 50,
+      "activeBeats": [
+        {
+          "beatId": "BEAT_MAJOR_RFM_D2",
+          "severity": "Major",
+          "remainingTicks": 30
+        }
+      ],
+      "activeDirectives": [],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 0,
+      "remainingInfluenceBudget": 3.75
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-causal-context-present-not-consumed",
+  "seed": 1009,
+  "tick": 1024,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 4
+    },
+    "director": {
+      "currentTick": 1024,
+      "currentSeason": "Spring",
+      "colonyPopulation": 57,
+      "foodReservesPct": 0.42,
+      "moraleAvg": 0.64,
+      "economyOutput": 1.15,
+      "activeBeats": [],
+      "activeDirectives": [],
+      "pendingCausalChains": [
+        {
+          "parentBeatId": "BEAT_CAUSAL_PARENT",
+          "status": "pending",
+          "conditionSummary": "foodReservesPct < 0.5",
+          "followUpBeatId": "BEAT_CAUSAL_FOLLOWUP",
+          "followUpSummary": "Escalate food support",
+          "remainingWindowTicks": 80,
+          "triggerCount": 0,
+          "lastFailureMessage": ""
+        }
+      ],
+      "beatCooldownRemainingTicks": 0,
+      "remainingInfluenceBudget": 4.75
+    }
+  }
+}

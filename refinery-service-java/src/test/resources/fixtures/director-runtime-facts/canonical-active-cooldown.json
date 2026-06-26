@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-active-cooldown",
+  "seed": 1002,
+  "tick": 240,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 4,
+      "storyBeatCooldownTicks": 99
+    },
+    "director": {
+      "currentTick": 240,
+      "currentSeason": "Summer",
+      "colonyPopulation": 52,
+      "activeBeats": [],
+      "activeDirectives": [],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 12,
+      "remainingInfluenceBudget": 4.5
+    }
+  }
+}

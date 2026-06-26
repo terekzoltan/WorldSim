@@ -28,6 +28,7 @@ their execution steps are not retroactively documented — see their proof links
 | **Wave 9 Runtime Campaign Hardening Plan** | `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md` |
 | **Wave 10 Campaign Logistics Hardening Plan** | `Docs/Plans/Master/Wave10-Campaign-Logistics-Hardening-Plan.md` |
 | **Wave 10.5 Refinery TR3 Audit Gates Plan** | `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md` |
+| **Pre-W10.6 Refinery Model Fidelity Plan** | `Docs/Plans/Master/Pre-W10.6-Refinery-Model-Fidelity-And-Validation-Assurance-Plan.md` |
 | **Wave 10.6 Coverage Baseline Plan** | `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md` |
 | **Wave 11 Ecology Plan** | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
 | **Wave 11 Ecology Hardening Plan** | `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md` |
@@ -2518,6 +2519,97 @@ TR3 audit gates:
 
 ---
 
+## Pre-W10.6 - Refinery Model Fidelity And Validation Assurance (Hard Governance Gate)
+
+Purpose:
+- Treat Refinery model fidelity as a first-class governance concern before more quality/tooling work or new runtime waves continue.
+- Expose which director semantics are really solver-backed and which remain transitional Java validation.
+- Prevent false confidence about the formal validity of LLM-directed world interventions.
+
+Source of truth:
+- `Docs/Plans/Master/Pre-W10.6-Refinery-Model-Fidelity-And-Validation-Assurance-Plan.md`
+
+Turn-gate:
+- This interrupt gate activates after Wave10.5 TR3-C is accepted GREEN and committed, and after W10.6-M1 planning is already complete.
+- W10.6-Q1 and W10.6-Q2 are blocked until `RFM-M2` closes this gate.
+- The gate is hard governance, not a demand to finish the ultimate solver-complete model before any other work.
+
+Priority policy:
+- Marker-only `.problem` rows do not count as real formal coverage.
+- Transitional Java validator behavior must not be described as the final formal truth layer.
+- New director/model semantics may not expand casually while this gate is open.
+
+Human/user assistance:
+- User/manual help is especially useful during `RFM-V1`, where current Wave10.5 director behavior needs focused proof beyond static review.
+
+### Sprint RFM: Director-First Refinery Fidelity Hardening
+
+- ✅ **RFM-M1** Governance lock and language correction (Meta Coordinator)
+- ✅ **RFM-D1** Formal coverage inventory (Track D)
+- ✅ **RFM-D2** Runtime-fact authority and fixture corpus (Track D primary, Track B consult)
+- ⬜ **RFM-D3** Director-first predicate promotion pack (Track D)
+- ⬜ **RFM-D4** Differential solver-vs-validator harness (Track D)
+- ⬜ **RFM-V1** Wave10.5 behavior proof pass (Track D primary, Meta/user assist optional)
+- ⬜ **RFM-M2** Closeout and W10.6 unblock decision (Meta Coordinator)
+
+### Pre-W10.6 - Execution Steps
+
+**Step 1 - governance interrupt insertion (Meta)**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta Coordinator | RFM-M1 | Wave10.5 TR3-C ✅ + commit + W10.6-M1 ✅ | Accepted plan-review, Combined insertion, state route, mandatory-doc priority note | Plan reviewed, hard governance gate inserted, W10.6-Q1/Q2 explicitly blocked, state/docs updated | RFM-D1 |
+
+RFM-M1 closeout:
+- ✅ `RFM-M1` accepted GREEN: this fidelity concern is now explicitly treated as a pre-W10.6 hard governance gate. W10.6-M1 remains complete, but W10.6-Q1/Q2 are paused until `RFM-M2`.
+
+**Step 2 - truth inventory first (Track D)**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Track D agent | RFM-D1 | RFM-M1 ✅ | Formal coverage matrix showing real formal predicates vs marker-only vs transitional Java guards vs bridge/runtime guards | New matrix doc accepted; highest-risk gaps explicit; no marker-only rule overclaimed as formal | RFM-D2 + RFM-V1; RFM-D3 only after RFM-D2 ✅ |
+
+RFM-D1 implementation closeout:
+- ✅ `RFM-D1` implementation completed as docs/inventory evidence only: `Docs/Plans/Master/Refinery-Formal-Coverage-And-Fidelity-Matrix.md` classifies director semantic families by real formal predicate/error predicate, marker-only artifact row, transitional Java guard, bridge/parser/extractor guard, runtime application guard, observability-only marker, and unsupported solver-sidecar status. The matrix explicitly includes `DirectorCorePatchAssertionsMapper` and `DirectorSolverObservability`, separates mapped runtime facts from authoritative runtime facts, and records highest-risk gaps for RFM-D2/RFM-D3 without changing Java, `.problem`, C#, runtime, ScenarioRunner, AI, App, or Graphics semantics. Next gate: RFM-D1 review/acceptance, then RFM-D2 + RFM-V1 can open per sequencing.
+
+**Step 3 - runtime-fact authority after inventory (Track D + Track B consult)**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Track D agent | RFM-D2 | RFM-D1 ✅ | Runtime-fact authority note, C#-originated fixture/sample corpus, mapper parity tests | Java runtime layer is tied to C#-authority fixtures; drift cases fail clearly; Track B consult deliverable is explicit | RFM-D3 + RFM-D4 |
+
+RFM-D2 closeout:
+- ✅ `RFM-D2` accepted GREEN by Meta step-review: Track B consult was consumed, `Docs/Plans/Master/Refinery-RFM-D2-Runtime-Fact-Authority-And-Fixtures.md` records canonical C# authority fields, request budget precedence, transitional fallbacks, campaign config ownership, must-fail drift cases, and verification scope. Java full `PatchRequest` fixture corpus was added under `refinery-service-java/src/test/resources/fixtures/director-runtime-facts/`, with dedicated mapper fixture tests in `DirectorRuntimeFactsFixtureTest` covering canonical current-shape facts, budget precedence, active beat/directive preservation, legacy fallback compatibility, and canonical drift detection. The previous severity-casing review blocker was fixed (`Major`/`Epic` C# snapshot casing with normalized Java facts), focused mapper/fixture tests and full Java suite are green, and no C# runtime, `.problem`, ScenarioRunner, AI, App, or Graphics changes were introduced.
+
+**Step 4 - promote real formal rules, not easy markers (Track D)**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Track D agent | RFM-D3 | RFM-D1 ✅ + RFM-D2 ✅ | Predicate/error-predicate promotion on highest-risk director rule families | At least one non-trivial multi-rule family beyond cooldown becomes real formal enforcement with negative solver tests and parity/mismatch classification | RFM-D4 |
+
+**Step 5 - differential drift harness (Track D)**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Track D agent | RFM-D4 | RFM-D2 ✅ + RFM-D3 ✅ | Deterministic solver-vs-validator-vs-bridge mismatch report | Unsupported and divergent regions are explicit; gate no longer relies on Java-only self-confirmation | RFM-M2 |
+
+**Step 6 - focused behavior proof for current Wave10.5 slice**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Track D agent | RFM-V1 | RFM-D1 ✅ | Fixture/live_mock/manual-safe behavior evidence note | Current Wave10.5 director behavior is re-grounded; residuals are routed without overclaiming solver completeness | RFM-M2 |
+
+**Step 7 - unblock or hold W10.6**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta Coordinator | RFM-M2 | RFM-D1 ✅ + RFM-D2 ✅ + RFM-D3 ✅ + RFM-D4 ✅ + RFM-V1 ✅ | Closeout verdict with explicit transitional/formal boundary statement | W10.6-Q1/Q2 either unblocked or held with named blocker(s) | W10.6-Q1 + W10.6-Q2 |
+
+**Critical path:** `RFM-M1 -> RFM-D1 -> RFM-D2 -> RFM-D3 -> RFM-D4 -> RFM-M2`.
+**Parallelism:** `RFM-V1` may run alongside `RFM-D2`/`RFM-D3` once `RFM-D1` exists, but must close before `RFM-M2`.
+
+---
+
 ## Wave 10.6 - Coverage Baseline And Test Quality (Quality Gate)
 
 Purpose:
@@ -2529,7 +2621,9 @@ Source of truth:
 - `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md`
 
 Wave turn-gate:
-- Wave10.6 is `READY` after Wave10.5 TR3-C is accepted GREEN and committed.
+- W10.6-M1 is already complete.
+- W10.6-Q1 and W10.6-Q2 are `NOT READY` until `RFM-M2` is `✅`.
+- Wave10.6 resumes after the pre-W10.6 fidelity interrupt gate closes.
 - Wave11 `E11-A` is not blocked by reaching a numeric coverage percentage.
 - Wave11 `E11-A` opens after W10.6-Q4 baseline evidence review, unless Q4 classifies a direct ecology/runtime test-debt item as `blocked-before-wave11`.
 - W10.6-Q5 and optional W10.6-Q6 do not block `E11-A` by default unless Q4/Meta explicitly promotes a finding.
@@ -2544,13 +2638,13 @@ Human/user assistance:
 - The user can help during W10.6-Q4 by classifying the first coverage gaps, especially whether any ecology-adjacent runtime blind spot should block Wave11.
 - Human/CI-owner approval is required before any W10.6-Q6 CI artifact workflow is added.
 
-### Sprint W10.6-Q: Coverage Baseline Infrastructure (Meta + Track B/D, Track C consult)
+### Sprint W10.6-Q: Coverage Baseline Infrastructure (Meta strategy lock, then Track B/D implementation; Track C consult where noted)
 
 - ✅ **W10.6-M1** Coverage strategy lock and plan-review (Meta Coordinator)
 - ⬜ **W10.6-Q1** C# coverage infrastructure - coverlet collector alignment and coverage collection across C# test projects (Track B primary, Track C/D consult)
 - ⬜ **W10.6-Q2** Java coverage infrastructure - JaCoCo report generation for `refinery-service-java` (Track D)
-- ⬜ **W10.6-Q3** Unified local coverage runbook and summary artifact contract (Meta/Track B, Track D consult)
-- ⬜ **W10.6-Q4** First coverage baseline evidence review and gap classification (Meta Coordinator / SMR Analyst style review, user assistance encouraged)
+- ⬜ **W10.6-Q3** Unified local coverage runbook and summary artifact contract (Track B technical prep, then Meta governance lock; Track D consult)
+- ⬜ **W10.6-Q4** First coverage baseline evidence review and gap classification (SMR Analyst review, then Meta classification; user assistance encouraged)
 - ⬜ **W10.6-Q5** Soft threshold and changed-code policy design (Meta Coordinator)
 - ⬜ **W10.6-Q6** Optional manual non-blocking CI coverage artifact upload (`workflow_dispatch` only; no PR/push/scheduled trigger yet)
 
@@ -2560,29 +2654,42 @@ Human/user assistance:
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
 |---------|---------|--------|------------------|---------------------|---------|
-| Meta Coordinator | W10.6-M1 | Wave10.5 TR3-C ✅ + commit | Accepted plan-review, Combined insertion, state route | Plan reviewed with one critic subagent, baseline-only policy locked, no-hard-gate/no-paid/no-generated-artifact policy explicit | W10.6-Q1 + W10.6-Q2 |
+| Meta Coordinator | W10.6-M1 | Wave10.5 TR3-C ✅ + commit | Accepted plan-review, Combined insertion, state route | Plan reviewed with one critic subagent, baseline-only policy locked, no-hard-gate/no-paid/no-generated-artifact policy explicit | Pre-W10.6 RFM gate; W10.6-Q1/Q2 only after RFM-M2 ✅ |
 
 W10.6-M1 closeout:
-- ✅ `W10.6-M1` accepted GREEN: coverage plan reviewed by Meta Coordinator plus one critic subagent. Required edits were folded into `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md`: explicit `WorldSim.RefineryClient.Tests` coverage-policy alignment, first-run restore caveat, Track C consult for `WorldSim.AI.Tests`, and Q6 restricted to optional/manual `workflow_dispatch` only. Next step: W10.6-Q1/Q2 can start in parallel.
+- ✅ `W10.6-M1` accepted GREEN: coverage plan reviewed by Meta Coordinator plus one critic subagent. Required edits were folded into `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md`: explicit `WorldSim.RefineryClient.Tests` coverage-policy alignment, first-run restore caveat, Track C consult for `WorldSim.AI.Tests`, and Q6 restricted to optional/manual `workflow_dispatch` only.
+- Next executable gate is the pre-W10.6 fidelity interrupt (`RFM-D1` through `RFM-M2`). W10.6-Q1/Q2 resume only after `RFM-M2`.
 
 **Step 2 - C# and Java coverage infrastructure in parallel**
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
 |---------|---------|--------|------------------|---------------------|---------|
-| Track B agent | W10.6-Q1 | W10.6-M1 ✅ | C# coverage collection command/result, package changes, exclusions if any, no generated artifacts staged | Coverlet coverage collection works for relevant C# test projects or exclusions documented; no hard threshold; build/test/`git diff --check` green | W10.6-Q3 |
-| Track D agent | W10.6-Q2 | W10.6-M1 ✅ | Java JaCoCo config/result, report paths, no generated artifacts staged | `refinery-service-java` test + `jacocoTestReport` works; XML generated locally; no hard threshold; no paid/live dependency | W10.6-Q3 |
+| Track B agent | W10.6-Q1 | W10.6-M1 ✅ + RFM-M2 ✅ | C# coverage collection command/result, package changes, exclusions if any, no generated artifacts staged | Coverlet coverage collection works for relevant C# test projects or exclusions documented; no hard threshold; build/test/`git diff --check` green | W10.6-Q3 |
+| Track D agent | W10.6-Q2 | W10.6-M1 ✅ + RFM-M2 ✅ | Java JaCoCo config/result, report paths, no generated artifacts staged | `refinery-service-java` test + `jacocoTestReport` works; XML generated locally; no hard threshold; no paid/live dependency | W10.6-Q3 |
 
-**Step 3 - unified local runbook after both coverage infrastructures exist**
-
-| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
-|---------|---------|--------|------------------|---------------------|---------|
-| Meta/Track B agent | W10.6-Q3 | W10.6-Q1 ✅ + W10.6-Q2 ✅ | Coverage runbook/summary artifact contract and local command sequence | Stable local C# + Java coverage command sequence documented; output paths under `.artifacts/coverage/<run-name>/`; no threshold gate | W10.6-Q4 |
-
-**Step 4 - baseline evidence review before Wave11 runtime work**
+**Step 3a - technical coverage runbook preparation after both infrastructures exist**
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
 |---------|---------|--------|------------------|---------------------|---------|
-| Meta Coordinator / SMR Analyst style review | W10.6-Q4 | W10.6-Q3 ✅ | Checked-in coverage evidence note plus gap classification | First baseline evidence note under `Docs/Evidence/Coverage/...`; raw reports local-only; every major gap classified as `accepted-for-now`, `future-soft-gate`, `test-debt-risk`, or `blocked-before-wave11` | Wave11 `E11-A` unless Q4 blocks; W10.6-Q5 |
+| Track B agent | W10.6-Q3 | W10.6-Q1 ✅ + W10.6-Q2 ✅ | Technical coverage runbook draft, local command sequence, artifact paths, and any tool fallback notes | Stable local C# + Java coverage command sequence documented; output paths under `.artifacts/coverage/<run-name>/`; no threshold gate | W10.6-Q3 Meta lock |
+
+**Step 3b - governance lock on the unified runbook**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta Coordinator | W10.6-Q3 | W10.6-Q3 Track B handoff ✅ | Approved artifact contract and governance wording for the unified coverage runbook | Runbook semantics are accepted; generated artifacts remain local-only by policy; no threshold gate is implied | W10.6-Q4 evidence review |
+
+**Step 4a - baseline evidence review before Wave11 runtime work**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| SMR Analyst | W10.6-Q4 | W10.6-Q3 ✅ | Coverage evidence review, gap findings, and recommendation packet | First baseline artifacts are inspected; major gaps are enumerated with evidence and recommended classification | W10.6-Q4 Meta classification |
+
+**Step 4b - gap classification and Wave11 unblock decision input**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| Meta Coordinator | W10.6-Q4 | W10.6-Q4 SMR review ✅ | Checked-in coverage evidence note plus final gap classification | First baseline evidence note under `Docs/Evidence/Coverage/...`; raw reports local-only; every major gap classified as `accepted-for-now`, `future-soft-gate`, `test-debt-risk`, or `blocked-before-wave11` | Wave11 `E11-A` unless Q4 blocks; W10.6-Q5 |
 
 **Step 5 - soft policy design after baseline exists**
 
@@ -2590,13 +2697,19 @@ W10.6-M1 closeout:
 |---------|---------|--------|------------------|---------------------|---------|
 | Meta Coordinator | W10.6-Q5 | W10.6-Q4 ✅ | Soft-threshold/changed-code policy proposal | No hard CI fail; future promotion criteria explicit; module-specific or changed-code warning policy defined | Optional W10.6-Q6 |
 
-**Step 6 - optional non-blocking CI artifact lane**
+**Step 6a - optional CI policy approval**
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
 |---------|---------|--------|------------------|---------------------|---------|
-| Meta/CI owner | W10.6-Q6 | W10.6-Q4 ✅ + human/CI approval | Manual CI artifact workflow or explicit defer decision | `workflow_dispatch` only if implemented; artifact upload works; no PR/push/scheduled trigger; no coverage threshold fail | Future coverage trend workflow |
+| Meta Coordinator | W10.6-Q6 | W10.6-Q4 ✅ + human/CI approval | Explicit go/no-go decision for manual CI artifact lane | CI artifact lane is either approved as optional `workflow_dispatch` only or explicitly deferred | W10.6-Q6 CI implementation |
 
-**Critical path:** `W10.6-M1 -> (W10.6-Q1 + W10.6-Q2) -> W10.6-Q3 -> W10.6-Q4 -> E11-A`.
+**Step 6b - optional non-blocking CI artifact lane implementation**
+
+| Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
+|---------|---------|--------|------------------|---------------------|---------|
+| CI owner | W10.6-Q6 | W10.6-Q6 Meta approval ✅ | Manual CI artifact workflow or explicit defer decision | `workflow_dispatch` only if implemented; artifact upload works; no PR/push/scheduled trigger; no coverage threshold fail | Future coverage trend workflow |
+
+**Critical path:** `W10.6-M1 -> RFM-M2 -> (W10.6-Q1 + W10.6-Q2) -> W10.6-Q3 -> W10.6-Q4 -> E11-A`.
 **Parallelism:** Q1 and Q2 may run in parallel after M1 because they touch separate C# and Java tooling surfaces; Q3/Q4 must remain sequential because they consume both outputs.
 
 ---
@@ -2634,7 +2747,7 @@ E11 runtime performance note:
 - ⬜ **E11-D** Predator lifecycle - energy, hunting, capture gain, starvation, reproduction, and prey-linked capacity (Track B)
 - ⬜ **E11-E** Emergency rescue demotion - existing replenish/rescue becomes explicit debug/safety policy with separate counters (Track B)
 
-### Sprint E11-B: Behavior + Supply + SMR Gates (Track C/B + SMR Analyst)
+### Sprint E11-B: Behavior + Supply, then SMR Gates (Track C and Track B first, then SMR Analyst)
 
 > Wave 11 Ecology Plan > Integration and evidence
 
@@ -2642,12 +2755,12 @@ E11 runtime performance note:
 - ⬜ **E11-G** Plant/meat supply bridge - staged plant/meat production counters and minimal Wave 8+ supply hooks, no domestication/farming scope (Track B)
 - ⬜ **E11-H** SMR ecology invariant pack - hard ecology invariants, ecology-aware drilldown, compare policy, and multi-lane scenario matrix (SMR Analyst, Track B)
 
-### Sprint E11-C: Debug UX + Evidence Closeout (Track A + SMR Analyst)
+### Sprint E11-C: Debug UX, then Evidence Closeout (Track A first, then SMR Analyst/Meta closeout)
 
 > Wave 11 Ecology Plan > Visualization and closeout
 
 - ⬜ **E11-I** Ecology snapshot + debug overlay - fertility/overgrazing, region pressure, animal lifecycle markers, and HUD counters from snapshots (Track A after Track B)
-- ⬜ **E11-J** Evidence closeout + baseline decision - full ecology matrix, manual app smoke, hard invariant gate, and baseline promotion decision (SMR Analyst + Meta Coordinator)
+- ⬜ **E11-J** Evidence closeout + baseline decision - full ecology matrix, manual app smoke, hard invariant gate, and baseline promotion decision (SMR Analyst review, then Meta closeout)
 
 ### Wave 11 - Execution Steps
 
@@ -2681,13 +2794,18 @@ E11 runtime performance note:
 |---------|---------|--------|-------|
 | Track B agent | E11-E | E11-D ✅ | Rescue demotion should happen after both lifecycle paths can stand on their own |
 
-**Step 5 - behavior, supply bridge, and SMR gates open after runtime core**
+**Step 5a - behavior and supply bridge open after lifecycle core**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track C agent | E11-F | E11-C ✅ + E11-D ✅ | AI/behavior consumes lifecycle context and must bound predator-human baseline behavior |
 | Track B agent | E11-G | E11-C ✅ + E11-D ✅ | Plant/meat supply bridge should use real lifecycle outputs, not respawn counters |
-| SMR Analyst | E11-H | E11-E ✅ | Hard ecology invariants must distinguish lifecycle births from emergency rescues |
+
+**Step 5b - SMR invariant pack after rescue demotion**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | E11-H | E11-E ✅ + E11-G ✅ | Hard ecology invariants must distinguish lifecycle births from emergency rescues and consume the real plant/meat supply bridge outputs |
 
 **Step 6 - visual/debug consume after snapshot and invariants are stable**
 
@@ -2695,11 +2813,17 @@ E11 runtime performance note:
 |---------|---------|--------|-------|
 | Track A agent | E11-I | E11-A ✅ + E11-H ✅ | Debug overlay consumes stable snapshot fields and SMR terminology |
 
-**Step 7 - evidence closeout**
+**Step 7a - ecology evidence review**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| SMR Analyst + Meta Coordinator | E11-J | E11-F ✅ + E11-G ✅ + E11-H ✅ + E11-I ✅ | Close only if accepted lanes pass hard ecology invariants without depending on emergency rescue |
+| SMR Analyst | E11-J | E11-F ✅ + E11-G ✅ + E11-H ✅ + E11-I ✅ | Review the full ecology matrix first and prepare the closeout recommendation; do not promote baseline or close the wave in the same row |
+
+**Step 7b - ecology closeout and baseline decision**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator | E11-J | E11-J SMR review ✅ | Close only if accepted lanes pass hard ecology invariants without depending on emergency rescue |
 
 Wave 11 policy note:
 - Predator-human interaction is ON in the Wave 11 baseline lanes, but it must be bounded and observable so the ecology gate does not become an uncontrolled colony-wipe test.
@@ -2755,9 +2879,11 @@ Candidate scope from the 2026-05-12 deep audit:
 | 9 | — | C9-C10 (Phase 5-6 S9-10) | Mostly sequential; Track A only at final campaign overlay consume |
 | 10 | — | C11-C13 (Phase 6-7 S11-13) | Sequential by phase, parallel consumer steps inside phases |
 | 10.5 | TR3 (Tools.Refinery Phase TR3) | — | Director-only convergence after Wave 10 and Wave 8.5 |
-| 11 | — | E11 (Closed-loop ecology redesign) | Runtime-first; Track C/B/SMR after lifecycle core; Track A debug consume late |
+| Pre-W10.6 | RFM (Refinery model fidelity gate) | — | Director-first hard governance interrupt before W10.6-Q1/Q2 |
+| 10.6 | — | W10.6 (Coverage baseline) | Baseline-only quality wave; Q1/Q2 blocked until Pre-W10.6 RFM-M2 closes |
+| 11 | — | E11 (Closed-loop ecology redesign) | Runtime-first; Track C/B parallel only after lifecycle core; SMR invariant pack after rescue demotion |
 
-**Totals:** 18 summary rows after adding Wave 8.7. Full document contains many sprint/addendum headings; epic counts are approximate and should be regenerated before use.
+**Totals:** 20 summary rows after adding Pre-W10.6 and Wave 10.6. Full document contains many sprint/addendum headings; epic counts are approximate and should be regenerated before use.
 
 ---
 
@@ -2776,7 +2902,7 @@ Candidate scope from the 2026-05-12 deep audit:
 | Current Wave 9 audit hardening desired before P6-C | Wave 9 runtime/perf hardening review | `Docs/Plans/Master/Wave9-Runtime-Campaign-Hardening-Plan.md` |
 | Wave 10 complete + Track A polish bandwidth available | Track A visual overhaul refresh triage | `WorldSim.Graphics/Docs/Plans/Track-A-Phase1-Visual-Overhaul-Plan.md` |
 | Wave 10 complete + Wave 8.5 complete | Tools.Refinery TR3 kickoff | `Docs/Plans/Master/Tools-Refinery-Migration-Plan.md` |
-| Wave 10.5 complete + ecology redesign desired | Wave 11 closed-loop ecology kickoff | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
+| W10.6-Q4 ✅ with no `blocked-before-wave11` ecology/runtime test-debt, or explicit Meta/user waiver | Wave 11 closed-loop ecology kickoff | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
 | Architecture hardening promoted by Meta | Wave 12 architecture hardening planning | `Docs/Plans/Master/Wave12-Codebase-Architecture-Hardening-Plan.md` |
 
 Track A deferred-reference note:

@@ -10,6 +10,11 @@ Status:
 - It does not by itself change any current implementation plan or code.
 - Existing WorldSim director code is still mostly imperative Java validation plus C# runtime application, not true `tools.refinery` integration yet.
 
+Current project priority note:
+- The correctness and fidelity of the Refinery model is now treated as a first-class governance concern because the long-term Season Director architecture depends on the Refinery model as the formal gate for LLM-proposed world interventions.
+- Until the dedicated hardening gate closes, do not overstate the current director stack as solver-complete or formal-model-complete.
+- Active hardening source of truth: `Docs/Plans/Master/Pre-W10.6-Refinery-Model-Fidelity-And-Validation-Assurance-Plan.md`.
+
 Mandatory usage rule:
 - Any track/agent/session that plans, reviews, implements, or refactors any refinery-related artifact must read this whole document first.
 - This includes, at minimum: Refinery model files, Java refinery service files, director/refinery plans, adapter/refinery integration code, and any new formal-model or designated-output-area design work.

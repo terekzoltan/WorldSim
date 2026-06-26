@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-legacy-nested-budget-fallback",
+  "seed": 1011,
+  "tick": 1280,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 3
+    },
+    "director": {
+      "currentTick": 1280,
+      "currentSeason": "Summer",
+      "colonyPopulation": 40,
+      "activeBeats": [],
+      "activeDirectives": [],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 0,
+      "remainingInfluenceBudget": 4.0
+    }
+  },
+  "constraints": {
+    "director": {
+      "maxBudget": 1.75
+    }
+  }
+}

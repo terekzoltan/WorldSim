@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-budget-request-override",
+  "seed": 1007,
+  "tick": 768,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 4
+    },
+    "director": {
+      "currentTick": 768,
+      "currentSeason": "Autumn",
+      "colonyPopulation": 55,
+      "activeBeats": [],
+      "activeDirectives": [],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 0,
+      "remainingInfluenceBudget": 3.0
+    }
+  },
+  "constraints": {
+    "maxBudget": 2.5,
+    "outputMode": "both",
+    "director": {
+      "maxBudget": 1.5
+    }
+  }
+}

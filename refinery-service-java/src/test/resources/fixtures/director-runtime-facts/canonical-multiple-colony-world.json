@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "v1",
+  "requestId": "rfm-d2-canonical-multiple-colony-world",
+  "seed": 1008,
+  "tick": 896,
+  "goal": "SEASON_DIRECTOR_CHECKPOINT",
+  "snapshot": {
+    "world": {
+      "colonyCount": 6
+    },
+    "director": {
+      "currentTick": 896,
+      "currentSeason": "Winter",
+      "colonyCount": 1,
+      "colonyPopulation": 72,
+      "activeBeats": [],
+      "activeDirectives": [],
+      "pendingCausalChains": [],
+      "beatCooldownRemainingTicks": 0,
+      "remainingInfluenceBudget": 5.0
+    }
+  }
+}
