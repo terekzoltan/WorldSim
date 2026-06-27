@@ -44,6 +44,8 @@ Refinery pre-read rule: any implementation, review, planning, or closeout step t
 
 Wave insertion rule: when adding any new wave or post-wave slice to this Combined plan, optimize for maximum safe parallelism only after preserving sequential clarity. Every new step must state its prerequisites, owner, expected handoff, acceptance/evidence gate, and exactly which later step it unlocks. If parallelization would blur dependency truth, ownership, proof source-of-truth, or closeout responsibility, split the work into smaller steps, serialize it, or place it behind an explicit gate instead of forcing concurrency.
 
+Step/parallelism interpretation rule: numbered execution steps are the sequence authority. Different numbered steps are sequential unless a later step explicitly says otherwise. Multiple `Session` rows inside the same execution step may run in parallel after their own prerequisites are satisfied, and they are expected to close independently before any later step that depends on all of their outputs starts. If one row depends on another row's output, they must not share the same step; split them into separate numbered steps or add an explicit intra-step dependency gate.
+
 Status legend: `⬜` = pending, `🔄` = ongoing, `✅` = done, `❌` = cancelled.
 
 Turn-gate legend (agent handoff safety):
@@ -2531,16 +2533,16 @@ Source of truth:
 
 Turn-gate:
 - This interrupt gate activates after Wave10.5 TR3-C is accepted GREEN and committed, and after W10.6-M1 planning is already complete.
-- W10.6-Q1 and W10.6-Q2 are blocked until `RFM-M2` closes this gate.
+- `RFM-M2` is closed; W10.6-Q1 and W10.6-Q2 are unblocked for their own turn-gates.
 - The gate is hard governance, not a demand to finish the ultimate solver-complete model before any other work.
 
 Priority policy:
 - Marker-only `.problem` rows do not count as real formal coverage.
 - Transitional Java validator behavior must not be described as the final formal truth layer.
-- New director/model semantics may not expand casually while this gate is open.
+- New director/model semantics may not expand casually without explicit reviewed transitional/formal classification.
 
 Human/user assistance:
-- User/manual help is especially useful during `RFM-V1`, where current Wave10.5 director behavior needs focused proof beyond static review.
+- User/manual help was considered during `RFM-V1`; fixture/live_mock evidence closed the required behavior proof, while manual app smoke remains optional.
 
 ### Sprint RFM: Director-First Refinery Fidelity Hardening
 
@@ -2549,8 +2551,8 @@ Human/user assistance:
 - ✅ **RFM-D2** Runtime-fact authority and fixture corpus (Track D primary, Track B consult)
 - ✅ **RFM-D3** Director-first predicate promotion pack (Track D)
 - ✅ **RFM-D4** Differential solver-vs-validator harness (Track D)
-- ⬜ **RFM-V1** Wave10.5 behavior proof pass (Track D primary, Meta/user assist optional)
-- ⬜ **RFM-M2** Closeout and W10.6 unblock decision (Meta Coordinator)
+- ✅ **RFM-V1** Wave10.5 behavior proof pass (Track D primary, Meta/user assist optional)
+- ✅ **RFM-M2** Closeout and W10.6 unblock decision (Meta Coordinator)
 
 ### Pre-W10.6 - Execution Steps
 
@@ -2561,7 +2563,7 @@ Human/user assistance:
 | Meta Coordinator | RFM-M1 | Wave10.5 TR3-C ✅ + commit + W10.6-M1 ✅ | Accepted plan-review, Combined insertion, state route, mandatory-doc priority note | Plan reviewed, hard governance gate inserted, W10.6-Q1/Q2 explicitly blocked, state/docs updated | RFM-D1 |
 
 RFM-M1 closeout:
-- ✅ `RFM-M1` accepted GREEN: this fidelity concern is now explicitly treated as a pre-W10.6 hard governance gate. W10.6-M1 remains complete, but W10.6-Q1/Q2 are paused until `RFM-M2`.
+- ✅ `RFM-M1` accepted GREEN: this fidelity concern became a pre-W10.6 hard governance gate. W10.6-M1 remained complete, and W10.6-Q1/Q2 were paused until `RFM-M2`; `RFM-M2` is now closed.
 
 **Step 2 - truth inventory first (Track D)**
 
@@ -2605,13 +2607,19 @@ RFM-D4 closeout:
 |---------|---------|--------|------------------|---------------------|---------|
 | Track D agent | RFM-V1 | RFM-D1 ✅ | Fixture/live_mock/manual-safe behavior evidence note | Current Wave10.5 director behavior is re-grounded; residuals are routed without overclaiming solver completeness | RFM-M2 |
 
+RFM-V1 closeout:
+- ✅ `RFM-V1` accepted GREEN by Meta step-review: focused Java and C# fixture support checks passed, mandatory `refinery_fixture` and `refinery_live_mock` ScenarioRunner evidence lanes both exited `0`, reached one applied checkpoint, and recorded zero request/apply failures. Checked-in evidence summary: `Docs/Evidence/SMR/pre-w10.6-rfm-v1-behavior-proof/README.md`. Manual app smoke and `refinery_live_validator` were intentionally not run and are not required for RFM-V1 GREEN; paid/live LLM behavior remains out of scope. This proof re-grounds fixture/live_mock behavior only and does not overclaim solver-backed parity for effects/biases/campaign/causal-chain semantics.
+
 **Step 7 - unblock or hold W10.6**
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
 |---------|---------|--------|------------------|---------------------|---------|
 | Meta Coordinator | RFM-M2 | RFM-D1 ✅ + RFM-D2 ✅ + RFM-D3 ✅ + RFM-D4 ✅ + RFM-V1 ✅ | Closeout verdict with explicit transitional/formal boundary statement | W10.6-Q1/Q2 either unblocked or held with named blocker(s) | W10.6-Q1 + W10.6-Q2 |
 
-**Critical path:** `RFM-M1 -> RFM-D1 -> RFM-D2 -> RFM-D3 -> RFM-D4 -> RFM-M2`.
+RFM-M2 closeout:
+- ✅ `RFM-M2` accepted GREEN: the pre-W10.6 refinery model fidelity interrupt gate is closed. RFM-D1 exposed formal coverage truth, RFM-D2 tied runtime facts to C#-originated fixtures, RFM-D3 promoted active major/epic explicit core story conflicts into real formal error predicates, RFM-D4 made validator/solver/bridge drift and unsupported regions explicit, and RFM-V1 re-grounded current fixture/live_mock behavior with no-paid evidence. Boundary statement: the current director stack is not solver-complete; effects/biases/campaign/causal-chain solver validation, paid/live LLM behavior, manual app smoke, and validator retirement remain unproven/out of scope. Closeout evidence: `Docs/Evidence/SMR/pre-w10.6-rfm-m2-closeout/README.md`. W10.6-Q1/Q2 are unblocked for baseline coverage work under the existing no-threshold/no-generated-artifact policy.
+
+**Critical path:** `RFM-M1 -> RFM-D1 -> RFM-D2 -> RFM-D3 -> RFM-D4 -> RFM-V1 -> RFM-M2`.
 **Parallelism:** `RFM-V1` may run alongside `RFM-D2`/`RFM-D3` once `RFM-D1` exists, but must close before `RFM-M2`.
 
 ---
@@ -2628,8 +2636,8 @@ Source of truth:
 
 Wave turn-gate:
 - W10.6-M1 is already complete.
-- W10.6-Q1 and W10.6-Q2 are `NOT READY` until `RFM-M2` is `✅`.
-- Wave10.6 resumes after the pre-W10.6 fidelity interrupt gate closes.
+- W10.6-Q1 and W10.6-Q2 are unblocked now that `RFM-M2` is `✅`.
+- Wave10.6 resumes after the pre-W10.6 fidelity interrupt gate closeout.
 - Wave11 `E11-A` is not blocked by reaching a numeric coverage percentage.
 - Wave11 `E11-A` opens after W10.6-Q4 baseline evidence review, unless Q4 classifies a direct ecology/runtime test-debt item as `blocked-before-wave11`.
 - W10.6-Q5 and optional W10.6-Q6 do not block `E11-A` by default unless Q4/Meta explicitly promotes a finding.
@@ -2647,8 +2655,8 @@ Human/user assistance:
 ### Sprint W10.6-Q: Coverage Baseline Infrastructure (Meta strategy lock, then Track B/D implementation; Track C consult where noted)
 
 - ✅ **W10.6-M1** Coverage strategy lock and plan-review (Meta Coordinator)
-- ⬜ **W10.6-Q1** C# coverage infrastructure - coverlet collector alignment and coverage collection across C# test projects (Track B primary, Track C/D consult)
-- ⬜ **W10.6-Q2** Java coverage infrastructure - JaCoCo report generation for `refinery-service-java` (Track D)
+- ✅ **W10.6-Q1** C# coverage infrastructure - coverlet collector alignment and coverage collection across C# test projects (Track B primary, Track C/D consult)
+- ✅ **W10.6-Q2** Java coverage infrastructure - JaCoCo report generation for `refinery-service-java` (Track D)
 - ⬜ **W10.6-Q3** Unified local coverage runbook and summary artifact contract (Track B technical prep, then Meta governance lock; Track D consult)
 - ⬜ **W10.6-Q4** First coverage baseline evidence review and gap classification (SMR Analyst review, then Meta classification; user assistance encouraged)
 - ⬜ **W10.6-Q5** Soft threshold and changed-code policy design (Meta Coordinator)
@@ -2664,7 +2672,7 @@ Human/user assistance:
 
 W10.6-M1 closeout:
 - ✅ `W10.6-M1` accepted GREEN: coverage plan reviewed by Meta Coordinator plus one critic subagent. Required edits were folded into `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md`: explicit `WorldSim.RefineryClient.Tests` coverage-policy alignment, first-run restore caveat, Track C consult for `WorldSim.AI.Tests`, and Q6 restricted to optional/manual `workflow_dispatch` only.
-- Next executable gate is the pre-W10.6 fidelity interrupt (`RFM-D1` through `RFM-M2`). W10.6-Q1/Q2 resume only after `RFM-M2`.
+- The pre-W10.6 fidelity interrupt (`RFM-D1` through `RFM-M2`) is closed. W10.6-Q1/Q2 are the next executable coverage infrastructure lanes.
 
 **Step 2 - C# and Java coverage infrastructure in parallel**
 
@@ -2672,6 +2680,12 @@ W10.6-M1 closeout:
 |---------|---------|--------|------------------|---------------------|---------|
 | Track B agent | W10.6-Q1 | W10.6-M1 ✅ + RFM-M2 ✅ | C# coverage collection command/result, package changes, exclusions if any, no generated artifacts staged | Coverlet coverage collection works for relevant C# test projects or exclusions documented; no hard threshold; build/test/`git diff --check` green | W10.6-Q3 |
 | Track D agent | W10.6-Q2 | W10.6-M1 ✅ + RFM-M2 ✅ | Java JaCoCo config/result, report paths, no generated artifacts staged | `refinery-service-java` test + `jacocoTestReport` works; XML generated locally; no hard threshold; no paid/live dependency | W10.6-Q3 |
+
+W10.6-Q1 closeout:
+- ✅ `W10.6-Q1` accepted GREEN by Meta step-review: C# test projects now have aligned `coverlet.collector` `6.0.2` metadata, per-project coverage fallback passed for all six test projects and produced Cobertura XMLs under `.artifacts/coverage/w10-6-q1-dotnet-001/`, build and diff checks passed, and no production/Java/CI/schema/runbook change was introduced. The solution-wide coverage timeout is routed to `W10.6-Q3`: the unified runbook must document the per-project fallback path instead of assuming solution-wide coverage is the stable default. `WorldSim.ArchTests` coverage remains test/tooling-only and should not be interpreted as production module coverage in `W10.6-Q4`.
+
+W10.6-Q2 closeout:
+- ✅ `W10.6-Q2` accepted GREEN by Meta step-review: `refinery-service-java` now has minimal Gradle JaCoCo report generation, `test jacocoTestReport` passed, XML and HTML report paths exist under ignored `build/`, and no threshold, CI, paid/live, `.problem`, validator/fallback/planner, bridge mapping, runtime, ScenarioRunner, C#, App, Graphics, or AI semantic change was introduced. `W10.6-Q3` must define how the native Gradle JaCoCo output is referenced or copied into the unified `.artifacts/coverage/<run-name>/java/` artifact contract.
 
 **Step 3a - technical coverage runbook preparation after both infrastructures exist**
 

@@ -165,7 +165,7 @@ RFM-D3 implementation selected active major/epic exclusivity only after RFM-D2 a
 | `BOTH_ACCEPT_SAME_CORE` | Validator, solver, and validated-output bridge agree on core story/directive fields. | Valid minor story while an unrelated active major beat exists. |
 | `BOTH_REJECT_COVERED_RULE` | Validator rejects and the formal solver path returns `NON_SUCCESS` for a real covered rule. | Cooldown story conflict; active major/epic same-severity story conflicts. |
 | `FORMAL_REJECTS_VALIDATOR_ACCEPTS` | Formal path rejects the explicit core assertion while validator repairs/normalizes the Java patch into an accepted result. | Explicit major story with no effects while an active major beat exists. |
-| `VALIDATOR_REJECTS_FORMAL_ACCEPTS` | Validator rejects a candidate that the current formal core sidecar accepts. | Category exists in harness for drift detection; no promoted RFM-D4 baseline case currently depends on it. |
+| `VALIDATOR_REJECTS_FORMAL_ACCEPTS` | Validator rejects a candidate that the current formal core sidecar accepts. | Deterministic invalid-directive baseline case covers this drift branch with validator rejection, solver success, empty unsupported list, and bridge directive-core output assertions. |
 | `VALIDATOR_REPAIR_ONLY_TRANSITIONAL` | Validator accepts only after Java-held repair/normalization, while formal core output reflects the original core assertion. | Explicit epic story with no effects normalized by validator to minor. |
 | `UNSUPPORTED_BY_FORMAL` | Candidate uses surfaces that are validator/bridge-owned or omitted by the current formal core sidecar. | Nested effects, directive biases, campaign ops, and causal chains. |
 
