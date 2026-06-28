@@ -40,6 +40,7 @@ public sealed class EcologyState
 
     readonly EcologyTileState[,] _tiles;
     readonly EcologyRegionCache _regionCache;
+    EcologyPlantCounters _plantCounters = EcologyPlantCounters.Empty with { EcologyRegionCacheRebuilds = 1 };
 
     EcologyState(int width, int height, int regionSize, EcologyTileState[,] tiles, EcologyRegionCache regionCache)
     {
@@ -57,6 +58,7 @@ public sealed class EcologyState
     public int RegionColumns { get; }
     public int RegionCount => _regionCache.Count;
     public EcologyLifecycleCounters LifecycleCounters { get; } = EcologyLifecycleCounters.Empty;
+    public EcologyPlantCounters PlantCounters => _plantCounters;
 
     public static EcologyState Create(Tile[,] map, int width, int height, int regionSize = DefaultRegionSize)
     {
@@ -109,11 +111,72 @@ public sealed class EcologyState
     public IReadOnlyList<EcologyRegionSnapshot> BuildRegionSnapshots(IEnumerable<Animal> animals, Season season, bool isDroughtActive)
         => _regionCache.BuildSnapshots(animals, season, isDroughtActive, RegionSize, RegionColumns);
 
+    public void ReportPlantHarvested(int x, int y, int harvestedAmount, bool depletedFoodNode)
+        => ApplyTileUpdate(PlantBiomassModel.ApplyHarvest(GetTile(x, y), harvestedAmount, depletedFoodNode));
+
+    public bool IsPlantBiomassRecovering(int x, int y)
+    {
+        var tile = GetTile(x, y);
+        return tile.PlantCapacity > 0f
+            && (tile.PlantBiomass < tile.PlantCapacity || tile.OvergrazingPressure > 0f);
+    }
+
+    public void TickPlantBiomassForRegrowthSpot(int x, int y, float dt, Season season, bool isDroughtActive)
+    {
+        var seasonModifier = EcologyRegionCache.GetSeasonModifier(season);
+        var droughtModifier = isDroughtActive ? 0.75f : 1f;
+        var update = PlantBiomassModel.ApplyGrowth(GetTile(x, y), dt, seasonModifier, droughtModifier);
+        ApplyTileUpdate(update);
+
+        if (!update.GrowthApplied)
+            return;
+
+        _plantCounters = _plantCounters with
+        {
+            PlantGrowthTicks = _plantCounters.PlantGrowthTicks + 1,
+            DroughtPlantPenaltyTicks = update.DroughtReducedGrowth
+                ? _plantCounters.DroughtPlantPenaltyTicks + 1
+                : _plantCounters.DroughtPlantPenaltyTicks,
+            OvergrazedRegionTicks = _regionCache.GetOvergrazingPressure(update.Tile.RegionId) >= 0.25f
+                ? _plantCounters.OvergrazedRegionTicks + 1
+                : _plantCounters.OvergrazedRegionTicks
+        };
+    }
+
+    public void RestorePlantBiomassForFoodNode(int x, int y)
+    {
+        var tile = GetTile(x, y);
+        if (tile.PlantCapacity <= 0f)
+            return;
+
+        var updated = tile with
+        {
+            PlantBiomass = tile.PlantCapacity
+        };
+        ApplyTileUpdate(new PlantBiomassUpdate(
+            updated,
+            updated.PlantBiomass - tile.PlantBiomass,
+            OvergrazingPressureDelta: 0f,
+            GrowthApplied: false,
+            DroughtReducedGrowth: false));
+    }
+
     internal static int GetRegionId(int x, int y, int regionSize, int regionColumns)
     {
         var chunkX = Math.Max(0, x) / Math.Max(1, regionSize);
         var chunkY = Math.Max(0, y) / Math.Max(1, regionSize);
         return chunkY * Math.Max(1, regionColumns) + chunkX;
+    }
+
+    void ApplyTileUpdate(PlantBiomassUpdate update)
+    {
+        var tile = update.Tile;
+        if (tile.X < 0 || tile.Y < 0 || tile.X >= Width || tile.Y >= Height)
+            return;
+
+        _tiles[tile.X, tile.Y] = tile;
+        if (update.BiomassDelta != 0f || update.OvergrazingPressureDelta != 0f)
+            _regionCache.ApplyTileDelta(tile.RegionId, update.BiomassDelta, update.OvergrazingPressureDelta);
     }
 
     static float ComputeFertility(int x, int y, Ground ground)

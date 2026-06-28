@@ -28,14 +28,37 @@ public sealed record EcologyRegionSnapshot(
 
 public sealed class EcologyRegionCache
 {
-    readonly IReadOnlyList<EcologyRegionBaseState> _regions;
+    readonly List<EcologyRegionBaseState> _regions;
+    readonly Dictionary<int, int> _regionIndexById;
 
     public EcologyRegionCache(IReadOnlyList<EcologyRegionBaseState> regions)
     {
         _regions = regions.OrderBy(region => region.RegionId).ToList();
+        _regionIndexById = _regions
+            .Select((region, index) => new { region.RegionId, Index = index })
+            .ToDictionary(entry => entry.RegionId, entry => entry.Index);
     }
 
     public int Count => _regions.Count;
+
+    public void ApplyTileDelta(int regionId, float plantBiomassDelta, float overgrazingPressureDelta)
+    {
+        if (!_regionIndexById.TryGetValue(regionId, out var index))
+            return;
+
+        var region = _regions[index];
+        var tileCount = Math.Max(1, region.LandTileCount + region.WaterTileCount);
+        var biomassTotal = Math.Clamp(region.PlantBiomassTotal + plantBiomassDelta, 0f, region.PlantCapacityTotal);
+        var pressure = Math.Clamp(region.OvergrazingPressure + overgrazingPressureDelta / tileCount, 0f, 1f);
+        _regions[index] = region with
+        {
+            PlantBiomassTotal = biomassTotal,
+            OvergrazingPressure = pressure
+        };
+    }
+
+    public float GetOvergrazingPressure(int regionId)
+        => _regionIndexById.TryGetValue(regionId, out var index) ? _regions[index].OvergrazingPressure : 0f;
 
     public IReadOnlyList<EcologyRegionSnapshot> BuildSnapshots(
         IEnumerable<Animal> animals,
@@ -78,7 +101,7 @@ public sealed class EcologyRegionCache
             .ToList();
     }
 
-    static float GetSeasonModifier(Season season)
+    public static float GetSeasonModifier(Season season)
         => season switch
         {
             Season.Spring => 1.1f,

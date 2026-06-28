@@ -2787,7 +2787,7 @@ E11 runtime performance note:
 > Wave 11 Ecology Plan > Runtime model
 
 - ✅ **E11-A** Ecology state contract - tile fertility, region capacity, initial/default plant biomass, aggregate passive lifecycle counters, and snapshot/export shape (Track B). Per-animal lifecycle fields/state are explicitly deferred to E11-C/E11-D.
-- ⬜ **E11-B** Plant growth + region carrying capacity - deterministic growth, overgrazing, season/drought modifiers, and bounded caches (Track B)
+- ✅ **E11-B** Plant growth + region carrying capacity - deterministic growth, overgrazing, season/drought modifiers, and bounded caches (Track B)
 - ⬜ **E11-C** Herbivore lifecycle - energy, grazing, starvation, reproduction, migration pressure, and no normal respawn dependency (Track B)
 - ⬜ **E11-D** Predator lifecycle - energy, hunting, capture gain, starvation, reproduction, and prey-linked capacity (Track B)
 - ⬜ **E11-E** Emergency rescue demotion - existing replenish/rescue becomes explicit debug/safety policy with separate counters (Track B)
@@ -2823,6 +2823,9 @@ E11-A closeout:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | E11-B | E11-A ✅ | Plant availability and region capacity must exist before animal lifecycle can use them; E11-B must turn E11-A initial/default `PlantBiomass` into dynamic plant-model truth or document any remaining static/default semantics explicitly |
+
+E11-B closeout:
+- ✅ `E11-B` accepted GREEN after Meta + Swarm synthesis and fix pass: dynamic plant biomass model added for the existing food-node/regrowth mutation surface, partial and depleted food harvest now enter bounded plant recovery, regrowth completion restores node+biomass consistency, region biomass/pressure totals update by delta, and overgrazing/drought/season growth behavior is covered by focused tests. Remaining static/default semantics are explicit: background non-food land biomass remains seeded/default until a later plant/lifecycle step introduces broader region/tile growth. No `Animal.cs`, Track C, Track A overlay, ScenarioRunner artifact/invariant, rescue demotion, or food taxonomy scope was introduced. Targeted E11-B/E11-A/PW8/low-cost tests and solution build passed; pre-check SAST `Random` findings in `World.cs` remain accepted as pre-existing/non-E11-B caveats.
 
 **Step 3 - herbivore lifecycle before predator lifecycle (Track B)**
 

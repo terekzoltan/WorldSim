@@ -113,6 +113,11 @@ Cover growth, seasonal modifier, drought modifier, overgrazing reduction, lower/
 
 Plant growth should update by region/tile cache, not by per-animal full-map scans. Any full-map recompute should be a periodic or dirty-cache rebuild path with counters. E11-B must verify that snapshot tile/region biomass values no longer remain stale after harvest/regrowth-relevant plant model updates, or explicitly document any remaining static/default semantics.
 
+E11-B review clarification:
+- E11-B dynamic biomass truth applies to the existing food-node and regrowth mutation surface plus the bounded plant recovery set created by harvest pressure.
+- Background non-food land biomass remains seeded/default unless a later plant/lifecycle step introduces a broader region/tile growth pass; do not treat it as full closed-loop plant ecology proof.
+- E11-B must keep region totals consistent with tile biomass for all mutated tiles.
+
 - [ ] **Step 3: Add cache counters**
 
 Counters:

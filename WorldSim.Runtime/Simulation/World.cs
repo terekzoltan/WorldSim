@@ -472,6 +472,7 @@ namespace WorldSim.Simulation
 
         readonly Random _rng;
         readonly List<(int x, int y, float timer, float target)> _foodRegrowth = new();
+        readonly HashSet<(int x, int y)> _plantBiomassRecovery = new();
         readonly List<string> _recentEvents = new();
         readonly HashSet<int> _houseMilestones = new();
         readonly HashSet<int> _extinctionMilestones = new();
@@ -765,8 +766,14 @@ namespace WorldSim.Simulation
             bool ok = tile.Harvest(need, qty);
             if (!ok) return false;
 
-            if (need == Resource.Food && tile.Node != null && tile.Node.Type == Resource.Food && tile.Node.Amount == 0)
-                RegisterFoodRegrowthSpot(pos.x, pos.y);
+            if (need == Resource.Food && tile.Node != null && tile.Node.Type == Resource.Food)
+            {
+                var depleted = tile.Node.Amount == 0;
+                _ecologyState.ReportPlantHarvested(pos.x, pos.y, qty, depleted);
+                RegisterPlantBiomassRecoverySpot(pos.x, pos.y);
+                if (depleted)
+                    RegisterFoodRegrowthSpot(pos.x, pos.y);
+            }
 
             return true;
         }
@@ -1307,6 +1314,9 @@ namespace WorldSim.Simulation
 
         public EcologyLifecycleCounters BuildEcologyLifecycleCounters()
             => _ecologyState.LifecycleCounters;
+
+        public EcologyPlantCounters BuildEcologyPlantCounters()
+            => _ecologyState.PlantCounters;
 
         internal static bool IsActiveFoodNode(ResourceNode? node)
             => node is { Type: Resource.Food, Amount: > 0 };
@@ -2625,9 +2635,18 @@ namespace WorldSim.Simulation
             _foodRegrowthProgress[(x, y)] = 0f;
         }
 
+        void RegisterPlantBiomassRecoverySpot(int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= Width || y >= Height)
+                return;
+
+            _plantBiomassRecovery.Add((x, y));
+        }
+
         void UpdateFoodRegrowth(float dt)
         {
             float growSpeed = IsDroughtActive ? 0.95f : 1f;
+            UpdatePlantBiomassRecovery(dt);
             for (int i = _foodRegrowth.Count - 1; i >= 0; i--)
             {
                 var spot = _foodRegrowth[i];
@@ -2635,7 +2654,11 @@ namespace WorldSim.Simulation
                 if (spot.timer >= spot.target)
                 {
                     if (_map[spot.x, spot.y].Ground != Ground.Water)
+                    {
                         _map[spot.x, spot.y].ReplaceNode(new ResourceNode(Resource.Food, _rng.Next(2, 7)));
+                        _ecologyState.RestorePlantBiomassForFoodNode(spot.x, spot.y);
+                        _plantBiomassRecovery.Remove((spot.x, spot.y));
+                    }
                     _foodRegrowth.RemoveAt(i);
                     _foodRegrowthProgress.Remove((spot.x, spot.y));
                     continue;
@@ -2643,6 +2666,19 @@ namespace WorldSim.Simulation
 
                 _foodRegrowthProgress[(spot.x, spot.y)] = Math.Clamp(spot.timer / Math.Max(0.0001f, spot.target), 0f, 1f);
                 _foodRegrowth[i] = spot;
+            }
+        }
+
+        void UpdatePlantBiomassRecovery(float dt)
+        {
+            if (_plantBiomassRecovery.Count == 0)
+                return;
+
+            foreach (var spot in _plantBiomassRecovery.ToList())
+            {
+                _ecologyState.TickPlantBiomassForRegrowthSpot(spot.x, spot.y, dt, CurrentSeason, IsDroughtActive);
+                if (!_ecologyState.IsPlantBiomassRecovering(spot.x, spot.y))
+                    _plantBiomassRecovery.Remove(spot);
             }
         }
 

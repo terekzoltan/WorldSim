@@ -35,6 +35,15 @@ Entries:
 - Resolution / guidance: Keep E11-A contract-first and explicitly route per-animal lifecycle fields to E11-C/E11-D. E11-B must either make biomass snapshot values dynamic plant-model truth or document any remaining static/default semantics. Do not treat aggregate passive counters as lifecycle behavior proof.
 - Status: guidance; active gate recorded in `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` and `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md`
 
+## 2026-06-28 - Wave 11 E11-B Step Review - Major - Dynamic state recovery must cover partial mutation paths
+
+- Track: Track B / Runtime ecology plant biomass
+- Source: Meta internal review + Swarm Assistant step-review synthesis for Wave 11 `E11-B`
+- Finding: The first E11-B implementation updated biomass on food harvest and depleted regrowth, but partially harvested food nodes that remained active did not enter any plant recovery path. A second review finding noted that background non-food land biomass remained seeded/static without explicit semantics.
+- Impact: Dynamic plant biomass could still become stale for common partial-harvest paths, undermining the E11-B goal of converting E11-A default biomass into runtime truth and risking downstream false-green ecology evidence.
+- Resolution / guidance: Fixed before closeout by adding a bounded plant recovery set for harvested food tiles, focused tests for partial harvest recovery, regrowth completion restore consistency, and overgrazing-reduced growth. E11-B documentation now states that dynamic biomass applies to the food-node/regrowth mutation surface, while background non-food land biomass remains seeded/default until a later broader plant/lifecycle pass.
+- Status: fixed in E11-B closeout
+
 ## 2026-06-27 - Wave 10.6 Q4 Coverage Baseline Review - Guidance - First .NET coverage baseline is lane-first, not merged module truth
 
 - Track: Meta Coordinator / SMR-style coverage review
