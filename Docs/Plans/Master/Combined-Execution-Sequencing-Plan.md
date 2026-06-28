@@ -2786,7 +2786,7 @@ E11 runtime performance note:
 
 > Wave 11 Ecology Plan > Runtime model
 
-- ⬜ **E11-A** Ecology state contract - tile fertility, region capacity, plant biomass, animal lifecycle fields, counters, and snapshot/export shape (Track B)
+- ✅ **E11-A** Ecology state contract - tile fertility, region capacity, initial/default plant biomass, aggregate passive lifecycle counters, and snapshot/export shape (Track B). Per-animal lifecycle fields/state are explicitly deferred to E11-C/E11-D.
 - ⬜ **E11-B** Plant growth + region carrying capacity - deterministic growth, overgrazing, season/drought modifiers, and bounded caches (Track B)
 - ⬜ **E11-C** Herbivore lifecycle - energy, grazing, starvation, reproduction, migration pressure, and no normal respawn dependency (Track B)
 - ⬜ **E11-D** Predator lifecycle - energy, hunting, capture gain, starvation, reproduction, and prey-linked capacity (Track B)
@@ -2815,23 +2815,26 @@ E11 runtime performance note:
 |---------|---------|--------|-------|
 | Track B agent | E11-A | W10.6-Q4 ✅ | Contract locks the runtime/snapshot fields before model logic or consumers start; no numeric coverage threshold is required |
 
+E11-A closeout:
+- ✅ `E11-A` accepted GREEN after Meta + Swarm step-review synthesis: runtime-owned ecology contract types, deterministic fixed 16x16 region chunks, bounded tile fertility/capacity/default biomass fields, region aggregate snapshots, passive aggregate lifecycle counters, and snapshot/interpolator preservation are implemented with focused runtime tests, PW8 telemetry regression tests, ArchTests, full Runtime tests, solution build, and diff hygiene passing. Scope clarification is now locked: E11-A does not add per-animal lifecycle fields/behavior; E11-C/E11-D own those fields/state/tests. E11-B must convert the E11-A initial/default `PlantBiomass` contract into dynamic plant-model truth or explicitly document any remaining static/default semantics. Pre-check SAST `Random` findings in `World.cs` are accepted as pre-existing/non-E11-A caveats.
+
 **Step 2 - plant capacity foundation (Track B)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | E11-B | E11-A ✅ | Plant availability and region capacity must exist before animal lifecycle can use them |
+| Track B agent | E11-B | E11-A ✅ | Plant availability and region capacity must exist before animal lifecycle can use them; E11-B must turn E11-A initial/default `PlantBiomass` into dynamic plant-model truth or document any remaining static/default semantics explicitly |
 
 **Step 3 - herbivore lifecycle before predator lifecycle (Track B)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | E11-C | E11-B ✅ | Herbivores depend on plant capacity; predators depend on viable prey behavior |
+| Track B agent | E11-C | E11-B ✅ | Herbivores depend on plant capacity; predators depend on viable prey behavior; E11-C owns per-animal herbivore lifecycle fields/state/tests deferred from E11-A |
 
 **Step 4a - predator lifecycle (Track B)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track B agent | E11-D | E11-C ✅ | Predator reproduction/starvation should be tied to the stabilized prey loop |
+| Track B agent | E11-D | E11-C ✅ | Predator reproduction/starvation should be tied to the stabilized prey loop; E11-D owns per-animal predator lifecycle fields/state/tests deferred from E11-A |
 
 **Step 4b - rescue demotion after lifecycle paths stand alone (Track B)**
 

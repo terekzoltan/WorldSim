@@ -66,7 +66,12 @@ The goal is not to add farms, domestication, milk, eggs, or a complete food taxo
 
 - [ ] **Step 1: Write state contract tests**
 
-Cover tile fertility, region capacity, plant biomass, animal energy, starvation counters, reproduction counters, migration counters, rescue counters, and snapshot export.
+Cover tile fertility, region capacity, initial/default plant biomass, passive aggregate starvation/reproduction/migration/rescue counters, and snapshot export. Per-animal lifecycle fields such as animal energy, maturity, starvation state, reproduction state, and migration state are not E11-A scope; E11-C/E11-D own those fields and behavior.
+
+E11-A review clarification:
+- E11-A locks the runtime/read-model ecology foundation only: deterministic fixed-grid regions, tile fertility/capacity/default biomass, aggregate passive counters, and snapshot export.
+- E11-A must not add animal lifecycle behavior or placeholder per-animal fields to `Animal.cs`.
+- The initial/default `PlantBiomass` exported by E11-A is a contract seed for E11-B, not proof of dynamic plant growth.
 
 Run:
 
@@ -102,11 +107,11 @@ Snapshot must provide enough fields for Track A overlay and SMR drilldown withou
 
 - [ ] **Step 1: Write deterministic plant tests**
 
-Cover growth, seasonal modifier, drought modifier, overgrazing reduction, lower/upper clamp, and no negative biomass.
+Cover growth, seasonal modifier, drought modifier, overgrazing reduction, lower/upper clamp, no negative biomass, and the transition from E11-A initial/default `PlantBiomass` to dynamic plant-model truth.
 
 - [ ] **Step 2: Add bounded update path**
 
-Plant growth should update by region/tile cache, not by per-animal full-map scans. Any full-map recompute should be a periodic or dirty-cache rebuild path with counters.
+Plant growth should update by region/tile cache, not by per-animal full-map scans. Any full-map recompute should be a periodic or dirty-cache rebuild path with counters. E11-B must verify that snapshot tile/region biomass values no longer remain stale after harvest/regrowth-relevant plant model updates, or explicitly document any remaining static/default semantics.
 
 - [ ] **Step 3: Add cache counters**
 
@@ -134,11 +139,11 @@ Expected: pass with deterministic plant biomass.
 
 - [ ] **Step 1: Write herbivore lifecycle tests**
 
-Cover grazing, energy gain, starvation, reproduction, migration pressure, land-safe spawn, and no normal respawn dependency.
+Cover grazing, energy gain, starvation, reproduction, migration pressure, land-safe spawn, no normal respawn dependency, and the per-animal herbivore lifecycle fields/state intentionally deferred from E11-A.
 
 - [ ] **Step 2: Write predator lifecycle tests**
 
-Cover prey-linked hunting, capture gain, starvation, reproduction, predator capacity, and bounded predator-human interaction flags.
+Cover prey-linked hunting, capture gain, starvation, reproduction, predator capacity, bounded predator-human interaction flags, and the per-animal predator lifecycle fields/state intentionally deferred from E11-A.
 
 - [ ] **Step 3: Add land-safe spawn/migration policy**
 

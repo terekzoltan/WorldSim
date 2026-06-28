@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-28 - Wave 11 E11-A Step Review - Guidance - Contract slices must not overclaim deferred lifecycle semantics
+
+- Track: Track B / Runtime ecology contract
+- Source: Meta internal review + Swarm Assistant step-review synthesis for Wave 11 `E11-A`
+- Finding: The Wave11 source wording asked for animal lifecycle fields, but the accepted E11-A implementation intentionally locked only tile/region ecology and passive aggregate lifecycle counters. Per-animal energy/starvation/reproduction/migration state is deferred to E11-C/E11-D. The new `PlantBiomass` fields are initial/default contract seed values until E11-B implements dynamic plant growth semantics.
+- Impact: Without an active route, downstream Track A/SMR/Track B consumers could overclaim E11-A as full animal lifecycle or live plant biomass proof, creating false-green ecology evidence and avoidable API churn.
+- Resolution / guidance: Keep E11-A contract-first and explicitly route per-animal lifecycle fields to E11-C/E11-D. E11-B must either make biomass snapshot values dynamic plant-model truth or document any remaining static/default semantics. Do not treat aggregate passive counters as lifecycle behavior proof.
+- Status: guidance; active gate recorded in `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` and `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md`
+
 ## 2026-06-27 - Wave 10.6 Q4 Coverage Baseline Review - Guidance - First .NET coverage baseline is lane-first, not merged module truth
 
 - Track: Meta Coordinator / SMR-style coverage review

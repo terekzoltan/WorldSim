@@ -77,6 +77,8 @@ public sealed record WorldRenderSnapshot(
     DirectorRenderState Director
 )
 {
+    public EcologyRenderData EcologyDetails { get; init; } = EcologyRenderData.Empty;
+
     public WorldRenderSnapshot(
         int Width,
         int Height,
@@ -289,7 +291,55 @@ public sealed record TileRenderData(
     int OwnerFactionId,
     bool IsContested,
     float OwnershipStrength,
-    float FoodRegrowthProgress);
+    float FoodRegrowthProgress,
+    int EcologyRegionId = -1,
+    float Fertility = 0f,
+    float PlantCapacity = 0f,
+    float PlantBiomass = 0f,
+    float OvergrazingPressure = 0f);
+
+public sealed record EcologyRenderData(
+    IReadOnlyList<EcologyRegionRenderData> Regions,
+    EcologyLifecycleCounterRenderData LifecycleCounters)
+{
+    public static EcologyRenderData Empty { get; } = new(
+        Regions: Array.Empty<EcologyRegionRenderData>(),
+        LifecycleCounters: EcologyLifecycleCounterRenderData.Empty);
+}
+
+public sealed record EcologyRegionRenderData(
+    int RegionId,
+    int LandTileCount,
+    int WaterTileCount,
+    float PlantBiomassTotal,
+    float PlantCapacityTotal,
+    int HerbivoreCount,
+    int PredatorCount,
+    float CarryingCapacity,
+    float OvergrazingPressure,
+    float SeasonModifier,
+    float DroughtModifier);
+
+public sealed record EcologyLifecycleCounterRenderData(
+    int HerbivoreBirths,
+    int PredatorBirths,
+    int HerbivoreStarvations,
+    int PredatorStarvations,
+    int HerbivoreMigrations,
+    int PredatorMigrations,
+    int LandSafeSpawnFallbacks,
+    int EmergencyRescues)
+{
+    public static EcologyLifecycleCounterRenderData Empty { get; } = new(
+        HerbivoreBirths: 0,
+        PredatorBirths: 0,
+        HerbivoreStarvations: 0,
+        PredatorStarvations: 0,
+        HerbivoreMigrations: 0,
+        PredatorMigrations: 0,
+        LandSafeSpawnFallbacks: 0,
+        EmergencyRescues: 0);
+}
 
 public sealed record HouseRenderData(int X, int Y, int ColonyId);
 

@@ -33,7 +33,10 @@ public static class WorldSnapshotInterpolator
             current.CurrentSeason,
             current.IsDroughtActive,
             current.RecentEvents,
-            current.Director);
+            current.Director)
+        {
+            EcologyDetails = current.EcologyDetails
+        };
     }
 
     private static IReadOnlyList<PersonRenderData> InterpolatePeople(IReadOnlyList<PersonRenderData> previous, IReadOnlyList<PersonRenderData> current, float alpha)

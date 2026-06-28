@@ -8,6 +8,7 @@ using WorldSim.Runtime.Diagnostics;
 using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
+using WorldSim.Simulation.Ecology;
 using WorldSim.Simulation.Effects;
 
 namespace WorldSim.Simulation
@@ -96,6 +97,7 @@ namespace WorldSim.Simulation
         public List<SpecializedBuilding> SpecializedBuildings = new();
         public List<DefensiveStructure> DefensiveStructures = new();
         public List<Animal> _animals = new();
+        EcologyState _ecologyState = null!;
 
         // Technology-affected properties
         public int WoodYield { get; set; } = 1; // Fa kitermelés hozama (mennyi fát kapnak egy gyűjtéskor)
@@ -647,6 +649,8 @@ namespace WorldSim.Simulation
             int animalCount = Math.Max(10, (Width * Height) / 256);
             for (int i = 0; i < animalCount; i++)
                 _animals.Add(Animal.Spawn(RandomFreePos(), CreateEntityRng()));
+
+            _ecologyState = EcologyState.Create(_map, Width, Height);
 
             InitializeFactionStances();
 
@@ -1294,6 +1298,15 @@ namespace WorldSim.Simulation
 
             return _foodRegrowthProgress.GetValueOrDefault((x, y), 0f);
         }
+
+        public EcologyTileState GetEcologyTileState(int x, int y)
+            => _ecologyState.GetTile(x, y);
+
+        public IReadOnlyList<EcologyRegionSnapshot> BuildEcologyRegionSnapshots()
+            => _ecologyState.BuildRegionSnapshots(_animals, CurrentSeason, IsDroughtActive);
+
+        public EcologyLifecycleCounters BuildEcologyLifecycleCounters()
+            => _ecologyState.LifecycleCounters;
 
         internal static bool IsActiveFoodNode(ResourceNode? node)
             => node is { Type: Resource.Food, Amount: > 0 };

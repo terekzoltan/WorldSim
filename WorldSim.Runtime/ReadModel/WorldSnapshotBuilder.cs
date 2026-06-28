@@ -31,6 +31,7 @@ public static class WorldSnapshotBuilder
                     activeFoodNodes++;
                 else if (World.IsDepletedFoodNode(tile.Node))
                     depletedFoodNodes++;
+                var ecologyTile = world.GetEcologyTileState(x, y);
 
                 tiles.Add(new TileRenderData(
                     x,
@@ -41,7 +42,12 @@ public static class WorldSnapshotBuilder
                     ownerFactionId,
                     world.IsTileContested(x, y),
                     world.GetTileOwnershipStrength(x, y),
-                    world.GetFoodRegrowthProgress(x, y)));
+                    world.GetFoodRegrowthProgress(x, y),
+                    ecologyTile.RegionId,
+                    ecologyTile.Fertility,
+                    ecologyTile.PlantCapacity,
+                    ecologyTile.PlantBiomass,
+                    ecologyTile.OvergrazingPressure));
             }
         }
 
@@ -269,6 +275,8 @@ public static class WorldSnapshotBuilder
             world.TotalInventoryFoodConsumed
         );
 
+        var ecologyDetails = BuildEcologyRenderData(world);
+
         return new WorldRenderSnapshot(
             world.Width,
             world.Height,
@@ -294,7 +302,41 @@ public static class WorldSnapshotBuilder
             world.IsDroughtActive,
             world.RecentEvents.ToList(),
             DirectorRenderState.Empty
-        );
+        )
+        {
+            EcologyDetails = ecologyDetails
+        };
+    }
+
+    private static EcologyRenderData BuildEcologyRenderData(World world)
+    {
+        var regions = world.BuildEcologyRegionSnapshots()
+            .Select(region => new EcologyRegionRenderData(
+                region.RegionId,
+                region.LandTileCount,
+                region.WaterTileCount,
+                region.PlantBiomassTotal,
+                region.PlantCapacityTotal,
+                region.HerbivoreCount,
+                region.PredatorCount,
+                region.CarryingCapacity,
+                region.OvergrazingPressure,
+                region.SeasonModifier,
+                region.DroughtModifier))
+            .ToList();
+        var lifecycle = world.BuildEcologyLifecycleCounters();
+
+        return new EcologyRenderData(
+            regions,
+            new EcologyLifecycleCounterRenderData(
+                lifecycle.HerbivoreBirths,
+                lifecycle.PredatorBirths,
+                lifecycle.HerbivoreStarvations,
+                lifecycle.PredatorStarvations,
+                lifecycle.HerbivoreMigrations,
+                lifecycle.PredatorMigrations,
+                lifecycle.LandSafeSpawnFallbacks,
+                lifecycle.EmergencyRescues));
     }
 
     private static TileGroundView MapGround(Ground ground) => ground switch

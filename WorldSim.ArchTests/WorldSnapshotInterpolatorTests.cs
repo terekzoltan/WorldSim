@@ -94,6 +94,25 @@ public class WorldSnapshotInterpolatorTests
         Assert.Equal(5, Assert.Single(interpolated.People).X);
     }
 
+    [Fact]
+    public void Interpolate_PreservesEcologyDetails()
+    {
+        var previous = CreateSnapshot(Array.Empty<CampaignRenderData>(), personX: 0);
+        var current = CreateSnapshot(Array.Empty<CampaignRenderData>(), personX: 10) with
+        {
+            EcologyDetails = CreateEcologyDetails()
+        };
+
+        var interpolated = WorldSnapshotInterpolator.Interpolate(previous, current, alpha: 0.5f);
+
+        var region = Assert.Single(interpolated.EcologyDetails.Regions);
+        Assert.Equal(3, region.RegionId);
+        Assert.Equal(11, region.LandTileCount);
+        Assert.Equal(2, region.HerbivoreCount);
+        Assert.Equal(1, region.PredatorCount);
+        Assert.Equal(0, interpolated.EcologyDetails.LifecycleCounters.HerbivoreBirths);
+    }
+
     private static WorldRenderSnapshot CreateSnapshot(IReadOnlyList<CampaignRenderData> campaigns, int personX)
         => CreateSnapshot(campaigns, Array.Empty<SupplyConvoyRenderData>(), personX);
 
@@ -310,6 +329,25 @@ public class WorldSnapshotInterpolatorTests
             MaxHealth: 160f,
             RecentActionEffect: "ram_wall_gate_pressure",
             LastActionTick: 22);
+
+    private static EcologyRenderData CreateEcologyDetails()
+        => new(
+            Regions: new[]
+            {
+                new EcologyRegionRenderData(
+                    RegionId: 3,
+                    LandTileCount: 11,
+                    WaterTileCount: 5,
+                    PlantBiomassTotal: 4.5f,
+                    PlantCapacityTotal: 8f,
+                    HerbivoreCount: 2,
+                    PredatorCount: 1,
+                    CarryingCapacity: 8f,
+                    OvergrazingPressure: 0.25f,
+                    SeasonModifier: 1f,
+                    DroughtModifier: 1f)
+            },
+            LifecycleCounters: EcologyLifecycleCounterRenderData.Empty);
 
     private static EcoHudData CreateEcoHudData()
         => new(
