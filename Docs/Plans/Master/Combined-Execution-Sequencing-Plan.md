@@ -30,6 +30,7 @@ their execution steps are not retroactively documented — see their proof links
 | **Wave 10.5 Refinery TR3 Audit Gates Plan** | `Docs/Plans/Master/Wave10.5-Refinery-TR3-Audit-Gates-Plan.md` |
 | **Pre-W10.6 Refinery Model Fidelity Plan** | `Docs/Plans/Master/Pre-W10.6-Refinery-Model-Fidelity-And-Validation-Assurance-Plan.md` |
 | **Wave 10.6 Coverage Baseline Plan** | `Docs/Plans/Master/Wave10.6-Coverage-Baseline-And-Test-Quality-Plan.md` |
+| **Wave 10.6 Coverage Soft Policy** | `Docs/Plans/Master/Wave10.6-Coverage-Soft-Policy.md` |
 | **Wave 11 Ecology Plan** | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
 | **Wave 11 Ecology Hardening Plan** | `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md` |
 | **Wave 12 Architecture Hardening Plan** | `Docs/Plans/Master/Wave12-Codebase-Architecture-Hardening-Plan.md` |
@@ -2657,10 +2658,10 @@ Human/user assistance:
 - ✅ **W10.6-M1** Coverage strategy lock and plan-review (Meta Coordinator)
 - ✅ **W10.6-Q1** C# coverage infrastructure - coverlet collector alignment and coverage collection across C# test projects (Track B primary, Track C/D consult)
 - ✅ **W10.6-Q2** Java coverage infrastructure - JaCoCo report generation for `refinery-service-java` (Track D)
-- ⬜ **W10.6-Q3** Unified local coverage runbook and summary artifact contract (Track B technical prep, then Meta governance lock; Track D consult)
-- ⬜ **W10.6-Q4** First coverage baseline evidence review and gap classification (SMR Analyst review, then Meta classification; user assistance encouraged)
-- ⬜ **W10.6-Q5** Soft threshold and changed-code policy design (Meta Coordinator)
-- ⬜ **W10.6-Q6** Optional manual non-blocking CI coverage artifact upload (`workflow_dispatch` only; no PR/push/scheduled trigger yet)
+- ✅ **W10.6-Q3** Unified local coverage runbook and summary artifact contract (Track B technical prep, then Meta governance lock; Track D consult)
+- ✅ **W10.6-Q4** First coverage baseline evidence review and gap classification (SMR Analyst review, then Meta classification; user assistance encouraged)
+- ✅ **W10.6-Q5** Soft threshold and changed-code policy design (Meta Coordinator)
+- ✅ **W10.6-Q6** Optional manual non-blocking CI coverage artifact upload (`workflow_dispatch` only; no PR/push/scheduled trigger)
 
 ### Wave 10.6 - Execution Steps
 
@@ -2699,6 +2700,12 @@ W10.6-Q2 closeout:
 |---------|---------|--------|------------------|---------------------|---------|
 | Meta Coordinator | W10.6-Q3 | W10.6-Q3 Track B handoff ✅ | Approved artifact contract and governance wording for the unified coverage runbook | Runbook semantics are accepted; generated artifacts remain local-only by policy; no threshold gate is implied | W10.6-Q4 evidence review |
 
+W10.6-Q3 Track B handoff:
+- ✅ `W10.6-Q3` technical prep produced `Docs/Plans/Master/Wave10.6-Coverage-Runbook.md` with the stable per-project `.NET` fallback sequence, the local summary artifact contract under `.artifacts/coverage/<run-name>/summary.md`, the test/tooling-only interpretation of `WorldSim.ArchTests`, and the v1 Java policy of referencing native JaCoCo XML/HTML outputs from ignored `build/` paths rather than copying generated reports by default.
+
+W10.6-Q3 Meta closeout:
+- ✅ `W10.6-Q3` accepted GREEN: runbook semantics are governance-locked, generated artifacts remain local-only by policy, and no threshold gate or CI/push trigger was introduced.
+
 **Step 4a - baseline evidence review before Wave11 runtime work**
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
@@ -2711,11 +2718,20 @@ W10.6-Q2 closeout:
 |---------|---------|--------|------------------|---------------------|---------|
 | Meta Coordinator | W10.6-Q4 | W10.6-Q4 SMR review ✅ | Checked-in coverage evidence note plus final gap classification | First baseline evidence note under `Docs/Evidence/Coverage/...`; raw reports local-only; every major gap classified as `accepted-for-now`, `future-soft-gate`, `test-debt-risk`, or `blocked-before-wave11` | Wave11 `E11-A` unless Q4 blocks; W10.6-Q5 |
 
+W10.6-Q4 SMR Analyst handoff:
+- ✅ Step 4a review packet recorded in `Docs/Evidence/Coverage/w10-6-baseline-001/SMR-REVIEW.md`: first baseline artifacts were inspected, major gaps were enumerated, `WorldSim.ScenarioRunner` zero collector output was recommended as `test-debt-risk`, and lane-first `.NET` interpretation limits were recommended as `future-soft-gate` rather than an immediate Wave11 block.
+
+W10.6-Q4 Meta closeout:
+- ✅ `W10.6-Q4` accepted GREEN: Meta consumed the Step 4a SMR packet and the unified baseline run `w10-6-unified-baseline-001`, then recorded the final classification in `Docs/Evidence/Coverage/w10-6-baseline-001/README.md` without committing raw generated XML/HTML artifacts. No item was classified as `blocked-before-wave11`: ecology-adjacent `WorldSim.Runtime` and `WorldSim.AI` lanes show meaningful first-baseline coverage, while the `WorldSim.ScenarioRunner` zero collector lane and the missing merged/module-filtered `.NET` summary remain routed as `test-debt-risk` and `future-soft-gate` follow-up inputs for `W10.6-Q5`.
+
 **Step 5 - soft policy design after baseline exists**
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
 |---------|---------|--------|------------------|---------------------|---------|
 | Meta Coordinator | W10.6-Q5 | W10.6-Q4 ✅ | Soft-threshold/changed-code policy proposal | No hard CI fail; future promotion criteria explicit; module-specific or changed-code warning policy defined | Optional W10.6-Q6 |
+
+W10.6-Q5 closeout:
+- ✅ `W10.6-Q5` accepted GREEN as docs-only policy design: `Docs/Plans/Master/Wave10.6-Coverage-Soft-Policy.md` defines advisory changed-code evidence prompts, future trusted-module delta prompt criteria, and deep-review escalation prompts without enabling any hard CI fail, PR/push/scheduled trigger, generated artifact commit flow, or numeric threshold. The policy explicitly keeps current `.NET` coverage as lane-first evidence until merged/module-filtered interpretation exists, excludes `WorldSim.ScenarioRunner` from early production line-coverage targets while preserving it as an evidence-tooling trust surface, keeps `WorldSim.ArchTests` test/tooling-only, and leaves App/Graphics under manual/architecture smoke evidence. Optional `W10.6-Q6` remains deferred unless the user/CI owner explicitly wants a manual `workflow_dispatch` artifact lane.
 
 **Step 6a - optional CI policy approval**
 
@@ -2723,11 +2739,17 @@ W10.6-Q2 closeout:
 |---------|---------|--------|------------------|---------------------|---------|
 | Meta Coordinator | W10.6-Q6 | W10.6-Q4 ✅ + human/CI approval | Explicit go/no-go decision for manual CI artifact lane | CI artifact lane is either approved as optional `workflow_dispatch` only or explicitly deferred | W10.6-Q6 CI implementation |
 
+W10.6-Q6 approval:
+- ✅ User/CI owner explicitly approved the optional manual artifact lane after `W10.6-Q5`. Scope is limited to a non-blocking `workflow_dispatch` workflow: artifact upload only, no coverage threshold fail, and no PR/push/scheduled trigger.
+
 **Step 6b - optional non-blocking CI artifact lane implementation**
 
 | Session | Epic(s) | Prereq | Expected handoff | Acceptance/evidence | Unlocks |
 |---------|---------|--------|------------------|---------------------|---------|
 | CI owner | W10.6-Q6 | W10.6-Q6 Meta approval ✅ | Manual CI artifact workflow or explicit defer decision | `workflow_dispatch` only if implemented; artifact upload works; no PR/push/scheduled trigger; no coverage threshold fail | Future coverage trend workflow |
+
+W10.6-Q6 closeout:
+- ✅ `W10.6-Q6` implemented: `.github/workflows/coverage-baseline.yml` adds a manual `Coverage Baseline Artifact` workflow with `workflow_dispatch` only, `windows-latest`, `.NET` per-project coverage lanes, Java `test jacocoTestReport`, generated `.artifacts/coverage/<run-name>/summary.md`, and GitHub artifact upload with operator-selected retention. It intentionally has no PR/push/scheduled trigger and no coverage percentage threshold. Test failures can fail the manual workflow, but coverage percentages cannot.
 
 **Critical path:** `W10.6-M1 -> RFM-M2 -> (W10.6-Q1 + W10.6-Q2) -> W10.6-Q3 -> W10.6-Q4 -> E11-A`.
 **Parallelism:** Q1 and Q2 may run in parallel after M1 because they touch separate C# and Java tooling surfaces; Q3/Q4 must remain sequential because they consume both outputs.

@@ -26,6 +26,24 @@ Severity guide:
 
 Entries:
 
+## 2026-06-27 - Wave 10.6 Q4 Coverage Baseline Review - Guidance - First .NET coverage baseline is lane-first, not merged module truth
+
+- Track: Meta Coordinator / SMR-style coverage review
+- Source: `Docs/Evidence/Coverage/w10-6-baseline-001/SMR-REVIEW.md`, `Docs/Evidence/Coverage/w10-6-baseline-001/README.md`, local run `.artifacts/coverage/w10-6-unified-baseline-001/`
+- Finding: The first Wave10.6 `.NET` coverage capture is a per-test-project collector baseline. Its Cobertura root percentages are useful evidence, but they are not yet a de-duplicated merged or module-filtered production truth.
+- Impact: Future reviews can overreact to lane-wide low percentages or understate module coverage quality if they treat these root values as clean assembly/module truth.
+- Resolution / guidance: Keep Q4 interpretation cautious. `W10.6-Q5` decided that no soft module-delta warning should be promoted until `.NET` module interpretation is either merged/module-filtered or explicitly lane-specific with no module-truth overclaim.
+- Status: guidance; consumed by `Docs/Plans/Master/Wave10.6-Coverage-Soft-Policy.md`
+
+## 2026-06-27 - Wave 10.6 Q4 Coverage Baseline Review - Major - ScenarioRunner collector lane can stay at zero despite passing tests
+
+- Track: Meta Coordinator / ScenarioRunner evidence quality
+- Source: `Docs/Evidence/Coverage/w10-6-baseline-001/SMR-REVIEW.md`, `Docs/Evidence/Coverage/w10-6-baseline-001/README.md`, local run `.artifacts/coverage/w10-6-unified-baseline-001/`
+- Finding: `WorldSim.ScenarioRunner.Tests` passed (`99` tests), but the first collector lane reported `0%` line and branch coverage in its Cobertura XML.
+- Impact: The project can falsely believe ScenarioRunner is adequately covered because tests are green, while the coverage baseline captures no executable/control-flow truth for that lane.
+- Resolution / guidance: Treat this as active evidence-tooling `test-debt-risk`, not a Wave11 blocker and not a production line-coverage target. `W10.6-Q5` excludes ScenarioRunner from early production coverage thresholds; fix the collector path only if a later reviewed plan creates a dedicated tools-coverage lane or needs runner-internal coverage.
+- Status: open as tooling debt; Q5 policy route recorded in `Docs/Plans/Master/Wave10.6-Coverage-Soft-Policy.md`
+
 ## 2026-06-20 - Wave 10 Step10B.5-F6 Closeout - Minor - Lifecycle progression does not prove manual command creation success
 
 - Track: SMR Analyst / Track B campaign runtime evidence

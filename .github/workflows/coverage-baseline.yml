@@ -1,0 +1,184 @@
+name: Coverage Baseline Artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_name:
+        description: Local artifact run name
+        required: true
+        default: w10-6-ci-manual
+        type: string
+      retention_days:
+        description: Artifact retention days
+        required: true
+        default: '14'
+        type: choice
+        options:
+          - '7'
+          - '14'
+          - '30'
+
+permissions:
+  contents: read
+
+jobs:
+  coverage-artifact:
+    name: Manual coverage artifact
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Normalize artifact paths
+        shell: pwsh
+        run: |
+          $runName = '${{ inputs.run_name }}'
+          if ([string]::IsNullOrWhiteSpace($runName)) {
+            $runName = 'w10-6-ci-manual-${{ github.run_id }}'
+          }
+
+          $runName = $runName -replace '[^A-Za-z0-9_.-]', '-'
+          $coverageRoot = ".artifacts/coverage/$runName"
+
+          New-Item -ItemType Directory -Force -Path $coverageRoot | Out-Null
+          "COVERAGE_RUN_NAME=$runName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "COVERAGE_ROOT=$coverageRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Restore .NET solution
+        shell: pwsh
+        run: dotnet restore .\WorldSim.sln
+
+      - name: Run .NET coverage lanes
+        shell: pwsh
+        run: |
+          $failed = $false
+          $coverageRoot = $env:COVERAGE_ROOT
+          $statusPath = Join-Path $coverageRoot 'dotnet-status.txt'
+
+          function Invoke-DotNetCoverageLane {
+            param(
+              [string]$Name,
+              [string]$Project,
+              [string]$OutputPath
+            )
+
+            New-Item -ItemType Directory -Force -Path $OutputPath | Out-Null
+            Add-Content -Path $statusPath -Value "START $Name $Project"
+            & dotnet test $Project --no-restore '--collect:XPlat Code Coverage' --results-directory $OutputPath
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0) {
+              Add-Content -Path $statusPath -Value "FAIL $Name exit=$exitCode"
+              $script:failed = $true
+            } else {
+              Add-Content -Path $statusPath -Value "PASS $Name"
+            }
+          }
+
+          Invoke-DotNetCoverageLane 'runtime' '.\WorldSim.Runtime.Tests\WorldSim.Runtime.Tests.csproj' (Join-Path $coverageRoot 'dotnet/runtime')
+          Invoke-DotNetCoverageLane 'ai' '.\WorldSim.AI.Tests\WorldSim.AI.Tests.csproj' (Join-Path $coverageRoot 'dotnet/ai')
+          Invoke-DotNetCoverageLane 'refinery-client' '.\WorldSim.RefineryClient.Tests\WorldSim.RefineryClient.Tests.csproj' (Join-Path $coverageRoot 'dotnet/refinery-client')
+          Invoke-DotNetCoverageLane 'refinery-adapter' '.\WorldSim.RefineryAdapter.Tests\WorldSim.RefineryAdapter.Tests.csproj' (Join-Path $coverageRoot 'dotnet/refinery-adapter')
+          Invoke-DotNetCoverageLane 'scenario-runner' '.\WorldSim.ScenarioRunner.Tests\WorldSim.ScenarioRunner.Tests.csproj' (Join-Path $coverageRoot 'dotnet/scenario-runner')
+          Invoke-DotNetCoverageLane 'arch' '.\WorldSim.ArchTests\WorldSim.ArchTests.csproj' (Join-Path $coverageRoot 'dotnet/arch')
+
+          if ($failed) {
+            exit 1
+          }
+
+      - name: Run Java JaCoCo lane
+        if: always()
+        shell: pwsh
+        run: |
+          $coverageRoot = $env:COVERAGE_ROOT
+          $javaRoot = Join-Path $coverageRoot 'java'
+          $statusPath = Join-Path $javaRoot 'java-status.txt'
+          New-Item -ItemType Directory -Force -Path $javaRoot | Out-Null
+
+          Push-Location .\refinery-service-java
+          .\gradlew.bat test jacocoTestReport
+          $exitCode = $LASTEXITCODE
+          Pop-Location
+
+          if ($exitCode -ne 0) {
+            Set-Content -Path $statusPath -Value "FAIL jacoco exit=$exitCode" -Encoding utf8
+            exit $exitCode
+          }
+
+          $source = '.\refinery-service-java\build\reports\jacoco\test'
+          $destination = Join-Path $javaRoot 'jacoco-test'
+          if (-not (Test-Path (Join-Path $source 'jacocoTestReport.xml'))) {
+            Set-Content -Path $statusPath -Value 'FAIL jacoco report xml missing' -Encoding utf8
+            exit 1
+          }
+
+          Copy-Item -Path $source -Destination $destination -Recurse -Force
+          Set-Content -Path $statusPath -Value 'PASS jacoco' -Encoding utf8
+
+      - name: Write coverage summary
+        if: always()
+        shell: pwsh
+        run: |
+          $coverageRoot = $env:COVERAGE_ROOT
+          New-Item -ItemType Directory -Force -Path $coverageRoot | Out-Null
+
+          $dotnetReports = @(Get-ChildItem -Path (Join-Path $coverageRoot 'dotnet') -Recurse -Filter 'coverage.cobertura.xml' -ErrorAction SilentlyContinue)
+          $javaReport = Join-Path $coverageRoot 'java/jacoco-test/jacocoTestReport.xml'
+          $javaHtml = Join-Path $coverageRoot 'java/jacoco-test/html/index.html'
+          $summaryPath = Join-Path $coverageRoot 'summary.md'
+
+          $summary = @(
+            '# WorldSim Coverage Artifact',
+            '',
+            "Run name: ``$($env:COVERAGE_RUN_NAME)``",
+            "GitHub run id: ``${{ github.run_id }}``",
+            "GitHub ref: ``${{ github.ref }}``",
+            '',
+            '## Policy',
+            '',
+            '- Manual `workflow_dispatch` artifact lane only.',
+            '- No PR, push, or scheduled trigger.',
+            '- No coverage percentage threshold or hard fail.',
+            '- Test failures still fail this manually-triggered run.',
+            '',
+            '## Report Files',
+            '',
+            "- .NET Cobertura XML count: ``$($dotnetReports.Count)``",
+            "- Java JaCoCo XML present: ``$(Test-Path $javaReport)``",
+            "- Java JaCoCo HTML index present: ``$(Test-Path $javaHtml)``",
+            '',
+            '## Non-Claims',
+            '',
+            '- This artifact does not define or enforce a threshold.',
+            '- ScenarioRunner remains an evidence-tooling lane, not a production line-coverage target.',
+            '- App/Graphics remain governed by manual and architecture smoke evidence.'
+          )
+
+          Set-Content -Path $summaryPath -Value $summary -Encoding utf8
+          $summary | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: worldsim-coverage-${{ github.run_id }}
+          path: .artifacts/coverage/
+          if-no-files-found: error
+          retention-days: ${{ fromJSON(inputs.retention_days) }}
