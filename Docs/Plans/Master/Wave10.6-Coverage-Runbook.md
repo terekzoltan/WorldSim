@@ -184,6 +184,16 @@ run_name = w10-6-ci-manual-001
 retention_days = 14
 ```
 
+First accepted manual CI run:
+
+- Run name: `w10-6-ci-manual-001`
+- GitHub run id: `28326071232`
+- Status: `Success`
+- Duration: `9m 7s`
+- Artifact count: `1`
+- Summary evidence: `.NET Cobertura XML count = 6`, Java JaCoCo XML present, Java JaCoCo HTML present
+- Checked-in evidence note: `Docs/Evidence/Coverage/w10-6-ci-manual-001/README.md`
+
 ## Non-Goals For This Runbook
 
 - No CI trigger design.

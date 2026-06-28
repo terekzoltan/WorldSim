@@ -2749,7 +2749,10 @@ W10.6-Q6 approval:
 | CI owner | W10.6-Q6 | W10.6-Q6 Meta approval ✅ | Manual CI artifact workflow or explicit defer decision | `workflow_dispatch` only if implemented; artifact upload works; no PR/push/scheduled trigger; no coverage threshold fail | Future coverage trend workflow |
 
 W10.6-Q6 closeout:
-- ✅ `W10.6-Q6` implemented: `.github/workflows/coverage-baseline.yml` adds a manual `Coverage Baseline Artifact` workflow with `workflow_dispatch` only, `windows-latest`, `.NET` per-project coverage lanes, Java `test jacocoTestReport`, generated `.artifacts/coverage/<run-name>/summary.md`, and GitHub artifact upload with operator-selected retention. It intentionally has no PR/push/scheduled trigger and no coverage percentage threshold. Test failures can fail the manual workflow, but coverage percentages cannot.
+- ✅ `W10.6-Q6` implemented and operationally proven: `.github/workflows/coverage-baseline.yml` adds a manual `Coverage Baseline Artifact` workflow with `workflow_dispatch` only, `windows-latest`, `.NET` per-project coverage lanes, Java `test jacocoTestReport`, generated `.artifacts/coverage/<run-name>/summary.md`, and GitHub artifact upload with operator-selected retention. The first CI-owner run `w10-6-ci-manual-001` (`28326071232`) succeeded in `9m 7s`, uploaded `1` artifact, reported `6` .NET Cobertura XML files, and confirmed Java JaCoCo XML + HTML presence. It intentionally has no PR/push/scheduled trigger and no coverage percentage threshold. Test failures can fail the manual workflow, but coverage percentages cannot. Evidence note: `Docs/Evidence/Coverage/w10-6-ci-manual-001/README.md`.
+
+Post-W10.6 quality note:
+- No pre-Wave11 test-hardening interrupt is recommended from the coverage baseline alone. A later `test quality ratchet` / quality hardening wave is useful after Wave11 exposes concrete ecology behavior and SMR evidence, focusing on merged/module-filtered .NET reporting, changed-code evidence prompts, and targeted ecology branch/edge tests rather than vanity percentage chasing.
 
 **Critical path:** `W10.6-M1 -> RFM-M2 -> (W10.6-Q1 + W10.6-Q2) -> W10.6-Q3 -> W10.6-Q4 -> E11-A`.
 **Parallelism:** Q1 and Q2 may run in parallel after M1 because they touch separate C# and Java tooling surfaces; Q3/Q4 must remain sequential because they consume both outputs.

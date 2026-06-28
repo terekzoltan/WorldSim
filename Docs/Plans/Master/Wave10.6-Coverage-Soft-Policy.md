@@ -136,6 +136,41 @@ Q6 remains non-blocking:
 - no PR, push, or scheduled trigger,
 - no coverage threshold fail.
 
+First accepted CI-owner run:
+
+- `w10-6-ci-manual-001`
+- GitHub run id `28326071232`
+- Status `Success`
+- Artifact count `1`
+- Evidence note: `Docs/Evidence/Coverage/w10-6-ci-manual-001/README.md`
+
+## Post-W10.6 Test Quality Recommendation
+
+Do not add a pre-Wave11 test-hardening interrupt solely because the first coverage baseline exists.
+
+Recommended professional framing for future work:
+
+- `test quality ratchet`
+- `quality hardening wave`
+- `coverage trust and changed-code evidence ratchet`
+
+Recommended timing:
+
+- after Wave11 has a concrete ecology behavior surface and at least one ecology-focused SMR evidence pass,
+- or as a later dedicated quality wave if coverage report trust, changed-code prompts, or ScenarioRunner tooling debt start slowing reviews.
+
+Recommended content for that future ratchet:
+
+- merged or module-filtered `.NET` report exploration,
+- targeted branch/edge-case tests for newly critical ecology loops,
+- changed-code evidence prompt enforcement in reviews,
+- optional ScenarioRunner tools-coverage investigation only if runner-internal coverage becomes useful,
+- App/Graphics manual/architecture smoke checklists instead of line-coverage targets.
+
+Non-goal:
+
+- do not delay Wave11 kickoff just to chase coverage percentages.
+
 ## Non-Claims
 
 - This policy does not prove runtime behavior.
