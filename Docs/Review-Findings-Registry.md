@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-28 - Wave 11 E11-C Step Review - Blocking - Queued reproduction must reserve regional capacity
+
+- Track: Track B / Runtime herbivore lifecycle
+- Source: Meta internal review + Swarm Assistant step-review synthesis for Wave 11 `E11-C`
+- Finding: The first E11-C implementation checks herbivore reproduction headroom against current `_animals`/region snapshots, then queues newborns for post-iteration flush. Multiple same-region eligible parents in one tick can all pass the same stale headroom check and flush together, exceeding intended regional carrying-capacity headroom.
+- Impact: E11-C can pass basic lifecycle tests while undermining the closed-loop prey population constraint that E11-D predator lifecycle and later ECO invariants depend on. Birth counters can also over-report lifecycle births relative to accepted capacity.
+- Resolution / guidance: Fixed locally across the E11-C review-fix passes. `QueueHerbivoreBirth(...)` is target-region reservation-aware, `Herbivore.TryReproduce(...)` now checks only lifecycle-local energy/age/cooldown, and parent reproduction side effects happen only after queue success. Focused regressions cover same-region reservation, parent-region-full/neighboring-target-region-available success, all-targets-full clean failure with unchanged parent energy/cooldown, failed birth no-mutation, negative migration counter, and non-zero birth/migration snapshot parity.
+- Status: fixed and accepted in E11-C second fix-pass closeout
+
 ## 2026-06-28 - Wave 11 E11-A Step Review - Guidance - Contract slices must not overclaim deferred lifecycle semantics
 
 - Track: Track B / Runtime ecology contract

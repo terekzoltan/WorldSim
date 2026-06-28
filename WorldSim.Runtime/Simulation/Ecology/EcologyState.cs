@@ -40,6 +40,7 @@ public sealed class EcologyState
 
     readonly EcologyTileState[,] _tiles;
     readonly EcologyRegionCache _regionCache;
+    EcologyLifecycleCounters _lifecycleCounters = EcologyLifecycleCounters.Empty;
     EcologyPlantCounters _plantCounters = EcologyPlantCounters.Empty with { EcologyRegionCacheRebuilds = 1 };
 
     EcologyState(int width, int height, int regionSize, EcologyTileState[,] tiles, EcologyRegionCache regionCache)
@@ -57,8 +58,20 @@ public sealed class EcologyState
     public int RegionSize { get; }
     public int RegionColumns { get; }
     public int RegionCount => _regionCache.Count;
-    public EcologyLifecycleCounters LifecycleCounters { get; } = EcologyLifecycleCounters.Empty;
+    public EcologyLifecycleCounters LifecycleCounters => _lifecycleCounters;
     public EcologyPlantCounters PlantCounters => _plantCounters;
+
+    public void ReportHerbivoreBirth()
+        => _lifecycleCounters = _lifecycleCounters with { HerbivoreBirths = _lifecycleCounters.HerbivoreBirths + 1 };
+
+    public void ReportHerbivoreStarvation()
+        => _lifecycleCounters = _lifecycleCounters with { HerbivoreStarvations = _lifecycleCounters.HerbivoreStarvations + 1 };
+
+    public void ReportHerbivoreMigration()
+        => _lifecycleCounters = _lifecycleCounters with { HerbivoreMigrations = _lifecycleCounters.HerbivoreMigrations + 1 };
+
+    public void ReportLandSafeSpawnFallback()
+        => _lifecycleCounters = _lifecycleCounters with { LandSafeSpawnFallbacks = _lifecycleCounters.LandSafeSpawnFallbacks + 1 };
 
     public static EcologyState Create(Tile[,] map, int width, int height, int regionSize = DefaultRegionSize)
     {

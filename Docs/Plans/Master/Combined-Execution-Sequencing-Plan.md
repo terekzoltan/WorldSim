@@ -2788,7 +2788,7 @@ E11 runtime performance note:
 
 - ✅ **E11-A** Ecology state contract - tile fertility, region capacity, initial/default plant biomass, aggregate passive lifecycle counters, and snapshot/export shape (Track B). Per-animal lifecycle fields/state are explicitly deferred to E11-C/E11-D.
 - ✅ **E11-B** Plant growth + region carrying capacity - deterministic growth, overgrazing, season/drought modifiers, and bounded caches (Track B)
-- ⬜ **E11-C** Herbivore lifecycle - energy, grazing, starvation, reproduction, migration pressure, and no normal respawn dependency (Track B)
+- ✅ **E11-C** Herbivore lifecycle - energy, grazing, starvation, reproduction, migration pressure, and no normal respawn dependency (Track B)
 - ⬜ **E11-D** Predator lifecycle - energy, hunting, capture gain, starvation, reproduction, and prey-linked capacity (Track B)
 - ⬜ **E11-E** Emergency rescue demotion - existing replenish/rescue becomes explicit debug/safety policy with separate counters (Track B)
 
@@ -2832,6 +2832,9 @@ E11-B closeout:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | E11-C | E11-B ✅ | Herbivores depend on plant capacity; predators depend on viable prey behavior; E11-C owns per-animal herbivore lifecycle fields/state/tests deferred from E11-A |
+
+E11-C closeout:
+- ✅ `E11-C` accepted GREEN after second fix-pass Meta step-review: herbivore lifecycle state/model is runtime-owned, grazing uses the E11-B `TryHarvest(... Food ...)` biomass seam, starvation/reproduction/migration counters are aggregate snapshot-safe, and lifecycle births are queued after animal iteration with target-region capacity/reservation/counter authority in `QueueHerbivoreBirth(...)`. The two review blockers were fixed: queued same-tick births now reserve capacity and `Herbivore.TryReproduce(...)` no longer parent-region pre-checks capacity before target-region selection. Focused tests cover same-region reservation, parent-region-full/neighboring-target-region-available success, all-targets-full clean failure with unchanged parent energy/cooldown, failed birth no-mutation, starvation-on-current-food before death, negative migration counter, and non-zero birth/migration snapshot parity. No Track A/C/ScenarioRunner, predator lifecycle, rescue demotion, food taxonomy, or animal snapshot-shape scope was introduced. Verification accepted: focused E11-C tests, full runtime tests, arch tests, solution build, optional full solution tests, syntax/diff/pre-check gates; SAST `World.cs` Random findings remain known pre-existing caveat.
 
 **Step 4a - predator lifecycle (Track B)**
 

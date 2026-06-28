@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using WorldSim.Simulation.Ecology;
 
 namespace WorldSim.Simulation;
 
@@ -161,6 +162,27 @@ public sealed class Herbivore : Animal
 
     public Herbivore((int x, int y) pos, Random? rng = null) : base(pos, speed: 1, vision: 5, rng ?? Random.Shared) { }
 
+    internal Herbivore(
+        (int x, int y) pos,
+        Random? rng,
+        float energy,
+        float age = AnimalLifecycleModel.HerbivoreMaturitySeconds,
+        float reproductionCooldown = 0f)
+        : this(pos, rng)
+    {
+        Energy = Math.Clamp(energy, 0f, AnimalLifecycleModel.HerbivoreMaxEnergy);
+        Age = Math.Max(0f, age);
+        ReproductionCooldown = Math.Max(0f, reproductionCooldown);
+    }
+
+    public float Energy { get; private set; } = AnimalLifecycleModel.HerbivoreInitialEnergy;
+    public float Age { get; private set; } = AnimalLifecycleModel.HerbivoreMaturitySeconds;
+    public float StarvationPressure { get; private set; }
+    public float ReproductionCooldown { get; private set; }
+    public float MigrationPressure { get; private set; }
+
+    bool _reportedStarvation;
+
     // Herbivores wander less frequently
     protected override double RandomStepChance => 0.5;
 
@@ -173,6 +195,35 @@ public sealed class Herbivore : Animal
         {
             IsAlive = false;
             return;
+        }
+
+        var lifecycle = AnimalLifecycleModel.TickHerbivore(
+            Energy,
+            Age,
+            StarvationPressure,
+            ReproductionCooldown,
+            MigrationPressure,
+            dt);
+        Energy = lifecycle.Energy;
+        Age = lifecycle.Age;
+        StarvationPressure = lifecycle.StarvationPressure;
+        ReproductionCooldown = lifecycle.ReproductionCooldown;
+        MigrationPressure = lifecycle.MigrationPressure;
+        var grazedThisTick = false;
+
+        if (lifecycle.Starved)
+        {
+            if (TryEatNearbyFood(w))
+            {
+                Energy = AnimalLifecycleModel.ApplyHerbivoreGrazing(Energy);
+                StarvationPressure = 0f;
+                grazedThisTick = true;
+            }
+            else
+            {
+                MarkStarved(w);
+                return;
+            }
         }
 
         // Look for nearest predator in vision
@@ -201,19 +252,26 @@ public sealed class Herbivore : Animal
             target = (Math.Clamp(target.x, 0, w.Width - 1), Math.Clamp(target.y, 0, w.Height - 1));
             StepTowards(w, target, Speed);
         }
-        else if (TryEatNearbyFood(w))
+        else if (!grazedThisTick && TryEatNearbyFood(w))
         {
-            // staying fed keeps herbivores clustered around food spots
+            Energy = AnimalLifecycleModel.ApplyHerbivoreGrazing(Energy);
+            StarvationPressure = 0f;
         }
         else if (TryMoveTowardsFood(w))
         {
             // move purposefully to food when calm
         }
+        else if (MigrationPressure >= AnimalLifecycleModel.HerbivoreMigrationPressureThreshold && TryMigrate(w))
+        {
+            MigrationPressure = 0f;
+        }
         else
         {
             // Wander calmly
             RandomStep(w, Speed);
-        }   
+        }
+
+        TryReproduce(w);
     }
 
     private bool TryEatNearbyFood(World w)
@@ -253,6 +311,45 @@ public sealed class Herbivore : Animal
 
         StepTowards(w, bestPos.Value, Speed);
         return true;
+    }
+
+    private bool TryMigrate(World w)
+    {
+        var before = Pos;
+        if (!w.TryFindHerbivoreMigrationTarget(Pos, Vision, out var target))
+            return false;
+
+        StepTowards(w, target, Speed);
+        if (Pos == before)
+            return false;
+
+        w.ReportHerbivoreMigration();
+        return true;
+    }
+
+    private void TryReproduce(World w)
+    {
+        if (!AnimalLifecycleModel.CanHerbivoreReproduce(
+                Energy,
+                Age,
+                ReproductionCooldown))
+            return;
+
+        if (!w.QueueHerbivoreBirth(this))
+            return;
+
+        Energy = AnimalLifecycleModel.ApplyHerbivoreReproductionCost(Energy);
+        ReproductionCooldown = AnimalLifecycleModel.HerbivoreReproductionCooldownSeconds;
+    }
+
+    private void MarkStarved(World w)
+    {
+        IsAlive = false;
+        if (_reportedStarvation)
+            return;
+
+        _reportedStarvation = true;
+        w.ReportHerbivoreStarvation();
     }
 }
 
