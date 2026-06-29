@@ -2790,7 +2790,7 @@ E11 runtime performance note:
 - ✅ **E11-B** Plant growth + region carrying capacity - deterministic growth, overgrazing, season/drought modifiers, and bounded caches (Track B)
 - ✅ **E11-C** Herbivore lifecycle - energy, grazing, starvation, reproduction, migration pressure, and no normal respawn dependency (Track B)
 - ✅ **E11-D** Predator lifecycle - energy, hunting, capture gain, starvation, reproduction, and prey-linked capacity (Track B)
-- ⬜ **E11-E** Emergency rescue demotion - existing replenish/rescue becomes explicit debug/safety policy with separate counters (Track B)
+- ✅ **E11-E** Emergency rescue demotion - existing replenish/rescue becomes explicit debug/safety policy with separate counters (Track B)
 
 ### Sprint E11-B: Behavior + Supply, then SMR Gates (Track C and Track B first, then SMR Analyst)
 
@@ -2850,6 +2850,9 @@ E11-D closeout:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | E11-E | E11-D ✅ | Rescue demotion should happen after both lifecycle paths can stand on their own |
+
+E11-E closeout:
+- ✅ `E11-E` accepted GREEN after Meta + Swarm review-fix synthesis: emergency rescue is now behind an explicit disabled-by-default `EmergencyRescuePolicy`, existing replenishment counter names remain compatible, emergency rescue count/policy/reason telemetry is exported, and ScenarioRunner has a focused `ECO-RESCUE-01` guard so normal assert lanes fail on rescue unless explicitly rescue-allowed. The review blocker was fixed before closeout: `EmergencyRescuePolicy.Disabled` now returns before RNG/counter/spawn work, `PreserveEmergencyRescueRandomCadence(...)` is removed, and a same-seed regression proves a disabled rescue probe does not change later enabled rescue counters, reason, animal type, or spawned position. `RelationDynamicsTests.SustainedBorderPressure_DegradesStance_OverTime` now pins adjacent actors in-test instead of relying on incidental seeded positioning. Verification accepted: focused E11-E Runtime/ScenarioRunner tests, relation regression, full Runtime tests, full ScenarioRunner tests, ArchTests, solution build, syntax check, and diff hygiene. Residual evidence route: E11-H must treat the explicit rescue-test `ECO-RESCUE-01` proof as invariant-specific, not full lane-health proof.
 
 **Step 5a - behavior and supply bridge open after lifecycle core**
 

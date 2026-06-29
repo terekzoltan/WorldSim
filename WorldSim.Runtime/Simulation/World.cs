@@ -131,6 +131,7 @@ namespace WorldSim.Simulation
         public bool EnableCombatPrimitives { get; set; }
         public bool EnableDiplomacy { get; set; }
         public bool EnableSiege { get; set; } = true;
+        public EmergencyRescuePolicy EmergencyRescuePolicy { get; set; } = EmergencyRescuePolicy.Disabled;
         public float PredatorHumanDamage { get; set; } = 10f;
         public float CombatDamageBonusMultiplier { get; set; } = 1f;
         public float CombatDefenseBonusMultiplier { get; set; } = 1f;
@@ -213,6 +214,7 @@ namespace WorldSim.Simulation
         public int TotalAiResearchTechDecisions { get; private set; }
         public int TotalHerbivoreReplenishmentSpawns { get; private set; }
         public int TotalPredatorReplenishmentSpawns { get; private set; }
+        public string LastEmergencyRescueReason { get; private set; } = EmergencyRescueReason.None.ToWireValue();
         public int TicksWithZeroHerbivores { get; private set; }
         public int TicksWithZeroPredators { get; private set; }
         public int? FirstZeroHerbivoreTick { get; private set; }
@@ -320,6 +322,9 @@ namespace WorldSim.Simulation
                 DepletedFoodNodes: depletedFoodNodes,
                 HerbivoreReplenishmentSpawns: TotalHerbivoreReplenishmentSpawns,
                 PredatorReplenishmentSpawns: TotalPredatorReplenishmentSpawns,
+                EmergencyRescues: BuildEcologyLifecycleCounters().EmergencyRescues,
+                EmergencyRescuePolicy: EmergencyRescuePolicy.ToWireValue(),
+                LastEmergencyRescueReason: LastEmergencyRescueReason,
                 TicksWithZeroHerbivores: TicksWithZeroHerbivores,
                 TicksWithZeroPredators: TicksWithZeroPredators,
                 FirstZeroHerbivoreTick: FirstZeroHerbivoreTick,
@@ -368,7 +373,8 @@ namespace WorldSim.Simulation
                 AnimalReplenishmentChancePerSecond,
                 PredatorReplenishmentChance,
                 FoodRegrowthMinSeconds,
-                FoodRegrowthJitterSeconds);
+                FoodRegrowthJitterSeconds,
+                EmergencyRescuePolicy.ToWireValue());
 
         public bool CanBuildFortifications(Colony colony)
         {
@@ -735,7 +741,7 @@ namespace WorldSim.Simulation
             FlushQueuedPredatorBirths();
 
             RecordEcologyPreReplenishmentState();
-            UpdateAnimalPopulation(dt);
+            UpdateEmergencyAnimalRescue(dt);
             UpdateMilestones();
 
             if (ResourceSharingEnabled && _colonies.Count > 1)
@@ -2853,8 +2859,11 @@ namespace WorldSim.Simulation
                 _recentEvents.RemoveAt(0);
         }
 
-        void UpdateAnimalPopulation(float dt)
+        void UpdateEmergencyAnimalRescue(float dt)
         {
+            if (EmergencyRescuePolicy == EmergencyRescuePolicy.Disabled)
+                return;
+
             int herbivores = _animals.Count(a => a is Herbivore && a.IsAlive);
             int predators = _animals.Count(a => a is Predator && a.IsAlive);
             bool predatorRescueCheck = predators == 0 && herbivores >= PredatorRescueMinHerbivores;
@@ -2867,6 +2876,7 @@ namespace WorldSim.Simulation
             {
                 _animals.Add(new Herbivore(RandomFreePos(), CreateEntityRng()));
                 TotalHerbivoreReplenishmentSpawns++;
+                ReportEmergencyRescue(EmergencyRescueReason.HerbivoreFloor);
                 herbivores++;
             }
 
@@ -2877,7 +2887,14 @@ namespace WorldSim.Simulation
             {
                 _animals.Add(new Predator(RandomFreePos(), CreateEntityRng()));
                 TotalPredatorReplenishmentSpawns++;
+                ReportEmergencyRescue(EmergencyRescueReason.PredatorExtinctWithPrey);
             }
+        }
+
+        void ReportEmergencyRescue(EmergencyRescueReason reason)
+        {
+            _ecologyState.ReportEmergencyRescue();
+            LastEmergencyRescueReason = reason.ToWireValue();
         }
 
         void FlushQueuedHerbivoreBirths()

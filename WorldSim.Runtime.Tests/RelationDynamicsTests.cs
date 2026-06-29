@@ -17,11 +17,17 @@ public class RelationDynamicsTests
 
         var a = world._colonies[0].Faction;
         var b = world._colonies[1].Faction;
+        var p0 = world._people.First(p => p.Home.Faction == a);
+        var p1 = world._people.First(p => p.Home.Faction == b);
 
         Assert.Equal(Stance.Neutral, world.GetFactionStance(a, b));
 
         for (int i = 0; i < 120; i++)
+        {
+            p0.Pos = (18, 12);
+            p1.Pos = (19, 12);
             world.Update(0.25f);
+        }
 
         var stance = world.GetFactionStance(a, b);
         Assert.True(stance is Stance.Hostile or Stance.War);

@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-29 - Wave 11 E11-E Step Review - Blocking - Disabled rescue policy must not consume runtime RNG
+
+- Track: Track B / Runtime emergency rescue demotion
+- Source: Meta + Swarm step-review synthesis for Wave 11 `E11-E`
+- Finding: The first E11-E implementation made emergency rescue default-disabled for spawn/counter behavior, but `EmergencyRescuePolicy.Disabled` still called `PreserveEmergencyRescueRandomCadence(...)`, which conditionally consumed `_rng.NextDouble()` in normal/default runs.
+- Impact: A disabled policy with hidden RNG consumption can change later deterministic simulation outcomes even when no rescue spawn or counter is emitted. That violates the E11-E contract that normal acceptance lanes must not depend on emergency rescue behavior unless explicitly enabled.
+- Resolution / guidance: Block closeout until disabled rescue is a pure no-op, or until compatibility cadence is promoted to an explicit non-default policy with documented semantics and focused deterministic tests. Add a same-seed regression proving disabled rescue invocation does not alter later downstream rescue placement/outcome.
+- Status: fixed and accepted in E11-E review-fix synthesis; E11-H evidence caveat remains active separately: rescue-test `ECO-RESCUE-01` proof is invariant-specific, not full lane-health proof
+
 ## 2026-06-29 - Wave 11 E11-D Step Review - Blocking - Predator death and capacity coverage must include edge paths
 
 - Track: Track B / Runtime predator lifecycle

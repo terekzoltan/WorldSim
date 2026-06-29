@@ -33,6 +33,9 @@ public sealed class EcologyTelemetryArtifactTests
         Assert.True(ecology.TryGetProperty("depletedFoodNodes", out _));
         Assert.True(ecology.TryGetProperty("herbivoreReplenishmentSpawns", out _));
         Assert.True(ecology.TryGetProperty("predatorReplenishmentSpawns", out _));
+        Assert.True(ecology.TryGetProperty("emergencyRescues", out _));
+        Assert.True(ecology.TryGetProperty("emergencyRescuePolicy", out _));
+        Assert.True(ecology.TryGetProperty("lastEmergencyRescueReason", out _));
         Assert.True(ecology.TryGetProperty("ticksWithZeroHerbivores", out _));
         Assert.True(ecology.TryGetProperty("ticksWithZeroPredators", out _));
         Assert.True(ecology.TryGetProperty("firstZeroHerbivoreTick", out _));
@@ -74,6 +77,9 @@ public sealed class EcologyTelemetryArtifactTests
         Assert.True(ecology.TryGetProperty("depletedFoodNodes", out _));
         Assert.True(ecology.TryGetProperty("herbivoreReplenishmentSpawns", out _));
         Assert.True(ecology.TryGetProperty("predatorReplenishmentSpawns", out _));
+        Assert.True(ecology.TryGetProperty("emergencyRescues", out _));
+        Assert.True(ecology.TryGetProperty("emergencyRescuePolicy", out _));
+        Assert.True(ecology.TryGetProperty("lastEmergencyRescueReason", out _));
         Assert.True(ecology.TryGetProperty("ticksWithZeroHerbivores", out _));
         Assert.True(ecology.TryGetProperty("ticksWithZeroPredators", out _));
     }
@@ -144,7 +150,7 @@ public sealed class EcologyTelemetryArtifactTests
     public void ConfigJson_EcologyBalanceValues_ArePersistedAsEffectiveValues()
     {
         var artifactDir = CreateArtifactDir();
-        var configJson = "[{\"Name\":\"ecology-balance\",\"Width\":32,\"Height\":20,\"InitialPop\":12,\"Ticks\":8,\"Dt\":0.25,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0,\"EnableSiege\":true,\"AnimalReplenishmentChancePerSecond\":0.25,\"PredatorReplenishmentChance\":0.75,\"FoodRegrowthMinSeconds\":9.0,\"FoodRegrowthJitterSeconds\":4.0}]";
+        var configJson = "[{\"Name\":\"ecology-balance\",\"Width\":32,\"Height\":20,\"InitialPop\":12,\"Ticks\":8,\"Dt\":0.25,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0,\"EnableSiege\":true,\"AnimalReplenishmentChancePerSecond\":0.25,\"PredatorReplenishmentChance\":0.75,\"FoodRegrowthMinSeconds\":9.0,\"FoodRegrowthJitterSeconds\":4.0,\"EmergencyRescuePolicy\":\"enabled\"}]";
 
         var exitCode = RunScenarioRunner(
             artifactDir,
@@ -158,13 +164,18 @@ public sealed class EcologyTelemetryArtifactTests
             out var stdout,
             out var stderr);
 
-        Assert.Equal(0, exitCode);
+        Assert.True(exitCode is 0 or 2, $"Unexpected exit code {exitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        using var assertions = ReadJson(Path.Combine(artifactDir, "assertions.json"));
+        Assert.Contains(assertions.RootElement.EnumerateArray(), assertion =>
+            assertion.GetProperty("invariantId").GetString() == "ECO-RESCUE-01"
+            && assertion.GetProperty("passed").GetBoolean());
         using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
         var balance = summary.RootElement.GetProperty("runs").EnumerateArray().First().GetProperty("ecologyBalance");
         Assert.Equal(0.25f, balance.GetProperty("animalReplenishmentChancePerSecond").GetSingle());
         Assert.Equal(0.75f, balance.GetProperty("predatorReplenishmentChance").GetSingle());
         Assert.Equal(9f, balance.GetProperty("foodRegrowthMinSeconds").GetSingle());
         Assert.Equal(4f, balance.GetProperty("foodRegrowthJitterSeconds").GetSingle());
+        Assert.Equal("enabled", balance.GetProperty("emergencyRescuePolicy").GetString());
     }
 
     [Fact]
@@ -185,13 +196,75 @@ public sealed class EcologyTelemetryArtifactTests
             out var stdout,
             out var stderr);
 
-        Assert.Equal(0, exitCode);
+        Assert.True(exitCode is 0 or 2, $"Unexpected exit code {exitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        using var assertions = ReadJson(Path.Combine(artifactDir, "assertions.json"));
+        Assert.Contains(assertions.RootElement.EnumerateArray(), assertion =>
+            assertion.GetProperty("invariantId").GetString() == "ECO-RESCUE-01"
+            && assertion.GetProperty("passed").GetBoolean());
         using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
         var balance = summary.RootElement.GetProperty("runs").EnumerateArray().First().GetProperty("ecologyBalance");
         Assert.Equal(1f, balance.GetProperty("animalReplenishmentChancePerSecond").GetSingle());
         Assert.Equal(0f, balance.GetProperty("predatorReplenishmentChance").GetSingle());
         Assert.True(balance.GetProperty("foodRegrowthMinSeconds").GetSingle() > 0f);
         Assert.Equal(3600f, balance.GetProperty("foodRegrowthJitterSeconds").GetSingle());
+        Assert.Equal("disabled", balance.GetProperty("emergencyRescuePolicy").GetString());
+    }
+
+    [Fact]
+    public void AssertMode_FailsNormalLaneWhenEmergencyRescueOccurs()
+    {
+        var artifactDir = CreateArtifactDir();
+        var configJson = "[{\"Name\":\"rescue-normal\",\"Width\":16,\"Height\":16,\"InitialPop\":12,\"Ticks\":1,\"Dt\":1.0,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0,\"EnableSiege\":true,\"AnimalReplenishmentChancePerSecond\":1.0,\"PredatorReplenishmentChance\":0.0,\"EmergencyRescuePolicy\":\"enabled\"}]";
+
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "727",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_ASSERT"] = "true",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.Equal(2, exitCode);
+        using var assertions = ReadJson(Path.Combine(artifactDir, "assertions.json"));
+        Assert.Contains(assertions.RootElement.EnumerateArray(), assertion =>
+            assertion.GetProperty("invariantId").GetString() == "ECO-RESCUE-01"
+            && !assertion.GetProperty("passed").GetBoolean());
+    }
+
+    [Fact]
+    public void AssertMode_AllowsExplicitRescueTestLane()
+    {
+        var artifactDir = CreateArtifactDir();
+        var configJson = "[{\"Name\":\"rescue-test\",\"Width\":16,\"Height\":16,\"InitialPop\":12,\"Ticks\":1,\"Dt\":1.0,\"EnableCombatPrimitives\":false,\"EnableDiplomacy\":false,\"StoneBuildingsEnabled\":false,\"BirthRateMultiplier\":1.0,\"MovementSpeedMultiplier\":1.0,\"EnableSiege\":true,\"AnimalReplenishmentChancePerSecond\":1.0,\"PredatorReplenishmentChance\":0.0,\"EmergencyRescuePolicy\":\"enabled\",\"AllowEmergencyRescueInAcceptance\":true}]";
+
+        var exitCode = RunScenarioRunner(
+            artifactDir,
+            new Dictionary<string, string>
+            {
+                ["WORLDSIM_SCENARIO_SEEDS"] = "728",
+                ["WORLDSIM_SCENARIO_PLANNERS"] = "simple",
+                ["WORLDSIM_SCENARIO_OUTPUT"] = "json",
+                ["WORLDSIM_SCENARIO_ASSERT"] = "true",
+                ["WORLDSIM_SCENARIO_CONFIGS_JSON"] = configJson
+            },
+            out var stdout,
+            out var stderr);
+
+        Assert.True(exitCode is 0 or 2, $"Unexpected exit code {exitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");
+        using var assertions = ReadJson(Path.Combine(artifactDir, "assertions.json"));
+        Assert.Contains(assertions.RootElement.EnumerateArray(), assertion =>
+            assertion.GetProperty("invariantId").GetString() == "ECO-RESCUE-01"
+            && assertion.GetProperty("passed").GetBoolean());
+        using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
+        var ecology = summary.RootElement.GetProperty("runs").EnumerateArray().First().GetProperty("ecology");
+        Assert.True(ecology.GetProperty("emergencyRescues").GetInt32() > 0);
+        Assert.Equal("enabled", ecology.GetProperty("emergencyRescuePolicy").GetString());
+        Assert.Equal("herbivore_floor", ecology.GetProperty("lastEmergencyRescueReason").GetString());
     }
 
     private static string RemoveEcologyBlocksFromSummary(string summaryPath)

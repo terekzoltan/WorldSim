@@ -9,6 +9,7 @@ using WorldSim.Simulation;
 using WorldSim.Simulation.Combat;
 using WorldSim.Simulation.Defense;
 using WorldSim.Simulation.Diplomacy;
+using WorldSim.Simulation.Ecology;
 using WorldSim.Simulation.Effects;
 using WorldSim.Simulation.Military;
 using WorldSim.Simulation.Navigation;
@@ -452,7 +453,8 @@ public sealed class SimulationRuntime
         float? animalReplenishmentChancePerSecond,
         float? predatorReplenishmentChance,
         float? foodRegrowthMinSeconds,
-        float? foodRegrowthJitterSeconds)
+        float? foodRegrowthJitterSeconds,
+        EmergencyRescuePolicy emergencyRescuePolicy)
     {
         _world.EnableCombatPrimitives = enableCombatPrimitives;
         _world.EnableDiplomacy = enableDiplomacy;
@@ -461,6 +463,7 @@ public sealed class SimulationRuntime
         _world.StoneBuildingsEnabled = stoneBuildingsEnabled;
         _world.BirthRateMultiplier = birthRateMultiplier;
         _world.MovementSpeedMultiplier = movementSpeedMultiplier;
+        _world.EmergencyRescuePolicy = emergencyRescuePolicy;
 
         if (animalReplenishmentChancePerSecond.HasValue)
             _world.AnimalReplenishmentChancePerSecond = animalReplenishmentChancePerSecond.Value;

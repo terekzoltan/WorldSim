@@ -1,6 +1,7 @@
 using System.Reflection;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Ecology;
 using Xunit;
 
 namespace WorldSim.Runtime.Tests;
@@ -22,6 +23,9 @@ public sealed class ScenarioEcologyTelemetryTests
         Assert.True(telemetry.DepletedFoodNodes >= 0);
         Assert.Equal(0, telemetry.HerbivoreReplenishmentSpawns);
         Assert.Equal(0, telemetry.PredatorReplenishmentSpawns);
+        Assert.Equal(0, telemetry.EmergencyRescues);
+        Assert.Equal("disabled", telemetry.EmergencyRescuePolicy);
+        Assert.Equal("none", telemetry.LastEmergencyRescueReason);
         Assert.Equal(0, telemetry.TicksWithZeroHerbivores);
         Assert.Equal(0, telemetry.TicksWithZeroPredators);
         Assert.Null(telemetry.FirstZeroHerbivoreTick);
@@ -53,13 +57,17 @@ public sealed class ScenarioEcologyTelemetryTests
         var world = new World(16, 16, 8, randomSeed: 91);
         world._animals.Clear();
 
-        var method = typeof(World).GetMethod("UpdateAnimalPopulation", BindingFlags.Instance | BindingFlags.NonPublic);
+        world.EmergencyRescuePolicy = EmergencyRescuePolicy.Enabled;
+        var method = typeof(World).GetMethod("UpdateEmergencyAnimalRescue", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
 
         method!.Invoke(world, new object[] { 200f });
         var afterSpawn = world.BuildScenarioEcologyTelemetrySnapshot();
         Assert.Equal(1, afterSpawn.HerbivoreReplenishmentSpawns);
         Assert.Equal(0, afterSpawn.PredatorReplenishmentSpawns);
+        Assert.Equal(1, afterSpawn.EmergencyRescues);
+        Assert.Equal("enabled", afterSpawn.EmergencyRescuePolicy);
+        Assert.Equal("herbivore_floor", afterSpawn.LastEmergencyRescueReason);
 
         method.Invoke(world, new object[] { 0f });
         var afterNoCheck = world.BuildScenarioEcologyTelemetrySnapshot();
@@ -90,6 +98,9 @@ public sealed class ScenarioEcologyTelemetryTests
             DepletedFoodNodes: 3,
             HerbivoreReplenishmentSpawns: 5,
             PredatorReplenishmentSpawns: 1,
+            EmergencyRescues: 3,
+            EmergencyRescuePolicy: "enabled",
+            LastEmergencyRescueReason: "predator_extinct_with_prey",
             TicksWithZeroHerbivores: 2,
             TicksWithZeroPredators: 7,
             FirstZeroHerbivoreTick: 11,
@@ -105,6 +116,9 @@ public sealed class ScenarioEcologyTelemetryTests
         Assert.Equal(3, timeline.DepletedFoodNodes);
         Assert.Equal(5, timeline.HerbivoreReplenishmentSpawns);
         Assert.Equal(1, timeline.PredatorReplenishmentSpawns);
+        Assert.Equal(3, timeline.EmergencyRescues);
+        Assert.Equal("enabled", timeline.EmergencyRescuePolicy);
+        Assert.Equal("predator_extinct_with_prey", timeline.LastEmergencyRescueReason);
         Assert.Equal(2, timeline.TicksWithZeroHerbivores);
         Assert.Equal(7, timeline.TicksWithZeroPredators);
     }
@@ -118,12 +132,14 @@ public sealed class ScenarioEcologyTelemetryTests
         Assert.Equal(World.DefaultPredatorReplenishmentChance, world.PredatorReplenishmentChance);
         Assert.Equal(World.DefaultFoodRegrowthMinSeconds, world.FoodRegrowthMinSeconds);
         Assert.Equal(World.DefaultFoodRegrowthJitterSeconds, world.FoodRegrowthJitterSeconds);
+        Assert.Equal(EmergencyRescuePolicy.Disabled, world.EmergencyRescuePolicy);
 
         var balance = world.BuildScenarioEcologyBalanceSnapshot();
         Assert.Equal(0.04f, balance.AnimalReplenishmentChancePerSecond);
         Assert.Equal(1.0f, balance.PredatorReplenishmentChance);
         Assert.Equal(18f, balance.FoodRegrowthMinSeconds);
         Assert.Equal(18f, balance.FoodRegrowthJitterSeconds);
+        Assert.Equal("disabled", balance.EmergencyRescuePolicy);
     }
 
     [Fact]
@@ -149,13 +165,14 @@ public sealed class ScenarioEcologyTelemetryTests
         var world = new World(16, 16, 8, randomSeed: 183)
         {
             AnimalReplenishmentChancePerSecond = 1f,
-            PredatorReplenishmentChance = 1f
+            PredatorReplenishmentChance = 1f,
+            EmergencyRescuePolicy = EmergencyRescuePolicy.Enabled
         };
         world._animals.Clear();
         for (var i = 0; i < 8; i++)
             world._animals.Add(new Herbivore((i, 1), new Random(200 + i)));
 
-        var method = typeof(World).GetMethod("UpdateAnimalPopulation", BindingFlags.Instance | BindingFlags.NonPublic);
+        var method = typeof(World).GetMethod("UpdateEmergencyAnimalRescue", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(world, new object[] { 1f });
 
@@ -170,13 +187,14 @@ public sealed class ScenarioEcologyTelemetryTests
         var world = new World(16, 16, 8, randomSeed: 185)
         {
             AnimalReplenishmentChancePerSecond = 1f,
-            PredatorReplenishmentChance = 1f
+            PredatorReplenishmentChance = 1f,
+            EmergencyRescuePolicy = EmergencyRescuePolicy.Enabled
         };
         world._animals.Clear();
         for (var i = 0; i < 7; i++)
             world._animals.Add(new Herbivore((i, 2), new Random(300 + i)));
 
-        var method = typeof(World).GetMethod("UpdateAnimalPopulation", BindingFlags.Instance | BindingFlags.NonPublic);
+        var method = typeof(World).GetMethod("UpdateEmergencyAnimalRescue", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(world, new object[] { 1f });
 
@@ -193,13 +211,14 @@ public sealed class ScenarioEcologyTelemetryTests
         var world = new World(16, 16, 8, randomSeed: 186)
         {
             AnimalReplenishmentChancePerSecond = 1f,
-            PredatorReplenishmentChance = 1f
+            PredatorReplenishmentChance = 1f,
+            EmergencyRescuePolicy = EmergencyRescuePolicy.Enabled
         };
         world._animals.Clear();
         for (var i = 0; i < 4; i++)
             world._animals.Add(new Herbivore((i, 3), new Random(400 + i)));
 
-        var method = typeof(World).GetMethod("UpdateAnimalPopulation", BindingFlags.Instance | BindingFlags.NonPublic);
+        var method = typeof(World).GetMethod("UpdateEmergencyAnimalRescue", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(world, new object[] { 1f });
 

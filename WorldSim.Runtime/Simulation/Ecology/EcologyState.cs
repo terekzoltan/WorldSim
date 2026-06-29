@@ -79,6 +79,9 @@ public sealed class EcologyState
     public void ReportLandSafeSpawnFallback()
         => _lifecycleCounters = _lifecycleCounters with { LandSafeSpawnFallbacks = _lifecycleCounters.LandSafeSpawnFallbacks + 1 };
 
+    public void ReportEmergencyRescue()
+        => _lifecycleCounters = _lifecycleCounters with { EmergencyRescues = _lifecycleCounters.EmergencyRescues + 1 };
+
     public static EcologyState Create(Tile[,] map, int width, int height, int regionSize = DefaultRegionSize)
     {
         regionSize = Math.Max(1, regionSize);

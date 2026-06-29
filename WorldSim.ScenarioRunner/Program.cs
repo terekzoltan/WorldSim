@@ -7,6 +7,7 @@ using WorldSim.Runtime;
 using WorldSim.Runtime.Diagnostics;
 using WorldSim.Runtime.Profiles;
 using WorldSim.Simulation;
+using WorldSim.Simulation.Ecology;
 using WorldSim.Simulation.Military;
 
 var outputMode = ParseOutputMode(Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_OUTPUT"));
@@ -408,7 +409,8 @@ static ScenarioRunResult BuildRunResult(
         Ecology: ecologyTelemetry,
         EcologyBalance: ecologyBalance,
         Supply: supplyTelemetry,
-        EnablePredatorHumanAttacks: world.EnablePredatorHumanAttacks);
+        EnablePredatorHumanAttacks: world.EnablePredatorHumanAttacks,
+        AllowEmergencyRescueInAcceptance: config.AllowEmergencyRescueInAcceptance);
 }
 
 static ScenarioRunResult RunRuntimeBackedWave10LifecycleScenario(
@@ -732,7 +734,8 @@ static SimulationRuntime CreateScenarioRuntime(ScenarioConfig config, NpcPlanner
                 config.AnimalReplenishmentChancePerSecond,
                 config.PredatorReplenishmentChance,
                 config.FoodRegrowthMinSeconds,
-                config.FoodRegrowthJitterSeconds);
+                config.FoodRegrowthJitterSeconds,
+                ParseEmergencyRescuePolicy(config.EmergencyRescuePolicy));
             return runtime;
         });
 
@@ -744,6 +747,8 @@ static void ApplyWave10LifecyclePreconditions(SimulationRuntime runtime, string?
 
 static void ApplyEcologyBalanceConfig(World world, ScenarioConfig config)
 {
+    world.EmergencyRescuePolicy = ParseEmergencyRescuePolicy(config.EmergencyRescuePolicy);
+
     if (config.AnimalReplenishmentChancePerSecond.HasValue)
         world.AnimalReplenishmentChancePerSecond = config.AnimalReplenishmentChancePerSecond.Value;
 
@@ -1903,6 +1908,9 @@ static List<ScenarioAssertionResult> EvaluateAssertions(IReadOnlyList<ScenarioRu
         AddAssertion("ECON-01", "economy", "error", runKey, assertEnabled, run.Food > 0, run.Food.ToString(), ">0", "Total food remains positive", results);
         AddAssertion("ECON-02", "economy", "info", runKey, assertEnabled, true, "informational", "informational", "Degenerate colony check is informational only", results);
 
+        var emergencyRescues = run.Ecology?.EmergencyRescues ?? 0;
+        AddAssertion("ECO-RESCUE-01", "ecology", "error", runKey, assertEnabled, run.AllowEmergencyRescueInAcceptance || emergencyRescues == 0, emergencyRescues.ToString(), "0 unless allowed", "Normal acceptance lanes do not depend on emergency rescue", results);
+
         if (!run.EnableCombatPrimitives)
         {
             AddSkippedAssertion("COMB-01", "combat", runKey, "combat_primitives_disabled", "Combat counters unavailable while combat primitives are disabled", results);
@@ -1930,6 +1938,9 @@ static List<ScenarioAssertionResult> EvaluateAssertions(IReadOnlyList<ScenarioRu
 
 static bool ShouldRequireCombatDeaths(ScenarioRunResult run)
     => run.CombatEngagements >= 50 || run.BattleTicks >= 30;
+
+static EmergencyRescuePolicy ParseEmergencyRescuePolicy(string? value)
+    => EmergencyRescuePolicyFormatter.ParsePolicyOrDisabled(value);
 
 static List<ScenarioAnomaly> DetectAnomalies(
     IReadOnlyList<ScenarioRunResult> runs,
@@ -2789,6 +2800,8 @@ sealed record ScenarioConfig(
     float? PredatorReplenishmentChance = null,
     float? FoodRegrowthMinSeconds = null,
     float? FoodRegrowthJitterSeconds = null,
+    string? EmergencyRescuePolicy = null,
+    bool AllowEmergencyRescueInAcceptance = false,
     string? SupplyScenario = null,
     string? Wave9Scenario = null,
     string? Wave10Scenario = null,
@@ -2854,7 +2867,8 @@ sealed record ScenarioRunResult(
     ScenarioEcologyTelemetrySnapshot? Ecology = null,
     ScenarioEcologyBalanceSnapshot? EcologyBalance = null,
     ScenarioSupplyTelemetrySnapshot? Supply = null,
-    bool EnablePredatorHumanAttacks = false);
+    bool EnablePredatorHumanAttacks = false,
+    bool AllowEmergencyRescueInAcceptance = false);
 
 sealed record ScenarioRunEnvelope(
     DateTime GeneratedAtUtc,
