@@ -475,6 +475,8 @@ namespace WorldSim.Simulation
         readonly HashSet<(int x, int y)> _plantBiomassRecovery = new();
         readonly List<Herbivore> _queuedHerbivoreBirths = new();
         readonly Dictionary<int, int> _queuedHerbivoreBirthsByRegion = new();
+        readonly List<Predator> _queuedPredatorBirths = new();
+        readonly Dictionary<int, int> _queuedPredatorBirthsByRegion = new();
         readonly List<string> _recentEvents = new();
         readonly HashSet<int> _houseMilestones = new();
         readonly HashSet<int> _extinctionMilestones = new();
@@ -730,6 +732,7 @@ namespace WorldSim.Simulation
             }
 
             FlushQueuedHerbivoreBirths();
+            FlushQueuedPredatorBirths();
 
             RecordEcologyPreReplenishmentState();
             UpdateAnimalPopulation(dt);
@@ -1210,8 +1213,13 @@ namespace WorldSim.Simulation
         public void ReportAnimalStuckRecovery() => TotalAnimalStuckRecoveries++;
         internal void ReportHerbivoreMigration() => _ecologyState.ReportHerbivoreMigration();
         internal void ReportHerbivoreStarvation() => _ecologyState.ReportHerbivoreStarvation();
+        internal void ReportPredatorStarvation() => _ecologyState.ReportPredatorStarvation();
         public void ReportPredatorDeath() => TotalPredatorDeaths++;
-        public void ReportPredatorKilledByHumans() => TotalPredatorKillsByHumans++;
+        public void ReportPredatorKilledByHumans()
+        {
+            TotalPredatorKillsByHumans++;
+            ReportPredatorDeath();
+        }
         public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
         public void ReportCombatEngagement() => TotalCombatEngagements++;
         public void ReportCombatDeath() => TotalCombatDeaths++;
@@ -1368,6 +1376,44 @@ namespace WorldSim.Simulation
 
         internal static int GetHerbivoreCapacityLimit(EcologyRegionSnapshot region)
             => Math.Max(2, (int)Math.Ceiling(region.CarryingCapacity * 2f));
+
+        internal bool QueuePredatorBirth(Predator parent)
+        {
+            if (parent == null || !parent.IsAlive)
+                return false;
+
+            if (!TryFindPredatorBirthPosition(parent.Pos, out var pos))
+                return false;
+
+            var regionId = GetEcologyTileState(pos.x, pos.y).RegionId;
+            if (!HasPredatorCapacityHeadroom(regionId))
+                return false;
+
+            _queuedPredatorBirthsByRegion[regionId] = _queuedPredatorBirthsByRegion.GetValueOrDefault(regionId) + 1;
+            _queuedPredatorBirths.Add(new Predator(
+                pos,
+                CreateEntityRng(),
+                energy: AnimalLifecycleModel.PredatorInitialEnergy,
+                age: 0f,
+                reproductionCooldown: AnimalLifecycleModel.PredatorReproductionCooldownSeconds));
+            _ecologyState.ReportPredatorBirth();
+            return true;
+        }
+
+        bool HasPredatorCapacityHeadroom(int regionId)
+        {
+            if (regionId < 0)
+                return false;
+
+            var region = BuildEcologyRegionSnapshots().FirstOrDefault(snapshot => snapshot.RegionId == regionId);
+            if (region == null)
+                return false;
+
+            return region.PredatorCount + _queuedPredatorBirthsByRegion.GetValueOrDefault(regionId) < GetPredatorCapacityLimit(region);
+        }
+
+        internal static int GetPredatorCapacityLimit(EcologyRegionSnapshot region)
+            => region.HerbivoreCount <= 0 ? 0 : Math.Max(1, region.HerbivoreCount / 4);
 
         internal bool TryFindHerbivoreMigrationTarget((int x, int y) origin, int radius, out (int x, int y) target)
         {
@@ -2845,6 +2891,96 @@ namespace WorldSim.Simulation
             _animals.AddRange(_queuedHerbivoreBirths);
             _queuedHerbivoreBirths.Clear();
             _queuedHerbivoreBirthsByRegion.Clear();
+        }
+
+        void FlushQueuedPredatorBirths()
+        {
+            if (_queuedPredatorBirths.Count == 0)
+            {
+                _queuedPredatorBirthsByRegion.Clear();
+                return;
+            }
+
+            _animals.AddRange(_queuedPredatorBirths);
+            _queuedPredatorBirths.Clear();
+            _queuedPredatorBirthsByRegion.Clear();
+        }
+
+        bool TryFindPredatorBirthPosition((int x, int y) parentPos, out (int x, int y) pos)
+        {
+            var parentRegion = GetEcologyTileState(parentPos.x, parentPos.y).RegionId;
+            if (TryFindPredatorBirthPosition(parentPos, parentRegion, sameRegionOnly: true, out pos))
+                return true;
+
+            if (TryFindPredatorBirthPosition(parentPos, parentRegion, sameRegionOnly: false, out pos))
+                return true;
+
+            for (var y = 0; y < Height; y++)
+            {
+                for (var x = 0; x < Width; x++)
+                {
+                    if (!IsValidHerbivoreLandTile(x, y))
+                        continue;
+
+                    var regionId = GetEcologyTileState(x, y).RegionId;
+                    if (!HasPredatorCapacityHeadroom(regionId))
+                        continue;
+
+                    pos = (x, y);
+                    _ecologyState.ReportLandSafeSpawnFallback();
+                    return true;
+                }
+            }
+
+            pos = parentPos;
+            return false;
+        }
+
+        bool TryFindPredatorBirthPosition((int x, int y) parentPos, int parentRegion, bool sameRegionOnly, out (int x, int y) pos)
+        {
+            const int MaxRadius = 5;
+            var regionsById = BuildEcologyRegionSnapshots().ToDictionary(region => region.RegionId);
+            (int x, int y)? best = null;
+            var bestScore = int.MinValue;
+
+            for (var radius = 1; radius <= MaxRadius; radius++)
+            {
+                for (var dy = -radius; dy <= radius; dy++)
+                {
+                    for (var dx = -radius; dx <= radius; dx++)
+                    {
+                        var md = Math.Abs(dx) + Math.Abs(dy);
+                        if (md == 0 || md > radius)
+                            continue;
+
+                        var x = parentPos.x + dx;
+                        var y = parentPos.y + dy;
+                        if (!IsValidHerbivoreLandTile(x, y))
+                            continue;
+
+                        var regionId = GetEcologyTileState(x, y).RegionId;
+                        if (sameRegionOnly && regionId != parentRegion)
+                            continue;
+
+                        if (!HasPredatorCapacityHeadroom(regionId))
+                            continue;
+
+                        var region = regionsById[regionId];
+                        var score = region.HerbivoreCount * 100 - md;
+                        if (score <= bestScore)
+                            continue;
+
+                        bestScore = score;
+                        best = (x, y);
+                    }
+                }
+
+                if (best != null)
+                    break;
+            }
+
+            pos = best ?? parentPos;
+            return best != null;
         }
 
         bool TryFindHerbivoreBirthPosition((int x, int y) parentPos, out (int x, int y) pos)

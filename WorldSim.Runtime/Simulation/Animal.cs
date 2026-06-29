@@ -364,10 +364,27 @@ public sealed class Predator : Animal
     private const double CaptureSuccessChance = 0.65;
     private const float MaxAgeYears = 95f;
 
-    private float _age;
     private float _hp = 40f;
-    private float _energy = 100f;
     private bool _reportedDeath;
+    bool _reportedStarvation;
+
+    internal Predator(
+        (int x, int y) pos,
+        Random? rng,
+        float energy,
+        float age = AnimalLifecycleModel.PredatorMaturitySeconds,
+        float reproductionCooldown = 0f)
+        : this(pos, rng)
+    {
+        Energy = Math.Clamp(energy, 0f, AnimalLifecycleModel.PredatorMaxEnergy);
+        Age = Math.Max(0f, age);
+        ReproductionCooldown = Math.Max(0f, reproductionCooldown);
+    }
+
+    public float Energy { get; private set; } = AnimalLifecycleModel.PredatorInitialEnergy;
+    public float Age { get; private set; }
+    public float StarvationPressure { get; private set; }
+    public float ReproductionCooldown { get; private set; }
 
     // Predators wander a bit more often than herbivores
     protected override double RandomStepChance => 0.8;
@@ -376,12 +393,26 @@ public sealed class Predator : Animal
     {
         if (!IsAlive) return;
 
-        _age += dt / 10f;
-        _energy = Math.Clamp(_energy - dt * 1.0f, 0f, 120f);
+        var lifecycle = AnimalLifecycleModel.TickPredator(
+            Energy,
+            Age,
+            StarvationPressure,
+            ReproductionCooldown,
+            dt);
+        Energy = lifecycle.Energy;
+        Age = lifecycle.Age;
+        StarvationPressure = lifecycle.StarvationPressure;
+        ReproductionCooldown = lifecycle.ReproductionCooldown;
 
-        if (_age > MaxAgeYears || _energy <= 0f)
+        if (Age > MaxAgeYears)
         {
             MarkDead(w);
+            return;
+        }
+
+        if (lifecycle.Starved)
+        {
+            MarkStarved(w);
             return;
         }
 
@@ -411,14 +442,15 @@ public sealed class Predator : Animal
             if (Pos == nearestPrey.Pos && nearestPrey.IsAlive && _rng.NextDouble() < CaptureSuccessChance)
             {
                 nearestPrey.IsAlive = false; // prey is removed by World after updates
-                _energy = Math.Clamp(_energy + 18f, 0f, 120f);
+                Energy = AnimalLifecycleModel.ApplyPredatorCaptureGain(Energy);
+                StarvationPressure = 0f;
             }
         }
         else
         {
             if (w.EnablePredatorHumanAttacks && TryHarassNearbyPerson(w))
             {
-                _energy = Math.Clamp(_energy + 4f, 0f, 120f);
+                Energy = AnimalLifecycleModel.ApplyPredatorHumanHarassGain(Energy);
             }
             else
             {
@@ -426,6 +458,8 @@ public sealed class Predator : Animal
                 RandomStep(w, Speed);
             }
         }
+
+        TryReproduce(w);
     }
 
     private bool TryHarassNearbyPerson(World w)
@@ -479,5 +513,31 @@ public sealed class Predator : Animal
 
         _reportedDeath = true;
         w.ReportPredatorDeath();
+    }
+
+    private void MarkStarved(World w)
+    {
+        IsAlive = false;
+        if (_reportedStarvation)
+            return;
+
+        _reportedStarvation = true;
+        w.ReportPredatorStarvation();
+        MarkDead(w);
+    }
+
+    private void TryReproduce(World w)
+    {
+        if (!AnimalLifecycleModel.CanPredatorReproduce(
+                Energy,
+                Age,
+                ReproductionCooldown))
+            return;
+
+        if (!w.QueuePredatorBirth(this))
+            return;
+
+        Energy = AnimalLifecycleModel.ApplyPredatorReproductionCost(Energy);
+        ReproductionCooldown = AnimalLifecycleModel.PredatorReproductionCooldownSeconds;
     }
 }

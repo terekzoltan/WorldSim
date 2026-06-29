@@ -2789,7 +2789,7 @@ E11 runtime performance note:
 - ✅ **E11-A** Ecology state contract - tile fertility, region capacity, initial/default plant biomass, aggregate passive lifecycle counters, and snapshot/export shape (Track B). Per-animal lifecycle fields/state are explicitly deferred to E11-C/E11-D.
 - ✅ **E11-B** Plant growth + region carrying capacity - deterministic growth, overgrazing, season/drought modifiers, and bounded caches (Track B)
 - ✅ **E11-C** Herbivore lifecycle - energy, grazing, starvation, reproduction, migration pressure, and no normal respawn dependency (Track B)
-- ⬜ **E11-D** Predator lifecycle - energy, hunting, capture gain, starvation, reproduction, and prey-linked capacity (Track B)
+- ✅ **E11-D** Predator lifecycle - energy, hunting, capture gain, starvation, reproduction, and prey-linked capacity (Track B)
 - ⬜ **E11-E** Emergency rescue demotion - existing replenish/rescue becomes explicit debug/safety policy with separate counters (Track B)
 
 ### Sprint E11-B: Behavior + Supply, then SMR Gates (Track C and Track B first, then SMR Analyst)
@@ -2841,6 +2841,9 @@ E11-C closeout:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | E11-D | E11-C ✅ | Predator reproduction/starvation should be tied to the stabilized prey loop; E11-D owns per-animal predator lifecycle fields/state/tests deferred from E11-A |
+
+E11-D closeout:
+- ✅ `E11-D` accepted GREEN after review-fix synthesis: predator lifecycle-local energy/age/starvation/reproduction state is runtime-owned, hunting/capture energy gain and starvation counters are covered, and predator lifecycle births use world-owned prey-linked target-region capacity/reservation in `QueuePredatorBirth(...)`. Review blockers were fixed before closeout: human-caused predator deaths are covered as non-starvation deaths and now increment `TotalPredatorDeaths`, and insufficient-prey capacity failure is covered when live prey exists but predator capacity is already full. Predator-human OFF remains guarded, rescue/replenishment demotion remains `E11-E` scope, land-safe newborn proof beyond all-land happy path is deferred to later ECO invariant/SMR coverage, and known `World.cs` Random SAST caveats remain accepted as pre-existing/non-E11-D findings.
 
 **Step 4b - rescue demotion after lifecycle paths stand alone (Track B)**
 

@@ -1,4 +1,5 @@
 using System.Reflection;
+using WorldSim.AI;
 using WorldSim.Runtime.ReadModel;
 using WorldSim.Simulation;
 using WorldSim.Simulation.Ecology;
@@ -247,6 +248,206 @@ public sealed class Wave11AnimalLifecycleTests
         var migrationSnapshotCounters = WorldSnapshotBuilder.Build(migrationWorld).EcologyDetails.LifecycleCounters;
         Assert.True(migrationRuntimeCounters.HerbivoreMigrations > 0);
         Assert.Equal(migrationRuntimeCounters.HerbivoreMigrations, migrationSnapshotCounters.HerbivoreMigrations);
+    }
+
+    [Fact]
+    public void PredatorHunting_CapturesPreyAndGainsEnergyWithoutReplenishment()
+    {
+        var world = CreateControlledWorld(seed: 11214);
+        var pos = FindLandTile(world);
+        var predator = new Predator(pos, new AlwaysCaptureRandom(), energy: 80f);
+        var prey = new Herbivore(pos, world.CreateEntityRng(), energy: 50f, reproductionCooldown: 30f);
+        world._animals.Add(predator);
+        world._animals.Add(prey);
+
+        world.Update(0f);
+        world.Update(0f);
+
+        Assert.True(predator.IsAlive);
+        Assert.False(prey.IsAlive);
+        Assert.DoesNotContain(prey, world._animals);
+        Assert.True(predator.Energy > 80f);
+        Assert.Equal(0, world.TotalPredatorReplenishmentSpawns);
+    }
+
+    [Fact]
+    public void PredatorStarvation_KillsAndIncrementsLifecycleCounter()
+    {
+        var world = CreateControlledWorld(seed: 11215);
+        var pos = FindLandTile(world);
+        var predator = new Predator(pos, world.CreateEntityRng(), energy: 0f);
+        world._animals.Add(predator);
+
+        world.Update(1f);
+        world.Update(1f);
+
+        Assert.False(predator.IsAlive);
+        Assert.DoesNotContain(predator, world._animals);
+        Assert.Equal(1, world.BuildEcologyLifecycleCounters().PredatorStarvations);
+        Assert.Equal(1, world.TotalPredatorDeaths);
+    }
+
+    [Fact]
+    public void PredatorReproduction_UsesPreyLinkedTargetRegionCapacityWithoutReplenishment()
+    {
+        var world = CreateControlledWorld(seed: 11216, width: 16, height: 16);
+        var parentPos = (x: 0, y: 0);
+        var predator = new Predator(parentPos, world.CreateEntityRng(), energy: AnimalLifecycleModel.PredatorMaxEnergy);
+        world._animals.Add(predator);
+        for (var i = 0; i < 8; i++)
+            world._animals.Add(new Herbivore((x: 8 + i % 4, y: 8 + i / 4), world.CreateEntityRng(), energy: 50f, reproductionCooldown: 30f));
+
+        world.Update(0f);
+
+        var predators = world._animals.OfType<Predator>().ToList();
+        Assert.Equal(2, predators.Count);
+        Assert.Equal(1, world.BuildEcologyLifecycleCounters().PredatorBirths);
+        Assert.Equal(0, world.TotalPredatorReplenishmentSpawns);
+        Assert.True(predator.ReproductionCooldown > 0f);
+        Assert.True(predator.Energy < AnimalLifecycleModel.PredatorMaxEnergy);
+        Assert.All(predators, p => Assert.NotEqual(Ground.Water, world.GetTile(p.Pos.x, p.Pos.y).Ground));
+    }
+
+    [Fact]
+    public void PredatorReproduction_NoPreyCapacityDoesNotMutateParentOrBirthCounter()
+    {
+        var world = CreateControlledWorld(seed: 11217);
+        var pos = FindLandTile(world);
+        var predator = new Predator(pos, world.CreateEntityRng(), energy: AnimalLifecycleModel.PredatorMaxEnergy);
+        world._animals.Add(predator);
+        var beforeEnergy = predator.Energy;
+        var beforeCooldown = predator.ReproductionCooldown;
+
+        world.Update(0f);
+
+        Assert.Equal(beforeEnergy, predator.Energy);
+        Assert.Equal(beforeCooldown, predator.ReproductionCooldown);
+        Assert.Single(world._animals.OfType<Predator>());
+        Assert.Equal(0, world.BuildEcologyLifecycleCounters().PredatorBirths);
+    }
+
+    [Fact]
+    public void PredatorReproduction_InsufficientPreyCapacityDoesNotMutateParentOrBirthCounter()
+    {
+        var world = CreateControlledWorld(seed: 11223, width: 16, height: 16);
+        var parentPos = (x: 0, y: 0);
+        var parent = new Predator(parentPos, world.CreateEntityRng(), energy: AnimalLifecycleModel.PredatorMaxEnergy);
+        var existingPredator = new Predator((x: 1, y: 0), world.CreateEntityRng(), energy: 50f, reproductionCooldown: 30f);
+        world._animals.Add(parent);
+        world._animals.Add(existingPredator);
+        for (var i = 0; i < 8; i++)
+            world._animals.Add(new Herbivore((x: 8 + i % 4, y: 8 + i / 4), world.CreateEntityRng(), energy: 50f, reproductionCooldown: 30f));
+
+        var beforeEnergy = parent.Energy;
+        var beforeCooldown = parent.ReproductionCooldown;
+
+        world.Update(0f);
+
+        Assert.Equal(2, world._animals.OfType<Predator>().Count());
+        Assert.Equal(beforeEnergy, parent.Energy);
+        Assert.Equal(beforeCooldown, parent.ReproductionCooldown);
+        Assert.Equal(0, world.BuildEcologyLifecycleCounters().PredatorBirths);
+        Assert.Equal(0, world.TotalPredatorReplenishmentSpawns);
+    }
+
+    [Fact]
+    public void PredatorNonStarvationDeaths_DoNotIncrementPredatorStarvations()
+    {
+        var oldAgeWorld = CreateControlledWorld(seed: 11218);
+        var oldAgePredator = new Predator(FindLandTile(oldAgeWorld), oldAgeWorld.CreateEntityRng(), energy: 80f, age: 96f);
+        oldAgeWorld._animals.Add(oldAgePredator);
+        oldAgeWorld.Update(0f);
+
+        Assert.Equal(0, oldAgeWorld.BuildEcologyLifecycleCounters().PredatorStarvations);
+        Assert.Equal(1, oldAgeWorld.TotalPredatorDeaths);
+
+        var towerWorld = CreateControlledWorld(seed: 11219);
+        var towerPredator = new Predator(FindLandTile(towerWorld), towerWorld.CreateEntityRng(), energy: 80f);
+        towerWorld._animals.Add(towerPredator);
+        towerPredator.ApplyTowerDamage(towerWorld, damage: 999f);
+
+        Assert.False(towerPredator.IsAlive);
+        Assert.Equal(0, towerWorld.BuildEcologyLifecycleCounters().PredatorStarvations);
+        Assert.Equal(1, towerWorld.TotalPredatorDeaths);
+
+        var humanWorld = CreateControlledWorld(seed: 11224);
+        humanWorld.EnableCombatPrimitives = true;
+        humanWorld.EnablePredatorHumanAttacks = true;
+        var humanKillPos = FindLandTile(humanWorld);
+        var humanKilledPredator = new Predator(humanKillPos, humanWorld.CreateEntityRng(), energy: 80f);
+        humanWorld._animals.Add(humanKilledPredator);
+        var fighter = Person.Spawn(
+            humanWorld._colonies[0],
+            humanKillPos,
+            new RuntimeNpcBrain(new FixedBrain(NpcCommand.Fight)),
+            new AlwaysCaptureRandom(),
+            humanWorld.AllocatePersonId());
+        fighter.Strength = 80;
+        fighter.Defense = 80;
+        fighter.Health = 300f;
+        fighter.Current = Job.Fight;
+        typeof(Person).GetField("_doingJob", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(fighter, 1);
+        humanWorld._people.Add(fighter);
+        for (var i = 0; i < 20 && humanKilledPredator.IsAlive; i++)
+            humanWorld.Update(0.25f);
+
+        Assert.False(humanKilledPredator.IsAlive);
+        Assert.Equal(0, humanWorld.BuildEcologyLifecycleCounters().PredatorStarvations);
+        Assert.Equal(1, humanWorld.TotalPredatorKillsByHumans);
+        Assert.Equal(1, humanWorld.TotalPredatorDeaths);
+    }
+
+    [Fact]
+    public void PredatorHumanAttacks_Off_RemainsDisabledAfterLifecycleRefactor()
+    {
+        var world = CreateControlledWorld(seed: 11220);
+        world.EnablePredatorHumanAttacks = false;
+        world.EnableCombatPrimitives = true;
+        var predator = new Predator((10, 10), world.CreateEntityRng(), energy: 80f);
+        world._animals.Add(predator);
+        var colony = world._colonies[0];
+        var person = Person.Spawn(
+            colony,
+            (10, 10),
+            new RuntimeNpcBrain(new FixedBrain(NpcCommand.Idle)),
+            world.CreateEntityRng(),
+            world.AllocatePersonId());
+        person.Health = 300f;
+        person.Current = Job.Fight;
+        world._people.Add(person);
+        var startHealth = person.Health;
+
+        for (var i = 0; i < 20; i++)
+            world.Update(0.25f);
+
+        Assert.Equal(0, world.TotalPredatorHumanHits);
+        Assert.Equal(0, world.TotalPredatorKillsByHumans);
+        Assert.True(person.Health >= startHealth - 0.001f);
+    }
+
+    [Fact]
+    public void SnapshotLifecycleCounters_IncludeNonZeroPredatorBirthsAndStarvations()
+    {
+        var birthWorld = CreateControlledWorld(seed: 11221, width: 16, height: 16);
+        birthWorld._animals.Add(new Predator((0, 0), birthWorld.CreateEntityRng(), energy: AnimalLifecycleModel.PredatorMaxEnergy));
+        for (var i = 0; i < 8; i++)
+            birthWorld._animals.Add(new Herbivore((x: 8 + i % 4, y: 8 + i / 4), birthWorld.CreateEntityRng(), energy: 50f, reproductionCooldown: 30f));
+        birthWorld.Update(0f);
+
+        var birthRuntimeCounters = birthWorld.BuildEcologyLifecycleCounters();
+        var birthSnapshotCounters = WorldSnapshotBuilder.Build(birthWorld).EcologyDetails.LifecycleCounters;
+        Assert.True(birthRuntimeCounters.PredatorBirths > 0);
+        Assert.Equal(birthRuntimeCounters.PredatorBirths, birthSnapshotCounters.PredatorBirths);
+
+        var starvationWorld = CreateControlledWorld(seed: 11222);
+        starvationWorld._animals.Add(new Predator(FindLandTile(starvationWorld), starvationWorld.CreateEntityRng(), energy: 0f));
+        starvationWorld.Update(1f);
+        starvationWorld.Update(1f);
+
+        var starvationRuntimeCounters = starvationWorld.BuildEcologyLifecycleCounters();
+        var starvationSnapshotCounters = WorldSnapshotBuilder.Build(starvationWorld).EcologyDetails.LifecycleCounters;
+        Assert.True(starvationRuntimeCounters.PredatorStarvations > 0);
+        Assert.Equal(starvationRuntimeCounters.PredatorStarvations, starvationSnapshotCounters.PredatorStarvations);
     }
 
     static World CreateControlledWorld(int seed, int width = 32, int height = 20)
@@ -522,4 +723,34 @@ public sealed class Wave11AnimalLifecycleTests
         (int x, int y) ParentPos,
         int ParentRegionCapacity,
         int TargetRegionCapacity);
+
+    sealed class AlwaysCaptureRandom : Random
+    {
+        public override double NextDouble() => 0.0;
+    }
+
+    sealed class FixedBrain : INpcDecisionBrain
+    {
+        readonly NpcCommand _command;
+
+        public FixedBrain(NpcCommand command)
+        {
+            _command = command;
+        }
+
+        public AiDecisionResult Think(in NpcAiContext context)
+        {
+            var trace = new AiDecisionTrace(
+                SelectedGoal: "Fixed",
+                PlannerName: "Fixed",
+                PolicyName: "Fixed",
+                PlanLength: 1,
+                PlanPreview: new[] { _command },
+                PlanCost: 1,
+                ReplanReason: "Fixed",
+                MethodName: "Fixed",
+                GoalScores: Array.Empty<GoalScoreEntry>());
+            return new AiDecisionResult(_command, trace);
+        }
+    }
 }

@@ -70,6 +70,12 @@ public sealed class EcologyState
     public void ReportHerbivoreMigration()
         => _lifecycleCounters = _lifecycleCounters with { HerbivoreMigrations = _lifecycleCounters.HerbivoreMigrations + 1 };
 
+    public void ReportPredatorBirth()
+        => _lifecycleCounters = _lifecycleCounters with { PredatorBirths = _lifecycleCounters.PredatorBirths + 1 };
+
+    public void ReportPredatorStarvation()
+        => _lifecycleCounters = _lifecycleCounters with { PredatorStarvations = _lifecycleCounters.PredatorStarvations + 1 };
+
     public void ReportLandSafeSpawnFallback()
         => _lifecycleCounters = _lifecycleCounters with { LandSafeSpawnFallbacks = _lifecycleCounters.LandSafeSpawnFallbacks + 1 };
 

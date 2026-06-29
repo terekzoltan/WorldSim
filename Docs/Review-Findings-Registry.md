@@ -26,6 +26,15 @@ Severity guide:
 
 Entries:
 
+## 2026-06-29 - Wave 11 E11-D Step Review - Blocking - Predator death and capacity coverage must include edge paths
+
+- Track: Track B / Runtime predator lifecycle
+- Source: Meta + Swarm step-review synthesis for Wave 11 `E11-D`
+- Finding: The first E11-D implementation covered the main predator lifecycle paths, but missed two blocking edge proofs: human-caused predator kills were not covered as non-starvation deaths that also increment global predator deaths, and predator reproduction capacity failure was not tested for the case where live prey exists but prey-linked predator capacity is already full.
+- Impact: E11-D could appear green while death accounting diverged by kill source, or while predator birth capacity only worked for the trivial no-prey case. Both gaps would weaken later E11-E rescue demotion and ECO invariant evidence that must distinguish lifecycle deaths/births from emergency safety policies.
+- Resolution / guidance: Fixed before closeout. `ReportPredatorKilledByHumans()` now increments `TotalPredatorDeaths`, focused tests cover human-caused predator death as non-starvation, and insufficient-prey capacity failure is tested with live prey present but predator capacity already full while parent energy/cooldown and birth counters remain unchanged. Land-safe newborn proof beyond all-land happy path remains a later ECO invariant/SMR follow-up, not an E11-D blocker.
+- Status: fixed and accepted in E11-D review-fix closeout
+
 ## 2026-06-28 - Wave 11 E11-C Step Review - Blocking - Queued reproduction must reserve regional capacity
 
 - Track: Track B / Runtime herbivore lifecycle
