@@ -98,6 +98,7 @@ namespace WorldSim.Simulation
         public List<DefensiveStructure> DefensiveStructures = new();
         public List<Animal> _animals = new();
         EcologyState _ecologyState = null!;
+        readonly ScenarioInitialEcologyTelemetrySnapshot _initialEcologyTelemetry = ScenarioInitialEcologyTelemetrySnapshot.Empty;
 
         // Technology-affected properties
         public int WoodYield { get; set; } = 1; // Fa kitermelés hozama (mennyi fát kapnak egy gyűjtéskor)
@@ -219,6 +220,13 @@ namespace WorldSim.Simulation
         public int TicksWithZeroPredators { get; private set; }
         public int? FirstZeroHerbivoreTick { get; private set; }
         public int? FirstZeroPredatorTick { get; private set; }
+        int? _firstPredatorHumanContactTick;
+        int? _firstPredatorHuntTick;
+        int? _firstHerbivoreGrazingTick;
+        int? _firstPredatorDeathTick;
+        int? _firstHerbivoreDeathTick;
+        int? _firstPredatorBirthTick;
+        int? _firstHerbivoreBirthTick;
         public int DenseNeighborhoodTicks { get; private set; }
         public int LastTickDenseActors { get; private set; }
         public int ActiveCombatGroupCount => _activeCombatGroups.Count;
@@ -314,6 +322,7 @@ namespace WorldSim.Simulation
             var (activeFoodNodes, depletedFoodNodes) = CountFoodNodes();
             var herbivores = _animals.Count(a => a is Herbivore && a.IsAlive);
             var predators = _animals.Count(a => a is Predator && a.IsAlive);
+            var supplyCounters = BuildEcologySupplyCounters();
 
             return new ScenarioEcologyTelemetrySnapshot(
                 Herbivores: herbivores,
@@ -323,6 +332,11 @@ namespace WorldSim.Simulation
                 HerbivoreReplenishmentSpawns: TotalHerbivoreReplenishmentSpawns,
                 PredatorReplenishmentSpawns: TotalPredatorReplenishmentSpawns,
                 EmergencyRescues: BuildEcologyLifecycleCounters().EmergencyRescues,
+                PlantFoodProduced: supplyCounters.PlantFoodProduced,
+                MeatFoodProduced: supplyCounters.MeatFoodProduced,
+                PlantFoodConsumedByAnimals: supplyCounters.PlantFoodConsumedByAnimals,
+                MeatFromHunt: supplyCounters.MeatFromHunt,
+                SupplyBridgeSkippedByNoBiomass: supplyCounters.SupplyBridgeSkippedByNoBiomass,
                 EmergencyRescuePolicy: EmergencyRescuePolicy.ToWireValue(),
                 LastEmergencyRescueReason: LastEmergencyRescueReason,
                 TicksWithZeroHerbivores: TicksWithZeroHerbivores,
@@ -330,8 +344,145 @@ namespace WorldSim.Simulation
                 FirstZeroHerbivoreTick: FirstZeroHerbivoreTick,
                 FirstZeroPredatorTick: FirstZeroPredatorTick,
                 PredatorDeaths: TotalPredatorDeaths,
-                PredatorHumanHits: TotalPredatorHumanHits);
+                PredatorHumanHits: TotalPredatorHumanHits,
+                FirstPredatorHumanContactTick: _firstPredatorHumanContactTick,
+                FirstPredatorHuntTick: _firstPredatorHuntTick,
+                FirstHerbivoreGrazingTick: _firstHerbivoreGrazingTick,
+                FirstPredatorDeathTick: _firstPredatorDeathTick,
+                FirstHerbivoreDeathTick: _firstHerbivoreDeathTick,
+                FirstPredatorBirthTick: _firstPredatorBirthTick,
+                FirstHerbivoreBirthTick: _firstHerbivoreBirthTick);
         }
+
+        public ScenarioInitialEcologyTelemetrySnapshot BuildScenarioInitialEcologyTelemetrySnapshot()
+            => _initialEcologyTelemetry;
+
+        ScenarioInitialEcologyTelemetrySnapshot CaptureInitialEcologyTelemetry()
+        {
+            var herbivores = _animals
+                .OfType<Herbivore>()
+                .Where(animal => animal.IsAlive)
+                .ToList();
+            var predators = _animals
+                .OfType<Predator>()
+                .Where(animal => animal.IsAlive)
+                .ToList();
+            var livingPeople = _people
+                .Where(person => person.Health > 0f)
+                .ToList();
+            var activeFoodPositions = new List<(int x, int y)>();
+            var activeFoodByRegion = new Dictionary<int, int>();
+
+            for (var y = 0; y < Height; y++)
+            {
+                for (var x = 0; x < Width; x++)
+                {
+                    if (!IsActiveFoodNode(_map[x, y].Node))
+                        continue;
+
+                    activeFoodPositions.Add((x, y));
+                    var regionId = GetEcologyTileState(x, y).RegionId;
+                    activeFoodByRegion[regionId] = activeFoodByRegion.GetValueOrDefault(regionId) + 1;
+                }
+            }
+
+            var regionSnapshots = BuildEcologyRegionSnapshots()
+                .OrderBy(region => region.RegionId)
+                .Select(region => new ScenarioInitialEcologyRegionSnapshot(
+                    RegionId: region.RegionId,
+                    LandTileCount: region.LandTileCount,
+                    PlantCapacityTotal: region.PlantCapacityTotal,
+                    ActiveFoodNodes: activeFoodByRegion.GetValueOrDefault(region.RegionId),
+                    Herbivores: region.HerbivoreCount,
+                    Predators: region.PredatorCount))
+                .ToArray();
+            var viableRegions = regionSnapshots
+                .Where(region => region.LandTileCount > 0 && region.PlantCapacityTotal > 0f)
+                .ToArray();
+            var herbivorePositions = herbivores.Select(animal => animal.Pos).ToArray();
+            var predatorPositions = predators.Select(animal => animal.Pos).ToArray();
+            var personPositions = livingPeople.Select(person => person.Pos).ToArray();
+
+            return new ScenarioInitialEcologyTelemetrySnapshot(
+                InitialAnimalPolicy: "legacy_random",
+                InitialAnimalPolicySource: "runtime_default",
+                TotalAnimals: herbivores.Count + predators.Count,
+                Herbivores: herbivores.Count,
+                Predators: predators.Count,
+                PredatorHerbivoreRatio: herbivores.Count > 0 ? predators.Count / (double)herbivores.Count : null,
+                AnimalsOnWater: _animals.Count(animal =>
+                    animal.IsAlive && GetTile(animal.Pos.x, animal.Pos.y).Ground == Ground.Water),
+                AnimalsOnMovementBlockedTiles: _animals.Count(animal =>
+                    animal.IsAlive && IsMovementBlocked(animal.Pos.x, animal.Pos.y, moverColonyId: -1)),
+                ViableRegions: viableRegions.Length,
+                ViableRegionsWithoutHerbivores: viableRegions.Count(region => region.Herbivores == 0),
+                PredatorsInPreyEmptyRegions: regionSnapshots
+                    .Where(region => region.Herbivores == 0)
+                    .Sum(region => region.Predators),
+                HerbivoresWithFoodInVision: CountScenarioEcologySourcesWithinRadius(
+                    herbivorePositions,
+                    activeFoodPositions,
+                    InitialEcologyFoodVisionRadius),
+                PredatorsWithPreyInVision: CountScenarioEcologySourcesWithinRadius(
+                    predatorPositions,
+                    herbivorePositions,
+                    InitialEcologyPreyVisionRadius),
+                PredatorsWithinHumanHarassRadius: CountScenarioEcologySourcesWithinRadius(
+                    predatorPositions,
+                    personPositions,
+                    InitialEcologyHumanHarassRadius),
+                PredatorsWithinEarlyHumanContactRadius: CountScenarioEcologySourcesWithinRadius(
+                    predatorPositions,
+                    personPositions,
+                    InitialEcologyEarlyHumanContactRadius),
+                FoodVisionRadius: InitialEcologyFoodVisionRadius,
+                PreyVisionRadius: InitialEcologyPreyVisionRadius,
+                HumanHarassRadius: InitialEcologyHumanHarassRadius,
+                EarlyHumanContactRadius: InitialEcologyEarlyHumanContactRadius,
+                HerbivoreToNearestFoodDistance: BuildScenarioEcologyDistanceSummary(
+                    herbivorePositions,
+                    activeFoodPositions),
+                PredatorToNearestPreyDistance: BuildScenarioEcologyDistanceSummary(
+                    predatorPositions,
+                    herbivorePositions),
+                PredatorToNearestPersonDistance: BuildScenarioEcologyDistanceSummary(
+                    predatorPositions,
+                    personPositions),
+                Regions: Array.AsReadOnly(regionSnapshots.ToArray()));
+        }
+
+        internal static ScenarioEcologyDistanceSummarySnapshot BuildScenarioEcologyDistanceSummary(
+            IReadOnlyList<(int x, int y)> sources,
+            IReadOnlyList<(int x, int y)> targets)
+        {
+            if (sources.Count == 0 || targets.Count == 0)
+                return ScenarioEcologyDistanceSummarySnapshot.Empty;
+
+            var distances = sources
+                .Select(source => targets.Min(target => ScenarioEcologyManhattan(source, target)))
+                .ToArray();
+            return new ScenarioEcologyDistanceSummarySnapshot(
+                SampleCount: distances.Length,
+                Minimum: distances.Min(),
+                Maximum: distances.Max(),
+                Average: distances.Average());
+        }
+
+        internal static int CountScenarioEcologySourcesWithinRadius(
+            IReadOnlyList<(int x, int y)> sources,
+            IReadOnlyList<(int x, int y)> targets,
+            int radius)
+        {
+            if (sources.Count == 0 || targets.Count == 0)
+                return 0;
+
+            var boundedRadius = Math.Max(0, radius);
+            return sources.Count(source =>
+                targets.Any(target => ScenarioEcologyManhattan(source, target) <= boundedRadius));
+        }
+
+        static int ScenarioEcologyManhattan((int x, int y) left, (int x, int y) right)
+            => Math.Abs(left.x - right.x) + Math.Abs(left.y - right.y);
 
         public ScenarioSupplyTelemetrySnapshot BuildScenarioSupplyTelemetrySnapshot()
         {
@@ -559,6 +710,10 @@ namespace WorldSim.Simulation
         const int CrowdDissipationNeighborRadius = 2;
         const int CrowdDissipationSearchRadius = 4;
         const int CrowdDissipationThreshold = 4;
+        const int InitialEcologyFoodVisionRadius = 5;
+        const int InitialEcologyPreyVisionRadius = 6;
+        const int InitialEcologyHumanHarassRadius = 2;
+        const int InitialEcologyEarlyHumanContactRadius = 6;
 
         int _lastTerritoryRecomputeTick;
         bool _territoryDirty = true;
@@ -662,6 +817,7 @@ namespace WorldSim.Simulation
                 _animals.Add(Animal.Spawn(RandomFreePos(), CreateEntityRng()));
 
             _ecologyState = EcologyState.Create(_map, Width, Height);
+            _initialEcologyTelemetry = CaptureInitialEcologyTelemetry();
 
             InitializeFactionStances();
 
@@ -732,9 +888,14 @@ namespace WorldSim.Simulation
             // Animals: update and remove the dead
             for (int i = _animals.Count - 1; i >= 0; i--)
             {
-                _animals[i].Update(this, dt);
-                if (!_animals[i].IsAlive)
+                var animal = _animals[i];
+                animal.Update(this, dt);
+                if (!animal.IsAlive)
+                {
+                    if (animal is Herbivore)
+                        _firstHerbivoreDeathTick ??= _tickCounter;
                     _animals.RemoveAt(i);
+                }
             }
 
             FlushQueuedHerbivoreBirths();
@@ -1220,13 +1381,21 @@ namespace WorldSim.Simulation
         internal void ReportHerbivoreMigration() => _ecologyState.ReportHerbivoreMigration();
         internal void ReportHerbivoreStarvation() => _ecologyState.ReportHerbivoreStarvation();
         internal void ReportPredatorStarvation() => _ecologyState.ReportPredatorStarvation();
-        public void ReportPredatorDeath() => TotalPredatorDeaths++;
+        public void ReportPredatorDeath()
+        {
+            TotalPredatorDeaths++;
+            _firstPredatorDeathTick ??= _tickCounter;
+        }
         public void ReportPredatorKilledByHumans()
         {
             TotalPredatorKillsByHumans++;
             ReportPredatorDeath();
         }
-        public void ReportPredatorHumanHit() => TotalPredatorHumanHits++;
+        public void ReportPredatorHumanHit()
+        {
+            TotalPredatorHumanHits++;
+            _firstPredatorHumanContactTick ??= _tickCounter;
+        }
         public void ReportCombatEngagement() => TotalCombatEngagements++;
         public void ReportCombatDeath() => TotalCombatDeaths++;
         internal void ReportInventoryFoodConsumed() => TotalInventoryFoodConsumed++;
@@ -1338,6 +1507,69 @@ namespace WorldSim.Simulation
         public EcologyPlantCounters BuildEcologyPlantCounters()
             => _ecologyState.PlantCounters;
 
+        public EcologySupplyCounters BuildEcologySupplyCounters()
+            => _ecologyState.SupplyCounters;
+
+        public void ReportPlantFoodProduced(int amount)
+            => _ecologyState.ReportPlantFoodProduced(amount);
+
+        public void ReportMeatFoodProduced(int amount)
+            => _ecologyState.ReportMeatFoodProduced(amount);
+
+        public void ReportPlantFoodConsumedByAnimals(int amount)
+        {
+            _ecologyState.ReportPlantFoodConsumedByAnimals(amount);
+            if (amount > 0)
+                _firstHerbivoreGrazingTick ??= _tickCounter;
+        }
+
+        public void ReportMeatFromHunt(int amount)
+        {
+            _ecologyState.ReportMeatFromHunt(amount);
+            if (amount > 0)
+                _firstPredatorHuntTick ??= _tickCounter;
+        }
+
+        public void ReportSupplyBridgeSkippedByNoBiomass()
+            => _ecologyState.ReportSupplyBridgeSkippedByNoBiomass();
+
+        public bool TryHarvestPlantFoodForSupply((int x, int y) pos, int qty)
+        {
+            if (pos.x < 0 || pos.y < 0 || pos.x >= Width || pos.y >= Height || qty <= 0)
+                return false;
+
+            var node = _map[pos.x, pos.y].Node;
+            if (node == null)
+            {
+                ReportSupplyBridgeSkippedByNoBiomass();
+                return false;
+            }
+
+            if (node.Type != Resource.Food)
+                return false;
+
+            if (node.Amount <= 0)
+            {
+                ReportSupplyBridgeSkippedByNoBiomass();
+                return false;
+            }
+
+            if (TryHarvest(pos, Resource.Food, qty))
+                return true;
+
+            ReportSupplyBridgeSkippedByNoBiomass();
+            return false;
+        }
+
+        public bool TryConsumePlantFoodByAnimal((int x, int y) pos, int qty)
+        {
+            if (!TryHarvest(pos, Resource.Food, qty))
+                return false;
+
+            ReportPlantFoodConsumedByAnimals(qty);
+            return true;
+        }
+
         internal bool HasHerbivoreCapacityHeadroom((int x, int y) pos)
         {
             // Advisory helper only; reproduction authority lives in QueueHerbivoreBirth after target selection.
@@ -1365,6 +1597,7 @@ namespace WorldSim.Simulation
                 age: 0f,
                 reproductionCooldown: AnimalLifecycleModel.HerbivoreReproductionCooldownSeconds));
             _ecologyState.ReportHerbivoreBirth();
+            _firstHerbivoreBirthTick ??= _tickCounter;
             return true;
         }
 
@@ -1403,6 +1636,7 @@ namespace WorldSim.Simulation
                 age: 0f,
                 reproductionCooldown: AnimalLifecycleModel.PredatorReproductionCooldownSeconds));
             _ecologyState.ReportPredatorBirth();
+            _firstPredatorBirthTick ??= _tickCounter;
             return true;
         }
 

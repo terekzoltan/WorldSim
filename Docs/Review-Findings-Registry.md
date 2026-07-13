@@ -26,6 +26,48 @@ Severity guide:
 
 Entries:
 
+## 2026-07-13 - Wave 11 E11-H Step 5c1-B - Major - Canonical Step 5c2 unlock clauses must require verified closeout
+
+- Track: Meta Coordinator / workflow governance
+- Finding: Active Step 5c1-B clauses omitted the successful verified `/closeout-commit` requirement.
+- Resolution / guidance: Both clauses now require final Meta GREEN plus completed and verified authorized closeout.
+- Status: fixed and verified by closeout ID `wave11-e11-h-step5c1b-closeout-20260713`; Step 5c2 requires committed-tree verification.
+
+## 2026-07-13 - Wave 11 E11-H Step 5c1-B - Major - Evidence README requires explicit closeout durability
+
+- Track: Meta Coordinator / SMR evidence package
+- Finding: The evidence README was untracked while prior wording risked overclaiming durability.
+- Resolution / guidance: Include the README explicitly and keep raw `.artifacts/**` local-only.
+- Status: fixed by repository-durable closeout package `wave11-e11-h-step5c1b-closeout-20260713`.
+
+## 2026-07-13 - Wave 11 E11-H Step 5c1-B - Minor - Dirty-hunk attribution must be independently reproducible
+
+- Track: Meta Coordinator / SMR evidence package
+- Finding: Interleaved dirty hunks lacked independently reproducible source/test attribution.
+- Resolution / guidance: Pin base `fee461152349d4ceefc1d44c89ecdc45173cb2c8`, five `Program.cs` anchors, and the `8+1+10=19` ledger.
+- Status: fixed; commit/tree/full-index identity is recorded in `ops/PROJECT_STATE.md`.
+
+## 2026-07-13 - Wave 11 E11-H Step 5c1-B - Minor - Timeline mapping proof needs unique field values
+
+- Track: SMR Analyst / ScenarioRunner evidence
+- Finding: Repeated `1` and `null` values are not fully anti-permutation resistant.
+- Resolution / guidance: `DEFER_STEP5C5`; add a seven-distinct-value fixture or evidence-backed waiver/reclassification.
+- Status: open; active gate is Combined/parent Step 5c5 package closeout.
+
+## 2026-07-11 - Wave 11 E11-H Step 5c1-A - Minor - Authoritative event seams need natural-caller regression coverage before package
+
+- Track: Track B / Runtime ecology observability
+- Finding: Reporter seams have focused first-write tests but natural production callers need end-to-end timestamp regressions.
+- Resolution / guidance: Add contact, hunt, grazing, and predator-death caller regressions or evidence-backed waiver before E11-H package closeout.
+- Status: open; active gate is Combined Step 5c5 / E11-H package review.
+
+## 2026-07-11 - Wave 11 E11-H Step 5c1-B - Minor - Initial ecology population claims must distinguish run-family ownership
+
+- Track: SMR Analyst / ScenarioRunner evidence
+- Finding: Direct-`World` and `SimulationRuntime`-backed paths have different initial snapshot availability.
+- Resolution / guidance: Publish and test the run-family matrix; required Runtime forwarding opens a separate Track B handoff.
+- Status: fixed and accepted in closeout package `wave11-e11-h-step5c1b-closeout-20260713`.
+
 ## 2026-06-29 - Wave 11 E11-E Step Review - Blocking - Disabled rescue policy must not consume runtime RNG
 
 - Track: Track B / Runtime emergency rescue demotion

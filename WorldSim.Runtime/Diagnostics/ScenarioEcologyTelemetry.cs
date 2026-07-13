@@ -1,5 +1,77 @@
 namespace WorldSim.Runtime.Diagnostics;
 
+public sealed record ScenarioEcologyDistanceSummarySnapshot(
+    int SampleCount,
+    int? Minimum,
+    int? Maximum,
+    double? Average)
+{
+    public static ScenarioEcologyDistanceSummarySnapshot Empty { get; } = new(
+        SampleCount: 0,
+        Minimum: null,
+        Maximum: null,
+        Average: null);
+}
+
+public sealed record ScenarioInitialEcologyRegionSnapshot(
+    int RegionId,
+    int LandTileCount,
+    float PlantCapacityTotal,
+    int ActiveFoodNodes,
+    int Herbivores,
+    int Predators);
+
+public sealed record ScenarioInitialEcologyTelemetrySnapshot(
+    string InitialAnimalPolicy,
+    string InitialAnimalPolicySource,
+    int TotalAnimals,
+    int Herbivores,
+    int Predators,
+    double? PredatorHerbivoreRatio,
+    int AnimalsOnWater,
+    int AnimalsOnMovementBlockedTiles,
+    int ViableRegions,
+    int ViableRegionsWithoutHerbivores,
+    int PredatorsInPreyEmptyRegions,
+    int HerbivoresWithFoodInVision,
+    int PredatorsWithPreyInVision,
+    int PredatorsWithinHumanHarassRadius,
+    int PredatorsWithinEarlyHumanContactRadius,
+    int FoodVisionRadius,
+    int PreyVisionRadius,
+    int HumanHarassRadius,
+    int EarlyHumanContactRadius,
+    ScenarioEcologyDistanceSummarySnapshot HerbivoreToNearestFoodDistance,
+    ScenarioEcologyDistanceSummarySnapshot PredatorToNearestPreyDistance,
+    ScenarioEcologyDistanceSummarySnapshot PredatorToNearestPersonDistance,
+    IReadOnlyList<ScenarioInitialEcologyRegionSnapshot> Regions)
+{
+    public static ScenarioInitialEcologyTelemetrySnapshot Empty { get; } = new(
+        InitialAnimalPolicy: "legacy_random",
+        InitialAnimalPolicySource: "runtime_default",
+        TotalAnimals: 0,
+        Herbivores: 0,
+        Predators: 0,
+        PredatorHerbivoreRatio: null,
+        AnimalsOnWater: 0,
+        AnimalsOnMovementBlockedTiles: 0,
+        ViableRegions: 0,
+        ViableRegionsWithoutHerbivores: 0,
+        PredatorsInPreyEmptyRegions: 0,
+        HerbivoresWithFoodInVision: 0,
+        PredatorsWithPreyInVision: 0,
+        PredatorsWithinHumanHarassRadius: 0,
+        PredatorsWithinEarlyHumanContactRadius: 0,
+        FoodVisionRadius: 5,
+        PreyVisionRadius: 6,
+        HumanHarassRadius: 2,
+        EarlyHumanContactRadius: 6,
+        HerbivoreToNearestFoodDistance: ScenarioEcologyDistanceSummarySnapshot.Empty,
+        PredatorToNearestPreyDistance: ScenarioEcologyDistanceSummarySnapshot.Empty,
+        PredatorToNearestPersonDistance: ScenarioEcologyDistanceSummarySnapshot.Empty,
+        Regions: Array.Empty<ScenarioInitialEcologyRegionSnapshot>());
+}
+
 public sealed record ScenarioEcologyTimelineSnapshot(
     int Herbivores,
     int Predators,
@@ -8,10 +80,22 @@ public sealed record ScenarioEcologyTimelineSnapshot(
     int HerbivoreReplenishmentSpawns,
     int PredatorReplenishmentSpawns,
     int EmergencyRescues,
+    int PlantFoodProduced,
+    int MeatFoodProduced,
+    int PlantFoodConsumedByAnimals,
+    int MeatFromHunt,
+    int SupplyBridgeSkippedByNoBiomass,
     string EmergencyRescuePolicy,
     string LastEmergencyRescueReason,
     int TicksWithZeroHerbivores,
-    int TicksWithZeroPredators)
+    int TicksWithZeroPredators,
+    int? FirstPredatorHumanContactTick,
+    int? FirstPredatorHuntTick,
+    int? FirstHerbivoreGrazingTick,
+    int? FirstPredatorDeathTick,
+    int? FirstHerbivoreDeathTick,
+    int? FirstPredatorBirthTick,
+    int? FirstHerbivoreBirthTick)
 {
     public static ScenarioEcologyTimelineSnapshot Empty { get; } = new(
         Herbivores: 0,
@@ -21,10 +105,22 @@ public sealed record ScenarioEcologyTimelineSnapshot(
         HerbivoreReplenishmentSpawns: 0,
         PredatorReplenishmentSpawns: 0,
         EmergencyRescues: 0,
+        PlantFoodProduced: 0,
+        MeatFoodProduced: 0,
+        PlantFoodConsumedByAnimals: 0,
+        MeatFromHunt: 0,
+        SupplyBridgeSkippedByNoBiomass: 0,
         EmergencyRescuePolicy: "disabled",
         LastEmergencyRescueReason: "none",
         TicksWithZeroHerbivores: 0,
-        TicksWithZeroPredators: 0);
+        TicksWithZeroPredators: 0,
+        FirstPredatorHumanContactTick: null,
+        FirstPredatorHuntTick: null,
+        FirstHerbivoreGrazingTick: null,
+        FirstPredatorDeathTick: null,
+        FirstHerbivoreDeathTick: null,
+        FirstPredatorBirthTick: null,
+        FirstHerbivoreBirthTick: null);
 }
 
 public sealed record ScenarioEcologyTelemetrySnapshot(
@@ -35,6 +131,11 @@ public sealed record ScenarioEcologyTelemetrySnapshot(
     int HerbivoreReplenishmentSpawns,
     int PredatorReplenishmentSpawns,
     int EmergencyRescues,
+    int PlantFoodProduced,
+    int MeatFoodProduced,
+    int PlantFoodConsumedByAnimals,
+    int MeatFromHunt,
+    int SupplyBridgeSkippedByNoBiomass,
     string EmergencyRescuePolicy,
     string LastEmergencyRescueReason,
     int TicksWithZeroHerbivores,
@@ -42,7 +143,14 @@ public sealed record ScenarioEcologyTelemetrySnapshot(
     int? FirstZeroHerbivoreTick,
     int? FirstZeroPredatorTick,
     int PredatorDeaths,
-    int PredatorHumanHits)
+    int PredatorHumanHits,
+    int? FirstPredatorHumanContactTick,
+    int? FirstPredatorHuntTick,
+    int? FirstHerbivoreGrazingTick,
+    int? FirstPredatorDeathTick,
+    int? FirstHerbivoreDeathTick,
+    int? FirstPredatorBirthTick,
+    int? FirstHerbivoreBirthTick)
 {
     public static ScenarioEcologyTelemetrySnapshot Empty { get; } = new(
         Herbivores: 0,
@@ -52,6 +160,11 @@ public sealed record ScenarioEcologyTelemetrySnapshot(
         HerbivoreReplenishmentSpawns: 0,
         PredatorReplenishmentSpawns: 0,
         EmergencyRescues: 0,
+        PlantFoodProduced: 0,
+        MeatFoodProduced: 0,
+        PlantFoodConsumedByAnimals: 0,
+        MeatFromHunt: 0,
+        SupplyBridgeSkippedByNoBiomass: 0,
         EmergencyRescuePolicy: "disabled",
         LastEmergencyRescueReason: "none",
         TicksWithZeroHerbivores: 0,
@@ -59,7 +172,14 @@ public sealed record ScenarioEcologyTelemetrySnapshot(
         FirstZeroHerbivoreTick: null,
         FirstZeroPredatorTick: null,
         PredatorDeaths: 0,
-        PredatorHumanHits: 0);
+        PredatorHumanHits: 0,
+        FirstPredatorHumanContactTick: null,
+        FirstPredatorHuntTick: null,
+        FirstHerbivoreGrazingTick: null,
+        FirstPredatorDeathTick: null,
+        FirstHerbivoreDeathTick: null,
+        FirstPredatorBirthTick: null,
+        FirstHerbivoreBirthTick: null);
 
     public ScenarioEcologyTimelineSnapshot ToTimelineSnapshot()
         => new(
@@ -70,10 +190,22 @@ public sealed record ScenarioEcologyTelemetrySnapshot(
             HerbivoreReplenishmentSpawns,
             PredatorReplenishmentSpawns,
             EmergencyRescues,
+            PlantFoodProduced,
+            MeatFoodProduced,
+            PlantFoodConsumedByAnimals,
+            MeatFromHunt,
+            SupplyBridgeSkippedByNoBiomass,
             EmergencyRescuePolicy,
             LastEmergencyRescueReason,
             TicksWithZeroHerbivores,
-            TicksWithZeroPredators);
+            TicksWithZeroPredators,
+            FirstPredatorHumanContactTick,
+            FirstPredatorHuntTick,
+            FirstHerbivoreGrazingTick,
+            FirstPredatorDeathTick,
+            FirstHerbivoreDeathTick,
+            FirstPredatorBirthTick,
+            FirstHerbivoreBirthTick);
 }
 
 public sealed record ScenarioEcologyBalanceSnapshot(

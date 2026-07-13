@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-06-16
+Last updated: 2026-07-13
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -33,6 +33,11 @@ their execution steps are not retroactively documented — see their proof links
 | **Wave 10.6 Coverage Soft Policy** | `Docs/Plans/Master/Wave10.6-Coverage-Soft-Policy.md` |
 | **Wave 11 Ecology Plan** | `Docs/Plans/Master/Wave11-Closed-Loop-Ecology-Redesign-Plan.md` |
 | **Wave 11 Ecology Hardening Plan** | `Docs/Plans/Master/Wave11-Ecology-Hardening-Plan.md` |
+| **Wave 11 E11-H Step 5c Seeding Plan** | `Docs/Plans/Master/Wave11-E11-H-Step5c-Habitat-Aware-Ecology-Seeding-And-SMR-Calibration-Plan.md` |
+| **Wave 11 E11-H Step 5c1-A Track B Plan** | `Docs/Plans/Master/Wave11-E11-H-Step5c1A-Track-B-Initial-State-Observability-Implementation-Plan.md` |
+| **Wave 11 E11-H Step 5c1-B SMR Plan** | `Docs/Plans/Master/Wave11-E11-H-Step5c1B-SMR-Initial-Ecology-Artifact-Plan.md` |
+| **Wave 11 E11-H Step 5c1-A Track B Prompt** | `Docs/Plans/Master/Wave11-E11-H-Step5c1A-Track-B-Agent-Prompt.md` |
+| **Wave 11 E11-H Step 5c1-B SMR Prompt** | `Docs/Plans/Master/Wave11-E11-H-Step5c1B-SMR-Analyst-Agent-Prompt.md` |
 | **Wave 12 Architecture Hardening Plan** | `Docs/Plans/Master/Wave12-Codebase-Architecture-Hardening-Plan.md` |
 
 Epic codes (e.g., `S1-A`, `P0-B`) are unique and greppable in the respective master plan.
@@ -2866,6 +2871,68 @@ E11-E closeout:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | SMR Analyst | E11-H | E11-E ✅ + E11-G ✅ | Hard ecology invariants must distinguish lifecycle births from emergency rescues and consume the real plant/meat supply bridge outputs |
+
+**Step 5c1-A - Runtime initial-state observability producer (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | E11-H initial-state Runtime producer | Step 5b diagnostic fallback complete | Implement immutable initial-state telemetry while preserving legacy spawn behavior. Plan: `Wave11-E11-H-Step5c1A-Track-B-Initial-State-Observability-Implementation-Plan.md`. |
+
+Step 5c1-A outcome:
+- ✅ Accepted GREEN with deterministic initial species/region/food/prey/person-distance and first-event evidence.
+- Focused Runtime gate passed 17/17 and ScenarioRunner compile passed with zero warnings/errors.
+- Natural production-caller timestamp regressions remain a Step 5c5/package gate.
+
+**Step 5c1-B - SMR initial ecology artifact consumer (SMR Analyst)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | E11-H initial ecology artifact contract | Step 5c1-A accepted GREEN | Consume Runtime-owned initial telemetry in run/summary/timeline artifacts without Runtime behavior changes. Plan: `Wave11-E11-H-Step5c1B-SMR-Initial-Ecology-Artifact-Plan.md`. |
+
+Step 5c1-B acceptance:
+- ScenarioRunner recomputes no habitat or distance truth;
+- direct-`World` and `SimulationRuntime`-backed run families are explicitly classified;
+- old artifacts without `initialEcology` remain parseable;
+- no `ECO-*` assertion or scenario balance change;
+- Step 5c2 unlocks only after final Meta GREEN and completed, verified authorized `/closeout-commit`.
+
+Step 5c1-B outcome:
+- ✅ Functional implementation, focused deep-review, renewed Meta wording review, and bounded closeout package are GREEN under closeout ID `wave11-e11-h-step5c1b-closeout-20260713`.
+- Direct-World artifacts expose `constructor_initial / pre_runner_setup`; three Runtime-backed lifecycle modes expose exact JSON `null`.
+- Focused gates passed: Runtime 17/17, supply 24/24, ScenarioRunner build 0 warnings/errors, artifact contract 19/19.
+- Repository-durable evidence: `Docs/Evidence/SMR/wave11-e11-h-step5c1-initial-observability/README.md`; raw `.artifacts/**` remains local-only.
+- F1/F2 are closed by the durable README, exact source/test ledger, and verified commit/tree identity in `ops/PROJECT_STATE.md`.
+- F3 and natural production-caller timestamp proof remain active Step 5c5/package gates.
+
+**Step 5c2 - Deterministic habitat-aware runtime seeding (Track B)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Track B agent | E11-H habitat-aware seeding | Step 5c1-B ✅ and verified closeout identity | Implement deterministic land-safe, food-aware, prey-aware, colony-distance, and region-budget seeding. Keep `legacy_random` compare-only; do not tune lifecycle or predator-human constants. |
+
+**Step 5c3 - SMR initialization and early-contact calibration (SMR Analyst)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| SMR Analyst | E11-H seeding calibration | Step 5c2 ✅ | Compare `legacy_random` and `habitat_aware` for seeds `101,202,303` under identical config. |
+
+**Step 5c4 - Manual visual observation lane (User / Manual QA)**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| User / Manual QA | E11-H qualitative topology observation | Step 5c3 evidence reviewed | Record exact profile, initial topology, first contact/hunt/grazing, clustering/pathing, and limitations. |
+
+**Step 5c5 - Meta route decision and focused gate**
+
+| Session | Epic(s) | Prereq | Notes |
+|---------|---------|--------|-------|
+| Meta Coordinator | E11-H route decision | Step 5c3 ✅ and Step 5c4 packet or waiver | Classify failures and authorize at most one next route. |
+
+Step 5c5 acceptance:
+- `DEFER_STEP5C5`: provide a uniquely-valued seven-field timeline fixture or evidence-backed waiver/reclassification;
+- provide natural production-caller timestamp regressions for contact, hunt, grazing, and predator death, or evidence-backed waiver;
+- focused 5-case GREEN -> expanded 9-run GREEN -> full 45-run remains strict;
+- E11-I/E11-J remain blocked until E11-H is accepted GREEN.
 
 **Step 6 - visual/debug consume after snapshot and invariants are stable**
 

@@ -276,7 +276,7 @@ public sealed class Herbivore : Animal
 
     private bool TryEatNearbyFood(World w)
     {
-        return w.TryHarvest(Pos, Resource.Food, 1);
+        return w.TryConsumePlantFoodByAnimal(Pos, 1);
     }
 
     private bool TryMoveTowardsFood(World w)
@@ -444,6 +444,7 @@ public sealed class Predator : Animal
                 nearestPrey.IsAlive = false; // prey is removed by World after updates
                 Energy = AnimalLifecycleModel.ApplyPredatorCaptureGain(Energy);
                 StarvationPressure = 0f;
+                w.ReportMeatFromHunt(1);
             }
         }
         else

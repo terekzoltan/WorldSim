@@ -474,10 +474,18 @@ public class Person
                         break;
 
                     case Job.GatherFood:
-                        if (w.TryHarvest(Pos, Resource.Food, 1))
-                            _home.Stock[Resource.Food] += GetGatherAmount(w, Resource.Food, w.FoodYield);
+                        if (w.TryHarvestPlantFoodForSupply(Pos, 1))
+                        {
+                            var amount = GetGatherAmount(w, Resource.Food, w.FoodYield);
+                            _home.Stock[Resource.Food] += amount;
+                            w.ReportPlantFoodProduced(amount);
+                        }
                         else if (veryLowFood && TryHuntNearbyHerbivore(w, 1))
-                            _home.Stock[Resource.Food] += Math.Max(1, GetGatherAmount(w, Resource.Food, w.FoodYield));
+                        {
+                            var amount = Math.Max(1, GetGatherAmount(w, Resource.Food, w.FoodYield));
+                            _home.Stock[Resource.Food] += amount;
+                            w.ReportMeatFoodProduced(amount);
+                        }
                         else
                             Wander(w);
                         break;
@@ -560,7 +568,9 @@ public class Person
 
                 if (veryLowFood && TryHuntNearbyHerbivore(w, range: 1))
                 {
-                    _home.Stock[Resource.Food] += Math.Max(1, GetGatherAmount(w, Resource.Food, w.FoodYield + 1));
+                    var amount = Math.Max(1, GetGatherAmount(w, Resource.Food, w.FoodYield + 1));
+                    _home.Stock[Resource.Food] += amount;
+                    w.ReportMeatFoodProduced(amount);
                     _idleTimeSeconds = 0f;
                     _lastPos = Pos;
                     return true;
@@ -926,7 +936,9 @@ public class Person
             case Profession.Hunter:
                 if (veryLowFood && TryHuntNearbyHerbivore(w, range: 2))
                 {
-                    _home.Stock[Resource.Food] += Math.Max(1, GetGatherAmount(w, Resource.Food, w.FoodYield + 1));
+                    var amount = Math.Max(1, GetGatherAmount(w, Resource.Food, w.FoodYield + 1));
+                    _home.Stock[Resource.Food] += amount;
+                    w.ReportMeatFoodProduced(amount);
                     return true;
                 }
                 break;

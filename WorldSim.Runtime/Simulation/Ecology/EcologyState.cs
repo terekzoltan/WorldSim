@@ -42,6 +42,7 @@ public sealed class EcologyState
     readonly EcologyRegionCache _regionCache;
     EcologyLifecycleCounters _lifecycleCounters = EcologyLifecycleCounters.Empty;
     EcologyPlantCounters _plantCounters = EcologyPlantCounters.Empty with { EcologyRegionCacheRebuilds = 1 };
+    EcologySupplyCounters _supplyCounters = EcologySupplyCounters.Empty;
 
     EcologyState(int width, int height, int regionSize, EcologyTileState[,] tiles, EcologyRegionCache regionCache)
     {
@@ -60,6 +61,7 @@ public sealed class EcologyState
     public int RegionCount => _regionCache.Count;
     public EcologyLifecycleCounters LifecycleCounters => _lifecycleCounters;
     public EcologyPlantCounters PlantCounters => _plantCounters;
+    public EcologySupplyCounters SupplyCounters => _supplyCounters;
 
     public void ReportHerbivoreBirth()
         => _lifecycleCounters = _lifecycleCounters with { HerbivoreBirths = _lifecycleCounters.HerbivoreBirths + 1 };
@@ -81,6 +83,41 @@ public sealed class EcologyState
 
     public void ReportEmergencyRescue()
         => _lifecycleCounters = _lifecycleCounters with { EmergencyRescues = _lifecycleCounters.EmergencyRescues + 1 };
+
+    public void ReportPlantFoodProduced(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        _supplyCounters = _supplyCounters with { PlantFoodProduced = SaturatingAdd(_supplyCounters.PlantFoodProduced, amount) };
+    }
+
+    public void ReportMeatFoodProduced(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        _supplyCounters = _supplyCounters with { MeatFoodProduced = SaturatingAdd(_supplyCounters.MeatFoodProduced, amount) };
+    }
+
+    public void ReportPlantFoodConsumedByAnimals(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        _supplyCounters = _supplyCounters with { PlantFoodConsumedByAnimals = SaturatingAdd(_supplyCounters.PlantFoodConsumedByAnimals, amount) };
+    }
+
+    public void ReportMeatFromHunt(int amount)
+    {
+        if (amount <= 0)
+            return;
+
+        _supplyCounters = _supplyCounters with { MeatFromHunt = SaturatingAdd(_supplyCounters.MeatFromHunt, amount) };
+    }
+
+    public void ReportSupplyBridgeSkippedByNoBiomass()
+        => _supplyCounters = _supplyCounters with { SupplyBridgeSkippedByNoBiomass = _supplyCounters.SupplyBridgeSkippedByNoBiomass + 1 };
 
     public static EcologyState Create(Tile[,] map, int width, int height, int regionSize = DefaultRegionSize)
     {
@@ -188,6 +225,12 @@ public sealed class EcologyState
         var chunkX = Math.Max(0, x) / Math.Max(1, regionSize);
         var chunkY = Math.Max(0, y) / Math.Max(1, regionSize);
         return chunkY * Math.Max(1, regionColumns) + chunkX;
+    }
+
+    static int SaturatingAdd(int left, int right)
+    {
+        var result = (long)Math.Max(0, left) + Math.Max(0, right);
+        return result > int.MaxValue ? int.MaxValue : (int)result;
     }
 
     void ApplyTileUpdate(PlantBiomassUpdate update)

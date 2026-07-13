@@ -11,6 +11,16 @@ public sealed record EcologyPlantCounters(
     public static EcologyPlantCounters Empty { get; } = new(0, 0, 0, 0);
 }
 
+public sealed record EcologySupplyCounters(
+    int PlantFoodProduced,
+    int MeatFoodProduced,
+    int PlantFoodConsumedByAnimals,
+    int MeatFromHunt,
+    int SupplyBridgeSkippedByNoBiomass)
+{
+    public static EcologySupplyCounters Empty { get; } = new(0, 0, 0, 0, 0);
+}
+
 public readonly record struct PlantBiomassUpdate(
     EcologyTileState Tile,
     float BiomassDelta,

@@ -146,14 +146,23 @@ public static class ArmyForagingModel
             return BuildFailure(state, sourceX, sourceY, normalizedConsumerKey, ArmyForageFailureReason.WaterTile, GetNodeAmount(tile.Node), poolBefore, poolBefore, consumerBefore, consumerBefore);
 
         if (tile.Node == null)
+        {
+            ReportSupplySkipIfNoBiomass(world, ArmyForageFailureReason.NoResourceNode);
             return BuildFailure(state, sourceX, sourceY, normalizedConsumerKey, ArmyForageFailureReason.NoResourceNode, 0, poolBefore, poolBefore, consumerBefore, consumerBefore);
+        }
 
         if (tile.Node.Type != Resource.Food)
+        {
+            ReportSupplySkipIfNoBiomass(world, ArmyForageFailureReason.WrongResource);
             return BuildFailure(state, sourceX, sourceY, normalizedConsumerKey, ArmyForageFailureReason.WrongResource, tile.Node.Amount, poolBefore, poolBefore, consumerBefore, consumerBefore);
+        }
 
         var sourceFoodBefore = tile.Node.Amount;
         if (sourceFoodBefore <= 0)
+        {
+            ReportSupplySkipIfNoBiomass(world, ArmyForageFailureReason.DepletedFood);
             return BuildFailure(state, sourceX, sourceY, normalizedConsumerKey, ArmyForageFailureReason.DepletedFood, sourceFoodBefore, poolBefore, poolBefore, consumerBefore, consumerBefore);
+        }
 
         var remainingConsumerCap = Math.Max(0, normalizedOptions.MaxFoodPerConsumer - consumerBefore);
         if (remainingConsumerCap <= 0)
@@ -167,9 +176,13 @@ public static class ArmyForagingModel
             return BuildFailure(state, sourceX, sourceY, normalizedConsumerKey, ArmyForageFailureReason.NoYield, sourceFoodBefore, poolBefore, poolBefore, consumerBefore, consumerBefore);
 
         if (!world.TryHarvest((sourceX, sourceY), Resource.Food, yield))
+        {
+            ReportSupplySkipIfNoBiomass(world, ArmyForageFailureReason.HarvestFailed);
             return BuildFailure(state, sourceX, sourceY, normalizedConsumerKey, ArmyForageFailureReason.HarvestFailed, sourceFoodBefore, poolBefore, poolBefore, consumerBefore, consumerBefore);
+        }
 
         rationPool.AddRations(yield);
+        world.ReportPlantFoodProduced(yield);
         state.RecordSuccess(sourceX, sourceY, normalizedConsumerKey, yield);
 
         var sourceFoodAfter = GetNodeAmount(world.GetTile(sourceX, sourceY).Node);
@@ -190,6 +203,17 @@ public static class ArmyForagingModel
 
     internal static string NormalizeConsumerKey(string? consumerKey)
         => string.IsNullOrWhiteSpace(consumerKey) ? string.Empty : consumerKey.Trim();
+
+    internal static bool CountsAsNoBiomassSupplySkip(ArmyForageFailureReason reason)
+        => reason is ArmyForageFailureReason.NoResourceNode
+            or ArmyForageFailureReason.DepletedFood
+            or ArmyForageFailureReason.HarvestFailed;
+
+    static void ReportSupplySkipIfNoBiomass(World world, ArmyForageFailureReason reason)
+    {
+        if (CountsAsNoBiomassSupplySkip(reason))
+            world.ReportSupplyBridgeSkippedByNoBiomass();
+    }
 
     private static ArmyForageResult BuildFailure(
         ArmyForagingState state,

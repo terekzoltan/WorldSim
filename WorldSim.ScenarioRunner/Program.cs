@@ -137,6 +137,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 BirthRateMultiplier = mainRunConfig.BirthRateMultiplier,
                 MovementSpeedMultiplier = mainRunConfig.MovementSpeedMultiplier
             };
+            var initialEcology = world.BuildScenarioInitialEcologyTelemetrySnapshot();
             ApplyEcologyBalanceConfig(world, mainRunConfig);
             ApplySupplyScenarioConfig(world, mainRunConfig);
 
@@ -203,6 +204,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
 
             var runResult = BuildRunResult(
                 world,
+                initialEcology,
                 mainRunConfig,
                 planner,
                 seed,
@@ -310,6 +312,7 @@ return Environment.ExitCode;
 
 static ScenarioRunResult BuildRunResult(
     World world,
+    ScenarioInitialEcologyTelemetrySnapshot initialEcology,
     ScenarioConfig config,
     NpcPlannerMode planner,
     int seed,
@@ -410,7 +413,8 @@ static ScenarioRunResult BuildRunResult(
         EcologyBalance: ecologyBalance,
         Supply: supplyTelemetry,
         EnablePredatorHumanAttacks: world.EnablePredatorHumanAttacks,
-        AllowEmergencyRescueInAcceptance: config.AllowEmergencyRescueInAcceptance);
+        AllowEmergencyRescueInAcceptance: config.AllowEmergencyRescueInAcceptance,
+        InitialEcology: initialEcology);
 }
 
 static ScenarioRunResult RunRuntimeBackedWave10LifecycleScenario(
@@ -2868,7 +2872,8 @@ sealed record ScenarioRunResult(
     ScenarioEcologyBalanceSnapshot? EcologyBalance = null,
     ScenarioSupplyTelemetrySnapshot? Supply = null,
     bool EnablePredatorHumanAttacks = false,
-    bool AllowEmergencyRescueInAcceptance = false);
+    bool AllowEmergencyRescueInAcceptance = false,
+    ScenarioInitialEcologyTelemetrySnapshot? InitialEcology = null);
 
 sealed record ScenarioRunEnvelope(
     DateTime GeneratedAtUtc,
