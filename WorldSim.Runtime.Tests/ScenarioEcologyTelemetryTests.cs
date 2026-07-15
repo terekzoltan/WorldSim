@@ -12,7 +12,13 @@ public sealed class ScenarioEcologyTelemetryTests
     [Fact]
     public void LegacyInitialization_FixedSeedPreservesRosterAndWorldRngCadence()
     {
-        var world = new World(16, 16, 8, randomSeed: 42);
+        var world = new World(
+            16,
+            16,
+            8,
+            brainFactory: null,
+            randomSeed: 42,
+            InitialAnimalSeedingOptions.LegacyCompare);
         var expectedRoster = new[]
         {
             (AnimalKind.Herbivore, 11, 9),
@@ -38,13 +44,19 @@ public sealed class ScenarioEcologyTelemetryTests
     [Fact]
     public void BuildScenarioInitialEcologyTelemetrySnapshot_IsFrozenDeterministicAndInternallyConsistent()
     {
-        var world = new World(16, 16, 8, randomSeed: 0);
+        var world = new World(
+            16,
+            16,
+            8,
+            brainFactory: null,
+            randomSeed: 0,
+            InitialAnimalSeedingOptions.LegacyCompare);
         var initial = world.BuildScenarioInitialEcologyTelemetrySnapshot();
         var repeated = world.BuildScenarioInitialEcologyTelemetrySnapshot();
 
         Assert.Same(initial, repeated);
         Assert.Equal("legacy_random", initial.InitialAnimalPolicy);
-        Assert.Equal("runtime_default", initial.InitialAnimalPolicySource);
+        Assert.Equal("compare_override", initial.InitialAnimalPolicySource);
         Assert.Equal(5, initial.FoodVisionRadius);
         Assert.Equal(6, initial.PreyVisionRadius);
         Assert.Equal(2, initial.HumanHarassRadius);
@@ -124,7 +136,13 @@ public sealed class ScenarioEcologyTelemetryTests
             CountWithinRadius(livingPredatorPositions, livingPersonPositions, initial.EarlyHumanContactRadius),
             initial.PredatorsWithinEarlyHumanContactRadius);
 
-        var sameSeed = new World(16, 16, 8, randomSeed: 0)
+        var sameSeed = new World(
+                16,
+                16,
+                8,
+                brainFactory: null,
+                randomSeed: 0,
+                InitialAnimalSeedingOptions.LegacyCompare)
             .BuildScenarioInitialEcologyTelemetrySnapshot();
         Assert.Equal(
             initial with { Regions = Array.Empty<ScenarioInitialEcologyRegionSnapshot>() },

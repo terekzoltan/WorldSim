@@ -98,6 +98,9 @@ namespace WorldSim.Simulation
         public List<DefensiveStructure> DefensiveStructures = new();
         public List<Animal> _animals = new();
         EcologyState _ecologyState = null!;
+        readonly InitialAnimalSeedingOptions _initialAnimalSeedingOptions;
+        readonly InitialAnimalSeedingResult _initialAnimalSeedingResult;
+        readonly string _initialAnimalPolicySource;
         readonly ScenarioInitialEcologyTelemetrySnapshot _initialEcologyTelemetry = ScenarioInitialEcologyTelemetrySnapshot.Empty;
 
         // Technology-affected properties
@@ -357,6 +360,57 @@ namespace WorldSim.Simulation
         public ScenarioInitialEcologyTelemetrySnapshot BuildScenarioInitialEcologyTelemetrySnapshot()
             => _initialEcologyTelemetry;
 
+        InitialAnimalSeedingInput BuildInitialAnimalSeedingInput(InitialAnimalSeedingOptions options)
+        {
+            var livingPeople = _people
+                .Where(person => person.Health > 0f)
+                .Select(person => person.Pos)
+                .Distinct()
+                .OrderBy(pos => pos.y)
+                .ThenBy(pos => pos.x)
+                .ToArray();
+            var colonyOrigins = _colonies
+                .Select(colony => colony.Origin)
+                .Distinct()
+                .OrderBy(pos => pos.y)
+                .ThenBy(pos => pos.x)
+                .ToArray();
+            var occupiedByPerson = livingPeople.ToHashSet();
+            var colonyOriginSet = colonyOrigins.ToHashSet();
+            var tiles = new List<InitialAnimalSeedingTileFact>(Width * Height);
+            for (var y = 0; y < Height; y++)
+            {
+                for (var x = 0; x < Width; x++)
+                {
+                    var pos = (x, y);
+                    var tile = _map[x, y];
+                    var ecology = _ecologyState.GetTile(x, y);
+                    tiles.Add(new InitialAnimalSeedingTileFact(
+                        X: x,
+                        Y: y,
+                        RegionId: ecology.RegionId,
+                        IsLand: tile.Ground != Ground.Water,
+                        IsMovementBlocked: IsMovementBlocked(x, y, moverColonyId: -1),
+                        IsLivingPersonOccupied: occupiedByPerson.Contains(pos),
+                        IsColonyOrigin: colonyOriginSet.Contains(pos),
+                        HasActiveFood: IsActiveFoodNode(tile.Node),
+                        Fertility: ecology.Fertility,
+                        PlantBiomass: ecology.PlantBiomass,
+                        PlantCapacity: ecology.PlantCapacity));
+                }
+            }
+
+            return new InitialAnimalSeedingInput(
+                Width,
+                Height,
+                Array.AsReadOnly(tiles.ToArray()),
+                Array.AsReadOnly(BuildEcologyRegionSnapshots().OrderBy(region => region.RegionId).ToArray()),
+                Array.AsReadOnly(livingPeople),
+                Array.AsReadOnly(colonyOrigins),
+                InitialEcologyHumanHarassRadius,
+                options);
+        }
+
         ScenarioInitialEcologyTelemetrySnapshot CaptureInitialEcologyTelemetry()
         {
             var herbivores = _animals
@@ -402,10 +456,22 @@ namespace WorldSim.Simulation
             var herbivorePositions = herbivores.Select(animal => animal.Pos).ToArray();
             var predatorPositions = predators.Select(animal => animal.Pos).ToArray();
             var personPositions = livingPeople.Select(person => person.Pos).ToArray();
+            var colonyOrigins = _colonies.Select(colony => colony.Origin).ToArray();
+            var personOrColonyPositions = personPositions
+                .Concat(colonyOrigins)
+                .Distinct()
+                .ToArray();
+            var fallbackSnapshots = _initialAnimalSeedingResult.Fallbacks
+                .Select(fallback => new ScenarioInitialEcologyFallbackSnapshot(
+                    fallback.Reason.ToWireValue(),
+                    fallback.Count))
+                .OrderBy(fallback => fallback.Reason, StringComparer.Ordinal)
+                .ToArray();
+            var habitatAware = _initialAnimalSeedingOptions.Policy == InitialAnimalSeedingPolicy.HabitatAware;
 
             return new ScenarioInitialEcologyTelemetrySnapshot(
-                InitialAnimalPolicy: "legacy_random",
-                InitialAnimalPolicySource: "runtime_default",
+                InitialAnimalPolicy: InitialAnimalSeedingWireValues.Policy(_initialAnimalSeedingOptions.Policy),
+                InitialAnimalPolicySource: _initialAnimalPolicySource,
                 TotalAnimals: herbivores.Count + predators.Count,
                 Herbivores: herbivores.Count,
                 Predators: predators.Count,
@@ -448,7 +514,36 @@ namespace WorldSim.Simulation
                 PredatorToNearestPersonDistance: BuildScenarioEcologyDistanceSummary(
                     predatorPositions,
                     personPositions),
-                Regions: Array.AsReadOnly(regionSnapshots.ToArray()));
+                Regions: Array.AsReadOnly(regionSnapshots.ToArray()))
+            {
+                InitialAnimalBudgetCeiling = _initialAnimalSeedingResult.AnimalCeiling,
+                InitialHerbivoreBudget = habitatAware ? _initialAnimalSeedingResult.HerbivoreBudget : null,
+                InitialPredatorBudget = habitatAware ? _initialAnimalSeedingResult.PredatorBudget : null,
+                InitialHerbivoresSpawned = herbivores.Count,
+                InitialPredatorsSpawned = predators.Count,
+                AnimalCeilingUnallocated = habitatAware ? _initialAnimalSeedingResult.AnimalCeilingUnallocated : 0,
+                HerbivoreBudgetUnfilled = habitatAware ? _initialAnimalSeedingResult.HerbivoreBudgetUnfilled : 0,
+                PredatorBudgetUnfilled = habitatAware ? _initialAnimalSeedingResult.PredatorBudgetUnfilled : 0,
+                InitialSeedingFallbackCount = habitatAware ? _initialAnimalSeedingResult.InitialSeedingFallbackCount : 0,
+                InitialSeedingFallbacks = habitatAware
+                    ? Array.AsReadOnly(fallbackSnapshots)
+                    : Array.Empty<ScenarioInitialEcologyFallbackSnapshot>(),
+                PreferredPersonOrColonyDistance = habitatAware
+                    ? _initialAnimalSeedingOptions.PreferredPersonOrColonyDistance
+                    : null,
+                PreferredHerbivoreFoodRadius = habitatAware
+                    ? _initialAnimalSeedingOptions.PreferredHerbivoreFoodRadius
+                    : null,
+                PreferredPredatorPreyRadius = habitatAware
+                    ? _initialAnimalSeedingOptions.PreferredPredatorPreyRadius
+                    : null,
+                PredatorsWithinPreferredPersonOrColonyDistance = habitatAware
+                    ? CountScenarioEcologySourcesCloserThanDistance(
+                        predatorPositions,
+                        personOrColonyPositions,
+                        _initialAnimalSeedingOptions.PreferredPersonOrColonyDistance)
+                    : null
+            };
         }
 
         internal static ScenarioEcologyDistanceSummarySnapshot BuildScenarioEcologyDistanceSummary(
@@ -720,7 +815,25 @@ namespace WorldSim.Simulation
         int _territoryRecomputeCount;
 
         public World(int width, int height, int initialPop, Func<Colony, RuntimeNpcBrain>? brainFactory = null, int? randomSeed = null)
+            : this(width, height, initialPop, brainFactory, randomSeed, initialAnimalSeedingOptions: null)
         {
+        }
+
+        public World(
+            int width,
+            int height,
+            int initialPop,
+            Func<Colony, RuntimeNpcBrain>? brainFactory,
+            int? randomSeed,
+            InitialAnimalSeedingOptions? initialAnimalSeedingOptions)
+        {
+            _initialAnimalSeedingOptions = initialAnimalSeedingOptions ?? InitialAnimalSeedingOptions.HabitatAwareDefault;
+            _initialAnimalSeedingOptions.Validate();
+            _initialAnimalPolicySource = initialAnimalSeedingOptions == null
+                ? InitialAnimalSeedingWireValues.RuntimeDefault
+                : _initialAnimalSeedingOptions.Policy == InitialAnimalSeedingPolicy.LegacyCompare
+                    ? InitialAnimalSeedingWireValues.CompareOverride
+                    : InitialAnimalSeedingWireValues.RuntimeOptions;
             _brainFactory = brainFactory ?? (_ => new RuntimeNpcBrain());
             _rng = randomSeed.HasValue ? new Random(randomSeed.Value) : new Random();
             Width = width;
@@ -811,12 +924,33 @@ namespace WorldSim.Simulation
                 }
             }
 
-            // 3. Animals
-            int animalCount = Math.Max(10, (Width * Height) / 256);
-            for (int i = 0; i < animalCount; i++)
-                _animals.Add(Animal.Spawn(RandomFreePos(), CreateEntityRng()));
-
             _ecologyState = EcologyState.Create(_map, Width, Height);
+            if (_initialAnimalSeedingOptions.Policy == InitialAnimalSeedingPolicy.LegacyCompare)
+            {
+                var animalCount = InitialAnimalSeeder.CalculateAnimalCeiling(
+                    Width,
+                    Height,
+                    _initialAnimalSeedingOptions.AreaTilesPerAnimal);
+                for (var i = 0; i < animalCount; i++)
+                    _animals.Add(Animal.Spawn(RandomFreePos(), CreateEntityRng()));
+
+                _initialAnimalSeedingResult = InitialAnimalSeedingResult.Legacy(
+                    animalCount,
+                    _animals.Count(animal => animal is Herbivore),
+                    _animals.Count(animal => animal is Predator));
+            }
+            else
+            {
+                _initialAnimalSeedingResult = InitialAnimalSeeder.Plan(
+                    BuildInitialAnimalSeedingInput(_initialAnimalSeedingOptions));
+                foreach (var placement in _initialAnimalSeedingResult.Placements)
+                {
+                    _animals.Add(placement.Kind == AnimalKind.Herbivore
+                        ? new Herbivore(placement.Pos, CreateEntityRng())
+                        : new Predator(placement.Pos, CreateEntityRng()));
+                }
+            }
+
             _initialEcologyTelemetry = CaptureInitialEcologyTelemetry();
 
             InitializeFactionStances();
@@ -2615,6 +2749,25 @@ namespace WorldSim.Simulation
             return count;
         }
 
+        internal static int CountScenarioEcologySourcesCloserThanDistance(
+            IReadOnlyList<(int x, int y)> sources,
+            IReadOnlyList<(int x, int y)> targets,
+            int distance)
+        {
+            if (distance <= 0 || sources.Count == 0 || targets.Count == 0)
+                return 0;
+
+            var count = 0;
+            foreach (var source in sources)
+            {
+                if (targets.Any(target =>
+                    Math.Abs(source.x - target.x) + Math.Abs(source.y - target.y) < distance))
+                    count++;
+            }
+
+            return count;
+        }
+
         private void MarkTerritoryDirty()
         {
             _territoryDirty = true;
@@ -2856,10 +3009,10 @@ namespace WorldSim.Simulation
             int grassTarget = (int)(total * 0.65); // ~60% grass
 
             // 1) Tömör víz-blokkok (nincs lyuk blobon belül)
-            GrowRegionSolid(mask, label: 0, targetCount: waterTarget, minBlob: Math.Max(64, total/500), maxBlob: Math.Max(256, total/160));
+            GrowRegionSolid(mask, label: 0, targetCount: waterTarget, minBlob: Math.Max(64, total / 500), maxBlob: Math.Max(256, total / 160));
 
             // 2) Tömör fű-blokkok a maradékba
-            GrowRegionSolid(mask, label: 1, targetCount: grassTarget, minBlob: Math.Max(64, total/500), maxBlob: Math.Max(256, total/160));
+            GrowRegionSolid(mask, label: 1, targetCount: grassTarget, minBlob: Math.Max(64, total / 500), maxBlob: Math.Max(256, total / 160));
 
             // 3) Ami kimaradt: dirt
             for (int y = 0; y < Height; y++)
@@ -2912,7 +3065,8 @@ namespace WorldSim.Simulation
                     if (mask[x, y] != -1) continue;
 
                     // kissé „fodros” part: néha kihagyunk
-                    if (_rng.NextDouble() < 0.06) { // 6%: part-véletlen
+                    if (_rng.NextDouble() < 0.06)
+                    { // 6%: part-véletlen
                         // de szomszédokat ettől még sorba tesszük -> tovább nő a blob
                     }
                     else
@@ -2980,22 +3134,22 @@ namespace WorldSim.Simulation
             {
                 int[,] copy = (int[,])mask.Clone();
                 for (int y = 0; y < Height; y++)
-                for (int x = 0; x < Width; x++)
-                {
-                    int cnt = 0, tot = 0;
-                    for (int yy = y - 1; yy <= y + 1; yy++)
-                    for (int xx = x - 1; xx <= x + 1; xx++)
+                    for (int x = 0; x < Width; x++)
                     {
-                        if (xx == x && yy == y) continue;
-                        if (xx < 0 || yy < 0 || xx >= Width || yy >= Height) continue;
-                        tot++;
-                        if (copy[xx, yy] == targetLabel) cnt++;
+                        int cnt = 0, tot = 0;
+                        for (int yy = y - 1; yy <= y + 1; yy++)
+                            for (int xx = x - 1; xx <= x + 1; xx++)
+                            {
+                                if (xx == x && yy == y) continue;
+                                if (xx < 0 || yy < 0 || xx >= Width || yy >= Height) continue;
+                                tot++;
+                                if (copy[xx, yy] == targetLabel) cnt++;
+                            }
+                        // ha sok a cél-szomszéd → odasimítjuk
+                        if (cnt >= 5) mask[x, y] = targetLabel;
+                        // ha alig van → elvékonyítjuk
+                        else if (cnt <= 1 && mask[x, y] == targetLabel) mask[x, y] = (targetLabel == 0 ? 2 : 2);
                     }
-                    // ha sok a cél-szomszéd → odasimítjuk
-                    if (cnt >= 5) mask[x, y] = targetLabel;
-                    // ha alig van → elvékonyítjuk
-                    else if (cnt <= 1 && mask[x, y] == targetLabel) mask[x, y] = (targetLabel == 0 ? 2 : 2);
-                }
             }
         }
 

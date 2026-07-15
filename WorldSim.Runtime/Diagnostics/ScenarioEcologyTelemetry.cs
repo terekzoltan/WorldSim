@@ -1,3 +1,5 @@
+using WorldSim.Simulation.Ecology;
+
 namespace WorldSim.Runtime.Diagnostics;
 
 public sealed record ScenarioEcologyDistanceSummarySnapshot(
@@ -20,6 +22,10 @@ public sealed record ScenarioInitialEcologyRegionSnapshot(
     int ActiveFoodNodes,
     int Herbivores,
     int Predators);
+
+public sealed record ScenarioInitialEcologyFallbackSnapshot(
+    string Reason,
+    int Count);
 
 public sealed record ScenarioInitialEcologyTelemetrySnapshot(
     string InitialAnimalPolicy,
@@ -46,9 +52,31 @@ public sealed record ScenarioInitialEcologyTelemetrySnapshot(
     ScenarioEcologyDistanceSummarySnapshot PredatorToNearestPersonDistance,
     IReadOnlyList<ScenarioInitialEcologyRegionSnapshot> Regions)
 {
+    private IReadOnlyList<ScenarioInitialEcologyFallbackSnapshot> _initialSeedingFallbacks =
+        Array.Empty<ScenarioInitialEcologyFallbackSnapshot>();
+
+    public int InitialAnimalBudgetCeiling { get; init; }
+    public int? InitialHerbivoreBudget { get; init; }
+    public int? InitialPredatorBudget { get; init; }
+    public int InitialHerbivoresSpawned { get; init; }
+    public int InitialPredatorsSpawned { get; init; }
+    public int AnimalCeilingUnallocated { get; init; }
+    public int HerbivoreBudgetUnfilled { get; init; }
+    public int PredatorBudgetUnfilled { get; init; }
+    public int InitialSeedingFallbackCount { get; init; }
+    public IReadOnlyList<ScenarioInitialEcologyFallbackSnapshot> InitialSeedingFallbacks
+    {
+        get => _initialSeedingFallbacks;
+        init => _initialSeedingFallbacks = value ?? Array.Empty<ScenarioInitialEcologyFallbackSnapshot>();
+    }
+    public int? PreferredPersonOrColonyDistance { get; init; }
+    public int? PreferredHerbivoreFoodRadius { get; init; }
+    public int? PreferredPredatorPreyRadius { get; init; }
+    public int? PredatorsWithinPreferredPersonOrColonyDistance { get; init; }
+
     public static ScenarioInitialEcologyTelemetrySnapshot Empty { get; } = new(
-        InitialAnimalPolicy: "legacy_random",
-        InitialAnimalPolicySource: "runtime_default",
+        InitialAnimalPolicy: InitialAnimalSeedingWireValues.HabitatAware,
+        InitialAnimalPolicySource: InitialAnimalSeedingWireValues.RuntimeDefault,
         TotalAnimals: 0,
         Herbivores: 0,
         Predators: 0,
