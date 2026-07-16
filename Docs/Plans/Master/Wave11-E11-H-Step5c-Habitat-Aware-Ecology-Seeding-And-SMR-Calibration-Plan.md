@@ -1,11 +1,11 @@
 # Wave 11 E11-H Step 5c - Habitat-Aware Ecology Seeding And SMR Calibration Plan
 
-Status: Canonical - planning approved; implementation requires per-step Track plan review
+Status: Canonical - Step 5c2 accepted GREEN; Step 5c3 ready
 Owner: Meta Coordinator
 Runtime owner: Track B
 Evidence owner: SMR Analyst
 Manual observation owner: User / Manual QA
-Last updated: 2026-07-10
+Last updated: 2026-07-16
 
 ## Purpose
 
@@ -209,6 +209,14 @@ Acceptance/evidence gate:
 - no global random 70/30 assignment remains in the promoted habitat-aware path.
 
 Unlocks: Step 5c3.
+
+Step 5c2 outcome:
+
+- accepted GREEN and integrated into `master` as commit `cdeee3d5512d5e88c18f01f3bece696cff8801e3`;
+- committed tree `3203115f42f2cd6925c4a7ea4f74c51a149e1216` preserves the reviewed five-file candidate identity;
+- focused committed-tree gates passed: initial seeding 19/19, telemetry 17/17, supply 24/24, Runtime analyzer/build 0/0, solution build 0/0, format verification, and diff hygiene;
+- no lifecycle, predator-human, rescue/replenishment, AI, App, Graphics, or ScenarioRunner behavior was promoted in this slice;
+- Step 5c3 is ready, while lifecycle viability, expanded/full matrices, E11-I, and E11-J remain blocked by their later gates.
 
 ### Step 5c3 - SMR Initialization And Early-Contact Calibration
 

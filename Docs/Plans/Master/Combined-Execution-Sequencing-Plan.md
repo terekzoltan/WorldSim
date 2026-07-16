@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-07-13
+Last updated: 2026-07-16
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -2909,6 +2909,13 @@ Step 5c1-B outcome:
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
 | Track B agent | E11-H habitat-aware seeding | Step 5c1-B ✅ and verified closeout identity | Implement deterministic land-safe, food-aware, prey-aware, colony-distance, and region-budget seeding. Keep `legacy_random` compare-only; do not tune lifecycle or predator-human constants. |
+
+Step 5c2 outcome:
+- ✅ Accepted GREEN and integrated into `master` as commit `cdeee3d5512d5e88c18f01f3bece696cff8801e3` with tree `3203115f42f2cd6925c4a7ea4f74c51a149e1216`.
+- The exact five-file committed tree passed initial-seeding 19/19, telemetry 17/17, supply 24/24, Runtime analyzer/build 0/0, solution build 0/0, format verification, and diff hygiene.
+- The prior mixed dirty worktree is preserved only on local safety branch `archive/e11h-pre-step5c2-master-20260716` at `1874f32ba380c845e294264f30c5014e9279c918`; its RED/deferred Runtime, AI, ScenarioRunner, test, and evidence hunks are not part of `master`.
+- This acceptance proves initialization only. Lifecycle viability, the focused predator-human sentinel, expanded/full matrices, E11-I, and E11-J remain gated by Steps 5c3-5c5 and E11-H closeout.
+- Step 5c3 is READY for the SMR Analyst under the locked compare and no-tuning constraints.
 
 **Step 5c3 - SMR initialization and early-contact calibration (SMR Analyst)**
 
