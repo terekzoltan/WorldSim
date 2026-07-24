@@ -252,11 +252,13 @@ public sealed class EcologyTelemetryArtifactTests : IDisposable
         using var summary = ReadJson(Path.Combine(artifactDir, "summary.json"));
         var run = summary.RootElement.GetProperty("runs").EnumerateArray().Single();
         Assert.Equal(JsonValueKind.Null, run.GetProperty("initialEcology").ValueKind);
+        Assert.Equal(JsonValueKind.Null, run.GetProperty("initialAnimalConfig").ValueKind);
         Assert.Equal(wave10Scenario, run.GetProperty("wave10").GetProperty("wave10Scenario").GetString());
         Assert.Equal("main_world_run", run.GetProperty("wave10").GetProperty("runtimeSource").GetString());
 
         using var runArtifact = ReadSingleRunArtifact(artifactDir);
         Assert.Equal(JsonValueKind.Null, runArtifact.RootElement.GetProperty("initialEcology").ValueKind);
+        Assert.Equal(JsonValueKind.Null, runArtifact.RootElement.GetProperty("initialAnimalConfig").ValueKind);
         Assert.False(File.Exists(Path.Combine(artifactDir, "wave10-probes.json")));
     }
 

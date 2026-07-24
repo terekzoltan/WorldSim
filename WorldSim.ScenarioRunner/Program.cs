@@ -56,6 +56,7 @@ var configs = parsedConfigs.Configs;
 var artifactDir = Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_ARTIFACT_DIR");
 const string InvalidWave9Scenario = "__invalid_wave9_scenario__";
 const string InvalidWave10Scenario = "__invalid_wave10_scenario__";
+const string InvalidInitialAnimalPolicy = "__invalid_initial_animal_policy__";
 
 if (configs.Count == 0 && string.IsNullOrWhiteSpace(rawConfigsJson))
 {
@@ -80,6 +81,13 @@ if (configs.Count == 0 && string.IsNullOrWhiteSpace(rawConfigsJson))
 var requestedScenarioLane = Environment.GetEnvironmentVariable("WORLDSIM_SCENARIO_LANE");
 if (!IsCoreScenarioLane(requestedScenarioLane))
 {
+    if (parsedConfigs.HasInitialAnimalConfiguration)
+    {
+        LogWarning("Warning: initial-animal scenario configuration is supported only on WORLDSIM_SCENARIO_LANE=core. Exiting with config_error.");
+        Environment.ExitCode = 3;
+        return Environment.ExitCode;
+    }
+
     var refineryExitCode = RefineryScenarioRunner.Run(new RefineryScenarioRunnerRequest(
         RawLane: requestedScenarioLane,
         Configs: configs.Select(config => new RefineryScenarioConfig(config.Name, config.Width, config.Height, config.InitialPop, config.Ticks, config.Dt)).ToList(),
@@ -93,6 +101,14 @@ if (!IsCoreScenarioLane(requestedScenarioLane))
         ConfigHadError: parsedConfigs.HadError));
     Environment.ExitCode = refineryExitCode;
     return refineryExitCode;
+}
+
+var coreRunIdentityError = ValidateCoreRunIdentityInputs(configs, planners, seeds, visualLaneResolution.Effective);
+if (coreRunIdentityError is not null)
+{
+    LogWarning($"Warning: {coreRunIdentityError} Exiting with config_error.");
+    Environment.ExitCode = 3;
+    return Environment.ExitCode;
 }
 
 var runs = new List<ScenarioRunResult>(configs.Count * planners.Count * seeds.Length);
@@ -122,12 +138,14 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 continue;
             }
 
+            var initialAnimalConfiguration = ResolveInitialAnimalSeedingConfiguration(mainRunConfig);
             var world = new World(
                 width: mainRunConfig.Width,
                 height: mainRunConfig.Height,
                 initialPop: mainRunConfig.InitialPop,
                 brainFactory: _ => new RuntimeNpcBrain(planner, $"ScenarioRunner:{planner}"),
-                randomSeed: seed)
+                randomSeed: seed,
+                initialAnimalSeedingOptions: initialAnimalConfiguration.ConstructorOptions)
             {
                 EnableCombatPrimitives = mainRunConfig.EnableCombatPrimitives,
                 EnableDiplomacy = mainRunConfig.EnableDiplomacy,
@@ -205,6 +223,7 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
             var runResult = BuildRunResult(
                 world,
                 initialEcology,
+                initialAnimalConfiguration,
                 mainRunConfig,
                 planner,
                 seed,
@@ -222,6 +241,14 @@ foreach (var config in configs.OrderBy(c => c.Name, StringComparer.Ordinal))
                 runTimelines[BuildRunKey(runResult)] = timelineSamples;
         }
     }
+}
+
+var duplicateCompletedRun = FindDuplicateRunIdentity(runs);
+if (duplicateCompletedRun is not null)
+{
+    LogWarning($"Warning: completed core runs contain duplicate semantic run identity for {DescribeRunIdentity(duplicateCompletedRun)}. Exiting with config_error.");
+    Environment.ExitCode = 3;
+    return Environment.ExitCode;
 }
 
 static ScenarioConfig ResolveMainRunExecutionConfig(ScenarioConfig config, bool assertEnabled)
@@ -313,6 +340,7 @@ return Environment.ExitCode;
 static ScenarioRunResult BuildRunResult(
     World world,
     ScenarioInitialEcologyTelemetrySnapshot initialEcology,
+    InitialAnimalSeedingResolution initialAnimalConfiguration,
     ScenarioConfig config,
     NpcPlannerMode planner,
     int seed,
@@ -414,7 +442,29 @@ static ScenarioRunResult BuildRunResult(
         Supply: supplyTelemetry,
         EnablePredatorHumanAttacks: world.EnablePredatorHumanAttacks,
         AllowEmergencyRescueInAcceptance: config.AllowEmergencyRescueInAcceptance,
-        InitialEcology: initialEcology);
+        InitialEcology: initialEcology,
+        InitialAnimalConfig: BuildInitialAnimalConfigSnapshot(initialAnimalConfiguration, initialEcology));
+}
+
+static ScenarioInitialAnimalConfigSnapshot BuildInitialAnimalConfigSnapshot(
+    InitialAnimalSeedingResolution resolution,
+    ScenarioInitialEcologyTelemetrySnapshot initialEcology)
+{
+    var habitatAware = initialEcology.InitialAnimalPolicy == "habitat_aware";
+    return new ScenarioInitialAnimalConfigSnapshot(
+        RequestedPolicy: resolution.RequestedPolicy,
+        EffectivePolicy: initialEcology.InitialAnimalPolicy,
+        EffectivePolicySource: initialEcology.InitialAnimalPolicySource,
+        AreaTilesPerAnimal: resolution.EffectiveOptions.AreaTilesPerAnimal,
+        PreferredPersonOrColonyDistance: habitatAware
+            ? resolution.EffectiveOptions.PreferredPersonOrColonyDistance
+            : null,
+        PreferredHerbivoreFoodRadius: habitatAware
+            ? resolution.EffectiveOptions.PreferredHerbivoreFoodRadius
+            : null,
+        PreferredPredatorPreyRadius: habitatAware
+            ? resolution.EffectiveOptions.PreferredPredatorPreyRadius
+            : null);
 }
 
 static ScenarioRunResult RunRuntimeBackedWave10LifecycleScenario(
@@ -2168,6 +2218,17 @@ static BaselineLoadResult ParseBaselineEnvelope(string? baselinePath)
             return new BaselineLoadResult(true, true, fullPath, null, "baseline file is empty or invalid");
         }
 
+        var duplicateBaselineRun = FindDuplicateRunIdentity(envelope.Runs);
+        if (duplicateBaselineRun is not null)
+        {
+            return new BaselineLoadResult(
+                true,
+                true,
+                fullPath,
+                null,
+                $"baseline contains duplicate semantic run identity for {DescribeRunIdentity(duplicateBaselineRun)}");
+        }
+
         return new BaselineLoadResult(true, false, fullPath, envelope, null);
     }
     catch (Exception ex)
@@ -2405,7 +2466,65 @@ static void WriteEvaluationOutput(
 }
 
 static string BuildRunKey(ScenarioRunResult run)
-    => $"{BuildStableKeyPart(run.ConfigName)}_{BuildStableKeyPart(run.PlannerMode)}_{BuildStableKeyPart(run.VisualLane)}_{run.Seed}";
+    => BuildRunKeyFromParts(run.ConfigName, run.PlannerMode, run.VisualLane, run.Seed);
+
+static string BuildRunKeyFromParts(string configName, string plannerMode, string visualLane, int seed)
+    => $"{BuildStableKeyPart(configName)}_{BuildStableKeyPart(plannerMode)}_{BuildStableKeyPart(visualLane)}_{seed}";
+
+static string? ValidateCoreRunIdentityInputs(
+    IReadOnlyList<ScenarioConfig> configs,
+    IReadOnlyList<NpcPlannerMode> planners,
+    IReadOnlyList<int> seeds,
+    LowCostProfileLane visualLane)
+{
+    var configNames = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var config in configs)
+    {
+        if (!configNames.Add(config.Name))
+            return $"duplicate effective scenario config name '{config.Name}' is not allowed on the core lane.";
+    }
+
+    var uniqueSeeds = new HashSet<int>();
+    foreach (var seed in seeds)
+    {
+        if (!uniqueSeeds.Add(seed))
+            return $"duplicate scenario seed '{seed}' is not allowed on the core lane.";
+    }
+
+    var plannedRunKeys = new HashSet<string>(StringComparer.Ordinal);
+    var visualLaneName = visualLane.ToString();
+    foreach (var config in configs.OrderBy(config => config.Name, StringComparer.Ordinal))
+    {
+        foreach (var planner in planners)
+        {
+            var plannerName = planner.ToString();
+            foreach (var seed in seeds.OrderBy(seed => seed))
+            {
+                if (!plannedRunKeys.Add(BuildRunKeyFromParts(config.Name, plannerName, visualLaneName, seed)))
+                {
+                    return $"duplicate planned semantic run identity for config '{config.Name}', planner '{plannerName}', lane '{visualLaneName}', seed '{seed}'.";
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
+static ScenarioRunResult? FindDuplicateRunIdentity(IReadOnlyList<ScenarioRunResult> runs)
+{
+    var runKeys = new HashSet<string>(StringComparer.Ordinal);
+    foreach (var run in runs)
+    {
+        if (!runKeys.Add(BuildRunKey(run)))
+            return run;
+    }
+
+    return null;
+}
+
+static string DescribeRunIdentity(ScenarioRunResult run)
+    => $"config '{run.ConfigName}', planner '{run.PlannerMode}', lane '{run.VisualLane}', seed '{run.Seed}'";
 
 static string BuildPerfRunKey(ScenarioRunResult run)
     => $"{run.ConfigName}/{run.PlannerMode}/{run.VisualLane}/{run.Seed}";
@@ -2592,7 +2711,7 @@ static List<NpcPlannerMode> ParsePlannerModes(string? raw)
 static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
 {
     if (string.IsNullOrWhiteSpace(raw))
-        return new ScenarioConfigParseResult(new List<ScenarioConfig>(), false, Array.Empty<string>());
+        return new ScenarioConfigParseResult(new List<ScenarioConfig>(), false, false, Array.Empty<string>());
 
     try
     {
@@ -2601,10 +2720,12 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
             return new ScenarioConfigParseResult(
                 new List<ScenarioConfig>(),
                 true,
+                false,
                 new[] { "Warning: WORLDSIM_SCENARIO_CONFIGS_JSON did not produce a config array. Exiting with config_error." });
 
         var configs = new List<ScenarioConfig>(parsed.Count);
         var warnings = new List<string>();
+        var hasInitialAnimalConfiguration = parsed.Any(HasInitialAnimalConfiguration);
         for (var index = 0; index < parsed.Count; index++)
         {
             var config = parsed[index];
@@ -2634,29 +2755,130 @@ static ScenarioConfigParseResult ParseScenarioConfigs(string? raw)
                 continue;
             }
 
+            var normalizedInitialAnimalPolicy = NormalizeInitialAnimalPolicy(config.InitialAnimalPolicy);
+            if (normalizedInitialAnimalPolicy == InvalidInitialAnimalPolicy)
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (InitialAnimalPolicy must be null, 'habitat_aware', or 'legacy_random'). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
+            var hasInitialAnimalOptions = HasInitialAnimalOptionOverrides(config);
+            if (normalizedInitialAnimalPolicy is null && hasInitialAnimalOptions)
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (initial-animal numeric options require an explicit InitialAnimalPolicy). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
+            if (config.InitialAnimalAreaTilesPerAnimal is <= 0)
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (InitialAnimalAreaTilesPerAnimal must be > 0). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
+            if (config.InitialAnimalPreferredPersonOrColonyDistance is < 0
+                || config.InitialAnimalPreferredHerbivoreFoodRadius is < 0
+                || config.InitialAnimalPreferredPredatorPreyRadius is < 0)
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (initial-animal preferred distances and radii must be >= 0). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
+            if (normalizedInitialAnimalPolicy == "legacy_random" && HasInitialAnimalPreferredOverrides(config))
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (legacy_random does not use preferred initial-animal distance or radius overrides). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
+            if (IsWave10LifecycleScenario(normalizedWave10Scenario) && HasInitialAnimalConfiguration(config))
+            {
+                warnings.Add($"Warning: invalid scenario config at index {index} (initial-animal configuration is unavailable for Runtime-backed Wave10 lifecycle scenarios). Ignoring entry and marking run as config_error.");
+                continue;
+            }
+
             configs.Add(config with
             {
                 Name = string.IsNullOrWhiteSpace(config.Name) ? $"config_{index + 1}" : config.Name,
                 Wave9Scenario = normalizedWave9Scenario,
-                Wave10Scenario = normalizedWave10Scenario
+                Wave10Scenario = normalizedWave10Scenario,
+                InitialAnimalPolicy = normalizedInitialAnimalPolicy
             });
         }
 
         if (configs.Count == 0)
         {
             warnings.Add("Warning: no valid scenario configs were provided. Exiting with config_error.");
-            return new ScenarioConfigParseResult(configs, true, warnings);
+            return new ScenarioConfigParseResult(configs, true, hasInitialAnimalConfiguration, warnings);
         }
 
-        return new ScenarioConfigParseResult(configs, warnings.Count > 0, warnings);
+        return new ScenarioConfigParseResult(configs, warnings.Count > 0, hasInitialAnimalConfiguration, warnings);
     }
     catch (Exception ex)
     {
         return new ScenarioConfigParseResult(
             new List<ScenarioConfig>(),
             true,
+            false,
             new[] { $"Warning: invalid WORLDSIM_SCENARIO_CONFIGS_JSON ({ex.Message}). Exiting with config_error." });
     }
+}
+
+static bool HasInitialAnimalConfiguration(ScenarioConfig config)
+    => !string.IsNullOrWhiteSpace(config.InitialAnimalPolicy)
+       || HasInitialAnimalOptionOverrides(config);
+
+static bool HasInitialAnimalOptionOverrides(ScenarioConfig config)
+    => config.InitialAnimalAreaTilesPerAnimal.HasValue
+       || HasInitialAnimalPreferredOverrides(config);
+
+static bool HasInitialAnimalPreferredOverrides(ScenarioConfig config)
+    => config.InitialAnimalPreferredPersonOrColonyDistance.HasValue
+       || config.InitialAnimalPreferredHerbivoreFoodRadius.HasValue
+       || config.InitialAnimalPreferredPredatorPreyRadius.HasValue;
+
+static string? NormalizeInitialAnimalPolicy(string? raw)
+{
+    if (string.IsNullOrWhiteSpace(raw))
+        return null;
+
+    return raw.Trim().ToLowerInvariant() switch
+    {
+        "habitat_aware" => "habitat_aware",
+        "legacy_random" => "legacy_random",
+        _ => InvalidInitialAnimalPolicy
+    };
+}
+
+static InitialAnimalSeedingResolution ResolveInitialAnimalSeedingConfiguration(ScenarioConfig config)
+{
+    if (!HasInitialAnimalConfiguration(config))
+    {
+        return new InitialAnimalSeedingResolution(
+            RequestedPolicy: null,
+            ConstructorOptions: null,
+            EffectiveOptions: InitialAnimalSeedingOptions.HabitatAwareDefault);
+    }
+
+    var options = config.InitialAnimalPolicy switch
+    {
+        "habitat_aware" => InitialAnimalSeedingOptions.HabitatAwareDefault,
+        "legacy_random" => InitialAnimalSeedingOptions.LegacyCompare,
+        _ => throw new InvalidOperationException("Initial-animal policy reached execution without validation.")
+    };
+    options = options with
+    {
+        AreaTilesPerAnimal = config.InitialAnimalAreaTilesPerAnimal ?? options.AreaTilesPerAnimal,
+        PreferredPersonOrColonyDistance = config.InitialAnimalPreferredPersonOrColonyDistance
+            ?? options.PreferredPersonOrColonyDistance,
+        PreferredHerbivoreFoodRadius = config.InitialAnimalPreferredHerbivoreFoodRadius
+            ?? options.PreferredHerbivoreFoodRadius,
+        PreferredPredatorPreyRadius = config.InitialAnimalPreferredPredatorPreyRadius
+            ?? options.PreferredPredatorPreyRadius
+    };
+
+    return new InitialAnimalSeedingResolution(
+        RequestedPolicy: config.InitialAnimalPolicy,
+        ConstructorOptions: options,
+        EffectiveOptions: options);
 }
 
 static bool IsKnownSupplyScenario(string? supplyScenario)
@@ -2809,7 +3031,26 @@ sealed record ScenarioConfig(
     string? SupplyScenario = null,
     string? Wave9Scenario = null,
     string? Wave10Scenario = null,
-    int? Wave10ManualLaunchTick = null);
+    int? Wave10ManualLaunchTick = null,
+    string? InitialAnimalPolicy = null,
+    int? InitialAnimalAreaTilesPerAnimal = null,
+    int? InitialAnimalPreferredPersonOrColonyDistance = null,
+    int? InitialAnimalPreferredHerbivoreFoodRadius = null,
+    int? InitialAnimalPreferredPredatorPreyRadius = null);
+
+sealed record InitialAnimalSeedingResolution(
+    string? RequestedPolicy,
+    InitialAnimalSeedingOptions? ConstructorOptions,
+    InitialAnimalSeedingOptions EffectiveOptions);
+
+sealed record ScenarioInitialAnimalConfigSnapshot(
+    string? RequestedPolicy,
+    string EffectivePolicy,
+    string EffectivePolicySource,
+    int AreaTilesPerAnimal,
+    int? PreferredPersonOrColonyDistance,
+    int? PreferredHerbivoreFoodRadius,
+    int? PreferredPredatorPreyRadius);
 
 sealed record ScenarioRunResult(
     string ConfigName,
@@ -2873,7 +3114,8 @@ sealed record ScenarioRunResult(
     ScenarioSupplyTelemetrySnapshot? Supply = null,
     bool EnablePredatorHumanAttacks = false,
     bool AllowEmergencyRescueInAcceptance = false,
-    ScenarioInitialEcologyTelemetrySnapshot? InitialEcology = null);
+    ScenarioInitialEcologyTelemetrySnapshot? InitialEcology = null,
+    ScenarioInitialAnimalConfigSnapshot? InitialAnimalConfig = null);
 
 sealed record ScenarioRunEnvelope(
     DateTime GeneratedAtUtc,
@@ -2944,7 +3186,11 @@ sealed record ScenarioArtifactManifest(
     string[] Wave10LaneNames,
     string[] Wave10ProofTypes);
 
-sealed record ScenarioConfigParseResult(List<ScenarioConfig> Configs, bool HadError, IReadOnlyList<string> Warnings);
+sealed record ScenarioConfigParseResult(
+    List<ScenarioConfig> Configs,
+    bool HadError,
+    bool HasInitialAnimalConfiguration,
+    IReadOnlyList<string> Warnings);
 
 sealed record ScenarioAssertionResult(
     string InvariantId,
