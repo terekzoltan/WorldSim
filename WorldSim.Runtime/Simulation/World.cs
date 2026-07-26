@@ -1787,7 +1787,10 @@ namespace WorldSim.Simulation
         }
 
         internal static int GetPredatorCapacityLimit(EcologyRegionSnapshot region)
-            => region.HerbivoreCount <= 0 ? 0 : Math.Max(1, region.HerbivoreCount / 4);
+            => GetPredatorCapacityLimit(region.HerbivoreCount);
+
+        internal static int GetPredatorCapacityLimit(int herbivoreCount)
+            => herbivoreCount <= 0 ? 0 : Math.Max(1, herbivoreCount / 4);
 
         internal bool TryFindHerbivoreMigrationTarget((int x, int y) origin, int radius, out (int x, int y) target)
         {

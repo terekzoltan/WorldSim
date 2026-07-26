@@ -273,6 +273,7 @@ internal static class InitialAnimalSeeder
             personOrColonyTargets,
             input.Options,
             herbivores,
+            selected.PredatorCount,
             workMetrics);
         if (predators.Count != selected.PredatorCount)
             throw new InvalidOperationException("Initial animal seeding scalar predator count did not match final materialization.");
@@ -405,9 +406,12 @@ internal static class InitialAnimalSeeder
             }
 
             workMetrics.RecordAllocationPrefixEvaluation();
-            if ((long)herbivorePrefixCount + totalPredatorCount <= animalCeiling)
+            var cappedPredatorCount = Math.Min(
+                totalPredatorCount,
+                World.GetPredatorCapacityLimit(herbivorePrefixCount));
+            if ((long)herbivorePrefixCount + cappedPredatorCount <= animalCeiling)
             {
-                var candidate = new AllocationChoice(herbivorePrefixCount, totalPredatorCount);
+                var candidate = new AllocationChoice(herbivorePrefixCount, cappedPredatorCount);
                 if (IsBetterAllocation(candidate, bestAnyAllocation))
                     bestAnyAllocation = candidate;
                 if (candidate.PredatorCount > 0
@@ -442,6 +446,7 @@ internal static class InitialAnimalSeeder
         IReadOnlyList<(int x, int y)> personOrColonyTargets,
         InitialAnimalSeedingOptions options,
         IReadOnlyList<InitialAnimalPlacement> herbivores,
+        int maximum,
         WorkMetricsCounter workMetrics)
     {
         if (herbivores.Count == 0)
@@ -498,7 +503,7 @@ internal static class InitialAnimalSeeder
             candidatesByRegion,
             limitsByRegion,
             AnimalKind.Predator,
-            int.MaxValue);
+            maximum);
     }
 
     private static List<InitialAnimalPlacement> BuildRoundRobinPlacements(

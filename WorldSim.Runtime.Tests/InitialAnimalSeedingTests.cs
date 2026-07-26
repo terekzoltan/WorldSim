@@ -269,6 +269,92 @@ public sealed class InitialAnimalSeedingTests
     }
 
     [Fact]
+    public void HabitatAware_FragmentedRegionsRespectAggregatePredatorCapacity()
+    {
+        var tiles = Enumerable.Range(0, 20)
+            .Select(x => Tile(
+                x,
+                0,
+                activeFood: x % 4 == 0,
+                regionId: x / 4))
+            .ToArray();
+        var input = BuildInput(tiles: tiles, width: 20, height: 1);
+
+        var first = InitialAnimalSeeder.Plan(input);
+        var second = InitialAnimalSeeder.Plan(input);
+
+        Assert.Equal(first.Policy, second.Policy);
+        Assert.Equal(first.AnimalCeiling, second.AnimalCeiling);
+        Assert.Equal(first.HerbivoreBudget, second.HerbivoreBudget);
+        Assert.Equal(first.PredatorBudget, second.PredatorBudget);
+        Assert.Equal(first.Placements, second.Placements);
+        Assert.Equal(first.Fallbacks, second.Fallbacks);
+        Assert.Equal(first.HerbivoreBudget, first.InitialHerbivoresSpawned);
+        Assert.Equal(first.PredatorBudget, first.InitialPredatorsSpawned);
+        Assert.Equal(8, first.HerbivoreBudget);
+        Assert.Equal(2, first.PredatorBudget);
+        Assert.Equal(
+            first.AnimalCeiling - first.HerbivoreBudget - first.PredatorBudget,
+            first.AnimalCeilingUnallocated);
+        Assert.Equal(World.GetPredatorCapacityLimit(first.HerbivoreBudget), first.PredatorBudget);
+        Assert.Equal(first.Placements.Count, first.Placements.Select(placement => placement.Pos).Distinct().Count());
+
+        foreach (var region in first.Placements.GroupBy(placement => placement.RegionId))
+        {
+            var herbivores = region.Count(placement => placement.Kind == AnimalKind.Herbivore);
+            var predators = region.Count(placement => placement.Kind == AnimalKind.Predator);
+            Assert.InRange(predators, 0, World.GetPredatorCapacityLimit(herbivores));
+        }
+    }
+
+    [Fact]
+    public void HabitatAware_LowPopulationRetainsSinglePredatorCompatibility()
+    {
+        var result = InitialAnimalSeeder.Plan(BuildInput(
+            tiles: BuildLandTiles(width: 2, height: 1, activeFood: new[] { (x: 0, y: 0) }),
+            width: 2,
+            height: 1));
+
+        Assert.Equal(1, result.HerbivoreBudget);
+        Assert.Equal(1, result.PredatorBudget);
+        Assert.Equal(World.GetPredatorCapacityLimit(result.HerbivoreBudget), result.PredatorBudget);
+        Assert.Equal(result.PredatorBudget, result.InitialPredatorsSpawned);
+    }
+
+    [Theory]
+    [InlineData(101)]
+    [InlineData(202)]
+    [InlineData(303)]
+    public void HabitatAware_LockedProfilePreservesHerbivoresThroughEarlyContact(int seed)
+    {
+        var first = new World(64, 40, 24, randomSeed: seed)
+        {
+            EnablePredatorHumanAttacks = true
+        };
+        var second = new World(64, 40, 24, randomSeed: seed)
+        {
+            EnablePredatorHumanAttacks = true
+        };
+        var initial = first.BuildScenarioInitialEcologyTelemetrySnapshot();
+
+        Assert.Equal(
+            first._animals.Select(animal => (animal.Kind, animal.Pos)).ToArray(),
+            second._animals.Select(animal => (animal.Kind, animal.Pos)).ToArray());
+        Assert.Equal(World.GetPredatorCapacityLimit(initial.Herbivores), initial.Predators);
+        Assert.Equal(0, initial.PredatorsInPreyEmptyRegions);
+
+        for (var tick = 0; tick < 3; tick++)
+            first.Update(0.25f);
+
+        var ecology = first.BuildScenarioEcologyTelemetrySnapshot();
+        Assert.True(ecology.Herbivores > 0, $"seed={seed}; herbivores={ecology.Herbivores}; firstZero={ecology.FirstZeroHerbivoreTick}");
+        Assert.Null(ecology.FirstZeroHerbivoreTick);
+        Assert.Equal(0, ecology.EmergencyRescues);
+        Assert.Equal(0, ecology.HerbivoreReplenishmentSpawns);
+        Assert.Equal(0, ecology.PredatorReplenishmentSpawns);
+    }
+
+    [Fact]
     public void HabitatAware_LargeMapUsesSinglePredatorMaterializationAndBoundedPrefixScan()
     {
         var firstInput = BuildLargeMapInput();
