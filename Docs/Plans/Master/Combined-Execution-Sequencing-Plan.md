@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-07-16
+Last updated: 2026-07-28
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -2881,7 +2881,7 @@ E11-E closeout:
 Step 5c1-A outcome:
 - ✅ Accepted GREEN with deterministic initial species/region/food/prey/person-distance and first-event evidence.
 - Focused Runtime gate passed 17/17 and ScenarioRunner compile passed with zero warnings/errors.
-- Natural production-caller timestamp regressions remain a Step 5c5/package gate.
+- Natural production-caller timestamp regressions remain a Step 5c4/package-closeout gate.
 
 **Step 5c1-B - SMR initial ecology artifact consumer (SMR Analyst)**
 
@@ -2902,7 +2902,7 @@ Step 5c1-B outcome:
 - Focused gates passed: Runtime 17/17, supply 24/24, ScenarioRunner build 0 warnings/errors, artifact contract 19/19.
 - Repository-durable evidence: `Docs/Evidence/SMR/wave11-e11-h-step5c1-initial-observability/README.md`; raw `.artifacts/**` remains local-only.
 - F1/F2 are closed by the durable README, exact source/test ledger, and verified commit/tree identity in `ops/PROJECT_STATE.md`.
-- F3 and natural production-caller timestamp proof remain active Step 5c5/package gates.
+- F3 and natural production-caller timestamp proof remain active Step 5c4/package-closeout gates.
 
 **Step 5c2 - Deterministic habitat-aware runtime seeding (Track B)**
 
@@ -2914,38 +2914,56 @@ Step 5c2 outcome:
 - ✅ Accepted GREEN and integrated into `master` as commit `cdeee3d5512d5e88c18f01f3bece696cff8801e3` with tree `3203115f42f2cd6925c4a7ea4f74c51a149e1216`.
 - The exact five-file committed tree passed initial-seeding 19/19, telemetry 17/17, supply 24/24, Runtime analyzer/build 0/0, solution build 0/0, format verification, and diff hygiene.
 - The prior mixed dirty worktree is preserved only on local safety branch `archive/e11h-pre-step5c2-master-20260716` at `1874f32ba380c845e294264f30c5014e9279c918`; its RED/deferred Runtime, AI, ScenarioRunner, test, and evidence hunks are not part of `master`.
-- This acceptance proves initialization only. Lifecycle viability, the focused predator-human sentinel, expanded/full matrices, E11-I, and E11-J remain gated by Steps 5c3-5c5 and E11-H closeout.
-- Step 5c3 is READY for the SMR Analyst under the locked compare and no-tuning constraints.
+- This acceptance proves initialization only. Lifecycle viability, the focused predator-human sentinel, expanded/full matrices, E11-I, and E11-J remain gated by Steps 5c3-5c4 and E11-H closeout.
+- Step 5c3 is active under SMR Analyst ownership until its implementation, evidence, review-fix, deep-review, and verified closeout loop is GREEN.
 
-**Step 5c3 - SMR initialization and early-contact calibration (SMR Analyst)**
-
-| Session | Epic(s) | Prereq | Notes |
-|---------|---------|--------|-------|
-| SMR Analyst | E11-H seeding calibration | Step 5c2 ✅ | Compare `legacy_random` and `habitat_aware` for seeds `101,202,303` under identical config. |
-
-**Step 5c4 - Manual visual observation lane (User / Manual QA)**
+**Step 5c3 - SMR implementation, calibration, and review-fix loop (SMR Analyst)**
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| User / Manual QA | E11-H qualitative topology observation | Step 5c3 evidence reviewed | Record exact profile, initial topology, first contact/hunt/grazing, clustering/pathing, and limitations. |
+| SMR Analyst | E11-H seeding calibration and evidence-tooling closeout | Step 5c2 ✅ | Implement and repair only the ScenarioRunner config/artifact/test/evidence surface, compare `legacy_random` and `habitat_aware` for seeds `101,202,303`, and repeat the review-fix loop until final Meta step-review GREEN. Runtime/AI/App/Graphics defects must be handed off, not fixed in this row. |
 
-**Step 5c5 - Meta route decision and focused gate**
+Step 5c3 current outcome and mandatory loop:
+- ScenarioRunner implementation plus initialization/early-contact artifacts are complete, but the first Meta step-review is YELLOW; the package is retained for repair rather than accepted or reverted.
+- The SMR Analyst remains the active owner for accepted ScenarioRunner/process-test/evidence findings, including bookkeeping, reproducible commands, evidence-source ledger, authority wording, and missing config-normalization coverage.
+- After each repair pass, rerun the locked focused gates and evidence checks. Before final acceptance, run the mandatory WorldSim deep-review over the repaired package.
+- Final deep-review synthesis found one additional ScenarioRunner contract blocker: duplicate config names or duplicate seeds can collide on the core artifact path's `BuildRunKey`, so Step 5c3 must reject duplicate effective run identities and prove no partial artifact overwrite or unhandled compare failure before GREEN. The fix must stay core-lane-only unless a separate Track D handoff reviews refinery behavior.
+- The existing Runtime-backed lifecycle artifact theory must also lock the additive `initialAnimalConfig: null` contract before GREEN.
+- Baseline compare remains keyed by semantic config name/planner/lane/seed rather than full input fingerprint. Step 5c3 documents that non-claim; full compare-identity hardening is a separate future contract gate, not an implicit change in this review-fix.
+- Step 5c3 completes only after the accepted findings are fixed, verification is GREEN, WorldSim deep-review is GREEN, final Meta step-review is GREEN, and the authorized closeout commit identity is verified.
+- The observed habitat-aware immediate prey collapse is route evidence, not permission for the SMR Analyst to tune Runtime. Any confirmed Runtime/seeding/lifecycle repair belongs to a separately authorized Track B row inside Step 5c4.
+- ✅ Step 5c3 final Meta review and verified closeout are complete at commit `ea94e7a8b8f3fe43cd44d5eb7b4c9fbf7351eae9`, tree `8939f1800ff865234ff252af5b37f1dc76ce5b5f`; duplicate run identities and Runtime-backed `initialAnimalConfig:null` coverage are closed.
+
+#### Wave 11 Step 5c4 - E11-H final route, optional manual validation, and Meta closeout
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Meta Coordinator | E11-H route decision | Step 5c3 ✅ and Step 5c4 packet or waiver | Classify failures and authorize at most one next route. |
+| Meta Coordinator | E11-H route and final closeout | Step 5c3 final GREEN + verified closeout commit | Classify the GREEN Step 5c3 evidence, request manual validation only when it answers a named uncertainty, authorize at most one narrow repair route, and close E11-H only after all hard gates are GREEN. |
+| Track B agent | Conditional Runtime/seeding/lifecycle repair | Explicit Meta handoff from the Step 5c4 route decision | Implement only the single evidence-backed Runtime-owned repair; do not absorb ScenarioRunner evidence-tooling fixes or stack multiple tuning hypotheses. |
+| SMR Analyst | Conditional post-repair evidence and hard-gate rerun | Authorized Track B repair reviewed GREEN, or Meta determines no Runtime repair is needed | Re-run the focused 5-case gate, then expanded 9-run, then full 45-run in strict order and prepare the final Epic evidence packet. |
+| User / Manual QA | Optional qualitative runtime observation | Explicit Meta request naming the profile and question | Run the requested simulation profile and return a short observation packet. Manual evidence is diagnostic input, not a default prerequisite or hard invariant proof. |
 
-Step 5c5 acceptance:
-- `DEFER_STEP5C5`: provide a uniquely-valued seven-field timeline fixture or evidence-backed waiver/reclassification;
+Step 5c4 acceptance and closeout:
+- the Step 5c3 closeout commit proves only the repaired ScenarioRunner/evidence package; Step 5c4 is not a duplicate commit gate, because it owns the conditional domain repair route, strict lifecycle matrices, and final E11-H verdict;
+- the historical `DEFER_STEP5C5` finding ID is discharged here by a uniquely-valued seven-field timeline fixture or an evidence-backed Meta waiver/reclassification;
 - provide natural production-caller timestamp regressions for contact, hunt, grazing, and predator death, or evidence-backed waiver;
 - focused 5-case GREEN -> expanded 9-run GREEN -> full 45-run remains strict;
-- E11-I/E11-J remain blocked until E11-H is accepted GREEN.
+- every authorized repair package has GREEN review/evidence and a verified commit identity;
+- no unresolved candidate, RED experiment, or manual uncertainty is silently promoted;
+- E11-H is explicitly accepted GREEN by Meta before this step completes;
+- the former standalone manual Step 5c4 and Meta Step 5c5 are absorbed into this single final gate. There is no separate Step 5c5 execution step.
 
-**Step 6 - visual/debug consume after snapshot and invariants are stable**
+Step 5c4 current route:
+- ✅ The seeding-only initialization repair is accepted GREEN and verified at commit `5b377583a81b6c9bcda84e884da97bacb46f6b98`, tree `1dca80444e255947269fad319274b1f638ae58a8`: aggregate predator capacity plus bounded materialization produce deterministic fragmented-region `8H/2P`, preserve low-population `1H/1P`, pass committed-tree `InitialAnimalSeedingTests` 24/24, and produce a 6/6 local-only 300-tick calibration with no zero-herbivore window or rescue/replenishment. This closes only the seeding repair, not Step 5c4 or E11-H.
+- 🔄 The canonical focused predator-human lifecycle gate is still RED at 4/5 (`101/Goap` predator extinction; 13/13 predator deaths are human kills). A durable same-fixture OFF hard-control harness is RED at 1/5 with four herbivore-extinction rows.
+- The next authorized work is one diagnostics-first predator-prey recruitment/mortality route. Human pressure changes the failure mode but is not the sole defect. Do not stack tuning, run expanded/full matrices, or open E11-I/E11-J while the focused gate is RED.
+- The separately discovered recent-hostile sentinel overflow has a bounded local TDD fix and regression, but it requires its own reviewed handoff/package and is not part of the accepted seeding-only repair.
+
+#### Step 6 - visual/debug consume after snapshot and invariants are stable
 
 | Session | Epic(s) | Prereq | Notes |
 |---------|---------|--------|-------|
-| Track A agent | E11-I | E11-A ✅ + E11-H ✅ | Debug overlay consumes stable snapshot fields and SMR terminology |
+| Track A agent | E11-I | E11-A ✅ + Step 5c4 ✅ + E11-H final Meta GREEN | Debug overlay consumes only the stable, accepted snapshot fields and SMR terminology. Step 5c3 implementation/review GREEN alone cannot open Step 6. |
 
 **Step 7a - ecology evidence review**
 

@@ -1,11 +1,11 @@
 # Wave 11 E11-H Step 5c - Habitat-Aware Ecology Seeding And SMR Calibration Plan
 
-Status: Canonical - Step 5c2 accepted GREEN; Step 5c3 ready
+Status: Canonical - Step 5c4 seeding-only repair verified closed; lifecycle diagnostics route active
 Owner: Meta Coordinator
 Runtime owner: Track B
 Evidence owner: SMR Analyst
 Manual observation owner: User / Manual QA
-Last updated: 2026-07-16
+Last updated: 2026-07-28
 
 ## Purpose
 
@@ -216,9 +216,9 @@ Step 5c2 outcome:
 - committed tree `3203115f42f2cd6925c4a7ea4f74c51a149e1216` preserves the reviewed five-file candidate identity;
 - focused committed-tree gates passed: initial seeding 19/19, telemetry 17/17, supply 24/24, Runtime analyzer/build 0/0, solution build 0/0, format verification, and diff hygiene;
 - no lifecycle, predator-human, rescue/replenishment, AI, App, Graphics, or ScenarioRunner behavior was promoted in this slice;
-- Step 5c3 is ready, while lifecycle viability, expanded/full matrices, E11-I, and E11-J remain blocked by their later gates.
+- Step 5c3 remains under SMR Analyst ownership until its implementation/evidence review-fix loop, mandatory WorldSim deep-review, final Meta step-review, and verified closeout commit are GREEN. Lifecycle viability, expanded/full matrices, E11-I, and E11-J remain blocked by Step 5c4 and E11-H final closeout.
 
-### Step 5c3 - SMR Initialization And Early-Contact Calibration
+### Step 5c3 - SMR Implementation, Calibration, And Review-Fix Loop
 
 Prerequisite: Step 5c2 accepted GREEN.
 
@@ -245,39 +245,63 @@ Acceptance/evidence gate:
 - no initial prey-empty predator regions unless explicitly justified fallback occurs;
 - no immediate colony adjacency outlier beyond configured policy;
 - artifacts expose sufficient evidence for manual and Meta review.
+- accepted ScenarioRunner/process-test/evidence review findings are fixed by the SMR Analyst and the locked focused verification is rerun after each repair pass;
+- duplicate effective config names and duplicate seeds are rejected before core simulation/artifact generation, with defensive unique-run-key and no-partial-artifact/compare-failure coverage; refinery-lane behavior remains unchanged without a separate Track D handoff;
+- successful Runtime-backed lifecycle artifacts explicitly preserve and test `initialAnimalConfig: null`;
+- baseline compare is not claimed to validate full `initialAnimalConfig` identity until a separate compare-contract hardening gate defines that behavior;
+- mandatory WorldSim deep-review is GREEN over the repaired package;
+- final Meta step-review is GREEN and the authorized closeout commit identity is verified.
 
 If SMR identifies a proven Runtime telemetry defect, open a separate Track B repair handoff. Do not edit Runtime files inside the SMR Analyst row.
 
-Unlocks: Step 5c4.
+Current outcome:
 
-### Step 5c4 - Manual Visual Observation
+- ScenarioRunner implementation plus initialization and early-contact artifacts are complete;
+- the first Meta step-review is YELLOW, so Step 5c3 has entered a mandatory review-fix loop rather than closing;
+- current accepted fixes remain ScenarioRunner/process-test/evidence owned, so the SMR Analyst performs them;
+- the immediate habitat-aware prey-collapse result is retained as route evidence, but it does not authorize Runtime tuning in Step 5c3.
 
-Prerequisite: Step 5c3 artifacts reviewed and one or two concrete manual targets selected.
+Unlocks: Step 5c4 only after final GREEN and verified closeout commit.
 
-Owner: User / Manual QA. Track A/App changes are not implied by this lane.
+### Step 5c4 - E11-H Final Route, Optional Manual Validation, And Meta Closeout
+
+Prerequisite: Step 5c3 final GREEN with verified closeout commit.
+
+Owner: Meta Coordinator. Conditional implementation owner: Track B. Evidence owner: SMR Analyst. Optional observation owner: User / Manual QA.
 
 Work:
 
-- run one or two specified app profiles;
-- observe initial predator/prey/food/human topology;
-- capture first predator-human contact, first hunt/grazing opportunity, clustering/pathing, and visible local depletion;
-- return a short structured observation packet with screenshots or a short recording when practical.
+- Meta classifies the final Step 5c3 evidence and authorizes at most one narrow next route;
+- if a Runtime/seeding/lifecycle defect is proven, Track B receives an explicit bounded repair handoff;
+- after any authorized repair is reviewed GREEN, the SMR Analyst reruns focused 5-case, expanded 9-run, and full 45-run evidence in strict order;
+- manual runtime observation is requested only when it answers a named topology, contact, clustering/pathing, or visual-parity uncertainty;
+- if requested, the user runs the exact specified profile and returns a short structured observation packet with screenshots or a recording when practical;
+- Meta performs the final E11-H closeout only after all hard evidence and package gates are GREEN.
+
+Current route decision:
+
+- Step 5c3 is GREEN and committed as `ea94e7a8b8f3fe43cd44d5eb7b4c9fbf7351eae9` with tree `8939f1800ff865234ff252af5b37f1dc76ce5b5f`;
+- the single authorized Track B seeding-only repair is accepted GREEN and verified at commit `5b377583a81b6c9bcda84e884da97bacb46f6b98`, tree `1dca80444e255947269fad319274b1f638ae58a8`: per-region capacity remains enforced, total initial predators are capped from total selected herbivores through the existing Runtime formula, and final materialization is bounded to the selected scalar budget;
+- committed-tree seeding verification is GREEN (`InitialAnimalSeedingTests` 24/24), including deterministic fragmented-region `8H/2P`, low-population `1H/1P`, and locked `101/202/303` early-contact coverage; local-only 300-tick calibration is 6/6 with no zero-herbivore window and no rescue/replenishment;
+- the canonical predator-human lifecycle sentinel remains RED at 4/5: `101/Goap` ends with predator extinction at tick `991`, and all 13 predator deaths are human kills; rescue and replenishment remain zero;
+- the durable executable predator-human OFF control is RED at 1/5 with herbivore extinction in four rows. Together with the canonical ON 4/5 result, it shows human pressure changes the failure mode but is not the sole lifecycle defect; the next route is predator-prey recruitment/mortality diagnosis rather than human-pressure-only tuning;
+- a separate sentinel-arithmetic correctness finding in `Person.HasRecentCombatIntent(...)` is TDD-fixed locally, but it must remain an independently reviewed package and must not be used to broaden the accepted seeding repair;
+- do not change lifecycle constants, rescue policy, AI, ScenarioRunner schema, or evidence thresholds. Expanded 9-run and full 45-run gates remain blocked.
 
 Acceptance/evidence gate:
 
-- manual packet records exact env/profile, duration, overlays, observations, and limitations;
-- manual evidence is labelled qualitative and is not used as hard invariant proof;
-- any missing visualization is routed to E11-I or a separately reviewed Track A/App diagnostic seam, not implemented inside Step 5c4.
+- the Step 5c3 closeout commit proves only the repaired ScenarioRunner/evidence package; Step 5c4 separately owns any conditional domain repair, strict lifecycle matrices, and the final E11-H verdict;
+- manual evidence is optional rather than a default prerequisite; when requested, its packet records exact env/profile, duration, overlays, observations, and limitations and remains qualitative;
+- any missing visualization is routed to E11-I or a separately reviewed Track A/App diagnostic seam, not implemented inside Step 5c4;
+- the historical `DEFER_STEP5C5` finding ID is discharged by a controlled uniquely-valued seven-field timeline fixture or an evidence-backed Meta waiver/reclassification;
+- natural production-caller timestamp regressions cover predator-human contact, predator hunt, herbivore grazing, and predator death, unless Meta records an explicit evidence-backed waiver;
+- all non-retained experiments are reverted or quarantined diagnostic-only;
+- focused 5-case GREEN is required before expanded 9-run;
+- expanded 9-run GREEN is required before full 45-run;
+- all authorized repair packages have GREEN review/evidence and verified commit identity;
+- E11-H receives explicit final Meta GREEN before Step 5c4 completes.
 
-Unlocks: Step 5c5.
-
-### Step 5c5 - Meta Route Decision And Focused Gate
-
-Prerequisite: Step 5c3 SMR evidence and Step 5c4 manual packet available, or manual lane explicitly waived with reason.
-
-Owner: Meta Coordinator.
-
-Decision outcomes:
+Route outcomes:
 
 - If initialization quality is GREEN and the focused 5-case gate is GREEN, authorize expanded 9-run predator-human evidence.
 - If initialization quality is GREEN but lifecycle remains RED, accept seeding independently and open one evidence-backed lifecycle/behavior route.
@@ -285,19 +309,9 @@ Decision outcomes:
 - If manual and SMR evidence disagree, prefer deterministic SMR for acceptance and open a separate app parity/config observability route.
 - If the focused gate still combines independent seed `101` prey collapse and seed `202` early predator extinction, authorize explicit gate decomposition for diagnosis while keeping final E11-H hard closeout unchanged.
 
-Acceptance/evidence gate:
+There is no separate Step 5c5. The former manual-observation lane and Meta route-decision gate are absorbed into Step 5c4 so Step 6 has one unambiguous prerequisite: Step 5c4 complete with E11-H final Meta GREEN.
 
-- written route decision classifies each failure mechanism;
-- no unresolved candidate is silently promoted;
-- `DEFER_STEP5C5`: the SMR Analyst provides a controlled artifact-path fixture with distinct
-  values for all seven first-event timeline fields and exact field-by-field mapping proof, or
-  Meta explicitly waives/reclassifies the finding with evidence before E11-H package closeout;
-- before E11-H package/closeout, natural production-caller timestamp regressions cover predator-human contact, predator hunt, herbivore grazing, and predator death, unless Meta records an explicit evidence-backed waiver;
-- all non-retained experiments are reverted or quarantined diagnostic-only;
-- focused 5-case GREEN is still required before expanded 9-run;
-- expanded 9-run GREEN is still required before full 45-run.
-
-Unlocks: either a single reviewed follow-up route or the existing expanded/full E11-H gate order.
+Unlocks: Step 6 / E11-I only after E11-H final Meta GREEN.
 
 ## Verification Matrix
 

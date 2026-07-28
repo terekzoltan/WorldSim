@@ -26,6 +26,60 @@ Severity guide:
 
 Entries:
 
+## 2026-07-25 - Wave 11 E11-H Step 5c4 - Major - Recent-hostile sentinel arithmetic can overflow
+
+- Track: Track B / combat intent bookkeeping.
+- Source: Focused predator-human contact-realization fixture isolation.
+- Finding: `HasRecentCombatIntent` subtracts `_recentHostileContactTick=int.MinValue` from the current tick; unchecked integer overflow can classify a never-observed hostile as recent and route `Fight` toward the default hostile position.
+- Impact: Early fight actions may bypass their actual predator/faction target, creating false movement and invalidating contact-focused tests or runtime decisions.
+- Resolution / guidance: Keep the predator same-tile contact hypothesis isolated. Use an initialized-timestamp guard before subtraction and prove both the direct recency predicate and higher-level follow-through predicate reject fresh actors; preserve genuine recent-contact tests.
+- Status: fixed locally with a RED-then-GREEN `FreshPerson_HasNoRecentCombatIntentBeforeAnyContact` regression and `ContactFollowThroughTests` 7/7. Reviewer classifies the fix as correct but requires a separately reviewed combat-intent package; it is not part of the accepted seeding-only repair.
+
+## 2026-07-24 - Wave 11 E11-H Step 5c4 - Major - Fragmented regions multiply the initial predator floor
+
+- Track: Track B / initial ecology seeding.
+- Source: Step 5c3 initialization and 300-tick early-contact evidence plus Meta Step 5c4 route classification.
+- Finding: Applying the minimum predator capacity independently in each prey-bearing region produces a global `5H/5P` roster on the locked 64x40 profile; predators hunt on tick 1 and herbivores reach zero on ticks 2-3.
+- Impact: Initialization quality remains RED even though placement safety and artifact health are GREEN.
+- Resolution / guidance: Preserve per-region capacity and lifecycle behavior, but cap the initial total predator budget from total selected herbivores through the same Runtime capacity formula and cap materialization to the selected budget. Prove fragmented-region determinism and locked 64x40 early viability before broader SMR gates.
+- Status: fixed and verified at commit `5b377583a81b6c9bcda84e884da97bacb46f6b98`, tree `1dca80444e255947269fad319274b1f638ae58a8`; committed-tree `InitialAnimalSeedingTests` pass 24/24, fragmented-region output is exactly `8H/2P`, low-population compatibility is `1H/1P`, and the local-only 300-tick calibration is 6/6 without a zero-herbivore window or rescue/replenishment. This resolves the seeding finding only; the focused lifecycle finding remains open.
+
+## 2026-07-25 - Wave 11 E11-H Step 5c4 - Major - Focused lifecycle remains RED after initialization repair
+
+- Track: Track B / closed-loop predator-prey lifecycle.
+- Source: Canonical five-case Runtime sentinel plus durable same-fixture predator-human OFF hard-control harness.
+- Finding: The canonical ON gate passes 4/5 and fails `101/Goap` through predator extinction (`firstZeroPredatorTick=991`, 13 predator deaths, 13 human kills). The executable OFF control passes only 1/5 and produces herbivore extinction in four rows, including one `202/Htn` row where both species eventually reach zero.
+- Impact: The aggregate seeding defect is fixed, but E11-H cannot claim closed-loop species continuity. Human pressure changes the failure mode but is not the sole lifecycle cause.
+- Resolution / guidance: Accept and package the initialization repair independently. Keep expanded 9-run and full 45-run blocked. Open one diagnostics-first predator-prey recruitment/mortality route comparing births, captures/meat, starvation, and first-zero timing before changing any constant or rescue/replenishment policy.
+- Status: open; focused lifecycle gate is RED and E11-H/E11-I/E11-J remain blocked.
+
+## 2026-07-18 - Wave 11 E11-H Step 5c3 Deep Review - Major - ScenarioRunner must reject duplicate effective run identities
+
+- Track: SMR Analyst / ScenarioRunner evidence contract
+- Source: Meta + external Swarm deep-review synthesis.
+- Finding: Duplicate config names or duplicate seeds can produce the same `BuildRunKey`, overwrite timelines/run files, mix drilldown metadata, and throw during baseline dictionary construction.
+- Impact: Artifact cardinality can disagree with retained run evidence, and compare mode can fail through an unhandled duplicate-key exception.
+- Resolution / guidance: Before Step 5c3 GREEN, reject duplicate effective config names and duplicate seeds as deterministic `config_error` on the core ScenarioRunner artifact path, defensively verify unique run keys, and add focused no-partial-artifact/no-unhandled-compare coverage. Do not change refinery-lane acceptance without a separately reviewed Track D handoff.
+- Status: fixed and verified by final Meta GREEN plus commit `ea94e7a8b8f3fe43cd44d5eb7b4c9fbf7351eae9`.
+
+## 2026-07-18 - Wave 11 E11-H Step 5c3 Deep Review - Guidance - Baseline compare key is not full config identity
+
+- Track: SMR Analyst / ScenarioRunner compare contract
+- Source: Meta + external Swarm deep-review synthesis.
+- Finding: Baseline comparison intentionally matches `configName + planner + visual lane + seed`; it does not validate `initialAnimalConfig` or the full execution config.
+- Impact: Reusing a config name after changing policy/options can be misread as no-config-drift evidence even though current Step 5c3 evidence does not rely on compare mode.
+- Resolution / guidance: Step 5c3 documents the non-claim. A named future ScenarioRunner compare-identity hardening gate is required before policy/options-changed runs under the same config name are treated as compatible baselines.
+- Status: guidance; not a Step 5c3 code blocker after the explicit non-claim, and no full-config fingerprint contract is implied.
+
+## 2026-07-18 - Wave 11 E11-H Step 5c3 Deep Review - Minor - Runtime-backed artifacts need explicit null contract coverage
+
+- Track: SMR Analyst / ScenarioRunner evidence contract
+- Source: Meta + external Swarm deep-review synthesis.
+- Finding: Successful Runtime-backed lifecycle runs currently serialize `initialAnimalConfig: null`, but existing run-family tests assert only the older `initialEcology: null` contract.
+- Impact: A future refactor could emit misleading ScenarioRunner-owned default identity beside a Runtime-backed run without a focused regression failing.
+- Resolution / guidance: Extend the existing Runtime-backed lifecycle artifact theory to assert JSON null in summary and run-file output without adding a new process case.
+- Status: fixed and verified by the three-row Runtime-backed lifecycle theory in commit `ea94e7a8b8f3fe43cd44d5eb7b4c9fbf7351eae9`.
+
 ## 2026-07-13 - Wave 11 E11-H Step 5c1-B - Major - Canonical Step 5c2 unlock clauses must require verified closeout
 
 - Track: Meta Coordinator / workflow governance
@@ -52,14 +106,14 @@ Entries:
 - Track: SMR Analyst / ScenarioRunner evidence
 - Finding: Repeated `1` and `null` values are not fully anti-permutation resistant.
 - Resolution / guidance: `DEFER_STEP5C5`; add a seven-distinct-value fixture or evidence-backed waiver/reclassification.
-- Status: open; active gate is Combined/parent Step 5c5 package closeout.
+- Status: open; historical ID retained, active discharge gate is Step 5c4 / E11-H package closeout.
 
 ## 2026-07-11 - Wave 11 E11-H Step 5c1-A - Minor - Authoritative event seams need natural-caller regression coverage before package
 
 - Track: Track B / Runtime ecology observability
 - Finding: Reporter seams have focused first-write tests but natural production callers need end-to-end timestamp regressions.
 - Resolution / guidance: Add contact, hunt, grazing, and predator-death caller regressions or evidence-backed waiver before E11-H package closeout.
-- Status: open; active gate is Combined Step 5c5 / E11-H package review.
+- Status: open; active gate is Combined Step 5c4 / E11-H package closeout.
 
 ## 2026-07-11 - Wave 11 E11-H Step 5c1-B - Minor - Initial ecology population claims must distinguish run-family ownership
 

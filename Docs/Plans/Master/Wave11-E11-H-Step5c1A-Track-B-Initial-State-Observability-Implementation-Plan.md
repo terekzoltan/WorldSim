@@ -349,7 +349,7 @@ Provide:
 - Test engineer: PASS after closing all-seven first-write and mixed-liveness proof gaps.
 - Final critic: APPROVED with high confidence, no findings.
 - Meta high-risk step-review plus external Swarm synthesis: GREEN; no blocking or major findings.
-- Non-blocking natural-caller timestamp regression coverage is routed to the Combined Step 5c5/package gate and does not reopen this implementation.
+- Non-blocking natural-caller timestamp regression coverage is routed to the Combined Step 5c4/package-closeout gate and does not reopen this implementation.
 - Security pre-check found no secrets in the three scoped files. SAST/quality/placeholder
   tools could not persist evidence because a parent workspace `.swarm` directory conflicts
   with this project root; focused compile/test/deep-review evidence remains authoritative.

@@ -1,10 +1,19 @@
 # Wave 11 E11-H Step 5c1-B - Isolated Evidence Package Repair Plan
 
-Status: REVIEW-FIX CYCLE IMPLEMENTED - one step-review pending; no staging or commit
-Owner sequence: Meta review-fix -> Meta step-review -> closeout-commit only after final GREEN
-Last updated: 2026-07-13
+Status: HISTORICAL / SUPERSEDED - verified closeout complete at `2cd8b776caab678aa3aecdc46f21e7b01f46687e`; current authority is Combined Step 5c4
+Historical owner sequence: Meta review-fix -> Meta step-review -> closeout-commit after final GREEN (completed)
+Last updated: 2026-07-28
 
-## Purpose
+## Current Authority
+
+This document is retained as the pre-closeout repair and attribution record for closeout ID
+`wave11-e11-h-step5c1b-closeout-20260713`. The package is repository-durable at verified commit
+`2cd8b776caab678aa3aecdc46f21e7b01f46687e`; Step 5c2 and Step 5c3 are complete, and the
+current execution authority is Combined Step 5c4. Present-tense workflow, readiness, blocking,
+and commit-authorization statements below are historical evidence for the 2026-07-13
+pre-closeout window. They do not reopen work or grant current mutation authority.
+
+## Historical Pre-Closeout Purpose (Retained)
 
 Make the functionally sound Step 5c1-B implementation independently attributable and
 review-ready without packaging unrelated dirty-worktree changes. Repository durability is
@@ -20,7 +29,7 @@ remain blocked.
 The P0 boundary, accepted Track B prerequisite classification, and base reference remain
 evidence. The P0-P4 and three-preplanned-commit model is superseded as an operator workflow.
 
-## Canonical Operator Workflow
+## Historical Operator Workflow (Completed)
 
 ```text
 Track fix plan complete
@@ -46,8 +55,8 @@ The review-ready diff remains uncommitted for the next single step-review.
 | Push | Forbidden |
 | Merge/cherry-pick/reset | Forbidden without a separate future decision |
 | Expanded/full matrix | Out of scope |
-| F3 timeline hardening | `DEFER_STEP5C5` |
-| Natural-caller hardening | Separate Track B Step 5c5 gate |
+| F3 timeline hardening | Historical finding ID `DEFER_STEP5C5`; discharged at the Step 5c4 package-closeout gate |
+| Natural-caller hardening | Separate Track B row inside the Step 5c4 package-closeout gate |
 
 The retained values classify the accepted package boundary only. They grant no Git permission
 and must not be executed as a P0-P4 runbook.
@@ -287,7 +296,7 @@ Execution:
 4. Reconstruct the durable plan/prompt/evidence chain.
 5. Add pre-review Combined and registry wording; Step 5c2 remains blocked.
 6. Persist F3 as `DEFER_STEP5C5` owned by SMR Analyst.
-7. Keep natural-caller hardening as a separate Track B Step 5c5 gate.
+7. Keep natural-caller hardening as a separate Track B row inside the Step 5c4 package-closeout gate.
 8. Run the exact 19-case focused gate.
 9. Generate the short local artifact from the candidate Commit 2 tree.
 10. Compare deterministic values with the current draft README.
@@ -303,7 +312,7 @@ Execution:
 Required F3 wording in Commit 2:
 
 ```text
-F3 uniquely-valued timeline mapping hardening is DEFER_STEP5C5. The SMR Analyst owns it at the Step 5c5/package closeout gate. It must be fixed, explicitly waived, or reclassified before E11-H package closeout.
+F3 uniquely-valued timeline mapping hardening retains the historical finding ID DEFER_STEP5C5. The SMR Analyst owns its discharge at the Step 5c4/package-closeout gate. It must be fixed, explicitly waived, or reclassified before E11-H package closeout.
 ```
 
 Suggested message:
@@ -400,7 +409,7 @@ Future `/closeout-commit` exact scope:
 | `WorldSim.ScenarioRunner.Tests/EcologyTelemetryArtifactTests.cs` | The reviewed locked 19-case contract only |
 | Step 5c/5c1-A/5c1-B plan, prompt, and manual-evidence paths | Only the reviewed owner-safe package documents |
 | `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md` | Step 5c1-B GREEN and Step 5c2 READY after successful closeout only |
-| `Docs/Review-Findings-Registry.md` | final F1/F2 disposition; F3 and natural-caller Step 5c5 gates remain active |
+| `Docs/Review-Findings-Registry.md` | final F1/F2 disposition; F3 and natural-caller Step 5c4/package-closeout gates remain active |
 | `Docs/Evidence/SMR/wave11-e11-h-step5c1-initial-observability/README.md` | Final closeout identity and repository-durable status |
 | this repair plan | Meta GREEN verdict, closeout identity, continuation lock |
 | `AGENTS.md` | one final cross-track handoff entry appended at file end |
@@ -510,20 +519,20 @@ focused tests/build, local artifact manifest, truthful README inclusion, raw art
 F3 route, local state update, and no-Git-mutation statement. Git durability proof belongs only
 to the future authorized closeout.
 
-## Review-Fix Done Criteria
+## Historical Review-Fix Done Criteria (Completed)
 
 The one review-fix cycle is complete when:
 
 - the README is explicitly included and truthfully states that durability is pending closeout;
 - F2 uses an independently reproducible exact anchor/case ledger instead of narrative history;
-- F3 is active as `DEFER_STEP5C5` in Combined, the parent Step 5c plan, and the findings registry;
+- F3 retains the historical ID `DEFER_STEP5C5` in Combined, the parent Step 5c plan, and the findings registry, with discharge routed to Step 5c4/package closeout;
 - the canonical command route is consistent in plan and operational state;
 - the locked Runtime 17/17, supply-bridge, ScenarioRunner build, and ScenarioRunner 19/19 gates pass;
 - raw artifacts remain local-only;
 - no Git mutation occurs;
 - Step 5c2 and all downstream work remain blocked pending one step-review and closeout.
 
-## Current Readiness
+## Historical Closeout Readiness (Completed)
 
 | Gate | Status |
 |---|---|
@@ -540,11 +549,11 @@ The one review-fix cycle is complete when:
 | ScenarioRunner build | PASS; 0 warnings, 0 errors |
 | ScenarioRunner `EcologyTelemetryArtifactTests` | 19/19 PASS |
 | Closeout ID | `wave11-e11-h-step5c1b-closeout-20260713` |
-| Next gate | Verified `/closeout-commit`, then Step 5c2 Track B kickoff |
-| Commit authorization | GRANTED only through the bounded closeout invocation and exact hunk manifest |
+| Historical next gate | Verified `/closeout-commit` completed; Step 5c2 and Step 5c3 subsequently completed |
+| Historical commit authorization | CONSUMED by verified closeout commit `2cd8b776caab678aa3aecdc46f21e7b01f46687e`; no current commit authority |
 | Push authorization | FORBIDDEN |
-| Step 5c2 | READY only after commit and committed-tree verification are recorded in `ops/PROJECT_STATE.md` |
+| Historical Step 5c2 unlock | COMPLETED after committed-tree verification; current authority is Combined Step 5c4 |
 
-The package becomes durable only through closeout ID
-`wave11-e11-h-step5c1b-closeout-20260713`. Commit/tree/full-index identity is recorded in the
-ignored operational state after committed-tree verification. No push is authorized.
+The package became durable through closeout ID `wave11-e11-h-step5c1b-closeout-20260713` at
+verified commit `2cd8b776caab678aa3aecdc46f21e7b01f46687e`. Commit/tree/full-index identity is recorded
+in the ignored operational state. This retained plan grants no current commit or push authority.
