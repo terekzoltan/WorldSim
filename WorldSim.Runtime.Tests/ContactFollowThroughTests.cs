@@ -12,6 +12,16 @@ namespace WorldSim.Runtime.Tests;
 public sealed class ContactFollowThroughTests
 {
     [Fact]
+    public void FreshPerson_HasNoRecentCombatIntentBeforeAnyContact()
+    {
+        var world = CreateCombatWorld(seed: 9300);
+        var person = world._people[0];
+
+        Assert.False(person.HasRecentCombatIntent(world.CurrentTick));
+        Assert.False(person.HasCombatFollowThroughIntent(world.CurrentTick));
+    }
+
+    [Fact]
     public void FightAction_PursuesRecentHostile_BeforeFallingBackHome()
     {
         var world = CreateCombatWorld(seed: 9301);

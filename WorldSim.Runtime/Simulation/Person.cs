@@ -2181,8 +2181,12 @@ public class Person
 
     internal bool HasRecentCombatIntent(int currentTick)
     {
-        bool recentHostile = currentTick - _recentHostileContactTick <= RecentHostileMemoryTicks;
-        bool recentCombat = LastCombatTick >= 0 && currentTick - LastCombatTick <= RecentHostileMemoryTicks;
+        bool recentHostile = _recentHostileContactTick >= 0
+            && currentTick >= _recentHostileContactTick
+            && currentTick - _recentHostileContactTick <= RecentHostileMemoryTicks;
+        bool recentCombat = LastCombatTick >= 0
+            && currentTick >= LastCombatTick
+            && currentTick - LastCombatTick <= RecentHostileMemoryTicks;
         return recentHostile || recentCombat;
     }
 
