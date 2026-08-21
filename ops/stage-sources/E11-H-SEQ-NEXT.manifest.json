@@ -1,0 +1,22 @@
+{
+  "schema_version": "stage-source-manifest.v1",
+  "target_id": "worldsim",
+  "epic": "E11-H",
+  "candidate_identity": "worldsim-e11h-step5c4-predator-hunger-gated-capture-trackb-final-v1@db8d18a",
+  "entries": [
+    {
+      "stage": "SEQ_NEXT",
+      "plan_class": "EPIC_PLAN",
+      "sources": [
+        {
+          "path": "ops/stage-sources/E11-H-SEQ-NEXT.md",
+          "source_class": "PLANNING_CONTEXT",
+          "logical_identity": "worldsim-e11h-step5c4-implement-blocked-planning-context-v1",
+          "producer": "worldsim-meta-coordinator",
+          "sha256": "9c4f180d1ee6502d0039c0e2e45ed951de10ce1b98a07e9dc22f06b47c535e3d",
+          "order": 0
+        }
+      ]
+    }
+  ]
+}

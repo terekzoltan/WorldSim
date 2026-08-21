@@ -45,9 +45,17 @@ packages/
 *.cache
 *.dbmdl
 
-# Private workflow/state notes
-ops/
+# Private workflow/state notes. Only the explicit-stage adoption packet is
+# versionable; all historical/temp workflow material remains ignored.
+ops/*
+!ops/PROJECT_STATE.md
+!ops/PROJECT_OVERLAY.md
+!ops/stage-sources/
+ops/stage-sources/*
+!ops/stage-sources/E11-H-SEQ-NEXT.md
+!ops/stage-sources/E11-H-SEQ-NEXT.manifest.json
 Docs/Plans/Workflow/
+.fal/
 
 # Generated architecture intelligence snapshots
 Docs/Architecture/

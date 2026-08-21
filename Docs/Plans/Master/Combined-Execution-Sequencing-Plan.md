@@ -4,6 +4,16 @@ Status: Active
 Owner: Meta Coordinator
 Last updated: 2026-07-28
 
+## Wave 11 Compact Hydration Frontier
+
+This bounded row is the machine-hydration projection of the active legacy
+sequence below. It does not replace the detailed Step 5c4 history or authorize a
+new repair. State and the pinned stage artifact remain required.
+
+| Epic | Accountable lane | Workflow phase | Current result | Exact next route |
+|---|---|---|---|---|
+| E11-H | Meta Coordinator / META | SEQ_NEXT | The Track B predator-hunger-gate candidate returned `IMPLEMENT_BLOCKED`; focused continuity was `1/10`, so the partial isolated candidate requires explicit Meta disposition and no second tuning is authorized. | `/seq-next` using the pinned implementation-blocked artifact |
+
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
 

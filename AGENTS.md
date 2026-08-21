@@ -1,5 +1,8 @@
 # WorldSim AGENTS Guide
 
+Agent Workflow Canon root: `../Agent-Workflow-Canon`
+Adoption contract: `../Agent-Workflow-Canon/ADOPTION.md`
+
 Ez a dokumentum a projekt tudatos szetvalasztasi terve: kulon fejlesztheto komponensek, tiszta hatarok, es parhuzamos munkaszervezes (Track A-D).
 
 ## Cel
