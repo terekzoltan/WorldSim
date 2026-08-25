@@ -14,7 +14,7 @@ Owner instructions, WorldSim target state, the active Combined heading, the pinn
 
 ## Current lifecycle boundary
 
-E11-H is at `SEQ_NEXT` after an `IMPLEMENT_BLOCKED` Track B result. Meta must disposition the isolated partial candidate before selecting at most one new evidence-backed repair seam or stopping. No second tuning, implementation resend, expanded matrix, closeout, E11-I, or E11-J is implied.
+E11-H is at a non-dispatchable `IMPLEMENT_BLOCKED` recovery hold. Meta must disposition the isolated partial candidate through governance, without invoking a lifecycle command, before selecting at most one new evidence-backed repair seam or stopping. Only an authorized new seam may create a later Track B `/seq-next` route. No second tuning, implementation resend, expanded matrix, closeout, E11-I, or E11-J is implied.
 
 ## Explicit-stage offline adoption
 

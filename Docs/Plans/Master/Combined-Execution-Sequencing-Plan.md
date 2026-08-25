@@ -12,7 +12,7 @@ new repair. State and the pinned stage artifact remain required.
 
 | Epic | Accountable lane | Workflow phase | Current result | Exact next route |
 |---|---|---|---|---|
-| E11-H | Meta Coordinator / META | SEQ_NEXT | The Track B predator-hunger-gate candidate returned `IMPLEMENT_BLOCKED`; focused continuity was `1/10`, so the partial isolated candidate requires explicit Meta disposition and no second tuning is authorized. | `/seq-next` using the pinned implementation-blocked artifact |
+| E11-H | Meta Coordinator / META | IMPLEMENT_BLOCKED | The Track B predator-hunger-gate candidate returned `IMPLEMENT_BLOCKED`; focused continuity was `1/10`, so the partial isolated candidate requires explicit Meta governance disposition and no second tuning is authorized. | No lifecycle route. Meta chooses `DISCARD`, `QUARANTINE`, or `RETAIN_DIAGNOSTIC_ONLY` without a command; only an authorized new seam may create a later Track B `/seq-next` route. |
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.

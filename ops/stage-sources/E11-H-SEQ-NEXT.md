@@ -1,9 +1,9 @@
-# E11-H SEQ_NEXT Planning Context
+# E11-H Blocked-Candidate Disposition Context
 
 Status: `IMPLEMENT_BLOCKED`
 Logical identity: `worldsim-e11h-step5c4-implement-blocked-planning-context-v1`
 Wave / Epic: `Wave 11 / E11-H`
-Accountable lane: `Meta Coordinator / META / worldsim.meta`
+Accountable role: `Meta Coordinator / META / worldsim.meta` (governance disposition only)
 Candidate identity: `worldsim-e11h-step5c4-predator-hunger-gated-capture-trackb-final-v1@db8d18a`
 
 ## Accepted result
@@ -24,8 +24,10 @@ Meta may then select at most one new evidence-backed route or stop. Do not tune 
 
 ## Route and provenance boundary
 
-- Bare lifecycle command: `/seq-next`
-- Recipient: `Meta Coordinator`
-- This target-owned capsule is the complete required `PLANNING_CONTEXT` for explicit-stage admission.
+- Current lifecycle command: `NONE`
+- Current lifecycle recipient: `NONE`
+- Meta disposition is a governance action, not a Meta `/seq-next` lifecycle stage.
+- If Meta authorizes one new evidence-backed seam, a fresh Track B-owned `/seq-next` planning context and stage-source manifest are required before admission.
+- The former `E11-H-SEQ-NEXT.manifest.json` is not current authority and must not be dispatched.
 - The detailed local result under `.opencode-router/artifacts/` is cold, ignored provenance only. It is not a required manifest source and is not portable authority.
 - This offline adoption sends no lifecycle command and grants no production capability.
