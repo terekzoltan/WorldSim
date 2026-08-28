@@ -14,12 +14,20 @@ Owner instructions, WorldSim target state, the active Combined heading, the pinn
 
 ## Current lifecycle boundary
 
-E11-H is at a non-dispatchable `IMPLEMENT_BLOCKED` recovery hold. Meta must disposition the isolated partial candidate through governance, without invoking a lifecycle command, before selecting at most one new evidence-backed repair seam or stopping. Only an authorized new seam may create a later Track B `/seq-next` route. No second tuning, implementation resend, expanded matrix, closeout, E11-I, or E11-J is implied.
+E11-H retains the rejected hunger-gate result as diagnostic evidence only. Meta has opened one bounded `SMR Diagnostic Delivery` specialist lifecycle to collect the smallest evidence needed to distinguish the OFF herbivore and ON seed-202 predator failure classes. This route is ScenarioRunner/SMR evidence-only in outcome: it cannot modify Runtime or gameplay, repeat the rejected candidate, run the expanded 9/full 45 matrices, close E11-H, or advance E11-I/E11-J. A proven Runtime gap returns to Meta and requires a separate Track B route.
+
+## Specialist Delivery adoption
+
+- Accountable lane/class/profile: `SMR Diagnostic Delivery / SPECIALIST_DELIVERY / worldsim.smr-diagnostic-delivery`.
+- Local role authority: `roles/SMR-DIAGNOSTIC-DELIVERY.md`.
+- Meta owns plan review, step review, evidence classification, and any later Track B route decision.
+- The existing `worldsim.smr-analyst` profile remains non-accountable review/evidence authority and is not silently upgraded.
+- Mapping an existing session to the specialist lane is a protected FAL control-plane action; a session title alone grants no authority.
 
 ## Explicit-stage offline adoption
 
-- `PROJECT_STATE.md` and `ops/stage-sources/` bind a sanitized, target-owned
-  projection of the exact blocked result as `PLANNING_CONTEXT`.
+- `PROJECT_STATE.md` and `ops/stage-sources/` bind the target-owned bounded
+  diagnostic planning context as `PLANNING_CONTEXT`.
 - This repository stores no live endpoint, credential, raw session ID, or capability grant. The protected FAL control plane remains local and owner-only.
 - This adoption is offline-only and sends no lifecycle command. Production dispatch requires a separately admitted capability and explicit Owner action.
 - Stop on state, Combined, artifact, manifest, role, worktree, transport, or candidate-identity drift; never retry an uncertain send.
@@ -28,6 +36,6 @@ E11-H is at a non-dispatchable `IMPLEMENT_BLOCKED` recovery hold. Meta must disp
 
 ## Project invariants
 
-- Preserve the current isolated candidate and primary dirty work exactly until Meta disposition.
+- Preserve the failed candidate only as diagnostic evidence; never reconstruct its source or authority.
 - Preserve deterministic Runtime authority and existing Track ownership.
-- No product, runtime, test, simulation, evidence threshold, commit, push, or publication change is authorized by this overlay.
+- No Runtime, AI, App, Graphics, gameplay tuning, baseline, threshold, expanded-matrix, closeout, E11-I, or E11-J change is authorized by this overlay.

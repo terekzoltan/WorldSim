@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-07-28
+Last updated: 2026-08-28
 
 ## Wave 11 Compact Hydration Frontier
 
@@ -12,7 +12,7 @@ new repair. State and the pinned stage artifact remain required.
 
 | Epic | Accountable lane | Workflow phase | Current result | Exact next route |
 |---|---|---|---|---|
-| E11-H | Meta Coordinator / META (governance hold only) | IMPLEMENT_BLOCKED | The failed Track B predator-hunger-gate candidate is `RETAIN_DIAGNOSTIC_ONLY`: focused continuity regressed to `1/10`, its source worktree no longer exists, and no candidate implementation authority is retained. | `STOP`; no lifecycle route. A future evidence-backed seam requires separate Meta governance authorization and may create only a fresh Track B `/seq-next` route. |
+| E11-H | SMR Diagnostic Delivery / SPECIALIST_DELIVERY | SEQ_NEXT | The failed Track B predator-hunger-gate candidate remains `RETAIN_DIAGNOSTIC_ONLY`; Meta has authorized one ScenarioRunner/SMR evidence-bounded diagnostic seam without Runtime repair authority. | `/seq-next` to `worldsim.smr-diagnostic-delivery` after exact protected admission; stop after bounded evidence for Meta classification. |
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -2967,6 +2967,7 @@ Step 5c4 current route:
 - ✅ The seeding-only initialization repair is accepted GREEN and verified at commit `5b377583a81b6c9bcda84e884da97bacb46f6b98`, tree `1dca80444e255947269fad319274b1f638ae58a8`: aggregate predator capacity plus bounded materialization produce deterministic fragmented-region `8H/2P`, preserve low-population `1H/1P`, pass committed-tree `InitialAnimalSeedingTests` 24/24, and produce a 6/6 local-only 300-tick calibration with no zero-herbivore window or rescue/replenishment. This closes only the seeding repair, not Step 5c4 or E11-H.
 - 🔄 The canonical focused predator-human lifecycle gate is still RED at 4/5 (`101/Goap` predator extinction; 13/13 predator deaths are human kills). A durable same-fixture OFF hard-control harness is RED at 1/5 with four herbivore-extinction rows.
 - The next authorized work is one diagnostics-first predator-prey recruitment/mortality route. Human pressure changes the failure mode but is not the sole defect. Do not stack tuning, run expanded/full matrices, or open E11-I/E11-J while the focused gate is RED.
+- Meta has instantiated that route as one bounded `SMR Diagnostic Delivery` lifecycle. Its first action is `/seq-next` for the smallest ON/OFF evidence package that distinguishes a shared recruitment/mortality bottleneck from independent OFF herbivore and ON seed-202 predator failures. The lane may change only ScenarioRunner/SMR evidence surfaces under a reviewed plan, must stop for Meta classification, and cannot open a Runtime repair or the expanded 9/full 45 matrices.
 - The separately discovered recent-hostile sentinel overflow has a bounded local TDD fix and regression, but it requires its own reviewed handoff/package and is not part of the accepted seeding-only repair.
 
 #### Step 6 - visual/debug consume after snapshot and invariants are stable

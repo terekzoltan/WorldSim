@@ -1,0 +1,22 @@
+{
+  "schema_version": "stage-source-manifest.v1",
+  "target_id": "worldsim",
+  "epic": "E11-H",
+  "candidate_identity": "worldsim-e11h-step5c4-smr-diagnostic-evidence-v1",
+  "entries": [
+    {
+      "stage": "SEQ_NEXT",
+      "plan_class": "EPIC_PLAN",
+      "sources": [
+        {
+          "path": "ops/stage-sources/E11-H-SMR-DIAGNOSTIC-SEQ-NEXT.md",
+          "source_class": "PLANNING_CONTEXT",
+          "logical_identity": "worldsim-e11h-step5c4-smr-diagnostic-seq-next-v1",
+          "producer": "worldsim-meta-coordinator",
+          "sha256": "ad19adf63a94dd70b8d83522118ba54b28a6faea2be8500053a0f5e9188af5ac",
+          "order": 0
+        }
+      ]
+    }
+  ]
+}
