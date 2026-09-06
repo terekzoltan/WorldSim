@@ -33,7 +33,7 @@ No lifecycle command was sent by this adoption.
 ## Pause and retained gates
 
 Owner authorized V2 rollout/project unfreeze on 2026-09-06. Rollout-only pause
-may lift after loaded-tool checks. All product gates remain: no rejected candidate
+is lifted after16/16 loaded-command checks. All product gates remain: no rejected candidate
 reconstruction, Runtime/gameplay/baseline tuning, expanded9/full45 matrix,
 E11-H closeout, E11-I or E11-J. Meta classifies bounded evidence before separately
 opening any Track B repair. Preserve unrelated dirty tests/plans. Failed candidate
