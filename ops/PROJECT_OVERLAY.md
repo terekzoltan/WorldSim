@@ -3,7 +3,7 @@
 ## Adoption and authority
 
 - Project: `WorldSim`
-- Adopted Canon: `4.1.1`
+- Adopted Canon: `5.0.0`
 - Canon root: `../Agent-Workflow-Canon`
 - Root bootloader: `../AGENTS.md`
 - Current frontier: `PROJECT_STATE.md`
@@ -22,17 +22,20 @@ E11-H retains the rejected hunger-gate result as diagnostic evidence only. Meta 
 - Local role authority: `roles/SMR-DIAGNOSTIC-DELIVERY.md`.
 - Meta owns plan review, step review, evidence classification, and any later Track B route decision.
 - The existing `worldsim.smr-analyst` profile remains non-accountable review/evidence authority and is not silently upgraded.
-- Mapping an existing session to the specialist lane is a protected FAL control-plane action; a session title alone grants no authority.
+- The private V2 mapping assigns the existing SMR Analyst session to this lane; a session title alone grants no authority.
 
-## Explicit-stage offline adoption
+## Router V2 adoption
 
-- `PROJECT_STATE.md` and `ops/stage-sources/` bind the target-owned bounded
-  diagnostic planning context as `PLANNING_CONTEXT`.
-- This repository stores no live endpoint, credential, raw session ID, or capability grant. The protected FAL control plane remains local and owner-only.
-- This adoption is offline-only and sends no lifecycle command. Production dispatch requires a separately admitted capability and explicit Owner action.
-- Stop on state, Combined, artifact, manifest, role, worktree, transport, or candidate-identity drift; never retry an uncertain send.
-- Detailed `.opencode-router/` results remain ignored cold provenance. They are
-  never a portable manifest dependency or production authority source.
+- Canon `tooling/opencode` owns shared definitions; FAL owns the managed installer.
+- One private V2 mapping/store retains addressed operation facts. Old manifests
+  and control receipts are cold history, not new per-stage gates.
+- Accepted plan and Meta review were imported without sending; PROJECT_STATE
+  names plan revision as next action. Do not replay completed stages.
+- Owner authorized rollout/unfreeze, not Runtime scope expansion or E11-H closeout.
+- Preserve identity, scope, duplicate-send and missing-evidence boundaries;
+  formatting and absent optional telemetry alone are not lifecycle blockers.
+- Orchestrator handles idle lane compact/minimal restore through V2; only Owner
+  interrupts sessions or compacts orchestrators. No private IDs belong here.
 
 ## Project invariants
 

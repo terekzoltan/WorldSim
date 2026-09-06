@@ -4,15 +4,14 @@ Status: Active
 Owner: Meta Coordinator
 Last updated: 2026-08-28
 
-## Wave 11 Compact Hydration Frontier
+## Wave 11 Current Frontier
 
-This bounded row is the machine-hydration projection of the active legacy
-sequence below. It does not replace the detailed Step 5c4 history or authorize a
-new repair. State and the pinned stage artifact remain required.
+This AWC5 row preserves Step5c4 domain history and grants no new repair.
+PROJECT_STATE owns exact continuation and retained V2 result references.
 
 | Epic | Accountable lane | Workflow phase | Current result | Exact next route |
 |---|---|---|---|---|
-| E11-H | SMR Diagnostic Delivery / SPECIALIST_DELIVERY | SEQ_NEXT | The failed Track B predator-hunger-gate candidate remains `RETAIN_DIAGNOSTIC_ONLY`; Meta has authorized one ScenarioRunner/SMR evidence-bounded diagnostic seam without Runtime repair authority. | `/seq-next` to `worldsim.smr-diagnostic-delivery` after exact protected admission; stop after bounded evidence for Meta classification. |
+| E11-H | SMR Diagnostic Delivery / SPECIALIST_DELIVERY | PLAN_REVISION | Diagnostic plan and Meta review completed and imported; rejected hunger-gate candidate remains RETAIN_DIAGNOSTIC_ONLY. | Read retained results, then `/terv-review-utan` to mapped SMR Analyst after V2 loaded checks; no replay, Runtime repair or expanded matrix. |
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.

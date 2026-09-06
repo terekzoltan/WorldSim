@@ -1,5 +1,11 @@
 # Meta Coordinator Runbook
 
+AWC5 adoption: shared lifecycle/role hydration lives in the sibling Canon.
+Current PROJECT_STATE and Combined frontier supersede historical route prose.
+Use preserved V2 results; old Swarm/Compact/per-stage P0B mechanics no longer
+apply. Meta retains independent review and evidence classification. Migration
+grants no Runtime repair/E11-H closeout. Only Owner interrupts sessions.
+
 > Ez a dokumentum a WorldSim projekt Meta Coordinator chat/session reszletes munkafolyamatait irja le.
 > A Meta Coordinator egyetlen celja: a parhuzamosan dolgozo AI agensek kozotti szinkronizacio,
 > a projekt-szintu konzisztencia es a strategiai iranyitas biztositasa.

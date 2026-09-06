@@ -1,5 +1,14 @@
 # WorldSim AGENTS Guide
 
+## AWC5 / Router V2 adoption (2026-09-06)
+
+Adopted Canon: `5.0.0`. Read `ops/PROJECT_OVERLAY.md`, `ops/PROJECT_STATE.md`
+and the current Combined frontier first. Canon `tooling/opencode` owns shared
+definitions; FAL Router V2 is the sole sender. AWC5 replaces older Swarm, Compact
+Lite, exact marker and per-stage admission mechanics below; all WorldSim domain,
+Track and acceptance gates remain. The SMR plan and Meta review already exist:
+do not repeat `/seq-next` or review. Only Owner interrupts sessions.
+
 Agent Workflow Canon root: `../Agent-Workflow-Canon`
 Adoption contract: `../Agent-Workflow-Canon/ADOPTION.md`
 

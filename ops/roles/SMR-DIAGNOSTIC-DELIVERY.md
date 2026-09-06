@@ -10,8 +10,8 @@
 
 This is a bounded Delivery lane, not a replacement for Track B and not an
 authority upgrade for the non-accountable `worldsim.smr-analyst` reviewer
-profile. A session may be mapped to this lane only through the protected FAL
-recipient and capability binding for the active diagnostic stage.
+profile. The Owner-enrolled private FAL V2 mapping binds the session to this lane;
+the existing work envelope restricts scope/effects. No per-stage P0B is required.
 
 ## Lifecycle ownership
 
