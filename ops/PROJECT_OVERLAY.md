@@ -26,6 +26,12 @@ E11-H retains the rejected hunger-gate result as diagnostic evidence only. Meta 
 
 ## Router V2 adoption
 
+Under explicit Owner enrollment, FAL may update only the marked observed-progress
+block in PROJECT_STATE.md. Meta/Owner retain scope, evidence classification,
+acceptance and next-dispatch authority. Existing diagnostic restrictions remain.
+Compare the dated baseline with retained operation facts, and use stage-sized
+sections/frozen references rather than a whole roadmap/history packet.
+
 - Canon `tooling/opencode` owns shared definitions; FAL owns the managed installer.
 - One private V2 mapping/store retains addressed operation facts. Old manifests
   and control receipts are cold history, not new per-stage gates.

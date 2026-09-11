@@ -1,5 +1,13 @@
 # WorldSim Project State
 
+The human phase/next-action fields below are the last Meta-reconciled baseline,
+not a claim of current session execution. Compare the observed block and retained
+results before continuing; stale baseline prose never authorizes a resend.
+
+<!-- FAL-OBSERVED-PROGRESS:BEGIN -->
+Observed progress awaiting explicit operator enrollment/refresh. No new authority.
+<!-- FAL-OBSERVED-PROGRESS:END -->
+
 Updated: 2026-09-06 by Owner-authorized AWC5 adoption.
 Adopted Canon: `5.0.0`; transport: FAL Router V2.
 State revision: `worldsim-awc5-smr-plan-revision-v1`.
@@ -22,7 +30,7 @@ already completed; accepted artifacts were imported without lifecycle sends.
 - Plan: `op-6742bd85-4c2e-49c8-8baf-11d986d551e7`, COMPLETED.
 - Meta review: `op-de96d87f-16ee-48f2-9b30-11b279df6373`, COMPLETED.
 
-## Exact next action
+## Last reconciled next action (baseline)
 
 Next actor: SMR Diagnostic Delivery in the mapped existing SMR Analyst session.
 Next command: `/terv-review-utan`, after Orchestrator reads the two retained

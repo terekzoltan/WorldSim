@@ -2,6 +2,11 @@
 
 ## AWC5 / Router V2 adoption (2026-09-06)
 
+PROJECT_STATE distinguishes the dated Meta baseline from its Owner-enrolled
+observed-progress block. Reconcile current operation evidence before acting on
+an old phase/next-action line; this grants no scope or replay authority. Read the
+active Combined section and needed frozen references, not the entire roadmap.
+
 Adopted Canon: `5.0.0`. Read `ops/PROJECT_OVERLAY.md`, `ops/PROJECT_STATE.md`
 and the current Combined frontier first. Canon `tooling/opencode` owns shared
 definitions; FAL Router V2 is the sole sender. AWC5 replaces older Swarm, Compact
