@@ -2,14 +2,51 @@ name: SMR Headless
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  smr-headless:
+  headless-smoke:
+    name: Deterministic headless smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Runtime deterministic harness
+        run: dotnet test WorldSim.Runtime.Tests/WorldSim.Runtime.Tests.csproj -c Debug --filter FullyQualifiedName~SimulationHarnessTests --logger "trx;LogFileName=runtime-smoke.trx" --results-directory TestResults
+      - name: ScenarioRunner bounded artifact smoke
+        env:
+          TMPDIR: ${{ runner.temp }}
+          WORLDSIM_SCENARIO_TEST_TIMEOUT_MINUTES: "2"
+        # Three existing tests, two seeds each, eight ticks per simulation.
+        # This is artifact/determinism proof, not ecology viability acceptance.
+        # Existing test wrappers invoke dotnet run --no-build in Debug.
+        run: dotnet test WorldSim.ScenarioRunner.Tests/WorldSim.ScenarioRunner.Tests.csproj -c Debug --filter "FullyQualifiedName~ArtifactBundle_ManifestHasCorrectRunCount|FullyQualifiedName~ArtifactBundle_PerRunFilesExist|FullyQualifiedName~ArtifactBundle_SummaryMatchesRunCount" --logger "trx;LogFileName=runner-smoke.trx" --results-directory TestResults
+      - name: Retain smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: headless-smoke-${{ github.run_id }}
+          path: |
+            TestResults/*.trx
+            ${{ runner.temp }}/worldsim-scenario-artifacts-*/
+          if-no-files-found: error
+          retention-days: 14
+
+  smr-headless:
+    # Preserve the expensive existing matrix, but never run it on push/PR.
+    if: github.event_name == 'workflow_dispatch'
+    name: Manual SMR matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -55,8 +92,8 @@ jobs:
             PERF_RED=$(jq -r '.perfRedCount // 0' "$MANIFEST_PATH")
             EXIT_REASON=$(jq -r '.exitReason // "unknown"' "$MANIFEST_PATH")
           else
-            ASSERT_FAILS=0
-            PERF_RED=0
+            ASSERT_FAILS=unknown
+            PERF_RED=unknown
             EXIT_REASON="manifest_missing"
           fi
 
@@ -77,7 +114,7 @@ jobs:
         with:
           name: smr-artifacts-${{ matrix.mode }}-${{ github.run_id }}
           path: ${{ steps.smr.outputs.artifact_dir }}
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: ${{ steps.manifest.outputs.retention_days }}
 
       - name: Append step summary
@@ -85,12 +122,12 @@ jobs:
         shell: bash
         run: |
           echo "## SMR Headless (${{ matrix.mode }})" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Exit code: \\`${{ steps.smr.outputs.exit_code }}\\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Exit reason: \\`${{ steps.manifest.outputs.exit_reason }}\\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Assertion failures: \\`${{ steps.manifest.outputs.assertion_failures }}\\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Perf red count: \\`${{ steps.manifest.outputs.perf_red_count }}\\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Artifact dir: \\`${{ steps.smr.outputs.artifact_dir }}\\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Artifact retention: \\`${{ steps.manifest.outputs.retention_days }} days\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Exit code: ${{ steps.smr.outputs.exit_code }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Exit reason: ${{ steps.manifest.outputs.exit_reason }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Assertion failures: ${{ steps.manifest.outputs.assertion_failures }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Perf red count: ${{ steps.manifest.outputs.perf_red_count }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact dir: ${{ steps.smr.outputs.artifact_dir }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Artifact retention: ${{ steps.manifest.outputs.retention_days }} days" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail job on SMR gate failure
         if: always()
@@ -100,3 +137,6 @@ jobs:
             echo "SMR gate failed for mode=${{ matrix.mode }} with exit=${{ steps.smr.outputs.exit_code }}"
             exit 1
           fi
+          # A successful process without a valid result bundle is not proof.
+          # Preserve existing performance policy: perf red is reported, not a new hard gate.
+          jq -e '.schemaVersion == "smr/v1" and .totalRuns == 15 and .exitCode == 0 and .assertionFailures == 0' "${{ steps.manifest.outputs.manifest_path }}"
