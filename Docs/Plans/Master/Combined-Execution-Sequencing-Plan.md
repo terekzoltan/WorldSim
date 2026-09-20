@@ -6,6 +6,29 @@ Last updated: 2026-08-28
 
 ## Wave 11 Current Frontier
 
+### CI companion — forward planning, not dispatch authority
+
+Owner-approved CI maintenance (2026-09-20): `.github/workflows/smr-headless.yml`
+targets the actual default branch `master`. Push/PR runs only the bounded
+Runtime harness and ScenarioRunner artifact smoke. The existing five-seed,
+three-planner assert/perf matrix stays `workflow_dispatch`-only; coverage remains
+in its separate manual workflow. Source configuration is not proof of a remote
+run: record the tested SHA and Actions result after authorized publication.
+
+| Roadmap surface | Existing coverage / bounded delta to plan | Owner | Trigger / evidence point |
+|---|---|---|---|
+| E11-H evidence tooling | Reuse artifact manifest/run/summary smoke; add focused regression for any newly accepted diagnostic contract. Smoke does not prove ecology viability or resolve the rejected candidate. | Track B for runner contract; SMR for approved evidence scope; Meta checks claim | Cheap PR/push smoke; domain evidence at the accepted E11-H gate, not every commit |
+| E11-H separately authorized Runtime repair | Add a deterministic reproduction and focused negative/control test in the repair plan; do not tune acceptance to make CI green. | Track B | Before candidate freeze; enable broader automation only after stable scope and cost are known |
+| E11-I snapshot/debug consume | Reuse architecture/snapshot parity checks; name the changed-field regression and manual rendering proof in its plan. | Track A with Track B snapshot handoff | After existing E11-H prerequisites; no automatic UI or graphics runner added here |
+| E11-J acceptance | Preserve the separately authorized full ecology matrix and manual app proof; cheap smoke cannot substitute. | SMR evidence, Meta acceptance | Existing Wave gate only; expanded9/full45 remain closed until separately authorized |
+| SMR Lab side-slice, when dispatched | Artifact reader: malformed/missing/mismatched bundle tests; later manual-run host: bounds, duplicate-start and completion/error tests. | Track A, Track B consultation | Agree exact checks in its own plan; synthetic fixtures first, no automatic large simulation |
+
+For each selected Epic, carry only its row into the verification plan, record
+no-change when existing checks suffice, and name an owner/revisit gate for
+deferred coverage. Review asks whether the regression is caught; closeout records
+local proof versus pending remote proof. These rows change neither readiness,
+product scope, current state nor any existing stop condition.
+
 This AWC5 row preserves Step5c4 domain history and grants no new repair.
 PROJECT_STATE owns exact continuation and retained V2 result references.
 
