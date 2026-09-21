@@ -34,7 +34,7 @@ PROJECT_STATE owns exact continuation and retained V2 result references.
 
 | Epic | Accountable lane | Workflow phase | Current result | Exact next route |
 |---|---|---|---|---|
-| E11-H | SMR Diagnostic Delivery / SPECIALIST_DELIVERY | PLAN_REVISION | Diagnostic plan and Meta review completed and imported; rejected hunger-gate candidate remains RETAIN_DIAGNOSTIC_ONLY. | Read retained results, then `/terv-review-utan` to mapped SMR Analyst after V2 loaded checks; no replay, Runtime repair or expanded matrix. |
+| E11-H | SMR Diagnostic Delivery / SPECIALIST_DELIVERY | CLOSEOUT | Bounded recruitment/mortality diagnostic accepted GREEN with `ACK_ONLY`; Meta classification is `H2_SUPPORTED_WITH_H3_LIMITATIONS`. Rejected hunger-gate candidate remains `RETAIN_DIAGNOSTIC_ONLY`, and E11-H remains open with focused gates RED. | `NONE` for this diagnostic lifecycle. Any later evidence or Runtime route requires separate Meta/Owner authority; no replay, repair, expanded matrix, or downstream unlock. |
 
 This document interleaves the Director Integration Master Plan and the Combat-Defense-Campaign
 Master Plan into a single wave-based execution schedule with per-item status tracking.
@@ -3027,8 +3027,9 @@ Step 5c4 acceptance and closeout:
 Step 5c4 current route:
 - ✅ The seeding-only initialization repair is accepted GREEN and verified at commit `5b377583a81b6c9bcda84e884da97bacb46f6b98`, tree `1dca80444e255947269fad319274b1f638ae58a8`: aggregate predator capacity plus bounded materialization produce deterministic fragmented-region `8H/2P`, preserve low-population `1H/1P`, pass committed-tree `InitialAnimalSeedingTests` 24/24, and produce a 6/6 local-only 300-tick calibration with no zero-herbivore window or rescue/replenishment. This closes only the seeding repair, not Step 5c4 or E11-H.
 - 🔄 The canonical focused predator-human lifecycle gate is still RED at 4/5 (`101/Goap` predator extinction; 13/13 predator deaths are human kills). A durable same-fixture OFF hard-control harness is RED at 1/5 with four herbivore-extinction rows.
-- The next authorized work is one diagnostics-first predator-prey recruitment/mortality route. Human pressure changes the failure mode but is not the sole defect. Do not stack tuning, run expanded/full matrices, or open E11-I/E11-J while the focused gate is RED.
-- Meta has instantiated that route as one bounded `SMR Diagnostic Delivery` lifecycle. Its first action is `/seq-next` for the smallest ON/OFF evidence package that distinguishes a shared recruitment/mortality bottleneck from independent OFF herbivore and ON seed-202 predator failures. The lane may change only ScenarioRunner/SMR evidence surfaces under a reviewed plan, must stop for Meta classification, and cannot open a Runtime repair or the expanded 9/full 45 matrices.
+- ✅ The bounded `SMR Diagnostic Delivery` recruitment/mortality evidence package is accepted GREEN with `ACK_ONLY`. Its frozen two-path candidate records four canonical ON/OFF cases, two deterministic target replays, checked cause accounting, and exact accepted-source versus rejected-candidate provenance.
+- Meta classification is `H2_SUPPORTED_WITH_H3_LIMITATIONS`: accepted-source OFF herbivore extinction is capture-dominated in both reviewed pairs, while accepted source does not reproduce the rejected candidate's `202/Simple/ON` predator extinction. Candidate-side detailed timing remains unavailable and the unclassified herbivore mortality residual of `1` remains explicit.
+- This diagnostic lifecycle stops at local closeout. It does not select a Runtime repair or authorize Track B, expanded 9/full 45 matrices, overall E11-H closeout, E11-I, or E11-J. Any later route requires separate Meta/Owner authority.
 - The separately discovered recent-hostile sentinel overflow has a bounded local TDD fix and regression, but it requires its own reviewed handoff/package and is not part of the accepted seeding-only repair.
 
 #### Step 6 - visual/debug consume after snapshot and invariants are stable

@@ -8,49 +8,52 @@ results before continuing; stale baseline prose never authorizes a resend.
 Observed progress awaiting explicit operator enrollment/refresh. No new authority.
 <!-- FAL-OBSERVED-PROGRESS:END -->
 
-Updated: 2026-09-06 by Owner-authorized AWC5 adoption.
+Updated: 2026-09-15 by Owner-authorized bounded diagnostic local closeout.
 Adopted Canon: `5.0.0`; transport: FAL Router V2.
-State revision: `worldsim-awc5-smr-plan-revision-v1`.
-Wave: `11`; Epic: `E11-H`; Workflow phase: `PLAN_REVISION`.
+State revision: `worldsim-awc5-smr-diagnostic-closeout-v1`.
+Wave: `11`; Epic: `E11-H`; Workflow phase: `CLOSEOUT`.
 Accountable Lane / class / profile:
 `SMR Diagnostic Delivery / SPECIALIST_DELIVERY / worldsim.smr-diagnostic-delivery`.
 Candidate identity: `worldsim-e11h-step5c4-smr-diagnostic-evidence-v1`.
 Plan identity: `worldsim-e11h-step5c4-smr-diagnostic-plan-v1@7ef7eda`.
-Review cycle: `0`; V2 work: `worldsim-e11h-smr-diagnostic`.
+Review cycle: `1`; V2 work: `worldsim-e11h-smr-diagnostic`.
 Sequence authority: `Docs/Plans/Master/Combined-Execution-Sequencing-Plan.md`.
 
 ## Accepted intent and observed progress
 
-Rejected hunger-gate candidate remains RETAIN_DIAGNOSTIC_ONLY. Accepted base:
-`db8d18a799f12fcf39dd593e7a42f6811663c21e`. Meta authorized only the smallest
-ScenarioRunner/SMR evidence package distinguishing OFF herbivore and ON seed202
-predator failure classes, not Runtime repair. Diagnostic plan and Meta review
-already completed; accepted artifacts were imported without lifecycle sends.
+Rejected hunger-gate candidate remains RETAIN_DIAGNOSTIC_ONLY. Accepted Runtime
+base remains `db8d18a799f12fcf39dd593e7a42f6811663c21e`. The bounded two-path SMR
+diagnostic candidate is accepted GREEN and acknowledged `ACK_ONLY`; Meta classifies
+the evidence as `H2_SUPPORTED_WITH_H3_LIMITATIONS`. This accepts diagnostic
+evidence only, not Runtime repair or overall E11-H lifecycle health.
 
 - Plan: `op-6742bd85-4c2e-49c8-8baf-11d986d551e7`, COMPLETED.
 - Meta review: `op-de96d87f-16ee-48f2-9b30-11b279df6373`, COMPLETED.
+- Implementation evidence: `op-21187c38-87f6-43f5-852a-fbd26598be44`, DELIVERED.
+- Final synthesis: `op-595e2040-d129-4697-8c7f-41b61a1d0fb8`, GREEN / ALLOWED.
+- Delivery acknowledgement: `op-cae1e480-c52e-4fc7-ab6d-375dfa7d0799`, ACK_ONLY.
 
-## Last reconciled next action (baseline)
+## Reconciled diagnostic closeout
 
-Next actor: SMR Diagnostic Delivery in the mapped existing SMR Analyst session.
-Next command: `/terv-review-utan`, after Orchestrator reads the two retained
-results and confirms loaded V2 tooling/addressing. Use their V2 operation references
-as inputs. Do not repeat seq-next or Meta review or discard history with a new work.
-No lifecycle command was sent by this adoption.
+Next actor: `NONE`.
+Next command: `NONE`.
+The accepted diagnostic lifecycle stops at local closeout. Do not replay its
+completed stages. Any later E11-H investigation or Track B repair requires new,
+separate Meta/Owner authority and must not be inferred from this evidence package.
 
 ## Pause and retained gates
 
-Owner authorized V2 rollout/project unfreeze on 2026-09-06. Rollout-only pause
-is lifted after16/16 loaded-command checks. All product gates remain: no rejected candidate
-reconstruction, Runtime/gameplay/baseline tuning, expanded9/full45 matrix,
-E11-H closeout, E11-I or E11-J. Meta classifies bounded evidence before separately
-opening any Track B repair. Preserve unrelated dirty tests/plans. Failed candidate
-evidence remains controlled behavior4/4 but continuity1/10; migration improves
-neither the result nor its acceptance.
+All product gates remain: no rejected-candidate reconstruction, Runtime/gameplay
+repair, baseline tuning, expanded9/full45 matrix, overall E11-H closeout, E11-I,
+or E11-J. Accepted-source OFF herbivore extinction is capture-dominated in the
+two reviewed pairs; accepted source does not reproduce the rejected candidate's
+`202/Simple/ON` predator extinction. Candidate-side detailed timing is unavailable,
+and unclassified herbivore mortality residual `1` remains an explicit limitation.
+Preserve unrelated dirty tests/plans and the independent SMR Lab side work.
 
-## Minimum context
+## Minimum context (primary E11-H)
 
 AGENTS -> PROJECT_OVERLAY -> state -> current Combined frontier ->
-ops/roles/SMR-DIAGNOSTIC-DELIVERY.md -> retained plan/review results.
+accepted diagnostic README -> retained synthesis/ACK references.
 Previous state and stage-sources remain cold history, not current send gates.
 Only Owner interrupts sessions. Basic role restoration remains available while paused.
