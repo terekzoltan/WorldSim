@@ -45,6 +45,15 @@ sections/frozen references rather than a whole roadmap/history packet.
 
 ## Project invariants
 
+The restrictions below describe the existing E11-H diagnostic assignment, not
+a ban on separately Owner-approved project tooling. On 2026-09-16 the Owner
+approved the local-browser SMR Lab planning adoption; its independent scope,
+Track A ownership and prerequisites are in
+`../Docs/Plans/Master/SMR-Lab-v01-Plan.md` and Combined's SMR Lab side-slice.
+It does not inherit or expand the E11-H work envelope, change Runtime/gameplay,
+or unlock E11-I/E11-J. Future diagnostic plans may use the bounded loop guidance;
+current frozen candidate limits remain unchanged.
+
 - Preserve the failed candidate only as diagnostic evidence; never reconstruct its source or authority.
 - Preserve deterministic Runtime authority and existing Track ownership.
 - No Runtime, AI, App, Graphics, gameplay tuning, baseline, threshold, expanded-matrix, closeout, E11-I, or E11-J change is authorized by this overlay.

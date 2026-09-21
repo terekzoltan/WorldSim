@@ -130,6 +130,7 @@ Tiltott: `Runtime -> Graphics`, `Runtime -> App`, `AI -> Graphics`, kozvetlen `G
 ### Track A - Graphics/UI
 
 Scope:
+- Owner-approved SMR Lab v0.1 extension (2026-09-16): local browser host, artifact reader and UI under the new Lab surface; see `Docs/Plans/Master/SMR-Lab-v01-Plan.md`. Track B retains existing ScenarioRunner/Runtime ownership. This is separate from E11-I and does not change Graphics snapshot boundaries.
 - `Game1` draw/update vizualis reszeinek kiszervezese `WorldSim.Graphics` ala.
 - Kamera, render pass-ok, HUD, tech menu overlay.
 

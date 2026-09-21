@@ -2,7 +2,7 @@
 
 Status: Active
 Owner: Meta Coordinator
-Last updated: 2026-08-28
+Last updated: 2026-09-21 (CI companion preserved; prospective parallel Lab adoption)
 
 ## Wave 11 Current Frontier
 
@@ -45,6 +45,41 @@ their execution steps are not retroactively documented — see their proof links
 
 ---
 
+## SMR Lab v0.1 — independent tooling slice
+
+Owner approved this direction and delegated its planning adoption to Chief of
+Staff on 2026-09-16. This section is the prospective sequencing entry for the
+local browser Lab; it does not replace the E11-H frontier, close its diagnostic,
+or activate E11-I/E11-J. Read [SMR Lab plan](SMR-Lab-v01-Plan.md) and
+[delivery outline](SMR-Lab-v01-Implementation-Plan.md).
+
+| Order / status | Owner | Prerequisite | Handoff / acceptance | Unlock | Parallel / integration boundary |
+|---|---|---|---|---|---|
+| 1 / ⬜ SMR-LAB-A | Track A; bounded Track B/SMR consultation | Owner-approved scope; explicitly addressed isolated worktree; Track A available | Artifact browser/comparison with source-faithful charts, unknown/partial handling, focused tests and ordinary Meta review/closure | SMR-LAB-B | May overlap E11-H using completed/frozen artifact copies; Lab-only writes, no ScenarioRunner/Runtime change |
+| 2 / ⬜ SMR-LAB-B | Track A for Lab host/UI; Track B owns any existing-runner changes | A accepted; approved small core-run budget; runner/build/resource conflicts resolved | Manual process adapter, one-start/one-run, unique output, effective config, bounded real smoke and CLI semantic parity, ordinary Meta review/closure | SMR Lab v0.1 complete only | Sequential after A; one resource window; shared runner/schema/build/state edits integrate serially under their existing owner |
+
+Next Lab action when selected: Track A `/seq-next`, refining the prepared outline
+into its exact implementation plan. Normal Meta `/terv-review` follows; no
+separate portfolio rewrite is required. Listing this route is not a lifecycle
+send, a diagnostic closeout, or a grant to reuse the E11-H work.
+
+Parallel execution does not merge lifecycle works. E11-H and SMR Lab retain
+separate work/candidate identities, owners and acceptance. Batch review never
+merges existing works or broadens their scope. Optional same-work batching is
+not a bridge between these separate works; work metadata changes do not prove
+directory rebinding.
+Reviews sharing the same Meta session queue normally, without interruption.
+
+Lab A may proceed alongside E11-H diagnostic closeout/research using completed
+artifacts in a separate worktree. Lab B follows A; its simulation batches share
+a scheduled CPU/memory budget with active SMR measurements. Shared
+ScenarioRunner/schema/build/state edits integrate serially at a stable boundary.
+
+E11-H remains the primary frontier. Its diagnostic GREEN/ACK does not close the
+Epic, and the Lab is not a prerequisite for continuing its approved work.
+Future bounded diagnostics may use [the approved loop](SMR-Diagnostic-Loop.md)
+inside their normal reviewed plans; existing frozen run limits remain unchanged.
+
 ## Reference Key
 
 | Alias | Full Path |
@@ -71,6 +106,9 @@ their execution steps are not retroactively documented — see their proof links
 | **Wave 11 E11-H Step 5c1-A Track B Prompt** | `Docs/Plans/Master/Wave11-E11-H-Step5c1A-Track-B-Agent-Prompt.md` |
 | **Wave 11 E11-H Step 5c1-B SMR Prompt** | `Docs/Plans/Master/Wave11-E11-H-Step5c1B-SMR-Analyst-Agent-Prompt.md` |
 | **Wave 12 Architecture Hardening Plan** | `Docs/Plans/Master/Wave12-Codebase-Architecture-Hardening-Plan.md` |
+| **SMR Lab v0.1** | `Docs/Plans/Master/SMR-Lab-v01-Plan.md` |
+| **SMR Lab delivery outline** | `Docs/Plans/Master/SMR-Lab-v01-Implementation-Plan.md` |
+| **SMR diagnostic loop** | `Docs/Plans/Master/SMR-Diagnostic-Loop.md` |
 
 Epic codes (e.g., `S1-A`, `P0-B`) are unique and greppable in the respective master plan.
 
@@ -937,6 +975,7 @@ Prereq: SMR-B2 exit codes must exist before CI is meaningful. SMR-B6 is therefor
 - `SMR-C1` exists to avoid overloading Track B with planner-specific interpretation logic when a small additive AI signal would make anomaly classification far more useful.
 - There is **no Track A epic in Wave 4.5**. This is intentional: Track A bandwidth remains focused on battle/siege/campaign UI in later waves, and the visual SMR Lab is deferred.
 - Visual `SMR Lab` target:
+  - 2026-09-16: Owner-approved local browser v0.1 is now sequenced in the prospective independent tooling slice above; the historical visual/in-game ambitions below remain later scope,
   - not before Wave 10 closeout,
   - should consume the artifact bundles defined here,
   - should start as replay/drilldown UI before any 16-window live mosaic experiment.
