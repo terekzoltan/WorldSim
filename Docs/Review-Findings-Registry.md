@@ -28,6 +28,12 @@ Entries:
 
 ## 2026-07-25 - Wave 11 E11-H Step 5c4 - Major - Recent-hostile sentinel arithmetic can overflow
 
+Preservation update 2026-09-23: implementation and regression are present on master
+in `3e77d92e6b8e4d3febb9f1aa2fbd37c2ffcee077`, matching the two frozen candidate
+blobs in the [historical plan](Plans/Archive/Wave11-E11-H-Step5c4-Combat-Intent-Sentinel-Implementation-Plan.md).
+The original report below is historical; do not implement the same fix again.
+This bookkeeping update is not new test execution or independent acceptance proof.
+
 - Track: Track B / combat intent bookkeeping.
 - Source: Focused predator-human contact-realization fixture isolation.
 - Finding: `HasRecentCombatIntent` subtracts `_recentHostileContactTick=int.MinValue` from the current tick; unchecked integer overflow can classify a never-observed hostile as recent and route `Fight` toward the default hostile position.
@@ -45,6 +51,11 @@ Entries:
 - Status: fixed and verified at commit `5b377583a81b6c9bcda84e884da97bacb46f6b98`, tree `1dca80444e255947269fad319274b1f638ae58a8`; committed-tree `InitialAnimalSeedingTests` pass 24/24, fragmented-region output is exactly `8H/2P`, low-population compatibility is `1H/1P`, and the local-only 300-tick calibration is 6/6 without a zero-herbivore window or rescue/replenishment. This resolves the seeding finding only; the focused lifecycle finding remains open.
 
 ## 2026-07-25 - Wave 11 E11-H Step 5c4 - Major - Focused lifecycle remains RED after initialization repair
+
+Preservation update 2026-09-23: the uncommitted ten-case harness is retained as an
+[exact diagnostic patch](Evidence/SMR/historical-focused-lifecycle-harness/README.md).
+The RED finding remains open; normal CI success cannot close it. Reproduction
+requires a separately scoped source/case/time budget, not automatic test promotion.
 
 - Track: Track B / closed-loop predator-prey lifecycle.
 - Source: Canonical five-case Runtime sentinel plus durable same-fixture predator-human OFF hard-control harness.

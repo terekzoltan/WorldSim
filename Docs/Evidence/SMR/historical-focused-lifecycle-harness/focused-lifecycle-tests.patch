@@ -1,0 +1,132 @@
+diff --git a/WorldSim.Runtime.Tests/Wave11AnimalLifecycleTests.cs b/WorldSim.Runtime.Tests/Wave11AnimalLifecycleTests.cs
+index e42bf0e606f0c5a0bdc2721b1832d5c650af3929..984fb06232adaad3edc954e8da3159652cbd3276 100644
+--- a/WorldSim.Runtime.Tests/Wave11AnimalLifecycleTests.cs
++++ b/WorldSim.Runtime.Tests/Wave11AnimalLifecycleTests.cs
+@@ -425,6 +425,106 @@ public sealed class Wave11AnimalLifecycleTests
+         Assert.True(person.Health >= startHealth - 0.001f);
+     }
+ 
++    [Theory]
++    [InlineData(101, NpcPlannerMode.Simple)]
++    [InlineData(101, NpcPlannerMode.Goap)]
++    [InlineData(202, NpcPlannerMode.Simple)]
++    [InlineData(202, NpcPlannerMode.Goap)]
++    [InlineData(202, NpcPlannerMode.Htn)]
++    public void HabitatAwarePredatorHuman_FocusedLifecycleGatePreservesBothSpecies(
++        int seed,
++        NpcPlannerMode plannerMode)
++        => AssertFocusedLifecycleContinuity(seed, plannerMode, enablePredatorHumanAttacks: true);
++
++    [Theory]
++    [InlineData(101, NpcPlannerMode.Simple)]
++    [InlineData(101, NpcPlannerMode.Goap)]
++    [InlineData(202, NpcPlannerMode.Simple)]
++    [InlineData(202, NpcPlannerMode.Goap)]
++    [InlineData(202, NpcPlannerMode.Htn)]
++    public void HabitatAwarePredatorHumanOff_FocusedLifecycleControlPreservesBothSpecies(
++        int seed,
++        NpcPlannerMode plannerMode)
++        => AssertFocusedLifecycleContinuity(seed, plannerMode, enablePredatorHumanAttacks: false);
++
++    static void AssertFocusedLifecycleContinuity(
++        int seed,
++        NpcPlannerMode plannerMode,
++        bool enablePredatorHumanAttacks)
++    {
++        var techPath = Path.Combine(FindRepoRoot(), "Tech", "technologies.json");
++        var runtime = new SimulationRuntime(
++            width: 64,
++            height: 40,
++            initialPopulation: 24,
++            technologyFilePath: techPath,
++            aiOptions: new RuntimeAiOptions
++            {
++                PlannerMode = plannerMode,
++                PolicyMode = NpcPolicyMode.GlobalPlanner
++            },
++            randomSeed: seed);
++        runtime.ConfigureScenarioRunnerWorldOptions(
++            enableCombatPrimitives: true,
++            enableDiplomacy: false,
++            enableSiege: true,
++            enablePredatorHumanAttacks: enablePredatorHumanAttacks,
++            stoneBuildingsEnabled: false,
++            birthRateMultiplier: 1f,
++            movementSpeedMultiplier: 1f,
++            animalReplenishmentChancePerSecond: null,
++            predatorReplenishmentChance: null,
++            foodRegrowthMinSeconds: null,
++            foodRegrowthJitterSeconds: null,
++            emergencyRescuePolicy: EmergencyRescuePolicy.Disabled);
++        var worldField = typeof(SimulationRuntime).GetField("_world", BindingFlags.Instance | BindingFlags.NonPublic);
++        var world = Assert.IsType<World>(worldField?.GetValue(runtime));
++        var initialEcology = world.BuildScenarioInitialEcologyTelemetrySnapshot();
++        Assert.Equal("habitat_aware", initialEcology.InitialAnimalPolicy);
++        Assert.Equal("runtime_default", initialEcology.InitialAnimalPolicySource);
++
++        for (var tick = 0; tick < 1200; tick++)
++            runtime.AdvanceTick(0.25f);
++
++        var run = runtime.BuildScenarioRunTelemetrySnapshot();
++        var ecology = run.Ecology;
++        var lifecycle = runtime.GetSnapshot().EcologyDetails.LifecycleCounters;
++        var diagnostic =
++            $"seed={seed};planner={plannerMode};predatorHumanEnabled={enablePredatorHumanAttacks};" +
++            $"herbivores={ecology.Herbivores};predators={ecology.Predators};" +
++            $"zeroHerbivoreTicks={ecology.TicksWithZeroHerbivores};zeroPredatorTicks={ecology.TicksWithZeroPredators};" +
++            $"firstZeroHerbivore={ecology.FirstZeroHerbivoreTick};firstZeroPredator={ecology.FirstZeroPredatorTick};" +
++            $"herbivoreBirths={lifecycle.HerbivoreBirths};predatorBirths={lifecycle.PredatorBirths};" +
++            $"herbivoreStarvations={lifecycle.HerbivoreStarvations};predatorStarvations={lifecycle.PredatorStarvations};" +
++            $"activeFood={ecology.ActiveFoodNodes};plantConsumed={ecology.PlantFoodConsumedByAnimals};meatFromHunt={ecology.MeatFromHunt};" +
++            $"predatorHumanHits={ecology.PredatorHumanHits};predatorDeaths={ecology.PredatorDeaths};" +
++            $"predatorKillsByHumans={run.PredatorKillsByHumans};emergencyRescues={ecology.EmergencyRescues};" +
++            $"herbivoreReplenishment={ecology.HerbivoreReplenishmentSpawns};predatorReplenishment={ecology.PredatorReplenishmentSpawns}";
++
++        Assert.Equal(enablePredatorHumanAttacks, run.EnablePredatorHumanAttacks);
++        if (enablePredatorHumanAttacks)
++        {
++            Assert.True(ecology.PredatorHumanHits > 0, diagnostic);
++        }
++        else
++        {
++            Assert.Equal(0, ecology.PredatorHumanHits);
++            Assert.Equal(0, run.PredatorKillsByHumans);
++        }
++
++        Assert.True(
++            ecology.Herbivores > 0
++            && ecology.Predators > 0
++            && ecology.TicksWithZeroHerbivores == 0
++            && ecology.TicksWithZeroPredators == 0
++            && ecology.FirstZeroHerbivoreTick is null
++            && ecology.FirstZeroPredatorTick is null,
++            diagnostic);
++        Assert.Equal(0, ecology.EmergencyRescues);
++        Assert.Equal(0, ecology.HerbivoreReplenishmentSpawns);
++        Assert.Equal(0, ecology.PredatorReplenishmentSpawns);
++    }
++
+     [Fact]
+     public void SnapshotLifecycleCounters_IncludeNonZeroPredatorBirthsAndStarvations()
+     {
+@@ -724,6 +824,20 @@ public sealed class Wave11AnimalLifecycleTests
+         int ParentRegionCapacity,
+         int TargetRegionCapacity);
+ 
++    static string FindRepoRoot()
++    {
++        var current = new DirectoryInfo(AppContext.BaseDirectory);
++        while (current is not null)
++        {
++            if (File.Exists(Path.Combine(current.FullName, "Tech", "technologies.json")))
++                return current.FullName;
++
++            current = current.Parent;
++        }
++
++        throw new DirectoryNotFoundException("Could not locate repository root containing Tech/technologies.json");
++    }
++
+     sealed class AlwaysCaptureRandom : Random
+     {
+         public override double NextDouble() => 0.0;
