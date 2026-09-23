@@ -1,5 +1,19 @@
 # WorldSim AGENTS Guide
 
+## AWC5 / Router V2 default-branch adoption (2026-09-23)
+
+Adopted Canon: `5.0.0`. Read `ops/PROJECT_OVERLAY.md`, `ops/PROJECT_STATE.md`
+and the relevant Combined frontier. Canon `tooling/opencode` owns shared sources;
+FAL Router V2 is the sole cross-session sender. This supersedes older Swarm,
+Compact Lite, exact-marker and per-stage admission mechanics below, not domain,
+Track or acceptance constraints. Only Owner interrupts sessions or compacts
+orchestrators. Basic role restoration is read-only and available while paused.
+This is governance adoption only: no active feature-branch progress, SMR Lab
+plan or product candidate is imported. Reconcile retained operations against the
+actual execution branch before continuing; never replay a dated baseline route.
+Git delivery follows the overlay's bounded branch/PR convention and actual Owner
+scope, never automatic publication or next-Epic authority.
+
 Agent Workflow Canon root: `../Agent-Workflow-Canon`
 Adoption contract: `../Agent-Workflow-Canon/ADOPTION.md`
 

@@ -1,5 +1,15 @@
 # Meta Coordinator Runbook
 
+## AWC5 authority bridge
+
+Use the adopted Canon `5.0.0` Meta/closeout runbooks and root AGENTS/overlay for
+lifecycle authority. Older procedures below are project-domain guidance, not
+permission to bypass candidate-bound review, write unreviewed behavior at closeout,
+or replay a stale next-action line. Local closeout never pushes. Explicitly
+authorized Git integration follows `canon/GIT-DELIVERY-AND-INTEGRATION.md` under
+the adopted Canon root and must verify actual branch/commit/tree identity even
+when the worktree is dirty. Preserve unrelated work and current Owner pauses.
+
 > Ez a dokumentum a WorldSim projekt Meta Coordinator chat/session reszletes munkafolyamatait irja le.
 > A Meta Coordinator egyetlen celja: a parhuzamosan dolgozo AI agensek kozotti szinkronizacio,
 > a projekt-szintu konzisztencia es a strategiai iranyitas biztositasa.
@@ -13,7 +23,9 @@
 - A Meta Coordinator **nem ir production kodot**. Kizarolag dokumentaciot, konfigot es audit-reportokat keszit.
 - Minden workflow outputja vagy AGENTS.md edit, vagy markdown report a felhasznalo szamara.
 - A workflow-k egyenkent is futtathatoak, vagy egyutt (`full-sweep`).
-- Git allapotra **NEM** tamaszkodunk (messy repo); helye: fajlok tenyleges tartalma a lenyeg.
+- Verify Git root, branch, commit/tree and actual file contents together. A dirty
+  checkout does not invalidate identity checks or authorize cleanup; preserve
+  unrelated changes and separate accepted candidates from integration evidence.
 - A workflow-optimalizalas es a human-in-the-loop tisztasag first-class Meta felelosseg. Ha egy visszatero ketertelmuseg, closeout-res, vagy koordinacios surlodas latszik, a Meta minimalis processz-javitast javasol es - ha a felhasznalo jovahagyja - rogzit a megfelelo dokumentumban.
 - Ha a statusz vagy gate-jelentes ketertelmu, az explicit emberi dontes / lock note erosebb, mint a hallgatolagos kovetkeztetes.
 - Uj wave vagy post-wave slice felvetelekor a Meta elso prioritasa a szekvencialis egyertelmuseg: csak azutan maximalizaljon parallelizmust, hogy a prereq-ek, ownerek, handoffok, acceptance/evidence gate-ek es unlockolt kovetkezo lepesek egyertelmuen le vannak irva.
