@@ -124,7 +124,11 @@ Evidence pointers: `Docs/Plans/Master/Wave9-10-SMR-Closeout-Plan.md`, `.artifact
 
 ### 2026-05-20 - SMR Balance Lab As First-Class Headless Workflow
 
-Status: inbox
+Status: partially promoted, 2026-09-16. The Owner-approved
+[SMR Lab v0.1](../Plans/Master/SMR-Lab-v01-Plan.md) is the current small delivery
+scope: artifact browser/comparison then manual core runs, sequenced in Combined.
+The historical BL-0..6 ideas below remain advisory; they are not prerequisites
+for that UI, not additional active Epics, and do not authorize auto-tuning.
 Area: SMR / tooling / process / runtime
 Source context: Wave 9 Step 12B SMR evidence showed that SMR now supports broad health packages plus targeted deterministic feature proof, but deeper balance diagnosis still depends on manual review. Existing docs already contain partial balance infrastructure (`Balance-Loop-Specification.md`, `Session-Balance-QA-Plan.md`, `SMR-M2-Evidence-Review-Protocol.md`, `balance-surface.md`), but there is no active Combined-plan slice that makes "SMR as Balance Lab" a first-class near-future goal.
 Idea: Promote SMR from evidence runner into a headless-first Balance Lab. The first useful version should not be a visual dashboard and should not auto-tune. It should consume existing SMR artifacts and produce analyst-grade scorecards plus human-reviewed tuning suggestions.

@@ -117,6 +117,12 @@ Every SMR session report should use this structure:
 
 ## 5. Deferred larger improvements
 
+2026-09-16 update: the Owner-approved
+[SMR Lab v0.1](SMR-Lab-v01-Plan.md) now selects a small artifact browser and
+manual core-run surface from this backlog. It is separately sequenced in
+Combined, not a prerequisite for the current diagnostic closeout. Broader
+scorecards, automatic suggestions and in-game replay remain deferred.
+
 These are intentionally deferred and should be handled after the current wave closeouts, not folded into routine SMR operation ad hoc:
 
 - richer summary/report synthesis layer
@@ -127,3 +133,14 @@ These are intentionally deferred and should be handled after the current wave cl
 - eventual visual `SMR Lab`
 
 These belong to the later SMR operational/productization backlog, not the minimum checklist.
+
+## 6. Bounded diagnostic assignments
+
+Use [SMR-Diagnostic-Loop.md](SMR-Diagnostic-Loop.md) for future diagnostic plans:
+one question, explicit source/config, distinguishing observations, exact
+case/replay and time budget, and a stop condition. Two rounds are a recommended
+starting bound, not an automatic expansion of an existing plan. Several approved
+measurements may occur inside one implementation stage without new lifecycle
+dispatches or Owner questions for each run. Scope/product/budget expansion needs
+a concrete new decision. Preserve unknown/proxy labels, separate measurement
+quality from ecosystem health, and leave Runtime fixes with the owning Track.
