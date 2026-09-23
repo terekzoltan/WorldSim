@@ -1,0 +1,2 @@
+# A patch's blank context line is a significant single space, not source whitespace.
+focused-lifecycle-tests.patch whitespace=-blank-at-eol

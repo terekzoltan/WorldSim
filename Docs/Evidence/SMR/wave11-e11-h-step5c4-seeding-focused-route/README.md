@@ -3,6 +3,13 @@
 Date: 2026-07-25
 Governance reconciled: 2026-07-28
 
+Preservation note (2026-09-23): the originally uncommitted focused ON/OFF test
+extension is retained as an [exact diagnostic patch](../historical-focused-lifecycle-harness/README.md),
+outside default test discovery. All historical RED results and acceptance gates
+below remain unchanged; no new simulation or ecology acceptance is claimed.
+The separate combat-intent implementation is already in commit `3e77d92`;
+its old implementation-ready plan is now a linked historical artifact, not a replay order.
+
 ## Scope
 
 This packet records the Step 5c4 initialization repair and the strict focused lifecycle
