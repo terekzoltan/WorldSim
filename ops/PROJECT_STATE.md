@@ -1,4 +1,14 @@
-# Current state
+# WorldSim Project State
+
+Adopted Canon: `5.0.0`; transport: FAL Router V2.
+Default-branch governance adoption: 2026-09-23. The recorded frontier below is
+preserved from this branch, not copied from active feature work. Reconcile actual
+execution-branch intent and retained operation evidence before choosing a next
+action. No lifecycle step is sent, repeated or accepted by this adoption.
+Old manifests/admission statements are historical provenance, not V2 send gates.
+Current Owner stops and domain restrictions remain in force.
+
+## Recorded default-branch baseline
 
 State revision: `worldsim-wave11-e11-h-step5c4-smr-diagnostic-delivery-v1`
 Configuration identity: `worldsim-e11h-step5c4-smr-diagnostic-seq-next-v1`
@@ -45,9 +55,12 @@ Keep the failed candidate as diagnostic evidence only and authorize `SMR Diagnos
 
 Meta preserved the `RETAIN_DIAGNOSTIC_ONLY` result and authorized one evidence-bounded specialist lifecycle. The failed candidate's detached worktree remains absent; nothing from it was staged, committed, pushed, copied, or reconstructed.
 
-# Next action
+# Recorded next-action intent (reconcile before execution)
 
-After protected no-send admission verifies the exact profile, recipient, state, and manifest binding, dispatch only `SMR Diagnostic Delivery /seq-next`. Do not resend `/implement` for the rejected hunger-gate plan.
+The recorded planning route was `SMR Diagnostic Delivery /seq-next`. Before any
+continuation, reconcile the actual execution branch and retained V2 operations;
+this dated route is not a resend order. Do not resend `/implement` for the rejected
+hunger-gate plan. This adoption establishes no current dispatch eligibility.
 
 # Next expected role
 
@@ -64,7 +77,7 @@ SMR Diagnostic Delivery
 
 # Open questions / blockers
 
-- Protected recipient/capability admission for the new specialist profile remains an external Owner/operator step.
+- Verify current Owner-enrolled recipient addressing and the work scope/effects before any new dispatch; legacy protected P0B admission is not a V2 prerequisite.
 - The diagnostic plan must explain how its smallest evidence set distinguishes the OFF herbivore and ON seed-202 predator failure classes without tuning the rejected hunger-threshold hypothesis.
 - Runtime repair remains blocked until Meta classifies the bounded evidence and separately authorizes a Track B route.
 

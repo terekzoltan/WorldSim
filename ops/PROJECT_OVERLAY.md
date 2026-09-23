@@ -3,7 +3,7 @@
 ## Adoption and authority
 
 - Project: `WorldSim`
-- Adopted Canon: `4.1.1`
+- Adopted Canon: `5.0.0`
 - Canon root: `../Agent-Workflow-Canon`
 - Root bootloader: `../AGENTS.md`
 - Current frontier: `PROJECT_STATE.md`
@@ -22,17 +22,34 @@ E11-H retains the rejected hunger-gate result as diagnostic evidence only. Meta 
 - Local role authority: `roles/SMR-DIAGNOSTIC-DELIVERY.md`.
 - Meta owns plan review, step review, evidence classification, and any later Track B route decision.
 - The existing `worldsim.smr-analyst` profile remains non-accountable review/evidence authority and is not silently upgraded.
-- Mapping an existing session to the specialist lane is a protected FAL control-plane action; a session title alone grants no authority.
+- Owner-enrolled private V2 mappings bind recipients; a session title alone grants no authority. Recheck addressing and the existing work envelope before dispatch.
 
-## Explicit-stage offline adoption
+## Router V2 adoption
 
-- `PROJECT_STATE.md` and `ops/stage-sources/` bind the target-owned bounded
-  diagnostic planning context as `PLANNING_CONTEXT`.
-- This repository stores no live endpoint, credential, raw session ID, or capability grant. The protected FAL control plane remains local and owner-only.
-- This adoption is offline-only and sends no lifecycle command. Production dispatch requires a separately admitted capability and explicit Owner action.
-- Stop on state, Combined, artifact, manifest, role, worktree, transport, or candidate-identity drift; never retry an uncertain send.
-- Detailed `.opencode-router/` results remain ignored cold provenance. They are
-  never a portable manifest dependency or production authority source.
+- Canon `tooling/opencode` owns definitions; FAL owns the managed installer and
+  one addressed operation store. Private recipient/work authority stays private.
+- Old stage manifests, capsule/Active Route and P0B receipts are cold history,
+  not current per-stage or ordinary-restart requirements.
+- Preserve delivery facts, current intent, independent Meta acceptance and Owner
+  stops separately. Query existing operations before retry; no replay from stale
+  state/Combined prose, and no acceptance inferred from formatting.
+- Orchestrator observes lane continuity and requests idle compact plus minimal
+  `/after-compact` through V2 within actual authority. Only Owner interrupts
+  sessions or compacts orchestrators. Missing optional telemetry is not a gate.
+- Only a separately Owner-enrolled marked state block may be mechanically
+  refreshed; human state/Combined intent remains Meta/Owner-owned.
+- This default-branch adoption transfers no active branch progress, product work,
+  unfreeze, new seam, matrix run or lifecycle-send permission.
+
+## Git delivery convention
+
+Follow `canon/GIT-DELIVERY-AND-INTEGRATION.md` under the adopted Canon root.
+Integration target is verified `master`. Each independently integrable Epic or
+workflow-fix uses a short-lived branch + PR; repairs remain on that branch.
+Concurrent independent writers use authorized worktrees, not new sessions by
+default. Meta closeout stays local; the existing orchestrator may coordinate or
+execute the Git sequence only under an explicit destination/head/base/effects/
+checks/stop envelope. Existing assignments and narrower stops are preserved.
 
 ## Project invariants
 
