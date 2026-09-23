@@ -10,6 +10,12 @@ Current Owner stops and domain restrictions remain in force.
 
 ## Recorded default-branch baseline
 
+Approved independent planning: [SMR Lab v0.1](../Docs/Plans/Master/SMR-Lab-v01-Plan.md),
+Track A, status PLANNED / NOT_DISPATCHED. Artifact browser/comparison precedes
+manual runs; each retains its review and acceptance. See Combined's Lab side slice.
+This pointer does not replace the recorded E11-H frontier or import its later
+feature-branch progress. No product implementation or lifecycle command occurred.
+
 State revision: `worldsim-wave11-e11-h-step5c4-smr-diagnostic-delivery-v1`
 Configuration identity: `worldsim-e11h-step5c4-smr-diagnostic-seq-next-v1`
 Wave: `11`

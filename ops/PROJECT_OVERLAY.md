@@ -53,6 +53,13 @@ checks/stop envelope. Existing assignments and narrower stops are preserved.
 
 ## Project invariants
 
+The restrictions below describe the existing E11-H diagnostic assignment, not
+a ban on separately Owner-approved project tooling. The approved local-browser
+SMR Lab plan is `../Docs/Plans/Master/SMR-Lab-v01-Plan.md`, with Track A ownership
+and independent PLANNED rows in Combined. This planning integration neither
+implements nor dispatches the Lab, inherits E11-H authority, changes Runtime,
+nor unlocks E11-I/E11-J. Its implementation retains normal Delivery/Meta review.
+
 - Preserve the failed candidate only as diagnostic evidence; never reconstruct its source or authority.
 - Preserve deterministic Runtime authority and existing Track ownership.
 - No Runtime, AI, App, Graphics, gameplay tuning, baseline, threshold, expanded-matrix, closeout, E11-I, or E11-J change is authorized by this overlay.
