@@ -56,13 +56,16 @@ or activate E11-I/E11-J. Read [SMR Lab plan](SMR-Lab-v01-Plan.md) and
 
 | Order / status | Owner | Prerequisite | Handoff / acceptance | Unlock | Parallel / integration boundary |
 |---|---|---|---|---|---|
-| 1 / ⬜ SMR-LAB-A | Track A; bounded Track B/SMR consultation | Owner-approved scope; explicitly addressed isolated worktree; Track A available | Artifact browser/comparison with source-faithful charts, unknown/partial handling, focused tests and ordinary Meta review/closure | SMR-LAB-B | May overlap E11-H using completed/frozen artifact copies; Lab-only writes, no ScenarioRunner/Runtime change |
+| 1 / ✅ SMR-LAB-A | Track A; bounded Track B/SMR consultation | Owner-approved scope; explicitly addressed isolated worktree; Track A available | Artifact browser/comparison with source-faithful charts, unknown/partial handling, focused tests and ordinary Meta review/closure | SMR-LAB-B | May overlap E11-H using completed/frozen artifact copies; Lab-only writes, no ScenarioRunner/Runtime change |
 | 2 / ⬜ SMR-LAB-B | Track A for Lab host/UI; Track B owns any existing-runner changes | A accepted; approved small core-run budget; runner/build/resource conflicts resolved | Manual process adapter, one-start/one-run, unique output, effective config, bounded real smoke and CLI semantic parity, ordinary Meta review/closure | SMR Lab v0.1 complete only | Sequential after A; one resource window; shared runner/schema/build/state edits integrate serially under their existing owner |
 
-Next Lab action when selected: Track A `/seq-next`, refining the prepared outline
-into its exact implementation plan. Normal Meta `/terv-review` follows; no
-separate portfolio rewrite is required. Listing this route is not a lifecycle
-send, a diagnostic closeout, or a grant to reuse the E11-H work.
+Historical Lab A planning route: Track A `/seq-next` refined the prepared outline,
+followed by normal Meta `/terv-review`. This is provenance, not a new lifecycle
+send, diagnostic closeout, or grant to reuse the E11-H work. The same frozen
+`smr-lab-a-local-v1` candidate has Meta GREEN `op-b173d650-1819-4d18-bc1d-fc8b068bfc6e`
+and Track A ACK_ONLY `op-01dacc17-1e0e-4384-ae60-8e4006281849`; local closeout
+hands scoped branch/PR/checks/merge-commit/verified-master integration to the
+Owner-assigned coordinator. SMR-LAB-B remains unopened and not dispatched.
 
 Parallel execution does not merge lifecycle works. E11-H and SMR Lab retain
 separate work/candidate identities, owners and acceptance. Batch review never
