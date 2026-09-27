@@ -16,6 +16,19 @@ manual runs; each retains its review and acceptance. See Combined's Lab side sli
 This pointer does not replace the recorded E11-H frontier or import its later
 feature-branch progress. No product implementation or lifecycle command occurred.
 
+## SMR-LAB-A observed progress — Meta closeout (2026-09-27)
+
+Human closeout authority, separate from the dated baseline above and any
+Owner-enrolled generated observed-progress projection: the frozen
+`smr-lab-a-local-v1` candidate on `feature/smr-lab-a-20260923` is locally closed
+by this closeout commit after Meta GREEN `op-b173d650-1819-4d18-bc1d-fc8b068bfc6e`,
+Track A ACK_ONLY `op-01dacc17-1e0e-4384-ae60-8e4006281849`, and bounded
+closeout-delta clarification `op-15a10ece-0049-43fd-a5e2-d2fe5f02f331`.
+Next actor: Owner-assigned WorldSim coordinator; scoped branch push, PR,
+required checks/composition, merge commit to `terekzoltan/WorldSim` `master`,
+then exact target verification and stop. Integration is not yet verified;
+SMR-LAB-B is not dispatched. The E11-H frontier recorded below remains separate.
+
 State revision: `worldsim-wave11-e11-h-step5c4-smr-diagnostic-delivery-v1`
 Configuration identity: `worldsim-e11h-step5c4-smr-diagnostic-seq-next-v1`
 Wave: `11`

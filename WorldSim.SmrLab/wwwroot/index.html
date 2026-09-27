@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WorldSim SMR Lab A</title>
+  <link rel="stylesheet" href="/lab.css">
+  <script src="/lab.js" defer></script>
+</head>
+<body>
+  <header><h1>SMR Lab — artifact browser</h1><p>Read-only exploration. Measured results are not Meta acceptance. UNKNOWN is not zero or PASS.</p></header>
+  <main>
+    <section><h2>Configured roots and bundles</h2><p id="roots"></p><div id="bundles"></div></section>
+    <section><h2>Runs</h2><label>Sort by <select id="sort"><option value="failures">Assertion failures</option><option value="people">People</option><option value="food">Food</option><option value="deathsPredator">Predator deaths</option></select></label><div id="runs"></div></section>
+    <section><h2>Selected run</h2><div id="detail">Select a run above.</div><label>Chart series <select id="metric"><option value="people">People</option><option value="food">Food</option><option value="herbivores">Herbivores</option><option value="predators">Predators</option><option value="activeFoodNodes">Active food nodes</option></select></label><div id="chart"></div><div id="events"></div></section>
+    <section><h2>Compare two runs</h2><p>Choose Left and Right from the run list, then compare.</p><p id="selections"></p><button type="button" id="compare">Compare</button><div id="comparison"></div><a id="report" hidden download="smr-lab-observation.md">Download Markdown observation report</a></section>
+  </main>
+  <footer>E11-H custom payload: real import unverified unless an approved retained payload is supplied. Replay files are metadata, not world-state replay.</footer>
+</body>
+</html>
