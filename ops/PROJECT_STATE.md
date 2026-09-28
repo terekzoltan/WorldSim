@@ -51,6 +51,24 @@ two reviewed pairs; accepted source does not reproduce the rejected candidate's
 and unclassified herbivore mortality residual `1` remains an explicit limitation.
 Preserve unrelated dirty tests/plans and the independent SMR Lab side work.
 
+## Subsequent bounded OFF measurement local closeout (2026-09-28)
+
+Meta locally closes only the separate two-case measurement/tooling candidate
+`op-a5fe33b2-9924-4e4b-82ef-578960a9c0ff` under Owner revision
+`db550684af11b8302aad4df49228e51387542e7fe7a49d997db3d6cfcd235ec9`:
+final GREEN `op-3bd181d7-091c-40cf-b8c7-36d0329c3713`, SMR `ACK_ONLY`
+`op-87999ecc-d0f3-4d48-af24-d9eba9752b53`. Read the new
+`Docs/Evidence/SMR/wave11-e11-h-step5c4-off-deficit-measurement-001/README.md`
+first; its per-tick raw/manifest remain private and hash-pinned. The Owner's
+App ecology sequence is a leading plausible explanation, but only
+capture-dominated herbivore decline is supported by the fixed OFF runs; no
+specific new technical defect or App predator-extinction cause is proven.
+Next actor/action for this bounded lifecycle: `NONE` after local commit;
+gameplay/balance is an Owner decision. The earlier diagnostic's `NONE` is
+unchanged. E11-H focused lifecycle stays RED/open, with Step 5c4 finding and
+timestamp gates still active; no E11-I/J unlock, Runtime repair, extra run,
+push or merge follows. Independent Lab work retains its own authority.
+
 ## Minimum context (primary E11-H)
 
 AGENTS -> PROJECT_OVERLAY -> state -> current Combined frontier ->
