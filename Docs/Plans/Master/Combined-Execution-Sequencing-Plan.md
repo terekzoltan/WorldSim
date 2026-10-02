@@ -57,7 +57,7 @@ or activate E11-I/E11-J. Read [SMR Lab plan](SMR-Lab-v01-Plan.md) and
 | Order / status | Owner | Prerequisite | Handoff / acceptance | Unlock | Parallel / integration boundary |
 |---|---|---|---|---|---|
 | 1 / ✅ SMR-LAB-A | Track A; bounded Track B/SMR consultation | Owner-approved scope; explicitly addressed isolated worktree; Track A available | Artifact browser/comparison with source-faithful charts, unknown/partial handling, focused tests and ordinary Meta review/closure | SMR-LAB-B | May overlap E11-H using completed/frozen artifact copies; Lab-only writes, no ScenarioRunner/Runtime change |
-| 2 / ⬜ SMR-LAB-B | Track A for Lab host/UI; Track B owns any existing-runner changes | A accepted; approved small core-run budget; runner/build/resource conflicts resolved | Manual process adapter, one-start/one-run, unique output, effective config, bounded real smoke and CLI semantic parity, ordinary Meta review/closure | SMR Lab v0.1 complete only | Sequential after A; one resource window; shared runner/schema/build/state edits integrate serially under their existing owner |
+| 2 / ✅ SMR-LAB-B (local closeout) | Track A for Lab host/UI; Track B owns any existing-runner changes | A accepted; approved small core-run budget; retained real evidence and reviewed repairs | Accepted cumulative 13-file candidate, Meta GREEN + Track A ACK_ONLY; CLI parity MATCH; QA1 Owner-accepted observation gap | SMR Lab v0.1 local tooling closeout only; no next-Epic dispatch | Local commit only; integration/remote CI unverified; E11-H gates remain separate |
 
 Historical Lab A planning route: Track A `/seq-next` refined the prepared outline,
 followed by normal Meta `/terv-review`. This is provenance, not a new lifecycle
@@ -65,7 +65,23 @@ send, diagnostic closeout, or grant to reuse the E11-H work. The same frozen
 `smr-lab-a-local-v1` candidate has Meta GREEN `op-b173d650-1819-4d18-bc1d-fc8b068bfc6e`
 and Track A ACK_ONLY `op-01dacc17-1e0e-4384-ae60-8e4006281849`; local closeout
 hands scoped branch/PR/checks/merge-commit/verified-master integration to the
-Owner-assigned coordinator. SMR-LAB-B remains unopened and not dispatched.
+Owner-assigned coordinator. B was unopened at that historical A handoff.
+
+B local closeout (2026-10-02): cumulative snapshot `op-1ab52caa` over `op-d37d54c5`,
+GREEN `op-0f55e906-cb86-4c07-aaa9-52f100299a36`, ACK_ONLY
+`op-c3f82dad-e0c1-4a63-b90b-5d4ecf0e9d2c`; Owner authorizes local commit, then stop.
+R1/R2/R2-RECOVERY are fixed. Three combat-disabled SKIPs and UNKNOWN source/build
+provenance remain; QA1's missing desktop-browser lifecycle observation is accepted
+as a limitation, not witnessed proof. See `WorldSim.SmrLab/Docs/LOCAL-QA-B.md`.
+
+Active deferred gate **SMR-LAB-UI-NARROW-LAYOUT-01 / LABB-LAYOUT1**: Track A under
+separate approval after B's desktop gate must identify the overflowing node at
+390x844 / scrollWidth 493 and verify narrow width/content before any mobile-quality
+claim. See `Docs/Review-Findings-Registry.md`. Meta/CI owner revisits local-only
+Lab test coverage at authorized integration/CI follow-up; no remote PASS claimed.
+Primary governance reconciliation is separate: preserve its newer E11-H measurement
+commit `7c184671` and observed-progress block; do not replace it with this branch's
+dated E11-H frontier. No C planning/adoption or new simulation authority is added.
 
 Parallel execution does not merge lifecycle works. E11-H and SMR Lab retain
 separate work/candidate identities, owners and acceptance. Batch review never

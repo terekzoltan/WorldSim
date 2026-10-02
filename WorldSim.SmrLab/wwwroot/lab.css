@@ -3,7 +3,8 @@ body { max-width: 1150px; margin: auto; padding: 1rem; }
 header, section, footer { background: #1c3045; padding: 1rem 1.4rem; margin: 1rem 0; border-radius: .5rem; }
 header { border-left: .35rem solid #59d1b5; }
 h1, h2 { margin: .2rem 0 .5rem; } h2 { font-size: 1.2rem; }
-button, select { font: inherit; padding: .3rem; margin: .2rem; cursor: pointer; }
+button, select, input { font: inherit; padding: .3rem; margin: .2rem; }
+button, select { cursor: pointer; }
 button { background: #296a70; color: white; border: 1px solid #80d7ca; border-radius: .25rem; }
 button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #ffcf7a; }
 a { color: #82d8ff; } .unknown, .partial, .warning { color: #ffcf7a; }
@@ -13,3 +14,6 @@ table { border-collapse: collapse; width: 100%; margin: .4rem 0; }
 td, th { border: 1px solid #567086; padding: .3rem; text-align: left; overflow-wrap: anywhere; }
 svg { width: 100%; height: 180px; background: #122439; border: 1px solid #567086; }
 .subtle { color: #c1d0dc; } .error { color: #ff9a9a; }
+.manual-fields { display: flex; flex-wrap: wrap; gap: .8rem; }
+.manual-fields label { display: grid; gap: .2rem; }
+.manual-fields input { width: 7rem; }

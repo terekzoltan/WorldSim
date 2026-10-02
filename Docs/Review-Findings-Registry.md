@@ -801,3 +801,21 @@ requires a separately scoped source/case/time budget, not automatic test promoti
 - Impact: Future agents could assume paid confirmation, rehearsal proof, completion caps, or concurrency locks already existed and start paid or review work on a false safety premise.
 - Resolution / guidance: Planning docs must distinguish currently enforced behavior from planned downstream enforcement, especially around paid/live/secret/cost guardrails.
 - Status: fixed
+
+## 2026-10-02 - SMR-LAB-B - Major - Retained terminal and publication recovery integrity
+
+- IDs: LABB-R1, LABB-R2, LABB-R2-RECOVERY.
+- Track: Track A / Lab manual-run host.
+- Source: final GREEN `op-0f55e906-cb86-4c07-aaa9-52f100299a36`; ACK_ONLY `op-c3f82dad-e0c1-4a63-b90b-5d4ecf0e9d2c`; cumulative candidate `op-1ab52caa` over `op-d37d54c5`.
+- Finding: Inconsistent terminal journals, terminal-before-publication races and unvalidated published recovery could admit new work or associate wrong evidence; malformed typed manifest reads could escape reconciliation.
+- Resolution / guidance: Validate terminal consistency; gate durable pending publication; reuse semantic inspection before published links and map malformed typed reads to unreadable evidence. Keep indexed-fixture negatives, matching legacy and no-replay controls.
+- Status: fixed; local closeout only. Release 57/57 and Node 3/3; no new real run or remote CI proof.
+
+## 2026-10-02 - SMR-LAB-B - Minor - LABB-LAYOUT1 narrow-viewport overflow
+
+- Track: Track A, under separate approval after B's desktop gate.
+- Source: Owner-accepted Codex In-app Browser `OBSERVATION.md`, documented in `WorldSim.SmrLab/Docs/LOCAL-QA-B.md`; final GREEN `op-0f55e906`.
+- Finding: At viewport 390x844, document scrollWidth was 493; the overflowing node is unknown. This was not a mobile/responsive PASS.
+- Impact: Narrow-layout readability cannot be claimed from the bounded desktop/chart evidence.
+- Resolution / guidance: Deferred to **SMR-LAB-UI-NARROW-LAYOUT-01**; identify the responsible node, resolve overflow and verify narrow width/content before any mobile-quality claim. The active gate is in Combined's SMR Lab section and the B QA document; no implementation is authorized by this entry.
+- Status: open / deferred minor; not a B desktop closeout blocker. LABB-QA1 remains a distinct Owner-accepted absence of actual browser lifecycle observation, not an observation or technical waiver.

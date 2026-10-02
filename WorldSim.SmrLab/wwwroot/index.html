@@ -3,13 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>WorldSim SMR Lab A</title>
+  <title>WorldSim SMR Lab</title>
   <link rel="stylesheet" href="/lab.css">
   <script src="/lab.js" defer></script>
+  <script src="/manual.js" defer></script>
 </head>
 <body>
-  <header><h1>SMR Lab — artifact browser</h1><p>Read-only exploration. Measured results are not Meta acceptance. UNKNOWN is not zero or PASS.</p></header>
+  <header><h1>SMR Lab — artifact browser</h1><p>Artifacts are exploratory evidence. Manual runs require one deliberate Start. Measured results are not Meta acceptance; UNKNOWN is not zero or PASS.</p></header>
   <main>
+    <section id="manual-section" hidden>
+      <h2>Manual bounded core run</h2>
+      <p>One seed × one planner × one supported config. A new Start launches one process; refresh does not relaunch it.</p>
+      <div class="manual-fields">
+        <label>Preset <select id="manual-preset"><option value="lab_small">lab_small (32×20, 12 people)</option><option value="lab_default">lab_default (64×40, 24 people)</option></select></label>
+        <label>Seed <input id="manual-seed" type="number" min="1" max="1000000" value="101"></label>
+        <label>Planner <select id="manual-planner"><option value="Simple">Simple</option><option value="Goap">Goap</option><option value="Htn">Htn</option></select></label>
+        <label>Ticks <input id="manual-ticks" type="number" min="10" max="120" value="40"></label>
+        <label>Mode <select id="manual-mode"><option value="standard">standard</option><option value="assert">assert</option></select></label>
+      </div>
+      <p id="manual-preview"></p><p id="manual-blocker" class="warning"></p>
+      <button id="manual-start" type="button">Start one core run</button>
+      <button id="manual-new" type="button" hidden>Prepare another intent</button>
+      <div id="manual-status" role="status" aria-live="polite"></div>
+    </section>
     <section><h2>Configured roots and bundles</h2><p id="roots"></p><div id="bundles"></div></section>
     <section><h2>Runs</h2><label>Sort by <select id="sort"><option value="failures">Assertion failures</option><option value="people">People</option><option value="food">Food</option><option value="deathsPredator">Predator deaths</option></select></label><div id="runs"></div></section>
     <section><h2>Selected run</h2><div id="detail">Select a run above.</div><label>Chart series <select id="metric"><option value="people">People</option><option value="food">Food</option><option value="herbivores">Herbivores</option><option value="predators">Predators</option><option value="activeFoodNodes">Active food nodes</option></select></label><div id="chart"></div><div id="events"></div></section>
