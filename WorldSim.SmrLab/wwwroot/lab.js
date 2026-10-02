@@ -131,3 +131,10 @@ $("compare").addEventListener("click", async () => {
   } catch (error) { if (revision === selectionRevision) showError(error); }
 });
 load().catch(showError);
+if (typeof window !== "undefined") window.addEventListener("lab:published", async event => {
+  try {
+    await load();
+    const found = bundles.find(bundle => bundle.id === event.detail);
+    if (found) { active = found; renderRuns(); $("bundles").scrollIntoView({ behavior: "smooth" }); }
+  } catch (error) { showError(error); }
+});

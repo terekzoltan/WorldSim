@@ -8,6 +8,43 @@ action. No lifecycle step is sent, repeated or accepted by this adoption.
 Old manifests/admission statements are historical provenance, not V2 send gates.
 Current Owner stops and domain restrictions remain in force.
 
+## SMR-LAB-B human local closeout (2026-10-02)
+
+This section is human closeout authority, not generated observed progress.
+Owner revision `a49c44f6c86382b81edc0910f73150cfb911fbd177ab06a5c912deab4e5e714f`
+authorizes this local commit only. Track A / TRACK / `worldsim.track-a` candidate
+is the cumulative `op-1ab52caa-3e8c-4b94-b663-5506e324d062` snapshot: its three
+delta hashes plus the ten unchanged hashes from `op-d37d54c5-d79d-4dd8-bc90-7bbc978ad38b`.
+Meta GREEN `op-0f55e906-cb86-4c07-aaa9-52f100299a36` and Track A ACK_ONLY
+`op-c3f82dad-e0c1-4a63-b90b-5d4ecf0e9d2c` establish acceptance; R1, R2 and
+R2-RECOVERY are fixed. This commit closes B locally on `feature/smr-lab-b-20260927`.
+Next actor/action for this local lifecycle: NONE; stop before push/PR/merge.
+
+Evidence: `WorldSim.SmrLab/Docs/LOCAL-QA-B.md`, `MANUAL-RUNS.md` and the retained
+synthesis/ACK. CLI parity remains MATCH, three combat-disabled assertions SKIP,
+binary-to-source provenance UNKNOWN. LABB-QA1 is the Owner-accepted absence of
+actual desktop-browser lifecycle observation, not an observed pass. Codex In-app
+Browser chart/table/timeline proof retains its separately documented limitations.
+LABB-LAYOUT1 remains deferred to `SMR-LAB-UI-NARROW-LAYOUT-01` (Track A, separate
+approval); Combined and the findings registry enforce closure before a mobile claim.
+
+Final local verification: 13/13 reviewed file hashes match; build-enabled Release
+Lab tests 57/57, Release Lab build 0 warnings/errors, Node 3/3 and JS syntax PASS.
+An initial Release attempt passed
+56/57 with a directory-move access-denied error in synthetic fixture setup; the
+unchanged bounded rerun passed 57/57. No host interruption or real run occurred.
+Remote CI is unverified; Meta/CI owner revisits Lab test inclusion at separately
+authorized integration/CI follow-up, as recorded in the B QA document.
+
+Primary governance comparison (read-only): `C:/EGYETEM/FUNSTUFF/WorldSim` retains
+E11-H local measurement commit `7c18467176c8fcc428489e3c4d1c59e0685458f4`, unrelated
+dirty edits and its enrolled generated observed-progress block. None is changed
+or imported here. The E11-H/A/default-branch text below is dated branch history,
+not a current dispatch route. Cross-root reconciliation debt: separately authorized
+primary Meta governance must record this B closeout/finding gate alongside its
+newer E11-H facts and preserve the observed block. Git delivery/integration and
+remote checks remain outside this local closeout. No Lab C planning is included.
+
 ## Recorded default-branch baseline
 
 Approved independent planning: [SMR Lab v0.1](../Docs/Plans/Master/SMR-Lab-v01-Plan.md),
