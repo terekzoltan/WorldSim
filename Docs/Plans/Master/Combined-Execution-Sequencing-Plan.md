@@ -4,6 +4,42 @@ Status: Active
 Owner: Meta Coordinator
 Last updated: 2026-09-21 (CI companion preserved; prospective parallel Lab adoption)
 
+<!-- C1-DEV006-LOCAL-CLOSEOUT-20261114:BEGIN -->
+## C1 dev006 reference-package local closeout / separate proposal-only scope (2026-11-14)
+
+New work `worldsim-c1-dev006-local-closeout-proposal-20261114`; Owner2026-11-14
+approves prospective LOCAL_COMMIT on existing `feature/fal-router-adoption` from
+`7c18467176c8fcc428489e3c4d1c59e0685458f4`, no branch switch/publication.
+Existing Meta/worldsim.meta owns closeout; B/TRACK/worldsim.track-b retains technical
+evidence ownership. Original work/grants/operations remain unchanged and completed.
+Candidate `c1-integrated002-dev-path-20261112-v1` / `20261112-dev006` / attempt008:
+inherited GREEN/ALLOWED + ACK_ONLY,8 CLOSED_FIXED/OPEN_NONE,45/45; no new acceptance.
+
+[Mechanical closeout record](SMR-Lab-C1-Integrated002-Dev006-Local-Closeout-Record-20261114.md)
+enumerates the exact8-path package, source/evidence pins, exclusions and verification.
+Only five unchanged plan/assessment docs, that record and these two NEW governance
+sections are committed. State/Combined staged images equal baseline HEAD plus ONLY
+the new sections; all other dirty hunks/observed projection stay outside the commit.
+Disposition CLOSED_REFERENCE_PACKAGE applies only on verified containing local commit;
+actual commit/tree are returned after commit, not embedded in this record.
+
+| Boundary | Terminal fact / separate next permission |
+|---|---|
+| Accepted technical developer path | Unchanged truthful175-parent/176-derivative; build/45/15subassertions/3families reused, no SDK/test/review/lifecycle replay |
+| Reference-package local closeout | NONE remaining after verified local commit; W/E implementation/binaries/raw evidence stay external; checkout is not standalone runnable |
+| Separate future proposal | PROPOSAL_ONLY via later orchestrator route to existing Meta, aligned to principal Combined C1 goal; no drafting in this transaction, execution/readiness approval or automatic successor; then Owner STOP |
+
+Meta owns CI deferral: no remote check/dispatch/PASS; revisit only with separately
+authorized publication/integration or later functional work. No push/PR/merge.
+Not full C1/Reader/trust/audit/I-R/ecology product acceptance: NOT_ADMITTED,
+TRUST_AUDIT_UNQUALIFIED, audit NOT_PERFORMED, first-I-R NO_GO, nativefalse/NOT PASSED;
+vector/clock limits, all UI/ecology/DEF1/Memory007/C2/I-J/launcher/F-S holds unchanged.
+Old B02/dev005/dev006/grants/evidence/config/seals and worktree complements preserved.
+Live FAL generated view is neither staged nor restored/refreshed manually; preserve
+October28 history separately and projection debt `DEFERRED / STATE_WRITER_UNAVAILABLE`.
+Shared Meta/governance/scratch SERIAL. No inline FAL checkpoint/maintenance or proposal.
+<!-- C1-DEV006-LOCAL-CLOSEOUT-20261114:END -->
+
 ## Wave 11 Current Frontier
 
 ### CI companion — forward planning, not dispatch authority
